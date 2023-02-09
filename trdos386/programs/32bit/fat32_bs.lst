@@ -1,0 +1,701 @@
+     1                                  ; ****************************************************************************
+     2                                  ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.0 - fat32_bs.s - FAT32 BOOT SECTOR
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; Last Update: 16/12/2017
+     5                                  ; ----------------------------------------------------------------------------
+     6                                  ; Beginning: 13/12/2017
+     7                                  ; ----------------------------------------------------------------------------
+     8                                  ; Assembler: NASM version 2.11  
+     9                                  ; ----------------------------------------------------------------------------
+    10                                  ;	    ((nasm fats32_bs.s - l fat32_bs.lst -o FAT32_BS.BIN)) 	
+    11                                  ; ----------------------------------------------------------------------------
+    12                                  ; Turkish Rational DOS
+    13                                  ; Operating System Project v2.0 by ERDOGAN TAN (Beginning: 04/01/2016)
+    14                                  ;
+    15                                  ; This boot sector code occupies 2 sectors.. as below:
+    16                                  ; * Boot Sector 1:
+    17                                  ; The 1st 512 bytes of this boot code will be on sector 0 (of the partition).
+    18                                  ; * Boot Sector 2:
+    19                                  ; Remain bytes of this boot code will be sector 2 (just after FSINFO sector)
+    20                                  ; of the (FAT32) partition.	
+    21                                  ;
+    22                                  ; NOTE:	This code has some tricks and TRDOS 386 specific modifications
+    23                                  ; which are not a part of original Microsoft Windows (XP) FAT32 BS code.
+    24                                  ; (Purpose of TRDOS 386 specific modifications and tricks is
+    25                                  ; to load 'TRDOS386.SYS' kernel file as easy and as correct,
+    26                                  ; without affecting FAT32 FS recognization for other operating systems.) 
+    27                                  ;
+    28                                  ; Note: Modifications (on WINDOWS 98 FAT32 boot sector code)
+    29                                  ;	are based on WINDOWS XP FAT32 boot sector(s) code (2 sectors), 
+    30                                  ;	which is disassembled by Erdogan Tan (12/12/2017)
+    31                                  ;	by using BINFILEHEX (Erdogan Tan) & IDA PRO FREE (Hex-Rays SA)
+    32                                  ;	programs.
+    33                                  ;
+    34                                  ; Derived from Microsoft WINDOWS 98 FAT 32 boot sector code
+    35                                  ; 	  which is edited/disassembled by Erdogan Tan (04/10/2003).
+    36                                  ;
+    37                                  ; Derived from 'trfdbs.s' TRDOS 386 FAT12 (3.5") floppy disk boot sector
+    38                                  ; source code by Erdogan Tan (06/07/2017).
+    39                                  ; ****************************************************************************
+    40                                  ; incbin "FAT32_BS.BIN" (in 'hdimage.s' & 'hdformat.s')
+    41                                  
+    42                                  rts_segment     equ	1000h
+    43                                  
+    44                                  [BITS 16]
+    45                                  [ORG 7C00h]
+    46                                  BS_jmpBoot:
+    47 00000000 EB58                                    jmp     short loc_5A  ; jmp short start
+    48                                  BS_jmpBoot_nop:
+    49 00000002 90                                      nop
+    50                                  
+    51                                  ; BootSector Identification (Data) Block
+    52                                  BS_OEMName:
+    53 00000003 4D5357494E342E31        		db	'MSWIN4.1'	; bp+3
+    54 0000000B 0002                    BPB_BytesPerSec: dw	512		; bp+11
+    55 0000000D 08                      BPB_SecPerClus:	db	8		; bp+13
+    56 0000000E 2000                    BPB_RsvdSecCnt:	dw	32		; bp+14
+    57 00000010 02                      BPB_NumFATs:	db	2		; bp+16
+    58 00000011 0000                    BPB_RootEntCnt: dw	0		; bp+17
+    59 00000013 0000                    BPB_TotSec16:	dw	0		; bp+19
+    60 00000015 F8                      BPB_Media:	db	0F8h		; bp+21
+    61 00000016 0000                    BPB_FATSz16:	dw	0		; bp+22
+    62 00000018 3F00                    BPB_SecPerTrk:	dw	63		; bp+24
+    63 0000001A FF00                    BPB_NumHeads:	dw	255		; bp+26
+    64 0000001C 01000000                BPB_HiddSec:	dd	1		; bp+28
+    65 00000020 00000000                BPB_TotSec32:	dd	0		; bp+32
+    66 00000024 00000000                BPB_FATSz32:	dd	0		; bp+36
+    67 00000028 0000                    BPB_ExtFlags:	dw	0		; bp+40
+    68 0000002A 0000                    BPB_FSVer:	dw	0		; bp+42
+    69 0000002C 02000000                BPB_RootClus:	dd	2		; bp+44
+    70 00000030 0100                    BPB_FSInfo:	dw	1		; bp+48
+    71 00000032 0600                    BPB_BkBootSec:	dw	6		; bp+50
+    72 00000034 00<rept>                BPB_Reserved:	times	12 db 0		; bp+52
+    73 00000040 80                      BS_DrvNum:	db	80h		; bp+64
+    74 00000041 00                      BS_Reserved1:	db	0		; bp+65
+    75 00000042 29                      BS_BootSig:	db	29h		; bp+66
+    76 00000043 00000000                BS_VolID:	dd	0		; bp+67
+    77 00000047 5452444F5333383620-     BS_VolLab:	db	'TRDOS386   '	; bp+71
+    77 00000050 2020               
+    78 00000052 4641543332202020        BS_FilSysType:	db	'FAT32   '	; bp+82
+    79                                  
+    80                                  start:
+    81                                  loc_5A:
+    82 0000005A 09C0                    		OR	AX, AX ; db 09h, C0h  (db 0Bh, C0h)
+    83                                  			 ; TRDOS 386 (FAT32 BS) LBA check trick!!
+    84                                  
+    85                                  		; ((WINDOWS XP FAT 32 boot sector code checks Masterboot
+    86                                  		; partition table for partition type, if it is 0Ch 
+    87                                  		; -FAT32 LBA-, the boot code changes 90h at BS offset 2
+    88                                  		; to 0Eh. Then a 0Eh at this addr is used as identifier, 
+    89                                  		; for reading disk sector by using INT 13h -LBA read- 
+    90                                  		; extension.))  
+    91                                  
+    92 0000005C 3DA101                  		cmp	ax, 417  ; If AX=417, the masterboot sector
+    93                                  				 ; has a SINGLIX FS (& TRDOS 386)
+    94                                  				 ; masterboot code; and...  
+    95                                  				 ; DX=ES=SS=0, BP=7C00h
+    96                                  				 ; SP=7C00h ... masterboot sector has
+    97                                  				 ; been loaded at 0:600h, it has
+    98                                  				 ; CHS parameters at offset 600h+420.
+    99                                  				 ; (There is a 01A1h in offset 600h+417)
+   100                                  	
+   101 0000005F 740F                    		je	short bs_01 ; no need to following assignments !
+   102                                  
+   103 00000061 31C0                    		xor	ax, ax
+   104 00000063 8ED8                    		mov	ds, ax
+   105 00000065 8EC0                    		mov	es, ax
+   106 00000067 BD007C                  		mov	bp, 7C00h
+   107 0000006A FA                      		cli
+   108 0000006B 8ED0                    		mov	ss, ax
+   109 0000006D 89EC                    		mov	sp, bp
+   110 0000006F FB                      		sti		
+   111                                  bs_01:
+   112                                  		; Check Bytes/Sector value
+   113                                  		; It must be 512 !? (at least, for TRDOS386) 
+   114 00000070 817E0B0002              		cmp	word [bp+0Bh], 512 ; [BPB_BytesPerSec]
+   115 00000075 757A                    		jne	short invalid_system_disk
+   116                                  
+   117                                  		; Following validation checks (*!*)
+   118                                  		; are done according to 
+   119                                  		; 	Microsoft Extensible Firmware Initiative
+   120                                  		;	FAT32 File System Specification, 
+   121                                  		;				Version 1.03 (2000).
+   122                                  		
+   123                                                  ; [BPB_FATSz16] must be 0 (!*!) ; [bp+16h]
+   124 00000077 6631C0                  		xor	eax, eax ; 0
+   125                                                  ;cmp	[BPB_FATSz16], ax ; 0	; sectors/fat for FAT16
+   126 0000007A 394616                                  cmp	[bp+16h], ax
+   127 0000007D 7572                    		jnz	short invalid_system_disk
+   128                                  
+   129                                  		; [BPB_FSVer] must be 0 for current FAT32 version (!*!)
+   130                                  		;cmp	[BPB_FSVer], ax   ; 0 	; [bp+2Ah], FAT32 version
+   131 0000007F 39462A                  		cmp	[bp+2Ah], ax
+   132 00000082 756D                    		jnz	short invalid_system_disk
+   133                                  
+   134                                  		; overwrite hd drive number !
+   135                                                  ;mov	[BS_DrvNum], dl		; drive number from INT 19h
+   136 00000084 885640                  		mov	[bp+40h], dl	
+   137                                  
+   138                                  		; reset FAT32 FS reading pointers and set SP to 7BF4h
+   139                                  		;xor	ecx, ecx ; *
+   140 00000087 6629C9                  		sub	ecx, ecx ; *
+   141 0000008A 6651                    		push	ecx 	; [bp-4] = 0   ; CHS limit (8.4GB)
+   142 0000008C 6651                    		push	ecx	; [bp-8] = 0   ; Address of Cluster 2
+   143 0000008E 6649                    		dec	ecx 	; 0FFFFFFFFh
+   144                                  		;mov	[loc_5A+1], cl ; 0FFh
+   145 00000090 884E5B                  		mov	[bp+5Bh], cl
+   146 00000093 6651                    		push	ecx	; [bp-12] = -1	; FAT sector in FAT buffer
+   147 00000095 6641                    		inc	ecx	; 0
+   148                                  
+   149                                  		; SP = 7BF4h
+   150                                  
+   151                                  		; check for ROMBIOS INT 13h extensions
+   152 00000097 B441                    		mov	ah, 41h
+   153                                  		;mov	bx, 55AAh
+   154 00000099 66BBAA550000            		mov	ebx, 55AAh  
+   155                                  		;mov	dl, [BS_DrvNum]
+   156                                  		;mov	dl, [bp+40h]
+   157 0000009F CD13                    		int	13h
+   158 000000A1 720F                    		jc	short bs_02
+   159 000000A3 81FB55AA                		cmp	bx, 0AA55h
+   160 000000A7 7509                    		jne	short bs_02
+   161 000000A9 F6C101                  		test	cl, 1
+   162 000000AC 7404                    		jz	short bs_02
+   163                                  
+   164                                  		; ROMBIOS INT 13h extentions are present...
+   165                                  
+   166                                  		;mov	byte [loc_5A], 0Ch ; 'LBA mode is available'
+   167 000000AE C6465A0C                		mov	byte [bp+5Ah], 0Ch
+   168                                  bs_02:
+   169                                  		; ..CHS limit setup..
+   170                                  
+   171                                  		; Get drive parameters (CHS parameters)
+   172                                  		;mov	dl, [BS_DrvNum]
+   173                                  		;mov	dl, [bp+40h]
+   174 000000B2 B408                    		mov	ah, 08h
+   175 000000B4 CD13                    		int	13h
+   176 000000B6 7245                    		jc	short disk_io_error
+   177                                  
+   178                                  		; CX = maximum value for cylinder and sector
+   179                                  		; DH = maximum value for head
+   180                                  		; DL = number of harddisks on first controller 			
+   181                                  		; ES:DI = address of hard disk parameters table
+   182                                  		; (Bits 6&7 of CL is high 2 bits of 10 bit clinder value
+   183                                  		; which is low 8 bits are in CH.)
+   184                                  
+   185 000000B8 1E                      		push	ds
+   186 000000B9 07                      		pop	es
+   187                                  
+   188                                  		; convert CHS values to CHS limit (as LBA)
+   189 000000BA 660FB6C6                		movzx	eax, dh
+   190 000000BE 40                      		inc	ax
+   191                                  		;movzx	edx, cl
+   192 000000BF 88CA                    		mov	dl, cl
+   193                                  		;and	dl, 3Fh
+   194 000000C1 83E23F                  		and	dx, 3Fh
+   195 000000C4 F7E2                    		mul	dx
+   196 000000C6 86CD                    		xchg	cl, ch
+   197 000000C8 C0ED06                  		shr	ch, 6
+   198 000000CB 41                      		inc	cx
+   199                                  		;movzx	ecx, cx ; *
+   200 000000CC 66F7E1                  		mul	ecx
+   201 000000CF 668946FC                		mov	[bp-4], eax ; dword [7BFCh] ; CHS limit
+   202                                  
+   203                                  		; Load the second half (remain bytes) of this boot code
+   204                                  		; at 7E00h.
+   205                                  
+   206                                  		; EDX = 0
+   207 000000D3 6689F0                  		mov	eax, esi
+   208 000000D6 6683C002                		add	eax, 2 ; Second half of boot code is in BS 2
+   209 000000DA 66BB007E0000            		mov	ebx, 7E00h
+   210 000000E0 B90100                  		mov	cx, 1
+   211 000000E3 E83400                  		call	disk_read
+   212 000000E6 7215                    		jc	short disk_io_error
+   213                                  
+   214                                  		; Boot sector 2 validation check 
+   215 000000E8 BEA101                  		mov	si, 417 
+   216 000000EB 3930                    		cmp	[bx+si], si ; [7E00h+417] = 417
+   217 000000ED 0F841101                		je	check_root_dir_entries
+   218                                  
+   219                                  invalid_system_disk:
+   220 000000F1 BE[9101]                		mov	si, Inv_disk_Msg
+   221 000000F4 E81400                  		call	print_msg
+   222                                  getchar_reboot:
+   223                                  		; Wait for a keystroke just before reboot
+   224 000000F7 30E4                    		xor	ah, ah
+   225 000000F9 CD16                    		int	16h
+   226                                  		
+   227 000000FB CD19                    		int	19h	; disk boot	
+   228                                  				; causes reboot of disk system
+   229                                  disk_io_error:
+   230 000000FD BE[8001]                		mov	si, Diskio_err_Msg
+   231 00000100 E80800                  		call	print_msg
+   232                                  ;replace_disk:		
+   233                                  ;		mov	si, Replace_Msg	
+   234                                  replace_disk:	
+   235 00000103 BE[A601]                		mov	si, Disk_err_replace_Msg
+   236 00000106 E80200                  		call	print_msg
+   237 00000109 EBEC                    		jmp	getchar_reboot
+   238                                  
+   239                                  print_msg:
+   240                                  		; DS:SI = Error message address (ASCIIZ string)	
+   241 0000010B B40E                    		mov	ah, 0Eh
+   242 0000010D BB0700                  		mov	bx, 7
+   243                                  bs_03:
+   244 00000110 AC                      		lodsb
+   245 00000111 84C0                    		test	al, al
+   246 00000113 7404                    		jz	short bs_04
+   247 00000115 CD10                    		int	10h		; - VIDEO - WRITE CHARACTER AND	ADVANCE	CURSOR (TTY WRITE)
+   248                                  					; AL = character, BH = display page (alpha modes)
+   249                                  					; BL = foreground color	(graphics modes)
+   250 00000117 EBF7                    		jmp	short bs_03
+   251                                  bs_04:
+   252 00000119 C3                      		retn
+   253                                  
+   254                                  disk_read:
+   255                                  		;mov	byte [bp+retry_count-7C00h], 4
+   256 0000011A B204                    		mov	dl, 4 ; retry count
+   257                                  disk_read_0:
+   258 0000011C 6660                    		pushad
+   259                                  
+   260                                  		; Jump to lba_read if sector addr overs CHS limit
+   261 0000011E 663B46FC                		cmp	eax, [bp-4] ; CHS limit ([7BFCh])
+   262 00000122 7220                    		jb	short chs_read
+   263                                  		; Disk I/O error if Int 13h LBA read func is not usable
+   264                                  		; byte [loc_5A+1] = LBA read mode availability sign 
+   265                                  		;cmp	byte [loc_5A], 0Ch ; FAT32 LBA availability
+   266 00000124 807E5A0C                		cmp	byte [bp+5Ah], 0Ch
+   267 00000128 7502                    		jne	short lba_read ; LBA mode is usable/available
+   268 0000012A F9                      		stc ; cf = 1
+   269 0000012B C3                      		retn
+   270                                  lba_read:
+   271                                  		;pushad
+   272                                  
+   273                                  		;mov	di, sp
+   274                                  		
+   275 0000012C 666A00                  		push	dword 0
+   276 0000012F 6650                    		push	eax
+   277 00000131 06                      		push	es
+   278 00000132 53                      		push	bx
+   279 00000133 6A01                    		push 	byte 1
+   280 00000135 6A10                    		push	byte 16 ; 10h
+   281 00000137 B442                    		mov	ah, 42h
+   282                                  		;mov	dl, [BS_DrvNum]
+   283 00000139 8A5640                  		mov	dl, [bp+40h]
+   284 0000013C 89E6                    		mov	si, sp
+   285 0000013E CD13                    		int	13h
+   286                                  
+   287                                  		;pop	eax
+   288                                  		;pop	eax
+   289                                  		;pop	eax
+   290                                  		;pop	eax
+   291                                  		;mov	sp, di
+   292                                  		
+   293 00000140 61                      		popa
+   294 00000141 61                      		popa
+   295 00000142 EB2A                    		jmp	short disk_read_1
+   296                                  chs_read:	
+   297                                  		;pushad
+   298                                  
+   299                                  		; Convert LBA to CHS
+   300 00000144 6631D2                  		xor	edx, edx
+   301                                  		;movzx	ecx, word [BPB_SecPerTrk] ; [bp+18h]
+   302                                  				; sectors per track (17 or 63)
+   303 00000147 660FB74E18              		movzx	ecx, word [bp+18h]
+   304 0000014C 66F7F1                  		div	ecx
+   305 0000014F FEC2                    		inc	dl	; sector number (1 based)
+   306 00000151 88D1                    		mov	cl, dl
+   307 00000153 6689C2                  		mov	edx, eax ; (heads * cylinder) + head number
+   308 00000156 66C1EA10                		shr	edx, 16	 ; high word in DX, low word in AX	
+   309                                  		;div	word [BPB_NumHeads] ; [bp+1Ah]
+   310                                  				 ; number of heads (2 to 255)
+   311 0000015A F7761A                  		div	word [bp+1Ah]
+   312                                  		; AX = cylinder (0 to 1023)
+   313                                  		; DX = head number (in DL)
+   314 0000015D 88D6                    		mov	dh, dl	 ; head number in DH
+   315                                  		;mov	dl, [BS_DrvNum] ; [bp+40h] ; Drive number (80h)
+   316 0000015F 8A5640                  		mov	dl, [bp+40h]
+   317 00000162 88C5                    		mov	ch, al ; Low 8 bits of cylinder number (0 to 7)
+   318 00000164 C0E406                  		shl	ah, 6  ; High 2 bits of cylinder is in bit 7&8	
+   319 00000167 08E1                    		or	cl, ah ; High two bits of CL is cylinder bits 8&9 
+   320 00000169 B80102                  		mov	ax, 201h ; Read 1 sector
+   321 0000016C CD13                    		int	13h
+   322                                  disk_read_1:
+   323 0000016E 6661                    		popad
+   324 00000170 7305                    		jnc	short disk_read_2
+   325                                  		; cf = 1
+   326                                  		;dec	byte [retry_count]
+   327                                  		;dec	byte [bp+retry_count-7C00h]
+   328 00000172 FECA                    		dec	dl ; Retry count
+   329 00000174 75A6                    		jnz	short disk_read_0 ; Retry
+   330                                  		; cf = 1		
+   331 00000176 C3                      		retn
+   332                                  disk_read_2:
+   333                                  		;add	bx, [bp+0Bh] ; [BPB_BytesPerSec] ; 512
+   334                                  		;add	bx, 512
+   335 00000177 80C702                  		add	bh, 2
+   336 0000017A 6640                    		inc	eax
+   337 0000017C 49                      		dec	cx
+   338 0000017D 759B                    		jnz	short disk_read
+   339                                  disk_read_retn:
+   340 0000017F C3                      		retn
+   341                                  
+   342                                  Diskio_err_Msg:
+   343 00000180 0D0A                                    db      0Dh, 0Ah
+   344 00000182 4469736B20492F4F20-     		db	'Disk I/O error'
+   344 0000018B 6572726F72         
+   345                                  		;db	'!'
+   346 00000190 00                      		db 	0
+   347                                  Inv_disk_Msg:   
+   348 00000191 0D0A                    		db      0Dh, 0Ah
+   349 00000193 496E76616C69642073-     		db	'Invalid system disk'
+   349 0000019C 797374656D20646973-
+   349 000001A5 6B                 
+   350                                  Disk_err_replace_Msg:
+   351 000001A6 21                      		db	'!'
+   352                                  Replace_Msg:    
+   353 000001A7 0D0A                    		db      0Dh, 0Ah
+   354 000001A9 5265706C6163652074-                     db      'Replace the disk and press any key to reboot.'
+   354 000001B2 6865206469736B2061-
+   354 000001BB 6E6420707265737320-
+   354 000001C4 616E79206B65792074-
+   354 000001CD 6F207265626F6F742E 
+   355 000001D6 0D0A00                                  db      0Dh, 0Ah,0
+   356                                  
+   357 000001D9 76312E30                		db	'v1.0'
+   358 000001DD 00                      		db 	0
+   359                                  
+   360 000001DE 31362F31322F323031-     		db	'16/12/2017'
+   360 000001E7 37                 
+   361 000001E8 00                      		db	0
+   362                                  
+   363 000001E9 00<rept>                		times	(508+rtsfilename-bsReserved1) - ($ - $$) db 0
+   364                                  
+   365                                  rtsfilename:
+   366 000001F0 5452444F5333383653-                     db      'TRDOS386SYS'
+   366 000001F9 5953               
+   367 000001FB 00                                      db      0
+   368                                  bsReserved1:
+   369 000001FC 5452                    next_segment:	db	'TR'  ; 'Turkish Rational DOS' feature identifier.
+   370                                  			      ; (Also 'next segment' pointer which
+   371                                  			      ;  will be used by kernel loading
+   372                                  			      ;  subroutine. Initial value will be 
+   373                                  			      ;  set to 'rts_segment', it is 1000h
+   374                                  			      ;	 for current TRDOS 386 kernel.)
+   375                                   	 		      ;  <<14-12-2017, TRDOS 386 v2.0.0>>
+   376                                  
+   377                                  bootsignature1:
+   378 000001FE 55AA                    		db	55h, 0AAh
+   379                                  
+   380                                  bsReserved2:
+   381 00000200 5254                    		db	'RT'  ; 'Turkish Rational DOS' feature identifier
+   382                                  
+   383                                  check_root_dir_entries: 
+   384                                  		; load root directory and check directory entries 
+   385                                  		; EAX = 0
+   386                                  				
+   387                                  		; calculate total size of FAT area
+   388                                  		;movzx	eax, byte [BPB_NumFATs]
+   389                                                  ;mov	al, [BPB_NumFATs] ; [bp+10h] ; number of FATs
+   390 00000202 8A4610                                  mov	al, [bp+10h]
+   391                                  		;mov	ecx, [BPB_FATSz32] ; [bp+24h] ; sectors per FAT
+   392 00000205 668B4E24                                mov	ecx, [bp+24h]
+   393 00000209 66F7E1                  		mul     ecx
+   394                                                               
+   395                                  		; add hidden sectors
+   396                                  		;add	eax, [BPB_HiddSec] ; [bp+1Ch]
+   397 0000020C 6603461C                		add	eax, [bp+1Ch]
+   398                                  
+   399                                  		; add reserved sectors
+   400                                                  ;movzx	edx, [BPB_RsvdSecCnt] ; [bp+0Eh]
+   401                                                  ;mov	dx, [BPB_RsvdSecCnt]
+   402 00000210 8B560E                  		mov	dx, [bp+0Eh]
+   403 00000213 6601D0                  		add	eax, edx
+   404                                  
+   405                                  		; Save address of cluster 2 into 7BF8h 
+   406 00000216 668946F8                		mov     [bp-8], eax	; EAX = Data Area (Cluster 2)
+   407                                                                          ; (Data) Start Addres in 7BF8h
+   408                                  
+   409                                  		; Reset FAT sector address pointer (7BF4h) 
+   410                                  		; 	which points to FAT sectors in the FAT buffer
+   411                                  		;	(8000h) 
+   412                                  		;	
+   413                                  		;mov	dword [bp-12], 0FFFFFFFFh ; invalid address 
+   414                                  						 ; (for now)
+   415                                  
+   416                                  		; Check Root Directory Start Cluster is valid or not.
+   417                                  		;mov	eax, [BPB_RootClus] ; [bp+2Ch]
+   418 0000021A 668B462C                		mov	eax, [bp+2Ch]
+   419                                  
+   420                                  load_root_dir_sector:
+   421                                  		; EAX = Cluster Number
+   422                                  
+   423                                  		; Cluster number must not be less than 2
+   424 0000021E 6683F802                		cmp	eax, 2			  ; Is it Cluster 2?
+   425 00000222 0F82CBFE                		jb	invalid_system_disk ; error if less than 2
+   426                                  
+   427                                                 	; Is it End Of Cluster Chain marker or something above?
+   428 00000226 663DF8FFFF0F                            cmp	eax, 0FFFFFF8h  ; clust 2 to 0FFFFFF7h is valid
+   429 0000022C 0F83C1FE                                jnb	invalid_system_disk ; invalid cluster num
+   430                                  					      ; or end of cluster chain			
+   431 00000230 6650                    		push	eax
+   432 00000232 6683E802                		sub	eax, 2	; 0 based cluster number
+   433                                  		;movzx	ebx, byte [BPB_SecPerClus] ; [bp+0Dh]
+   434 00000236 660FB65E0D              		movzx	ebx, byte [bp+0Dh]
+   435 0000023B 89DE                    		mov	si, bx	; save sector per cluster in SI
+   436 0000023D 66F7E3                  		mul	ebx
+   437                                  		; EAX = relative sector of the 1st part of root dir 
+   438 00000240 660346F8                		add	eax, [bp-8] ; add 'start address of data area'
+   439                                  				    ; (in 7BF8h) to relative address
+   440                                  bs_05:
+   441 00000244 BB0082                  		mov	bx, 8200h  ; Root directory buffer (1 sector)		
+   442 00000247 89DF                    		mov	di, bx
+   443 00000249 B90100                  		mov	cx, 1
+   444 0000024C E8CBFE                  		call	disk_read
+   445 0000024F 0F82AAFE                		jc	disk_io_error
+   446                                  
+   447                                  		; BX = 8400h
+   448                                  
+   449                                  search_startup_file: 
+   450                                  		; check/compare root dir entry for/with kernel file
+   451 00000253 382D                    		cmp	[di], ch ; 0
+   452 00000255 0F8498FE                		je	invalid_system_disk ; kernel not found!
+   453 00000259 B10B                    		mov	cl, 11 ; 0Bh
+   454                                  		; SI = count down value from 'sectors per cluster'
+   455 0000025B 56                      		push	si ; SPC to 1
+   456 0000025C BE[F001]                		mov	si, rtsfilename ; Run Time System file name
+   457                                  					; or Kernel file name
+   458                                  					; (or Startup file name)
+   459                                  					; (or Standalone file name)
+   460                                  					; in MSDOS directory entry
+   461                                  					; format. ('TRDOS386SYS')
+   462                                  					; It is 'TRDOS386.SYS'
+   463                                  					; for TRDOS 386 OS.
+   464 0000025F F3A6                    		repe	cmpsb ; compare dir entry and kernel's name
+   465 00000261 5E                      		pop	si
+   466 00000262 7478                    		jz	load_startup_file ; kernel is there!
+   467 00000264 01CF                    		add	di, cx
+   468 00000266 83C715                  		add	di, 21 ; 15h (11+21=32)
+   469 00000269 39DF                    		cmp	di, bx ; 8400h
+   470 0000026B 72E6                    		jb	short search_startup_file ; chk next entry
+   471                                  		; Sector Per Cluster countdown
+   472 0000026D 4E                      		dec	si 
+   473 0000026E 75D4                    		jnz	short bs_05 ; next sector in same cluster
+   474 00000270 6658                    		pop	eax
+   475 00000272 E80600                  		call	get_next_cluster
+   476 00000275 0F8284FE                		jc	disk_io_error
+   477                                  		;; EAX = 32 bit cluster number (32 bit FAT entry)
+   478                                  		;and	eax, 0FFFFFFFh ; 28 bit cluster number
+   479 00000279 EBA3                    		jmp	short load_root_dir_sector
+   480                                  
+   481                                  get_next_cluster:	; get next (FAT32) directory/file cluster
+   482                                  		; EAX = current cluster number (28 bit, zero based)
+   483 0000027B 66C1E002                		shl	eax, 2 ; 32 bit FAT entry offset
+   484 0000027F E80D00                  		call	get_fat32_entry
+   485 00000282 720A                    		jc	short bs_06 ; Disk read error!
+   486 00000284 26668B01                		mov	eax, [es:bx+di]	; 32 bit clust entry number
+   487 00000288 6625FFFFFF0F            		and	eax, 0FFFFFFFh	; 28 bit cluster number
+   488                                  		;cmp	eax, 0FFFFFF8h
+   489                                  		;cmc
+   490                                  bs_06:
+   491 0000028E C3                      		retn
+   492                                  
+   493                                  get_fat32_entry:
+   494                                  		; EAX = 32 bit FAT entry (dword) offset
+   495 0000028F BF0080                  		mov	di, 8000h ; FAT (sector) buffer
+   496                                  		;movzx	ecx, word [BPB_BytesPerSec] ; [bp+11]
+   497                                  		;mov	cx, [BPB_BytesPerSec]
+   498                                  		;mov	cx, [bp+0Bh]
+   499 00000292 B90002                  		mov	cx, 512
+   500                                  		;xor	edx, edx
+   501 00000295 31D2                    		xor	dx, dx
+   502 00000297 66F7F1                  		div	ecx
+   503                                  		; EAX = FAT sector number (relative)
+   504                                  		; Check FAT sector number if it is already
+   505                                  		; in FAT buffer at 8000h.
+   506                                  		; Current FAT sector is in 7BF4h. 
+   507                                  		; (Note: initial FAT sector value in 7BF4h is
+   508                                  		;	 0FFFFFFFFh which means the buff 
+   509                                  		;	 is not loaded yet..)
+   510 0000029A 663B46F4                		cmp	eax, [bp-0Ch] ; [7BF4h]
+   511 0000029E 7434                    		je	short bs_08 ; same sector in FAT buffer
+   512 000002A0 668946F4                		mov	[bp-0Ch], eax ; save FAT sector number
+   513                                  		; Calculate physcial (LBA) address of FAT sector
+   514                                  		; by adding hidden (partition's start sector)
+   515                                  		; and reserved sectors (between BS and FAT).
+   516                                  		;add	eax, [BPB_HiddSec] ; [bp+1Ch]
+   517 000002A4 6603461C                		add	eax, [bp+1Ch]
+   518                                  		;movzx	ecx, word [BPB_RsvdSecCnt] ; [bp+0Eh]
+   519                                  		;mov	cx, [BPB_RsvdSecCnt] ; = 32 (typically)
+   520 000002A8 8B4E0E                  		mov	cx, [bp+0Eh]
+   521 000002AB 6601C8                  		add	eax, ecx ; LBA of the FAT sector
+   522                                  		; Check FAT mirroring flag..
+   523                                  		;	bits 0 to 3 are used for active FAT number 
+   524                                  		;	If bit 7 is 1, only one (active) FAT copy
+   525                                  		;	is updated (written without mirroring). 
+   526                                  		;  (Default active FAT is 0 and default option
+   527                                  		;   is to mirror the active FAT -at runtime- into
+   528                                  		;	all FAT copies -generally 2 FATs-. 	
+   529                                  		;movzx	ebx, word [BPB_ExtFlags] ; [bp+28h]
+   530                                  		;mov	bx, [BPB_ExtFlags]
+   531 000002AE 8B5E28                  		mov	bx, [bp+28h]
+   532 000002B1 83E30F                  		and	bx, 0Fh
+   533 000002B4 7414                    		jz	short bs_07	; FAT number 0 is active
+   534                                  					; (as default)
+   535                                  		; compare active FAT number with number of FATs	
+   536                                  		;cmp	bl, [BPB_NumFATs] ; [bp+10h]
+   537 000002B6 3A5E10                  		cmp	bl, [bp+10h]
+   538 000002B9 731C                    		jnb	short bs_09 ; invalid parameter!
+   539 000002BB 52                      		push	dx
+   540 000002BC 6689C1                  		mov	ecx, eax
+   541                                  		; multiply zero based FAT number with FAT size
+   542                                  		;mov	eax, [BPB_FATSz32] ; [bp+24h]
+   543 000002BF 668B4624                		mov	eax, [bp+24h]
+   544 000002C3 66F7E3                  		mul	ebx
+   545 000002C6 6601C8                  		add	eax, ecx   ; start of active FAT copy
+   546 000002C9 5A                      		pop	dx
+   547                                  bs_07:
+   548 000002CA 52                      		push	dx
+   549 000002CB 89FB                    		mov	bx, di
+   550 000002CD B90100                  		mov	cx, 1
+   551 000002D0 E847FE                  		call	disk_read
+   552                                  		; If cf = 1 -> Disk I/O err, not invalid sys disk!
+   553 000002D3 5A                      		pop	dx
+   554                                  bs_08:
+   555 000002D4 89D3                    		mov	bx, dx
+   556 000002D6 C3                      		retn
+   557                                  bs_09:
+   558                                  		; Invalid boot sector parameter/data
+   559                                  		;add	sp, 4
+   560 000002D7 58                      		pop	ax ; return to 'get_next_cluster'
+   561 000002D8 58                      		pop	ax ; return to 'search_startup_file'
+   562 000002D9 E915FE                  		jmp	invalid_system_disk
+   563                                  
+   564                                  load_startup_file:
+   565                                  		; DI = directory entry offset 9 (of 32 bytes)
+   566 000002DC 83C404                  		add	sp, 4 ; pop eax
+   567                                  		; High word of First Cluster
+   568 000002DF 8B7509                  		mov	si, [di+9] ; [di+DIR_FstClusHI-11]
+   569                                  		; Low word of First Cluster
+   570 000002E2 8B7D0F                  		mov	di, [di+0Fh] ; [di+DIR_FstClusLO-11]
+   571 000002E5 89F0                    		mov	ax, si
+   572 000002E7 66C1E010                		shl	eax, 10h ; * 65536
+   573 000002EB 89F8                    		mov	ax, di
+   574                                  		; Valid cluster number must not be less than 2
+   575                                  		; and it (a first cluster value in directoy entry)
+   576                                  		; must not be greater than 0FFFFFFF7h. 
+   577 000002ED 6683F802                		cmp	eax, 2
+   578 000002F1 0F82FCFD                		jb	invalid_system_disk
+   579 000002F5 663DF8FFFF0F            		cmp	eax, 0FFFFFF8h
+   580 000002FB 0F83F2FD                		jnb	invalid_system_disk
+   581                                  
+   582 000002FF 6689C1                  		mov	ecx, eax ; save first cluster number
+   583                                  
+   584                                  		; Load  RTS (Kernel) file
+   585 00000302 BE[7003]                                mov     si, Loading_Msg
+   586 00000305 E803FE                                  call    print_msg
+   587                                                  
+   588 00000308 6689C8                  		mov	eax, ecx ; restore first cluster number
+   589                                  		
+   590 0000030B BB0010                  		mov	bx, rts_segment ; 1000h
+   591                                  		;mov	[next_segment], bx
+   592 0000030E 899E[FC85]              		mov	[bp+next_segment-7C00h], bx
+   593                                  bs_10:
+   594 00000312 6650                    		push	eax ; 28 bit cluster num, starts from 2
+   595 00000314 6683E802                		sub	eax, 2 ; now, cluster num starts from 0 
+   596                                  		;movzx	ecx, byte [BPB_SecPerClus] ; [bp+0Dh]
+   597 00000318 660FB64E0D              		movzx	ecx, byte [bp+0Dh]
+   598 0000031D 66F7E1                  		mul	ecx
+   599                                  		; eax = sector offset (from start of data area)
+   600 00000320 660346F8                		add	eax, [bp-8] ; add data area (start) addr
+   601                                  		;mov	bx, [next_segment] ; 1000h +
+   602 00000324 8B9E[FC85]              		mov	bx, [bp+next_segment-7C00h]
+   603 00000328 06                      		push	es
+   604 00000329 8EC3                    		mov	es, bx ; segment = 1000h +
+   605 0000032B 31DB                    		xor	bx, bx ; offset = 0 
+   606                                  		; CL = num of sectors to read (= sectors/cluster)
+   607 0000032D E8EAFD                  		call	disk_read
+   608 00000330 07                      		pop	es
+   609 00000331 6658                    		pop	eax
+   610 00000333 C1EB04                  		shr	bx, 4 ; from byte count to paragraph count
+   611                                  		;add	[next_segment], bx ; next segment
+   612 00000336 019E[FC85]              		add	[bp+next_segment-7C00h], bx
+   613 0000033A E83EFF                  		call	get_next_cluster
+   614                                  		;jc	short diskio_error
+   615 0000033D 7212                    		jc	short trdos_loading_error
+   616 0000033F 663DF8FFFF0F            		cmp	eax, 0FFFFFF8h
+   617 00000345 734D                    		jnb	short bs_11
+   618                                  
+   619 00000347 6683F802                		cmp	eax, 2
+   620 0000034B 0F82A2FD                		jb	invalid_system_disk 
+   621 0000034F EBC1                    		jmp	short bs_10
+   622                                  
+   623                                  trdos_loading_error:
+   624 00000351 BE[5A03]                		mov	si, Load_err_Msg
+   625 00000354 E8B4FD                  		call	print_msg
+   626 00000357 E9A9FD                  		jmp	replace_disk
+   627                                  
+   628                                  Load_err_Msg:
+   629 0000035A 0D0A                                    db      0Dh, 0Ah
+   630 0000035C 5452444F53204C6F61-                     db      'TRDOS Loading Error'
+   630 00000365 64696E67204572726F-
+   630 0000036E 72                 
+   631                                  		;db	'!'
+   632 0000036F 00                      		db	0
+   633                                  
+   634 00000370 0D0A                    Loading_Msg:    db      0Dh, 0Ah
+   635 00000372 4C6F6164696E67204B-                     db      "Loading Kernel TRDOS386.SYS ..."
+   635 0000037B 65726E656C20545244-
+   635 00000384 4F533338362E535953-
+   635 0000038D 202E2E2E           
+   636 00000391 0D0A00                                  db      0Dh, 0Ah, 0
+   637                                  
+   638                                  		; End Of File
+   639                                  bs_11:
+   640                                  		; Set TRDOS 386 kernel specific parameters (& signs)
+   641                                  		; and
+   642                                  		; Launch TRDOS 386 Kernel (Startup/RTS file)
+   643                                     		
+   644                                  		;mov	ax, [next_segment] ; 16 paragraphs after the
+   645                                  					  ; start of the last segment
+   646                                  					  ; of the kernel file loading
+   647                                  					  ; space.
+   648                                  					  ; So, (top of) stack will have
+   649                                  					  ; 256 bytes or more distance
+   650                                  					  ; from the last byte
+   651                                  					  ; of the kernel file.	 							
+   652                                  					  ; (This will be enough for
+   653                                  					  ; TRDOS 386 kernel before 
+   654                                  					  ; entering protected mode.)
+   655 00000394 8B86[FC85]              		mov	ax, [bp+next_segment-7C00h]
+   656 00000398 FA                      		cli
+   657 00000399 8ED0                    		mov	ss, ax
+   658 0000039B BCFEFF                  		mov	sp, 0FFFEh			
+   659 0000039E FB                      		sti
+   660                                  
+   661                                  		;xor	edx, edx
+   662                                                  
+   663 0000039F 66B8A1010000                            mov     eax, 417 ; TRDOS boot sector sign for TRDOS386.SYS
+   664                                  
+   665                                  		;mov	dl, [BS_DrvNum]
+   666 000003A5 8A5640                                  mov	dl, [bp+40h]
+   667 000003A8 BB0010                  		mov     bx, rts_segment ; 1000h
+   668 000003AB 8EDB                                    mov     ds, bx
+   669 000003AD 8EC3                                    mov     es, bx
+   670                                  		;mov	fs, bx
+   671                                  		;mov	gs, bx 
+   672                                  
+   673                                  		;xor	ebx, ebx
+   674                                  		;xor	ecx, ecx
+   675                                  		;xor	esi, esi
+   676                                  		;xor	edi, edi
+   677                                  		;xor	ebp, ebp
+   678                                  
+   679 000003AF 31DB                    		xor	bx, bx
+   680 000003B1 26FF27                  		jmp	[es:bx]  ; 1000h:0000h
+   681                                  
+   682 000003B4 00<rept>                		times	1020 - ($ - $$) db 0
+   683                                  bsReserved3:
+   684 000003FC 5452                    		db	'TR'	; 'Turkish Rational DOS' feature identifier
+   685                                  bootsignature2:
+   686 000003FE 55AA                    		db	55h, 0AAh
