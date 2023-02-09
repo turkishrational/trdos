@@ -1,0 +1,2328 @@
+     1                                  ; ****************************************************************************
+     2                                  ; dsectpm3.s (TRDOS 386, TRDOS v2.0 - sample binary file, 'dsectpm3.prg')
+     3                                  ; ---------------------------------------------------------------------------
+     4                                  ; DSECTPM3.PRG ! TEST program !
+     5                                  ; 'Display Disk Sectors' by using TRDOS 386 disk and timer interrupts.
+     6                                  ;
+     7                                  ; 27/05/2016 - 07/07/202016 (dsectpm2)
+     8                                  ; 28/08/2020 (dsectpm3)
+     9                                  ;
+    10                                  ; Derived from 'dsectrm2.s' source code for Retro UNIX 386 v1 'boot'
+    11                                  ;
+    12                                  ; [ Last Modification: 29/08/2020 ]
+    13                                  ;
+    14                                  ; ****************************************************************************
+    15                                  ; dsectrm2.s (21/02/2015, Retro UNIX 386 v1, standalone program, real mode)
+    16                                  ; dsectpm.s (28/02/2015, Retro UNIX 386 v1, standalone prog, protected mode)
+    17                                  ; dsectpm2.s (07/07/2016, TRDOS 386 v1 application, protecded mode program)
+    18                                  ; 
+    19                                  ; Assembler: NASM 2.11
+    20                                  
+    21                                  ; display disk sector data [Retro Unix 386 v1 - test ]
+    22                                  ; by Erdogan Tan [ Real Mode adaption (Standalone program), 21/02/2015 ]
+    23                                  
+    24                                  ESCKey	 equ 1Bh    ;27		
+    25                                  ENTERKey equ 0Dh    ;13
+    26                                  SPACEKey equ 20h    ;32
+    27                                  BACKSPC	 equ 08h    ; 8
+    28                                  DELKey	 equ 53E0h
+    29                                  F1Key	 equ 3B00h
+    30                                  F2Key	 equ 3C00h
+    31                                  F3Key	 equ 3D00h
+    32                                  F4Key	 equ 3E00h ; 28/08/2020
+    33                                  HOMEKey  equ 47E0h
+    34                                  ENDKey	 equ 4FE0h
+    35                                  PgUpKey	 equ 49E0h
+    36                                  PgDnKey  equ 51E0h 
+    37                                  
+    38                                  ; 02/07/2016
+    39                                  
+    40                                  [BITS 32]
+    41                                  	
+    42                                  	; clear bss area
+    43                                  
+    44                                  	; ecx = 0
+    45 00000000 B9B8120000              	mov	ecx, bss_end - bss_start
+    46 00000005 66C1E902                	shr	cx, 2 ; dword count
+    47 00000009 BF[50180000]            	mov	edi, bss_start
+    48                                  	; eax = 0
+    49                                  	;xor	eax, eax
+    50 0000000E F3AB                    	rep	stosd
+    51                                  	
+    52 00000010 BE[8C170000]                    mov     esi, prg_msg
+    53 00000015 E8D90D0000              	call	print_msg
+    54                                  
+    55                                  	; Filling disk parameters tables
+    56                                  _fd0:
+    57                                  	;xor	dl, dl ; fd0
+    58                                  	;mov	[drv], dl
+    59 0000001A BB[A0180000]            	mov	ebx, fd0_dpt
+    60 0000001F B408                    	mov	ah, 08h	; return disk parameters
+    61 00000021 CD33                      	int	33h	; TRDOS 386 disk io interrupt
+    62 00000023 724B                    	jc	short _hd0
+    63 00000025 C605[5E180000]80        	mov	byte [drv_status], 80h
+    64 0000002C 001D[22180000]          	add	[fd0_type], bl
+    65 00000032 8815[062B0000]          	mov	[fdc], dl
+    66 00000038 E899080000              	call	set_disk_parms
+    67 0000003D FE0D[062B0000]          	dec	byte [fdc]
+    68 00000043 742B                    	jz	short _hd0
+    69                                  _fd1:
+    70 00000045 B201                    	mov	dl, 1 ; fd1
+    71 00000047 8815[5D180000]          	mov	[drv], dl
+    72 0000004D BB[B0180000]            	mov	ebx, fd1_dpt
+    73 00000052 B408                    	mov	ah, 08h	; return disk parameters
+    74 00000054 CD33                      	int	33h	; TRDOS 386 disk io interrupt
+    75 00000056 7218                    	jc	short _hd0
+    76 00000058 C605[5F180000]80        	mov	byte [drv_status+1], 80h
+    77 0000005F 001D[23180000]          	add	[fd1_type], bl
+    78 00000065 E86C080000              	call	set_disk_parms
+    79 0000006A FE0D[062B0000]                  dec     byte [fdc] ; = 0 
+    80                                  _hd0:
+    81 00000070 B280                    	mov	dl, 80h ; hd0
+    82 00000072 8815[5D180000]          	mov	[drv], dl
+    83 00000078 BB[C0180000]            	mov	ebx, hd0_dpt
+    84 0000007D B408                    	mov	ah, 08h	; return disk parameters
+    85 0000007F CD33                      	int	33h	; TRDOS 386 disk io interrupt
+    86 00000081 7224                    	jc	short _hd1
+    87 00000083 8A4314                  	mov	al, [ebx+16+4] ; device register, bit 6 = LBA bit
+    88 00000086 C0E806                  	shr	al, 6 ; bit 6 = bit 0
+    89 00000089 0480                    	add	al, 80h
+    90 0000008B A2[60180000]            	mov	[drv_status+2], al
+    91 00000090 8815[052B0000]          	mov	[hdc], dl
+    92 00000096 E83B080000              	call	set_disk_parms
+    93 0000009B FE0D[052B0000]          	dec	byte [hdc]  ; number of fixed disk drives - 1
+    94 000000A1 0F8485000000            	jz	sccps
+    95                                  _hd1:
+    96 000000A7 B281                    	mov	dl, 81h ; hd1
+    97 000000A9 8815[5D180000]          	mov	[drv], dl
+    98 000000AF BB[E0180000]            	mov	ebx, hd1_dpt
+    99 000000B4 B408                    	mov	ah, 08h	; return disk parameters
+   100 000000B6 CD33                      	int	33h	; TRDOS 386 disk io interrupt
+   101 000000B8 721A                    	jc	short _hd2
+   102 000000BA 8A4314                  	mov	al, [ebx+16+4] ; device register, bit 6 = LBA bit
+   103 000000BD C0E806                  	shr	al, 6 ; bit 6 = bit 0
+   104 000000C0 0480                    	add	al, 80h
+   105 000000C2 A2[61180000]            	mov	[drv_status+3], al
+   106 000000C7 E80A080000              	call	set_disk_parms
+   107 000000CC FE0D[052B0000]          	dec	byte [hdc]
+   108 000000D2 7458                    	jz	short sccps
+   109                                  _hd2:
+   110 000000D4 B282                    	mov	dl, 82h ; hd2
+   111 000000D6 8815[5D180000]          	mov	[drv], dl
+   112 000000DC BB[00190000]            	mov	ebx, hd2_dpt
+   113 000000E1 B408                    	mov	ah, 08h	; return disk parameters
+   114 000000E3 CD33                      	int	33h	; TRDOS 386 disk io interrupt
+   115 000000E5 721A                    	jc	short _hd3
+   116 000000E7 8A4314                  	mov	al, [ebx+16+4] ; device register, bit 6 = LBA bit
+   117 000000EA C0E806                  	shr	al, 6 ; bit 6 = bit 0
+   118 000000ED 0480                    	add	al, 80h
+   119 000000EF A2[62180000]            	mov	[drv_status+4], al
+   120 000000F4 E8DD070000              	call	set_disk_parms
+   121 000000F9 FE0D[052B0000]          	dec	byte [hdc]
+   122 000000FF 742B                    	jz	short sccps
+   123                                  _hd3:
+   124 00000101 B283                    	mov	dl, 83h ; hd3
+   125 00000103 8815[5D180000]          	mov	[drv], dl
+   126 00000109 BB[20190000]            	mov	ebx, hd3_dpt
+   127 0000010E B408                    	mov	ah, 08h	; return disk parameters
+   128 00000110 CD33                      	int	33h	; TRDOS 386 disk io interrupt
+   129 00000112 7218                    	jc	short sccps
+   130 00000114 8A4314                  	mov	al, [ebx+16+4] ; device register, bit 6 = LBA bit
+   131 00000117 C0E806                  	shr	al, 6 ; bit 6 = bit 0
+   132 0000011A 0480                    	add	al, 80h
+   133 0000011C A2[63180000]            	mov	[drv_status+5], al
+   134 00000121 E8B0070000              	call	set_disk_parms
+   135 00000126 FE0D[052B0000]          	dec	byte [hdc] ; = 0
+   136                                  
+   137                                  sccps:
+   138                                  	; get cursor position
+   139 0000012C 31DB                    	xor	ebx, ebx ; bh = video page 0
+   140 0000012E B403                    	mov	ah, 03h	; get cursor position and shape
+   141 00000130 CD31                    	int	31h 	; TRDOS 386 video interrupt
+   142                                  			; (IBM PC/AT ROMBIOS, INT 10h) 	
+   143 00000132 668915[50180000]        	mov	[cursor_posn], dx ; position
+   144 00000139 66890D[52180000]        	mov	[cursor_shp], cx ; shape
+   145                                  
+   146                                  	; Save video page (before displaying sector)
+   147                                  
+   148                                  	; copy video page 0 to video page 6
+   149                                  	;sub	ebx, ebx ; bl = 0 -> system to system
+   150                                  			 ; bh = 0 -> 80*25 text mode 
+   151 00000140 28C9                    	sub	cl, cl   ; source = video page 0
+   152 00000142 B206                    	mov	dl, 6    ; destination = video page 6
+   153 00000144 B81F000000              	mov	eax, 31  ; 'sysvideo'
+   154 00000149 CD40                    	int	40h	 ; TRDOS 386 system call  
+   155                                  
+   156                                  display_sectors:
+   157 0000014B E868070000              	call	hide_cursor
+   158                                  	; Save cursor position
+   159 00000150 66A1[50180000]          	mov	ax, [cursor_posn] ; cursor pos. 
+   160                                  				  ; for video page 0
+   161 00000156 66A3[54180000]          	mov	[cursor_posb], ax
+   162 0000015C E88A050000              	call	clear_frame
+   163                                  
+   164                                  	; start (Real Time Clock) timer function
+   165 00000161 B3FF                            mov     bl, 0FFh ; signal return (response) byte
+   166 00000163 B703                            mov     bh, 3    ; 1 second (rtc interrupt) 
+   167                                  	;mov	ecx, 1
+   168 00000165 66B90100                	mov	cx, 1
+   169 00000169 BA[4B180000]            	mov	edx, timer_event ; signal return (response) address
+   170 0000016E B821000000              	mov	eax, 33	; 'systimer'
+   171 00000173 CD40                    	int	40h	; TRDOS 386 system call
+   172 00000175 7253                            jc      short dscl_0
+   173                                  
+   174 00000177 A2[042B0000]            	mov	[timer_event_number], al 
+   175                                  
+   176 0000017C EB4C                    	jmp	short dscl_0
+   177                                  
+   178                                  dscl_esc:
+   179 0000017E E81E040000              	call	restore_video_page
+   180                                  dscl_getc:
+   181 00000183 E8BF030000              	call	getch
+   182                                  	;
+   183 00000188 3C1B                    	cmp	al, ESCKey
+   184 0000018A 0F847C030000                    je      dscl_exit
+   185 00000190 C605[57180000]00        	mov	byte [dscmd], 0 ; reset
+   186                                  	; 29/08/2020
+   187 00000197 663D003B                	cmp	ax, F1Key
+   188 0000019B 0F82D3020000            	jb	dscl_6	
+   189 000001A1 7427                    	je	short dscl_0 ; [dscmd] = 0
+   190                                  	; 28/08/2020
+   191 000001A3 663D003E                	cmp	ax, F4Key
+   192                                  	;ja	dscl_6 ; not one of F1 to F4 functions
+   193 000001A7 0F87D7020000            	ja	dscl_29 ; 29/08/2020
+   194 000001AD 7209                    	jb	short dscl_f3 ; F3key or F2Key
+   195                                  dscl_f4:
+   196 000001AF C605[57180000]03        	mov	byte [dscmd], 3 ; Display disk size (and CHS)
+   197 000001B6 EB12                    	jmp	short dscl_0
+   198                                  dscl_f3:
+   199                                  	; 29/08/2020
+   200                                  	;cmp	ax, F1Key
+   201                                          ;je	short dscl_0 ; [dscmd] = 0
+   202                                  	;
+   203 000001B8 FE05[57180000]          	inc	byte [dscmd] ; 1
+   204                                  	; 28/08/2020
+   205                                  	;cmp	ax, F3Key
+   206                                  	;jb	short dscl_5 ; F2Key
+   207                                  	; 29/08/2020
+   208 000001BE 663D003C                	cmp	ax, F2Key
+   209 000001C2 7430                    	je	short dscl_5
+   210                                  	; 28/08/2020
+   211 000001C4 FE05[57180000]          	inc	byte [dscmd] ; 2
+   212                                  	; Display disk parameters (HDPT table)
+   213                                  dscl_0:
+   214 000001CA E8C4030000              	call	save_video_page
+   215 000001CF BE[AE160000]            	mov	esi, F1_ib ; F1 (Change drive)
+   216                                  			   ; Inputbox address
+   217                                  dscl_ib:
+   218 000001D4 E82E060000              	call	inputbox
+   219                                  		; cursor position in DX
+   220 000001D9 E8E1060000              	call	show_cursor
+   221                                  		; cursor blinks at current position
+   222 000001DE 8B0D[58190000]          	mov	ecx, [prev_sec]
+   223                                  dscl_3:
+   224 000001E4 E85E030000              	call	getch
+   225 000001E9 3C1B                    	cmp	al, ESCKey
+   226 000001EB 7513                    	jne	short dscl_27
+   227 000001ED E8C6060000                      call    hide_cursor
+   228 000001F2 EB8A                            jmp     dscl_esc
+   229                                  dscl_5:
+   230                                  	; 28/08/2020
+   231                                  	;cmp	ax, F2Key
+   232                                  	;jne	dscl_6
+   233 000001F4 E89A030000              	call	save_video_page
+   234 000001F9 BE[BC160000]            	mov	esi, F2_ib ; F2 (Change sector)
+   235                                  		           ; Inputbox address
+   236                                  	;mov	byte [dscmd], 1
+   237 000001FE EBD4                            jmp     short dscl_ib
+   238                                  dscl_27:
+   239 00000200 3C20                    	cmp	al, SPACEKey
+   240 00000202 7444                    	je	short dscl_4	
+   241 00000204 3C0D                         	cmp	al, ENTERKey
+   242 00000206 7440                    	je	short dscl_4
+   243                                  	;
+   244 00000208 31DB                    	xor	ebx, ebx
+   245 0000020A 803D[57180000]01            	cmp     byte [dscmd], 1
+   246 00000211 0F8481000000            	je	dscl_12
+   247                                  	;
+   248 00000217 3C30                    	cmp	al, '0'
+   249 00000219 72C9                    	jb	short dscl_3
+   250 0000021B 3C35                    	cmp	al, '5'
+   251 0000021D 77C5                    	ja	short dscl_3
+   252 0000021F 8B3D[4C180000]          	mov	edi, [current_txtpos]
+   253 00000225 AA                      	stosb
+   254                                  	;
+   255                                  	;xor	bh, bh  ; video page 0
+   256 00000226 66B90100                	mov	cx, 1   ; character count
+   257 0000022A B40A                    	mov	ah, 0Ah ; write chr at current cursor pos.
+   258 0000022C CD31                    	int	31h     ; TRDOS 386 video interrupt
+   259                                  	;
+   260 0000022E 2C30                    	sub	al, '0'
+   261 00000230 88C2                    	mov	dl, al
+   262 00000232 30F6                    	xor	dh, dh
+   263 00000234 88C3                    	mov	bl, al
+   264 00000236 C0E302                  	shl	bl, 2  ; *4
+   265 00000239 81C3[40190000]          	add	ebx, ds_sec ; current_sector
+   266 0000023F 8B0B                    	mov	ecx, [ebx]
+   267 00000241 BE[5C190000]                    mov     esi, sector_buffer
+   268 00000246 EB9C                    	jmp	short dscl_3 
+   269                                  dscl_4:
+   270 00000248 803D[58180000]00        	cmp	byte [inds],  0 ; display other half or not ?
+   271 0000024F 0F8733010000                    ja      dscl_oh         ; other half
+   272 00000255 6652                    	push	dx
+   273                                  	; save regs (ESI, ECX, DX)
+   274 00000257 E85C060000              	call	hide_cursor
+   275                                  	; restore regs (ESI, ECX, DX)
+   276 0000025C 665A                    	pop	dx
+   277 0000025E 89C8                    	mov	eax, ecx
+   278                                  	;
+   279 00000260 803D[57180000]01        	cmp     byte [dscmd], 1 ; Requested function ?
+   280 00000267 0F84DE000000                    je      dscl_17         ; Change sector (F2)
+   281 0000026D 0F824F010000                    jb      dscl_ns         ; Change drive (F1)
+   282                                  
+   283                                  	; Display disk parameters (dscmd = 2)
+   284 00000273 80FA02                  	cmp	dl, 2
+   285 00000276 7203                    	jb	short dscl_28
+   286 00000278 80C27E                  	add	dl, 7Eh
+   287                                  dscl_28:
+   288                                  	; 28/08/2020
+   289 0000027B 803D[57180000]03        	cmp	byte [dscmd], 3
+   290 00000282 750A                    	jne	short dscl_dskprm
+   291                                  
+   292 00000284 E87E0B0000              	call	dskvprm ; disk size and virtual chs parms
+   293 00000289 E9F0FEFFFF              	jmp	dscl_esc
+   294                                  
+   295                                  dscl_dskprm:
+   296 0000028E E847080000              	call	dskprm
+   297 00000293 E9E6FEFFFF                      jmp     dscl_esc
+   298                                  dscl_12:
+   299 00000298 663DE053                	cmp	ax, DELKey	; DEL key
+   300 0000029C 7404                    	je	short dscl_bs
+   301 0000029E 3C08                    	cmp	al, BACKSPC	; Backspace key
+   302 000002A0 7535                    	jne	short dscl_13
+   303                                  dscl_bs:
+   304 000002A2 803D[56180000]00        	cmp	byte [txtposoff], 0
+   305 000002A9 0F8635FFFFFF                    jna     dscl_3
+   306 000002AF FE0D[56180000]          	dec	byte [txtposoff]
+   307 000002B5 FE0D[50180000]          	dec	byte [cursor_posn]
+   308 000002BB E8BD140000              	call	set_cpos
+   309 000002C0 0FB61D[56180000]        	movzx	ebx, byte [txtposoff]
+   310 000002C7 FE0D[56180000]          	dec	byte [txtposoff]
+   311 000002CD FE0D[50180000]          	dec	byte [cursor_posn]
+   312 000002D3 B020                    	mov	al, 20h
+   313 000002D5 EB1B                            jmp     short dscl_14
+   314                                  dscl_13:
+   315 000002D7 8A1D[56180000]          	mov	bl, [txtposoff]
+   316 000002DD 80FB08                  	cmp	bl, 8
+   317 000002E0 0F83FEFEFFFF                    jnb     dscl_3
+   318                                  	;
+   319 000002E6 3C30                    	cmp	al, '0'
+   320 000002E8 0F82F6FEFFFF                    jb      dscl_3
+   321 000002EE 3C39                    	cmp	al, '9'
+   322 000002F0 7739                    	ja	short dscl_15
+   323                                  dscl_14:
+   324 000002F2 D0E3                    	shl	bl, 1
+   325 000002F4 8B35[4C180000]          	mov	esi, [current_txtpos]
+   326 000002FA 01F3                    	add	ebx, esi
+   327 000002FC 8803                    	mov	[ebx], al
+   328                                  	;
+   329 000002FE 30FF                    	xor	bh, bh  ; video page 0
+   330 00000300 66B90100                	mov	cx, 1	; character count
+   331 00000304 B40A                    	mov	ah, 0Ah ; write chr at current cursor pos.
+   332 00000306 CD31                    	int	31h     ; TRDOS 386 video interrupt
+   333                                  	;
+   334 00000308 803D[56180000]08        	cmp	byte [txtposoff], 8
+   335 0000030F 0F8DCFFEFFFF            	jge	dscl_3 ; JGE !
+   336 00000315 FE05[56180000]          	inc	byte [txtposoff]
+   337 0000031B FE05[50180000]          	inc	byte [cursor_posn]
+   338 00000321 E857140000              	call	set_cpos
+   339 00000326 E9B9FEFFFF                      jmp     dscl_3 
+   340                                  dscl_15:
+   341 0000032B 3C41                    	cmp	al, 'A'
+   342 0000032D 0F82B1FEFFFF                    jb      dscl_3
+   343 00000333 3C46                    	cmp	al, 'F'
+   344 00000335 76BB                            jna     short dscl_14
+   345                                  dscl_16:
+   346 00000337 3C61                    	cmp	al, 'a'
+   347 00000339 0F82A5FEFFFF                    jb      dscl_3
+   348 0000033F 3C66                    	cmp	al, 'f'
+   349 00000341 0F879DFEFFFF                    ja      dscl_3
+   350 00000347 2C20                    	sub	al, 'a' - 'A'
+   351 00000349 EBA7                    	jmp	short dscl_14
+   352                                  	;
+   353                                  dscl_17:
+   354 0000034B 8B35[4C180000]          	mov	esi, [current_txtpos]
+   355 00000351 31C0                    	xor	eax, eax
+   356 00000353 A2[56180000]            	mov	byte [txtposoff], al ; 0
+   357 00000358 50                      	push	eax  ; sector value (reset)	
+   358                                  dscl_18:
+   359 00000359 66AD                    	lodsw
+   360 0000035B 3C30                    	cmp	al, '0'
+   361 0000035D 7219                    	jb	short dscl_22
+   362                                  dscl_19: 
+   363 0000035F 29C9                    	sub	ecx, ecx
+   364 00000361 BB[7A150000]            	mov	ebx, hexchrs
+   365                                  dscl_20:
+   366 00000366 3A03                    	cmp	al, [ebx]
+   367 00000368 7405                    	je	short dscl_21
+   368                                  	;cmp	cl, 15
+   369                                  	;jnb	short dscl_22
+   370 0000036A FEC1                    	inc	cl
+   371 0000036C 43                      	inc	ebx
+   372 0000036D EBF7                    	jmp	short dscl_20
+   373                                  dscl_21: 
+   374 0000036F 58                      	pop	eax
+   375 00000370 C1E004                  	shl	eax, 4	; * 16
+   376 00000373 01C8                    	add	eax, ecx
+   377 00000375 50                      	push	eax
+   378 00000376 EBE1                    	jmp	short dscl_18
+   379                                  dscl_22:
+   380 00000378 8A15[8A150000]          	mov	dl, [ds_drv]
+   381 0000037E 30F6                    	xor	dh, dh
+   382 00000380 58                      	pop	eax
+   383 00000381 BE[5C190000]                    mov     esi, sector_buffer
+   384 00000386 EB3A                            jmp     short dscl_ns
+   385                                  dscl_oh:
+   386 00000388 8A15[8A150000]          	mov	dl, [ds_drv]
+   387 0000038E 0FB6DA                  	movzx	ebx, dl
+   388 00000391 C0E302                  	shl	bl, 2
+   389 00000394 81C3[40190000]          	add	ebx, ds_sec
+   390 0000039A 8B03                    	mov	eax, [ebx]
+   391 0000039C BE[5C190000]                    mov     esi, sector_buffer
+   392                                  	;
+   393 000003A1 8A35[8B150000]          	mov	dh, [ds_drv+1]
+   394 000003A7 08F6                    	or	dh, dh
+   395 000003A9 7404                    	jz	short dscl_nh ; second half of sector (0->1)
+   396 000003AB 30F6                    	xor	dh, dh	      ; reset (0)	
+   397 000003AD EB08                    	jmp	short dscl_nx
+   398                                  dscl_nh:
+   399 000003AF 81C600010000            	add	esi, 256
+   400 000003B5 FEC6                    	inc	dh
+   401                                  dscl_nx:
+   402 000003B7 8835[8B150000]          	mov	[ds_drv+1], dh
+   403 000003BD E991000000                      jmp     dscl_25
+   404                                  dscl_ns:
+   405 000003C2 8835[8B150000]          	mov	[ds_drv+1], dh
+   406 000003C8 0FB6DA                  	movzx	ebx, dl
+   407 000003CB C0E302                  	shl	bl, 2
+   408 000003CE 81C3[40190000]          	add	ebx, ds_sec
+   409 000003D4 3A15[8A150000]          	cmp	dl, [ds_drv]
+   410 000003DA 7504                    	jne	short dscl_23
+   411 000003DC 3B03                    	cmp	eax, [ebx]
+   412 000003DE 7473                    	je	dscl_25
+   413                                  dscl_23:
+   414 000003E0 8A0D[8A150000]          	mov	cl, [ds_drv]
+   415 000003E6 880D[072B0000]          	mov	[prev_drv], cl
+   416 000003EC 8815[8A150000]          	mov	[ds_drv], dl
+   417                                  dscl_26:
+   418 000003F2 8B0B                    	mov	ecx, [ebx]
+   419 000003F4 890D[58190000]          	mov	[prev_sec], ecx
+   420 000003FA 8903                    	mov	[ebx], eax
+   421 000003FC E8A9050000              	call	read_disk_sector
+   422 00000401 7336                    	jnc	short dscl_24
+   423                                  dscl_rd_err:
+   424                                  	;
+   425                                  	;mov	al, ah	; error code
+   426                                  	;mov	edi, err_code_str
+   427                                  	;call	write_hex
+   428                                  	;
+   429 00000403 BE[CC160000]            	mov	esi, dskr_err ; drive not ready or read error
+   430 00000408 E8FA030000              	call	inputbox
+   431 0000040D E835010000              	call	getch
+   432 00000412 E88A010000              	call	restore_video_page
+   433 00000417 0FB61D[072B0000]        	movzx	ebx, byte [prev_drv]
+   434 0000041E 881D[8A150000]          	mov	[ds_drv], bl
+   435 00000424 C0E302                  	shl	bl, 2
+   436 00000427 81C3[40190000]          	add	ebx, ds_sec
+   437 0000042D A1[58190000]            	mov	eax, [prev_sec]
+   438 00000432 8903                    	mov	[ebx], eax
+   439 00000434 E94AFDFFFF                      jmp     dscl_getc
+   440                                  dscl_24:
+   441 00000439 668B15[8A150000]        	mov	dx, [ds_drv]
+   442 00000440 0FB6DA                  	movzx	ebx, dl
+   443 00000443 C0E302                  	shl	bl, 2
+   444 00000446 81C3[40190000]          	add	ebx, ds_sec
+   445 0000044C 8B03                    	mov	eax, [ebx]
+   446 0000044E BE[5C190000]                    mov     esi, sector_buffer
+   447                                  dscl_25:
+   448 00000453 E865010000              	call	display_sector
+   449 00000458 E836010000              	call	save_video_page
+   450 0000045D E921FDFFFF                      jmp     dscl_getc
+   451                                  dscl_11:
+   452 00000462 BE[5C190000]                    mov     esi, sector_buffer
+   453 00000467 8A15[8A150000]          	mov	dl, [ds_drv]
+   454 0000046D 28F6                    	sub	dh, dh	 ; 0 = first half of sector
+   455 0000046F E94EFFFFFF                      jmp     dscl_ns
+   456                                  dscl_6:	
+   457 00000474 3C20                    	cmp	al, SPACEKey
+   458 00000476 0F840CFFFFFF                    je      dscl_oh
+   459 0000047C 3C0D                         	cmp	al, ENTERKey
+   460 0000047E 0F8404FFFFFF                    je      dscl_oh
+   461                                  dscl_29:
+   462 00000484 663DE047                	cmp	ax, HOMEKey
+   463 00000488 7504                    	jne	short dscl_7
+   464 0000048A 31C0                    	xor	eax, eax
+   465 0000048C EBD4                    	jmp	short dscl_11
+   466                                  dscl_7:
+   467 0000048E 663DE04F                	cmp	ax, ENDKey
+   468 00000492 7515                    	jne	short dscl_8
+   469 00000494 0FB61D[8A150000]        	movzx	ebx, byte [ds_drv]
+   470 0000049B C0E302                  	shl	bl, 2
+   471 0000049E 81C3[88180000]                  add     ebx, drv_size
+   472 000004A4 8B03                    	mov	eax, [ebx]
+   473 000004A6 48                      	dec	eax
+   474 000004A7 EBB9                    	jmp	short dscl_11
+   475                                  dscl_8:
+   476 000004A9 663DE051                	cmp	ax, PgDnKey
+   477 000004AD 753E                    	jne	short dscl_10
+   478 000004AF E810000000              	call	dscl_9
+   479 000004B4 40                      	inc	eax
+   480 000004B5 39C8                    	cmp	eax, ecx ; last sector
+   481 000004B7 0F8605FFFFFF            	jna	dscl_ns
+   482 000004BD 31C0                    	xor	eax, eax
+   483 000004BF E92EFFFFFF              	jmp	dscl_26 
+   484                                  dscl_9:	
+   485 000004C4 0FB615[8A150000]        	movzx	edx, byte [ds_drv]
+   486 000004CB 89D3                    	mov	ebx, edx
+   487 000004CD C0E302                  	shl	bl, 2  ; *4
+   488 000004D0 81C3[88180000]                  add     ebx, drv_size
+   489 000004D6 8B0B                    	mov	ecx, [ebx]
+   490 000004D8 49                      	dec	ecx
+   491 000004D9 81EB[88180000]                  sub     ebx, drv_size
+   492 000004DF 81C3[40190000]          	add	ebx, ds_sec ; current sector
+   493 000004E5 8B03                    	mov	eax, [ebx]	
+   494 000004E7 BE[5C190000]                    mov     esi, sector_buffer
+   495 000004EC C3                              retn
+   496                                  dscl_10:
+   497 000004ED 663DE049                	cmp	ax, PgUpKey
+   498 000004F1 0F858CFCFFFF                    jne     dscl_getc
+   499 000004F7 E8C8FFFFFF              	call	dscl_9
+   500 000004FC 48                      	dec	eax
+   501 000004FD 39C8                    	cmp	eax, ecx ; last sector
+   502 000004FF 0F86BDFEFFFF            	jna	dscl_ns
+   503 00000505 89C8                    	mov	eax, ecx
+   504 00000507 E9E6FEFFFF              	jmp	dscl_26
+   505                                  
+   506                                  dscl_exit:
+   507                                  	;
+   508                                  	; Stop timer event
+   509 0000050C 0FB61D[042B0000]        	movzx	ebx, byte [timer_event_number]
+   510                                  		; bh = 0 -> stop timer event
+   511                                  
+   512 00000513 20DB                    	and	bl, bl
+   513 00000515 7409                    	jz	short dscl_rvp
+   514 00000517 B821000000              	mov	eax, 33	; 'systimer'
+   515 0000051C CD40                    	int	40h	; TRDOS 386 system call
+   516                                  
+   517 0000051E 28DB                    	sub	bl, bl
+   518                                  dscl_rvp:
+   519                                  	; Restore video page (before displaying sector)
+   520                                  
+   521                                  	; copy video page 6 to video page 0
+   522                                  	;sub	ebx, ebx ; bl = 0 -> system to system
+   523                                  			 ; bh = 0 -> 80*25 text mode 
+   524 00000520 B106                    	mov	cl, 6    ; source = video page 6
+   525                                  
+   526 00000522 E87E000000              	call	restore_v_pg_x
+   527                                  
+   528                                  	; Restore cursor position
+   529 00000527 668B15[54180000]        	mov	dx, [cursor_posb] 
+   530                                  	;
+   531                                  	; Set cursor position
+   532                                  	;xor	bh, bh  ; Video page 0
+   533 0000052E B402                    	mov	ah, 2	; set cursor position
+   534 00000530 CD31                    	int	31h 	; TRDOS 386 video interrupt
+   535                                  	
+   536                                  	; Show standard blinking text cursor 
+   537 00000532 668B0D[52180000]                mov 	cx, [cursor_shp]
+   538 00000539 B401                    	mov	ah, 1	; set cursor type
+   539 0000053B CD31                    	int	31h 	; TRDOS 386 video interrupt
+   540                                  
+   541                                  terminate:
+   542 0000053D B801000000              	mov	eax, 1	; 'sysexit'
+   543 00000542 CD40                    	int	40h	; TRDOS 386 system call
+   544                                  haltsys:
+   545 00000544 F4                      	hlt
+   546 00000545 EBFD                    	jmp	short haltsys
+   547                                  
+   548                                  getch:
+   549                                  dscl_rtc_p:
+   550 00000547 803D[4B180000]00        	cmp	byte [timer_event], 0
+   551 0000054E 7638                    	jna	short dscl_getch
+   552                                  
+   553                                  	; timer function
+   554 00000550 C605[4B180000]00        	mov	byte [timer_event], 0
+   555                                  		
+   556 00000557 BF[541C0000]            	mov	edi, video_buffer + 0A0h + 50h ; Row 1, Column 40
+   557 0000055C 807F013F                	cmp     byte [edi+1], 3Fh ; cyan (3) Background
+   558                                  			; white (F) forecolor 
+   559                                  			; (display disk sector frame)
+   560 00000560 752C                    	jne	short dscl_getchar
+   561                                  
+   562 00000562 51                      	push	ecx
+   563 00000563 52                      	push	edx
+   564                                  
+   565 00000564 E8F3010000              	call	rtc_p
+   566                                  
+   567                                  	; print real time clock content (as formatted)
+   568                                  	; to video page line 1, column 40
+   569 00000569 BE[541C0000]            	mov	esi, video_buffer + 0A0h + 50h
+   570 0000056E B928000100              	mov	ecx, 10028h ; row 1, column 40 (top left)
+   571 00000573 BA4E000100                      mov     edx, 10028h + rtc_msg_end - rtc_msg ; (bottom right)
+   572                                  			    ; row 1, column 40 + rtc_msg lenth 
+   573 00000578 29FF                    	sub	edi, edi ; no swap
+   574 0000057A BB05000000              	mov	ebx, 5  ; user to system window transfer (active page)
+   575 0000057F B81F000000              	mov	eax, 31 ; 'sysvideo'
+   576 00000584 CD40                    	int	40h	; TRDOS 386 system call	
+   577                                  
+   578 00000586 5A                      	pop	edx
+   579 00000587 59                      	pop	ecx
+   580                                  	
+   581                                  dscl_getch:
+   582                                  	; Check keyboard buffer
+   583 00000588 B411                    	mov	ah, 11h
+   584 0000058A CD32                    	int 	32h ; TRDOS 386 keyboard interrupt
+   585                                  		    ; (IBM PC/AT ROMBIOS, INT 16h)			
+   586 0000058C 74B9                    	jz	short dscl_rtc_p ; keyboard buffer empty
+   587                                  
+   588                                  dscl_getchar:
+   589                                  	; Getchar by using keyboard interrupt
+   590 0000058E B410                    	mov	ah, 10h
+   591 00000590 CD32                    	int 	32h ; TRDOS 386 keyboard interrupt
+   592                                  		    ; (IBM PC/AT ROMBIOS, INT 16h)			
+   593 00000592 C3                      	retn
+   594                                  		
+   595                                  save_video_page:
+   596                                  	; Save video page
+   597                                  
+   598                                  	; copy video page 0 to video page 7
+   599 00000593 29DB                    	sub	ebx, ebx ; bl = 0 -> system to system
+   600                                  			 ; bh = 0 -> 80*25 text mode 
+   601 00000595 28C9                    	sub	cl, cl   ; source = video page 0
+   602 00000597 B207                    	mov	dl, 7    ; destination = video page 7
+   603 00000599 B81F000000              	mov	eax, 31  ; 'sysvideo'
+   604 0000059E CD40                    	int	40h	 ; TRDOS 386 system call
+   605                                  
+   606 000005A0 C3                      	retn  
+   607                                  
+   608                                  restore_video_page:
+   609                                  	; copy video page 7 to video page 0
+   610 000005A1 29DB                    	sub	ebx, ebx ; bl = 0 -> system to system
+   611                                  			 ; bh = 0 -> 80*25 text mode 
+   612 000005A3 B107                    	mov	cl, 7    ; source = video page 7
+   613                                  
+   614                                  restore_v_pg_x:
+   615 000005A5 28D2                    	sub	dl, dl   ; destination = video page 0
+   616 000005A7 B81F000000              	mov	eax, 31  ; 'sysvideo'
+   617 000005AC CD40                    	int	40h	 ; TRDOS 386 system call  
+   618                                  
+   619 000005AE B302                    	mov	bl, 2	 ; system to user
+   620                                  	;xor	dl, dl   ; video page 0
+   621 000005B0 B9[641B0000]            	mov	ecx, video_buffer ; user buffer
+   622 000005B5 B81F000000              	mov	eax, 31	 ; 'sysvideo'
+   623 000005BA CD40                     	int	40h	 ; TRDOS 386 system call  
+   624                                  	
+   625 000005BC C3                      	retn
+   626                                  	
+   627                                  display_sector:
+   628                                  	; display disk sector data (on video page 0)
+   629                                  	;
+   630                                  	; INPUT ->
+   631                                  	;	ESI = sector buffer offset
+   632                                  	; 	      (sector size: 512 bytes)
+   633                                  	;	EAX = sector number
+   634                                  	;	DL = drive number (0,1,2,3,4,5,6)
+   635                                  	;	DH = portion control byte 
+   636                                  	;		 (0= first half of the sector, 
+   637                                  	;		 >0= second half of the sector) 
+   638                                  	; OUTPUT ->
+   639                                  	;	Video page 0 (0B8000h) will be filled
+   640                                  	;	with sector data
+   641                                  	;	(ESI points to byte 256 of the buffer
+   642                                  	;	or end of the buffer)	
+   643                                  	;
+   644                                  	; Modified registers: eax, edx, ecx, ebx, esi, edi
+   645                                  	;
+   646                                  	;
+   647                                  	;xor	ecx, ecx ; reset for cx loop counts
+   648 000005BD C605[58180000]01        	mov	byte [inds], 1 ; for ENTER key handling 
+   649                                  	;
+   650 000005C4 50                      	push	eax
+   651 000005C5 52                      	push	edx
+   652 000005C6 E820010000              	call	clear_frame
+   653 000005CB 5A                      	pop	edx
+   654 000005CC 58                      	pop	eax
+   655                                  dsfh:
+   656 000005CD 31DB                    	xor	ebx, ebx
+   657 000005CF 08F6                    	or	dh, dh
+   658 000005D1 7402                    	jz	short dsfh1
+   659 000005D3 B310                    	mov	bl, 10h
+   660                                  dsfh1:
+   661 000005D5 881D[59180000]          	mov	[paragr], bl	; Paragraph (16 bytes)
+   662                                  	;
+   663 000005DB 88D3                    	mov	bl, dl
+   664 000005DD C0E302                  	shl	bl, 2	; *4
+   665 000005E0 81C3[8C150000]          	add	ebx, drv_names
+   666 000005E6 8B13                    	mov	edx, [ebx]
+   667 000005E8 8915[AD150000]          	mov	[drv_name], edx
+   668 000005EE E8BF000000              	call	dwordtohex
+   669 000005F3 8915[BB150000]          	mov	[sector_num], edx
+   670 000005F9 A3[BF150000]            	mov	[sector_num+4], eax
+   671 000005FE B001                    	mov	al, 1
+   672 00000600 B43F                    	mov	ah, 3Fh ; cyan background, white forecolor
+   673 00000602 BB[A4150000]            	mov	ebx, dpheader
+   674 00000607 E8CC000000              	call	print_line
+   675 0000060C B015                    	mov	al, 21
+   676                                  	;mov	ah, 3Fh ; cyan background, white forecolor
+   677 0000060E BB[15160000]            	mov	ebx, dpfooter1
+   678 00000613 E8C0000000              	call	print_line
+   679 00000618 B016                    	mov	al, 22
+   680                                  	;mov	ah, 3Fh ; cyan background, white forecolor
+   681 0000061A BB[5F160000]            	mov	ebx, dpfooter2
+   682 0000061F E8B4000000              	call	print_line
+   683                                  ds1:
+   684 00000624 B910000000              	mov	ecx, 16
+   685                                  ds2:
+   686 00000629 A0[59180000]            	mov	al, [paragr]
+   687 0000062E E841000000              	call	bytetohex
+   688 00000633 66A3[CB150000]          	mov	[sdline_1], ax
+   689                                  	;
+   690 00000639 51                      	push	ecx
+   691 0000063A B110                    	mov	cl, 16
+   692 0000063C BF[D3150000]            	mov	edi, sdline_2
+   693                                  ds3:
+   694 00000641 AC                      	lodsb	
+   695 00000642 E82D000000              	call	bytetohex
+   696 00000647 66AB                    	stosw
+   697 00000649 47                      	inc	edi
+   698 0000064A E2F5                    	loop	ds3
+   699 0000064C 83EE10                  	sub	esi, 16
+   700 0000064F 47                      	inc	edi
+   701 00000650 B110                    	mov	cl, 16
+   702 00000652 F3A4                    	rep	movsb
+   703 00000654 59                      	pop	ecx
+   704 00000655 B013                    	mov	al, 19	; line (row) 3 to 24
+   705 00000657 28C8                    	sub	al, cl
+   706 00000659 B407                    	mov	ah, 07h ; Black background, light gray forecolor
+   707 0000065B BB[C5150000]            	mov	ebx, sdline
+   708 00000660 E85F000000              	call	print_line_80 ; 04/12/2014
+   709 00000665 E205                    	loop	ds4
+   710                                  	
+   711                                  	;call	video_page_update
+   712                                  	;retn
+   713                                  
+   714 00000667 E9B8000000              	jmp	video_page_update
+   715                                  ds4:
+   716 0000066C FE05[59180000]          	inc	byte [paragr]
+   717 00000672 EBB5                    	jmp	short ds2
+   718                                  
+   719                                  ; Convert binary number to hexadecimal string
+   720                                  
+   721                                  bytetohex:
+   722                                  	; INPUT ->
+   723                                  	; 	AL = byte (binary number)
+   724                                  	; OUTPUT ->
+   725                                  	;	AX = hexadecimal string
+   726                                  	;
+   727 00000674 53                      	push	ebx
+   728 00000675 0FB6D8                  	movzx	ebx, al
+   729 00000678 C0EB04                  	shr	bl, 4
+   730 0000067B 8A9B[7A150000]          	mov	bl, [ebx+hexchrs] 	 	
+   731 00000681 86D8                    	xchg	bl, al
+   732 00000683 80E30F                  	and	bl, 0Fh
+   733 00000686 8AA3[7A150000]          	mov	ah, [ebx+hexchrs] 
+   734 0000068C 5B                      	pop	ebx	
+   735 0000068D C3                      	retn
+   736                                  
+   737                                  wordtohex:
+   738                                  	; INPUT ->
+   739                                  	; 	AX = word (binary number)
+   740                                  	; OUTPUT ->
+   741                                  	;	EAX = hexadecimal string
+   742                                  	;
+   743 0000068E 53                      	push	ebx
+   744 0000068F 86E0                    	xchg	ah, al
+   745 00000691 6650                    	push	ax
+   746 00000693 0FB6DC                  	movzx	ebx, ah
+   747 00000696 C0EB04                  	shr	bl, 4
+   748 00000699 8A83[7A150000]          	mov	al, [ebx+hexchrs] 	 	
+   749 0000069F 88E3                    	mov	bl, ah
+   750 000006A1 80E30F                  	and	bl, 0Fh
+   751 000006A4 8AA3[7A150000]          	mov	ah, [ebx+hexchrs]
+   752 000006AA C1E010                  	shl	eax, 16
+   753 000006AD 6658                    	pop	ax
+   754 000006AF 5B                      	pop	ebx
+   755 000006B0 EBC2                    	jmp	short bytetohex
+   756                                  	;mov	bl, al
+   757                                  	;shr	bl, 4
+   758                                  	;mov	bl, [ebx+hexchrs] 	 	
+   759                                  	;xchg	bl, al	 	
+   760                                  	;and	bl, 0Fh
+   761                                  	;mov	ah, [ebx+hexchrs] 
+   762                                  	;pop	ebx	
+   763                                  	;retn
+   764                                  
+   765                                  dwordtohex:
+   766                                  	; INPUT ->
+   767                                  	; 	EAX = dword (binary number)
+   768                                  	; OUTPUT ->
+   769                                  	;	EDX:EAX = hexadecimal string
+   770                                  	;
+   771 000006B2 50                      	push	eax
+   772 000006B3 C1E810                  	shr	eax, 16
+   773 000006B6 E8D3FFFFFF              	call	wordtohex
+   774 000006BB 89C2                    	mov	edx, eax
+   775 000006BD 58                      	pop	eax
+   776 000006BE E8CBFFFFFF              	call	wordtohex
+   777 000006C3 C3                      	retn
+   778                                  
+   779                                  print_line_80:
+   780                                  	; 04/12/2014
+   781                                  	; al = line (0 to 24)
+   782                                  	; ah = color attributes
+   783                                  	; ebx = 80 chars string address	
+   784 000006C4 E881000000              	call 	get_lpos
+   785 000006C9 51                      	push	ecx
+   786 000006CA B950000000              	mov	ecx, 80
+   787                                  pl80:
+   788 000006CF 8A03                    	mov	al, [ebx]
+   789 000006D1 43                      	inc	ebx
+   790 000006D2 66AB                    	stosw
+   791 000006D4 E2F9                    	loop	pl80
+   792 000006D6 59                      	pop	ecx
+   793 000006D7 C3                      	retn
+   794                                  
+   795                                  print_line:
+   796                                  	; al = line (0 to 24)
+   797                                  	; ah = color attributes	
+   798                                  	; ebx = ASCIIZ string address
+   799 000006D8 E86D000000              	call	get_lpos
+   800 000006DD 56                      	push	esi
+   801 000006DE 89DE                    	mov	esi, ebx
+   802                                  prl1:
+   803 000006E0 AC                      	lodsb
+   804 000006E1 20C0                    	and	al, al
+   805 000006E3 7404                    	jz	short prl2
+   806 000006E5 66AB                    	stosw
+   807 000006E7 EBF7                    	jmp	short prl1
+   808                                  prl2:
+   809 000006E9 5E                      	pop	esi
+   810 000006EA C3                      	retn
+   811                                  
+   812                                  clear_frame:
+   813 000006EB 30C0                    	xor	al, al ; Line 0
+   814 000006ED E846000000              	call	clear_line
+   815 000006F2 B001                    	mov	al, 1
+   816 000006F4 B43F                    	mov	ah, 3Fh ; cyan background, white forecolor
+   817 000006F6 E83F000000              	call	fill_color
+   818 000006FB B001                    	mov	al, 1
+   819                                  dscf0:	
+   820 000006FD FEC0                    	inc	al
+   821 000006FF 6650                    	push	ax
+   822 00000701 E832000000              	call	clear_line
+   823 00000706 6658                    	pop	ax
+   824 00000708 3C13                    	cmp	al, 19
+   825 0000070A 72F1                    	jb	short dscf0
+   826                                  	;inc	al ; line 20
+   827 0000070C B43F                    	mov	ah, 3Fh
+   828                                  dscf1:
+   829 0000070E FEC0                    	inc	al
+   830 00000710 6650                    	push	ax
+   831 00000712 E823000000              	call	fill_color	  
+   832 00000717 6658                    	pop	ax
+   833 00000719 3C17                    	cmp	al, 23
+   834 0000071B 72F1                    	jb	short dscf1
+   835 0000071D FEC0                    	inc	al
+   836 0000071F E814000000              	call	clear_line
+   837                                  
+   838                                  	;call	video_page_update
+   839                                  	;retn
+   840                                  
+   841                                  video_page_update:
+   842                                  	; copy video buffer content to video page 0
+   843 00000724 BB01000000              	mov	ebx, 1	; BL = 1 = user to system
+   844 00000729 B200                    	mov	dl, 0	; video page 0
+   845 0000072B B9[641B0000]            	mov	ecx, video_buffer
+   846 00000730 B81F000000              	mov	eax, 31 ; 'sysvideo'
+   847 00000735 CD40                    	int	40h	; TRDOS 386 system call	
+   848 00000737 C3                      	retn
+   849                                  
+   850                                  clear_line:
+   851 00000738 30E4                    	xor	ah, ah ; blank
+   852                                  fill_color:
+   853                                  	; al = line (0 to 24)
+   854                                  	; ah = color attributes
+   855 0000073A E80B000000              	call	get_lpos
+   856 0000073F B950000000              	mov	ecx, 80
+   857 00000744 B020                    	mov	al, 20h ; space/blank
+   858 00000746 F366AB                  	rep	stosw
+   859 00000749 C3                      	retn
+   860                                  
+   861                                  get_lpos:  ; Get line position in video buffer
+   862 0000074A 6650                    	push	ax
+   863 0000074C B4A0                    	mov	ah, 80*2
+   864 0000074E F6E4                    	mul	ah
+   865 00000750 0FB7F8                  	movzx	edi, ax
+   866 00000753 81C7[641B0000]          	add	edi, video_buffer
+   867 00000759 6658                    	pop	ax
+   868 0000075B C3                      	retn
+   869                                  
+   870                                  rtc_p:	
+   871                                  	; Print Real Time Clock content
+   872                                  	;
+   873 0000075C B404                    	mov	ah, 4	; read the date
+   874 0000075E CD35                    	int	35h	; TRDOS 386 date&time interrupt
+   875                                  			; (IBM PC/AT ROMBIOS, INT 1Ah)
+   876                                  	;mov	[date_day], dl
+   877                                  	;mov	[date_month], dh
+   878 00000760 668915[5C1B0000]        	mov	[date_day], dx
+   879                                  	;mov	[date_year], cl
+   880                                  	;mov	[date_century], ch
+   881 00000767 66890D[5E1B0000]        	mov	[date_year], cx
+   882                                  	;
+   883 0000076E B402                    	mov	ah, 2	; read the time
+   884 00000770 CD35                    	int	35h	; TRDOS 386 date&time interrupt
+   885 00000772 8835[601B0000]                  mov     [time_second], dh
+   886                                          ;mov    [time_minute], cl
+   887                                          ;mov    [time_hour], ch
+   888 00000778 66890D[611B0000]                mov     [time_minute], cx
+   889                                  	;
+   890 0000077F A0[5F1B0000]            	mov	al, [date_century]
+   891 00000784 E875000000              	call	bcd_to_ascii
+   892 00000789 66A3[3C180000]          	mov	word [datestr+6], ax
+   893 0000078F A0[5E1B0000]            	mov	al, byte [date_year]
+   894 00000794 E865000000              	call	bcd_to_ascii
+   895 00000799 66A3[3E180000]          	mov	word [datestr+8], ax
+   896 0000079F A0[5D1B0000]            	mov	al, byte [date_month]
+   897 000007A4 E855000000              	call	bcd_to_ascii
+   898 000007A9 66A3[39180000]          	mov	word [datestr+3], ax
+   899 000007AF A0[5C1B0000]            	mov	al, byte [date_day]
+   900 000007B4 E845000000              	call	bcd_to_ascii
+   901 000007B9 66A3[36180000]          	mov	word [datestr], ax
+   902                                  	;
+   903 000007BF A0[621B0000]                    mov     al, byte [time_hour]
+   904 000007C4 E835000000              	call	bcd_to_ascii
+   905 000007C9 66A3[42180000]          	mov	word [timestr], ax
+   906 000007CF A0[611B0000]                    mov     al, byte [time_minute]
+   907 000007D4 E825000000              	call	bcd_to_ascii
+   908 000007D9 66A3[45180000]          	mov	word [timestr+3], ax
+   909 000007DF A0[601B0000]                    mov     al, byte [time_second]
+   910 000007E4 E815000000              	call	bcd_to_ascii
+   911 000007E9 66A3[48180000]          	mov	word [timestr+6], ax
+   912                                  	;		
+   913 000007EF BE[24180000]            	mov	esi, rtc_msg ; message offset
+   914                                  	;
+   915                                  	;mov	edi, video_buffer + 0A0h + 050h ; Row 1, Column 40
+   916                                  	;mov	ah, [edi+1]
+   917                                  	;cmp	ah, 3Fh ; cyan (3) Background
+   918                                  			; white (F) forecolor 
+   919                                  			; (display disk sector frame)
+   920                                  	;jne	short prtcmsg_ok	
+   921                                  prtcmsg:
+   922 000007F4 AC                      	lodsb
+   923 000007F5 08C0                    	or	al, al
+   924 000007F7 7404                    	jz	short prtcmsg_ok
+   925 000007F9 AA                      	stosb
+   926 000007FA 47                      	inc 	edi
+   927 000007FB EBF7                    	jmp	short prtcmsg
+   928                                  prtcmsg_ok:
+   929 000007FD C3                      	retn
+   930                                  
+   931                                  bcd_to_ascii:
+   932                                  	; INPUT ->
+   933                                  	;	AL = Packed BCD number
+   934                                  	; OUTPUT ->
+   935                                  	;	AX = ASCII word/number
+   936                                  	;
+   937 000007FE D410                    	db	0D4h, 10h	; Undocumented inst. AAM
+   938                                  				; AH = AL / 10h
+   939                                  				; AL = AL MOD 10h
+   940 00000800 660D3030                	or	ax, '00'	; Make it ASCII based
+   941                                  
+   942 00000804 86E0                            xchg	ah, al 
+   943                                  	
+   944 00000806 C3                      	retn	
+   945                                  
+   946                                  inputbox:
+   947                                  	; Show an input box for user/keyboard input
+   948                                  	; INPUT ->
+   949                                  	;	ESI = input structure address 
+   950                                  	; OUTPUT ->
+   951                                  	;	DX  = cursor position for input
+   952                                  	;	input box will be displayed (on tty0)
+   953                                  	;
+   954                                  	; Modified registers: eax, ebx, ecx, edx, esi, edi
+   955                                  
+   956 00000807 C605[58180000]00        	mov	byte [inds], 0 ; for ENTER key handling
+   957 0000080E 31C9                    	xor	ecx, ecx
+   958 00000810 BB[641B0000]            	mov	ebx, video_buffer
+   959 00000815 B818500000              	mov	eax, 5018h ; 80, 24
+   960 0000081A 668B16                  	mov	dx, [esi] ; box width (dl)
+   961                                  			  ; box height (dh)
+   962 0000081D 28F0                    	sub	al, dh
+   963 0000081F D0E8                    	shr	al, 1
+   964 00000821 A2[5B180000]            	mov	[ibcp+1], al ; row
+   965 00000826 F6E4                    	mul	ah
+   966 00000828 66D1E0                  	shl	ax, 1  ; char + attribute
+   967 0000082B 01C3                    	add	ebx, eax
+   968 0000082D B050                    	mov	al, 80
+   969 0000082F 28D0                    	sub	al, dl
+   970 00000831 D0E8                    	shr	al, 1 
+   971 00000833 A2[5A180000]            	mov	[ibcp], al ; column
+   972 00000838 D0E0                    	shl	al, 1  ; char + attribute
+   973 0000083A 28E4                    	sub	ah, ah
+   974 0000083C 01C3                    	add	ebx, eax
+   975 0000083E 8A6605                  	mov	ah, [esi+5] ; color attributes
+   976 00000841 B020                    	mov	al, 20h	; space/blank
+   977 00000843 88F1                    	mov	cl, dh ; height
+   978                                  ib0:
+   979 00000845 51                      	push	ecx
+   980 00000846 88D1                    	mov	cl, dl
+   981 00000848 89DF                    	mov	edi, ebx	
+   982 0000084A F366AB                  	rep	stosw
+   983 0000084D 59                      	pop	ecx
+   984 0000084E 81C3A0000000            	add	ebx, 80*2 ; number of columns * 2
+   985 00000854 E2EF                    	loop	ib0
+   986                                  	;
+   987 00000856 BF[641B0000]            	mov	edi, video_buffer
+   988 0000085B A0[5B180000]            	mov	al, [ibcp+1] ; row position
+   989 00000860 024602                  	add	al, [esi+2] ; label offset (row)
+   990 00000863 A2[5B180000]            	mov	[ibcp+1], al
+   991 00000868 B4A0                    	mov	ah, 80*2
+   992 0000086A F6E4                    	mul	ah
+   993 0000086C 01C7                    	add	edi, eax
+   994 0000086E A0[5A180000]            	mov	al, [ibcp] ; column position
+   995 00000873 024603                  	add	al, [esi+3] ; label offset (column)
+   996 00000876 A2[5A180000]            	mov	[ibcp], al
+   997 0000087B 30E4                    	xor	ah, ah
+   998 0000087D D0E0                    	shl	al, 1
+   999 0000087F 01C7                    	add	edi, eax
+  1000 00000881 89F3                    	mov	ebx, esi
+  1001 00000883 83C606                  	add	esi, 6 ; Label offset
+  1002                                  ib2:
+  1003 00000886 AC                      	lodsb
+  1004 00000887 08C0                    	or	al, al
+  1005 00000889 7406                    	jz	short ib3
+  1006 0000088B AA                      	stosb
+  1007 0000088C 47                      	inc 	edi	
+  1008 0000088D FEC1                    	inc	cl
+  1009 0000088F EBF5                    	jmp	short ib2
+  1010                                  ib3:
+  1011 00000891 000D[5A180000]          	add	[ibcp], cl ; column position
+  1012 00000897 893D[4C180000]          	mov	[current_txtpos], edi
+  1013                                  	;
+  1014 0000089D 8A4B04                  	mov	cl, [ebx+4] ; input char count
+  1015 000008A0 08C9                    	or	cl, cl
+  1016 000008A2 7407                    	jz	short ib5 ; message box (no input)	
+  1017 000008A4 B020                    	mov	al, 20h
+  1018 000008A6 B407                    	mov	ah, 07h ; black background
+  1019                                  			; light gray fore color	
+  1020                                  ib4:
+  1021 000008A8 F366AB                  	rep	stosw
+  1022                                  ib5:	
+  1023 000008AB E874FEFFFF              	call	video_page_update
+  1024 000008B0 668B15[5A180000]        	mov	dx, [ibcp] ; cursor position
+  1025 000008B7 C3                      	retn
+  1026                                  
+  1027                                  hide_cursor:
+  1028                                        	;CH = cursor start line (bits 0-4) 
+  1029                                  	;     and options (bits 5-7).
+  1030                                  	;CL = bottom cursor line (bits 0-4).
+  1031                                  	; when bit 5 of CH is set to 0, the cursor is visible. 
+  1032                                  	; when bit 5 is 1, the cursor is not visible. 
+  1033                                  	; hide blinking text cursor: 
+  1034 000008B8 51                              push	ecx
+  1035 000008B9 B520                    	mov 	ch, 32
+  1036 000008BB 30FF                    	xor	bh, bh ; video page 0
+  1037 000008BD EB0F                    	jmp	short hc_sc
+  1038                                  
+  1039                                  show_cursor:
+  1040                                    	; dh = row
+  1041                                  	; dl = column
+  1042 000008BF 51                      	push	ecx
+  1043 000008C0 668915[50180000]        	mov	[cursor_posn], dx
+  1044 000008C7 E8B80E0000              	call	set_cposx
+  1045                                  	;
+  1046                                  	;show box-shaped blinking text cursor
+  1047 000008CC B50D                    	mov	ch, 13
+  1048                                  hc_sc:
+  1049 000008CE B10F                            mov 	cl, 15
+  1050 000008D0 B401                            mov 	ah, 1
+  1051 000008D2 CD31                            int 	31h
+  1052 000008D4 59                      	pop	ecx
+  1053 000008D5 C3                      	retn
+  1054                                  
+  1055                                  set_disk_parms:
+  1056                                  	; 26/08/2020
+  1057 000008D6 8A15[5D180000]          	mov	dl, [drv]
+  1058 000008DC 80FA80                  	cmp	dl, 80h
+  1059 000008DF 7249                    	jb	short set_disk_parms_fd ; floppy
+  1060 000008E1 2401                    	and	al, 1  ; LBA ready ?
+  1061 000008E3 7451                    	jz	short set_disk_parms_chs
+  1062                                  set_disk_parms_lba:
+  1063                                  	; 28/08/2020
+  1064                                  	;; Translated FDPT
+  1065                                  	;mov	ax, [ebx+9]  ; physical cylinders
+  1066                                  	;mov	dh, [ebx+11] ; physical heads
+  1067                                  	;mov	cl, [ebx+4]  ; physical sectors per track 
+  1068                                  	;jmp	short sdp0
+  1069                                  
+  1070                                  	; 28/08/2020 
+  1071                                  	; TRDOS 386 kernel, INT 33h, Function 15h modification
+  1072                                  	; (Read DASD type) get disk size function return:
+  1073                                  	; ah = 03h (eax = 300h)
+  1074                                  	; cx:dx = disk size (LBA disk dize)
+  1075                                  	
+  1076 000008E5 B415                    	mov	ah, 15h
+  1077                                  	;;sub	al, al
+  1078                                  	;mov	dl, [drv]
+  1079 000008E7 CD33                    	int	33h
+  1080                                  	;jnc	short set_disk_parms_lba_exact
+  1081                                  
+  1082                                  	;; Translated FDPT
+  1083                                  	;mov	ax, [ebx+9]  ; physical cylinders
+  1084                                  	;mov	dh, [ebx+11] ; physical heads
+  1085                                  	;mov	cl, [ebx+4]  ; physical sectors per track 
+  1086                                  	;mov	dl, [drv]
+  1087                                  	;jmp	short sdp0
+  1088                                  
+  1089                                  ;set_disk_parms_lba_exact
+  1090                                  	; 28/08/2020
+  1091 000008E9 6689C8                  	mov	ax, cx ; hw of disk size
+  1092 000008EC C1E010                  	shl	eax, 16
+  1093 000008EF 6689D0                  	mov	ax, dx ; lw of disk size
+  1094 000008F2 0FB61D[5D180000]        	movzx	ebx, byte [drv] ; physical disk drive number
+  1095 000008F9 80EB7E                  	sub	bl, 07Eh ; hd0 = 2
+  1096 000008FC C0E302                  	shl	bl, 2 ; * 4
+  1097 000008FF 8983[88180000]          	mov	[ebx+drv_size], eax ; 32 bit LBA disk size
+  1098 00000905 D0EB                    	shr	bl, 1 ; / 2
+  1099 00000907 66C783[70180000]FF-     	mov	word [ebx+drv_heads], 255 ; virtual heads
+  1099 0000090F 00                 
+  1100 00000910 66C783[7C180000]3F-     	mov	word [ebx+drv_spt], 63 ; virtual sectors per track
+  1100 00000918 00                 
+  1101 00000919 B9C13E0000              	mov	ecx, 16065 ; 255*63	
+  1102 0000091E 31D2                    	xor	edx, edx
+  1103 00000920 F7F1                    	div	ecx
+  1104                                  	; eax = ax = cylinders
+  1105 00000922 668983[64180000]        	mov	[ebx+drv_cylinders], ax
+  1106 00000929 C3                      	retn
+  1107                                  
+  1108                                  set_disk_parms_fd:
+  1109                                  	;mov	al, ch ; last cylinder (bits 0-7)
+  1110                                  	;mov	ah, cl ; 
+  1111                                  	;shr	ah, 6  ; last cylinder (bits 8-9)
+  1112 0000092A 6640                    	inc	ax  ; convert max. cyl number to cyl count
+  1113 0000092C 88E8                    	mov	al, ch
+  1114 0000092E FEC0                    	inc	al
+  1115 00000930 28E4                    	sub	ah, ah
+  1116 00000932 FEC6                    	inc	dh  ; convert last head to heads
+  1117                                  	;and	cl, 63 ; sectors per track
+  1118 00000934 EB09                    	jmp	short sdp0  
+  1119                                  
+  1120                                  set_disk_parms_chs:
+  1121                                  	; Standard FDPT
+  1122 00000936 668B03                  	mov	ax, [ebx]  ; physical cylinders
+  1123 00000939 8A7302                  	mov	dh, [ebx+2] ; physical heads
+  1124 0000093C 8A4B0E                  	mov	cl, [ebx+14] ; physical sectors per track 
+  1125                                  sdp0:
+  1126 0000093F 0FB6DA                  	movzx   ebx, dl
+  1127 00000942 80FB80                  	cmp	bl, 80h
+  1128 00000945 7203                    	jb	short sdp1
+  1129 00000947 80EB7E                  	sub	bl, 7Eh
+  1130                                  sdp1:	
+  1131 0000094A D0E3                    	shl	bl, 1
+  1132 0000094C 81C3[64180000]          	add	ebx, drv_cylinders
+  1133 00000952 668903                  	mov	[ebx], ax
+  1134 00000955 6650                    	push	ax ; ** cylinders
+  1135 00000957 81EB[64180000]          	sub	ebx, drv_cylinders
+  1136 0000095D 81C3[70180000]          	add	ebx, drv_heads
+  1137 00000963 88F0                    	mov	al, dh ; heads
+  1138 00000965 30E4                    	xor	ah, ah
+  1139 00000967 668903                  	mov	[ebx], ax
+  1140 0000096A 81EB[70180000]          	sub     ebx, drv_heads
+  1141 00000970 81C3[7C180000]          	add     ebx, drv_spt
+  1142 00000976 6683E13F                	and	cx, 3Fh  ; sectors (bits 0-6)
+  1143 0000097A 66890B                  	mov	[ebx], cx ; sectors per track
+  1144 0000097D 81EB[7C180000]          	sub     ebx, drv_spt
+  1145 00000983 66D1E3                  	shl	bx, 1
+  1146 00000986 81C3[88180000]          	add	ebx, drv_size ; disk size (in sectors)
+  1147                                  	; LBA size = cylinders * heads * secpertrack
+  1148 0000098C 66F7E1                  	mul	cx 
+  1149 0000098F 6689C2                  	mov	dx, ax ; heads*spt					
+  1150 00000992 6658                    	pop	ax ; ** cylinders
+  1151 00000994 803D[5D180000]80        	cmp	byte [drv], 80h
+  1152 0000099B 7202                    	jb	short sdp2
+  1153 0000099D 6648                    	dec	ax ; 1 cylinder reserved (!?)
+  1154                                  sdp2:
+  1155 0000099F 66F7E2                  	mul	dx ; cylinders * (heads*spt)		
+  1156 000009A2 668903                  	mov	[ebx], ax
+  1157 000009A5 66895302                	mov	[ebx+2], dx
+  1158                                  	;
+  1159 000009A9 C3                      	retn	
+  1160                                  
+  1161                                  ;set_disk_parms
+  1162                                  ;	movzx   ebx, byte [drv]
+  1163                                  ;	cmp	bl, 80h
+  1164                                  ;	jb	short sdp0
+  1165                                  ;	sub	bl, 7Eh
+  1166                                  ;sdp0:	
+  1167                                  ;	;add	ebx, drv_status
+  1168                                  ;	;mov     byte [ebx], 80h ; 'Present' flag
+  1169                                  ;	;
+  1170                                  ;	mov	al, ch ; last cylinder (bits 0-7)
+  1171                                  ;	mov	ah, cl ; 
+  1172                                  ;	shr	ah, 6  ; last cylinder (bits 8-9)
+  1173                                  ;	;sub	ebx, drv_status
+  1174                                  ;	shl	bl, 1
+  1175                                  ;	add	ebx, drv_cylinders
+  1176                                  ;	inc	ax  ; convert max. cyl number to cyl count		
+  1177                                  ;	mov	[ebx], ax
+  1178                                  ;	push	ax ; ** cylinders
+  1179                                  ;	sub	ebx, drv_cylinders
+  1180                                  ;	add	ebx, drv_heads
+  1181                                  ;	mov	al, dh ; last head number
+  1182                                  ;	xor	ah, ah
+  1183                                  ;	inc	ax     ; heads 	
+  1184                                  ;	mov	[ebx], ax
+  1185                                  ;	sub     ebx, drv_heads
+  1186                                  ;	add     ebx, drv_spt
+  1187                                  ;	and	cx, 3Fh  ; sectors (bits 0-6)
+  1188                                  ;	mov	[ebx], cx
+  1189                                  ;	sub     ebx, drv_spt
+  1190                                  ;	shl	bx, 1
+  1191                                  ;	add	ebx, drv_size ; disk size (in sectors)
+  1192                                  ;	; LBA size = cylinders * heads * secpertrack
+  1193                                  ;	mul	cx 
+  1194                                  ;	mov	dx, ax ; heads*spt					
+  1195                                  ;	pop	ax ; ** cylinders
+  1196                                  ;	cmp	byte [drv], 80h
+  1197                                  ;	jb	short sdp1
+  1198                                  ;	dec	ax ; 1 cylinder reserved (!?)
+  1199                                  ;sdp1:
+  1200                                  ;	mul	dx ; cylinders * (heads*spt)		
+  1201                                  ;	mov	[ebx], ax
+  1202                                  ;	mov	[ebx+2], dx
+  1203                                  ;	;
+  1204                                  ;	retn
+  1205                                  
+  1206                                  read_disk_sector:
+  1207                                  	; EAX = sector number (LBA)
+  1208                                  	;
+  1209 000009AA 0FB61D[8A150000]        	movzx	ebx, byte [ds_drv]
+  1210 000009B1 88DA                    	mov	dl, bl	
+  1211 000009B3 80FA02                  	cmp	dl, 2
+  1212 000009B6 7203                    	jb	short rd0
+  1213 000009B8 80C27E                  	add	dl, 7Eh  ; 80h, 81h, 82h, 83h
+  1214                                  rd0:
+  1215 000009BB 89DE                    	mov	esi, ebx
+  1216 000009BD 8815[5D180000]          	mov	[drv], dl
+  1217 000009C3 81C3[5E180000]          	add	ebx, drv_status
+  1218 000009C9 8A33                    	mov	dh, [ebx]
+  1219                                  rd1:
+  1220 000009CB 80FEF0                  	cmp	dh, 0F0h
+  1221 000009CE F5                      	cmc
+  1222 000009CF 7262                            jc      short rd_lba_fails
+  1223                                  	;
+  1224 000009D1 89F3                    	mov	ebx, esi
+  1225 000009D3 C0E302                  	shl	bl, 2
+  1226 000009D6 81C3[40190000]          	add	ebx, ds_sec
+  1227 000009DC 8B03                    	mov	eax, [ebx]
+  1228 000009DE 81EB[40190000]          	sub	ebx, ds_sec
+  1229 000009E4 81C3[88180000]                  add     ebx, drv_size 
+  1230 000009EA 3B03                    	cmp	eax, [ebx] ; Last sector + 1 (number of secs.)
+  1231 000009EC F5                      	cmc
+  1232 000009ED 7244                            jc      short rd_lba_fails
+  1233                                  	;
+  1234 000009EF F6C601                  	test	dh, 1 ; LBA ready ?
+  1235 000009F2 7440                            jz      short rd_chs
+  1236                                  rd_lba:
+  1237                                  	; LBA read (private function)
+  1238                                  	;((Retro UNIX 386 v1 - DISK I/O Test))
+  1239 000009F4 81C6[5E180000]          	add	esi, drv_status
+  1240 000009FA 80268F                  	and	byte [esi], 8Fh ; clear error bits
+  1241                                  	;
+  1242 000009FD 89C1                    	mov	ecx, eax ; Logical Block/Sector Address
+  1243 000009FF C1EB10                  	shr	ebx, 16
+  1244 00000A02 BB[5C190000]                    mov     ebx, sector_buffer
+  1245 00000A07 8A15[5D180000]          	mov	dl, [drv]
+  1246 00000A0D C605[5C180000]04        	mov	byte [retry_count], 4
+  1247                                  rd_lba_retry:
+  1248 00000A14 B41B                    	mov	ah, 1Bh ; LBA read (private function)		
+  1249 00000A16 B001                    	mov	al, 1
+  1250 00000A18 CD33                    	int	33h	; TRDOS 386 disk io interrupt
+  1251 00000A1A 7317                    	jnc	short rd_lba_ok
+  1252                                  
+  1253 00000A1C 80FC80                  	cmp	ah, 80h ; time out ?
+  1254 00000A1F 7411                    	je	short rd_lba_rfails
+  1255 00000A21 FE0D[5C180000]          	dec	byte [retry_count]
+  1256 00000A27 7409                    	jz	short rd_lba_rfails
+  1257                                  	
+  1258 00000A29 B40D                    	mov	ah, 0Dh ; Alternate reset
+  1259 00000A2B CD33                    	int	33h	; TRDOS 386 disk io interrupt
+  1260 00000A2D 73E5                            jnc     short rd_lba_retry
+  1261 00000A2F 800EF0                  	or	byte [esi], 0F0h ; drive not ready !
+  1262                                  rd_lba_rfails:
+  1263 00000A32 F9                      	stc
+  1264                                  rd_lba_fails:
+  1265                                  rd_lba_ok:
+  1266 00000A33 C3                      	retn
+  1267                                  	;
+  1268                                  	; CHS read (convert LBA address to CHS values)	;	
+  1269                                  rd_chs:
+  1270 00000A34 D1E6                    	shl	esi, 1
+  1271 00000A36 89F3                    	mov	ebx, esi
+  1272 00000A38 31D2                    	xor	edx, edx ; 0
+  1273 00000A3A 29C9                    	sub	ecx, ecx 
+  1274 00000A3C 81C3[7C180000]                  add     ebx, drv_spt
+  1275 00000A42 668B0B                  	mov	cx, [ebx] ; sector per track
+  1276                                                  ; EAX = sector address (LBA)
+  1277 00000A45 F7F1                    	div	ecx
+  1278 00000A47 88D1                    	mov	cl, dl	; sector number - 1
+  1279 00000A49 FEC1                    	inc	cl	; sector number (1 based)
+  1280 00000A4B 6651                    	push	cx
+  1281 00000A4D 89F3                    	mov	ebx, esi
+  1282 00000A4F 81C3[70180000]                  add     ebx, drv_heads
+  1283 00000A55 668B0B                  	mov	cx, [ebx] ; heads
+  1284 00000A58 31D2                    	xor	edx, edx
+  1285                                  		; EAX = cylinders * heads + head
+  1286 00000A5A F7F1                    	div	ecx
+  1287 00000A5C 6659                    	pop	cx     ; sector number
+  1288 00000A5E 88D6                    	mov	dh, dl ; head number
+  1289 00000A60 8A15[5D180000]          	mov	dl, [drv]
+  1290 00000A66 88C5                    	mov	ch, al ; cylinder (bits 0-7)
+  1291 00000A68 C0E406                  	shl	ah, 6
+  1292 00000A6B 08E1                    	or	cl, ah ; cylinder (bits 8-9)
+  1293                                  		       ; sector (bits 0-7)
+  1294 00000A6D BB[5C190000]                    mov     ebx, sector_buffer
+  1295                                  		; CL = sector (bits 0-6)
+  1296                                  		;      cylinder (bits 7-8 -> bits 8-9)
+  1297                                  		; CH = cylinder (bits 0-7)
+  1298                                  		; DH = head
+  1299                                  		; DL = drive
+  1300                                  
+  1301 00000A72 D1EE                    	shr	esi, 1 ; drive index (byte alignment)
+  1302 00000A74 81C6[5E180000]          	add	esi, drv_status
+  1303 00000A7A 80268F                  	and	byte [esi], 8Fh ; clear error bits
+  1304                                  	;
+  1305 00000A7D C605[5C180000]04        	mov	byte [retry_count], 4
+  1306                                  rd_retry:	
+  1307 00000A84 B402                    	mov	ah, 02h ; read sectors
+  1308 00000A86 B001                    	mov	al, 1 ; sector count	
+  1309 00000A88 CD33                    	int	33h	; TRDOS 386 disk io interrupt
+  1310 00000A8A 7320                    	jnc	short rd_ok
+  1311 00000A8C 80FC80                  	cmp	ah, 80h ; time out ?
+  1312 00000A8F 7408                    	je	short rd_rfails
+  1313 00000A91 FE0D[5C180000]          	dec	byte [retry_count]
+  1314 00000A97 7502                    	jnz	short rd_reset
+  1315                                  rd_rfails:
+  1316 00000A99 F9                      	stc
+  1317                                  rd_fails:
+  1318 00000A9A C3                      	retn
+  1319                                  rd_reset:
+  1320 00000A9B 28E4                    	sub	ah, ah
+  1321 00000A9D 80FA80                  	cmp	dl, 80h
+  1322 00000AA0 7202                    	jb	short rd_fd_reset
+  1323 00000AA2 B40D                    	mov	ah, 0Dh ; Alternate reset
+  1324                                  rd_fd_reset:
+  1325 00000AA4 CD33                    	int	33h	; TRDOS 386 disk io interrupt
+  1326 00000AA6 73DC                            jnc     short rd_retry
+  1327 00000AA8 800EF0                  	or	byte [esi], 0F0h ; drive not ready !
+  1328 00000AAB F9                      	stc
+  1329                                  rd_ok:
+  1330 00000AAC C3                      	retn
+  1331                                  
+  1332                                  clear_screen:
+  1333 00000AAD BF[641B0000]            	mov	edi, video_buffer
+  1334 00000AB2 B9D0070000              	mov	ecx, 80*25
+  1335 00000AB7 66B82007                        mov     ax, 0720h ; light gray char space (blank)
+  1336 00000ABB F366AB                  	rep	stosw
+  1337                                  
+  1338 00000ABE E861FCFFFF              	call	video_page_update
+  1339                                  
+  1340 00000AC3 6631D2                          xor     dx, dx    ; column 0, row 0
+  1341 00000AC6 E9B90C0000              	jmp	set_cposx ; set cursor position
+  1342                                  
+  1343                                  rfdp_err:
+  1344 00000ACB E8DDFFFFFF              	call	clear_screen
+  1345 00000AD0 BE[0B180000]            	mov	esi, drv_not_ready
+  1346 00000AD5 E919030000              	jmp	print_msg	
+  1347                                  
+  1348                                  dskprm:
+  1349                                  	; DISPLAY DISK PARAMETERS TABLE
+  1350                                  	;
+  1351                                  	; INPUT -> DL = Disk/Drive #
+  1352                                  	; 
+  1353 00000ADA 8815[5D180000]          	mov	byte [drv], dl  ; 0,1,80h,81h,82h,83h 
+  1354                                  	;
+  1355 00000AE0 F6C280                  	test	dl, 80h
+  1356 00000AE3 7403                    	jz	short dskprm0
+  1357 00000AE5 80EA7E                  	sub	dl, 7Eh ; hd0 = 2
+  1358                                  dskprm0:
+  1359 00000AE8 0FB6DA                  	movzx	ebx, dl
+  1360 00000AEB 81C3[5E180000]          	add	ebx, drv_status
+  1361                                  
+  1362 00000AF1 803B80                  	cmp	byte [ebx], 80h  ; existing ?
+  1363 00000AF4 72D5                    	jb	short rfdp_err
+  1364                                  	;
+  1365 00000AF6 E8B2FFFFFF              	call	clear_screen	 ; clear video page 0	
+  1366                                  	;
+  1367 00000AFB 8A1D[5D180000]                  mov	bl, [drv]
+  1368 00000B01 F6C380                  	test	bl, 80h
+  1369 00000B04 0F85F7000000                    jnz     print_hdpt
+  1370                                  
+  1371 00000B0A 0FB6F3                  	movzx	esi, bl
+  1372 00000B0D 80C330                  	add	bl, 30h	; '0'
+  1373 00000B10 881D[A30E0000]          	mov	byte [flpdnum], bl
+  1374 00000B16 81C6[22180000]          	add	esi, fd0_type
+  1375 00000B1C 8A06                    	mov	al, [esi]
+  1376 00000B1E A2[DA0E0000]                    mov     byte [flpdtype], al 
+  1377                                                                     ; floppy disk drive type
+  1378                                  				   ; (1=360K, 2=1.2M, 3=720K, 4=1.44M)
+  1379                                  print_flpdpt:
+  1380                                  	; Writing the Diskette Parameter Table on screen
+  1381 00000B23 C0E304                  	shl	bl, 4 ; * 16
+  1382 00000B26 0FB6F3                  	movzx	esi, bl
+  1383 00000B29 81C6[A0180000]          	add	esi, fd0_dpt
+  1384 00000B2F AC                      	lodsb 	; bits 0-3: SRT step rate time
+  1385                                  		; bits 4-7: head unload time
+  1386 00000B30 BF[240F0000]            	mov	edi, rSrtHdUnld
+  1387 00000B35 E8AC000000              	call	write_hex
+  1388 00000B3A AC                      	lodsb 	; bit 0: 1=use DMA
+  1389                                  		; bits 2-7: head load time
+  1390 00000B3B BF[6C0F0000]            	mov	edi, rDmaHdLd
+  1391 00000B40 E8A1000000              	call	write_hex
+  1392 00000B45 AC                      	lodsb 	; 55-ms increments 
+  1393                                  		; before turning disk motor off
+  1394 00000B46 BF[B30F0000]            	mov	edi, bMotorOff
+  1395 00000B4B E896000000              	call	write_hex
+  1396 00000B50 AC                      	lodsb 	; sector size
+  1397                                  		; (0=128, 1=256, 2=512, 3=1024)
+  1398 00000B51 BF[F80F0000]            	mov	edi, bSectSize
+  1399 00000B56 E88B000000              	call	write_hex
+  1400 00000B5B AC                      	lodsb 	; EOT (last sector on a track)
+  1401 00000B5C BF[24100000]            	mov	edi, bLastTrack
+  1402 00000B61 E880000000              	call	write_hex
+  1403 00000B66 AC                      	lodsb 	; gap length 
+  1404                                  		; for read/write operations
+  1405 00000B67 BF[40100000]            	mov	edi, bGapLen
+  1406 00000B6C E875000000              	call	write_hex
+  1407 00000B71 AC                      	lodsb 	; DTL (Data Transfer Length)
+  1408                                  		; max transfer when length not set	
+  1409 00000B72 BF[5C100000]            	mov	edi, bDTL
+  1410 00000B77 E86A000000              	call	write_hex
+  1411 00000B7C AC                      	lodsb 	; gap length for format operation
+  1412 00000B7D BF[78100000]            	mov	edi, bGapFmt
+  1413 00000B82 E85F000000              	call	write_hex
+  1414 00000B87 AC                      	lodsb 	; fill character for format 
+  1415                                  		; (normally F6H)
+  1416 00000B88 BF[94100000]            	mov	edi, bFillChar
+  1417 00000B8D E854000000              	call	write_hex
+  1418 00000B92 AC                      	lodsb 	; head-settle time
+  1419                                  		; (in milliseconds)
+  1420 00000B93 BF[BF100000]            	mov	edi, bHdSettle
+  1421 00000B98 E849000000              	call	write_hex
+  1422 00000B9D AC                      	lodsb 	; motor-startup time
+  1423                                  		; (in 1/8th-second intervals)
+  1424 00000B9E BF[E8100000]            	mov	edi, bMotorOn
+  1425 00000BA3 E83E000000              	call	write_hex
+  1426                                  	;
+  1427                                  	; (extension, not in original bios function)
+  1428 00000BA8 AC                      	lodsb	; Max. track number
+  1429 00000BA9 BF[22110000]            	mov	edi, bMaxTrack
+  1430 00000BAE E833000000              	call	write_hex
+  1431 00000BB3 AC                      	lodsb	; Data transfer rate
+  1432 00000BB4 BF[3E110000]            	mov	edi, bDataRate
+  1433 00000BB9 E828000000              	call	write_hex
+  1434                                  	;
+  1435 00000BBE A0[5D180000]            	mov	al, [drv]
+  1436 00000BC3 0430                    	add	al, 30h ; '0'
+  1437 00000BC5 A2[A30E0000]                    mov     byte [flpdnum], al
+  1438 00000BCA BE[9B0E0000]                    mov     esi, FLPDPT
+  1439 00000BCF E81F020000              	call	print_msg
+  1440 00000BD4 C3                      	retn
+  1441                                  
+  1442                                  write_dhex:
+  1443 00000BD5 88E3                    	mov	bl, ah
+  1444 00000BD7 C0EB04                          shr     bl, 4
+  1445 00000BDA E813000000                      call    dhgd
+  1446 00000BDF 88E3                    	mov	bl, ah
+  1447 00000BE1 E80C000000              	call	dhgd
+  1448                                  
+  1449                                  write_hex:
+  1450 00000BE6 88C3                    	mov	bl, al
+  1451 00000BE8 C0EB04                          shr     bl, 4
+  1452 00000BEB E802000000              	call	dhgd
+  1453 00000BF0 88C3                    	mov	bl, al
+  1454                                  	;call	dhgd
+  1455                                  	;retn
+  1456                                  dhgd:
+  1457 00000BF2 50                      	push	eax
+  1458 00000BF3 83E30F                  	and	ebx, 0Fh
+  1459 00000BF6 81C3[7A150000]                  add     ebx, hex_digits
+  1460 00000BFC 8A03                            mov     al, [ebx]
+  1461 00000BFE AA                      	stosb
+  1462 00000BFF 58                      	pop	eax
+  1463 00000C00 C3                      	retn
+  1464                                  
+  1465                                  print_hdpt:
+  1466                                  	;mov	bl, [drv]
+  1467 00000C01 80E303                  	and	bl, 3
+  1468 00000C04 88D8                    	mov	al, bl
+  1469 00000C06 0402                    	add	al, 2
+  1470 00000C08 A2[5D180000]            	mov	[drv], al
+  1471                                  	;
+  1472 00000C0D C0E305                  	shl	bl, 5 ; * 32
+  1473 00000C10 0FB6F3                  	movzx	esi, bl
+  1474 00000C13 81C6[C0180000]          	add	esi, hd0_dpt  
+  1475                                  	;
+  1476 00000C19 807E03A0                	cmp	byte [esi+3], 0A0h ; Translated table
+  1477 00000C1D 0F84EB000000                    je      print_thdpt       ; indicator
+  1478                                  	;
+  1479                                  	; Writing Fixed Disk Parameter Table on screen
+  1480 00000C23 66AD                    	lodsw 	; Number of Cylinders
+  1481 00000C25 BF[B1110000]            	mov	edi, cylnum
+  1482 00000C2A E8A6FFFFFF              	call	write_dhex
+  1483 00000C2F AC                      	lodsb	; Number of Heads
+  1484 00000C30 BF[CE110000]            	mov	edi, headnum
+  1485 00000C35 E8ACFFFFFF              	call	write_hex
+  1486 00000C3A AC                      	lodsb	; Reserved
+  1487 00000C3B BF[E9110000]            	mov	edi, rsvd3
+  1488 00000C40 E8A1FFFFFF              	call	write_hex
+  1489 00000C45 AC                      	lodsb	; Reserved
+  1490 00000C46 BF[04120000]            	mov	edi, rsvd4
+  1491 00000C4B E896FFFFFF              	call	write_hex
+  1492 00000C50 66AD                    	lodsw	; Precompensation (Obsolete)
+  1493 00000C52 BF[1F120000]            	mov	edi, pcompnum
+  1494 00000C57 E879FFFFFF              	call	write_dhex
+  1495 00000C5C AC                      	lodsb	; Reserved
+  1496 00000C5D BF[3C120000]            	mov	edi, rsvd7
+  1497 00000C62 E87FFFFFFF              	call	write_hex
+  1498 00000C67 AC                      	lodsb	; Drive Control Byte
+  1499 00000C68 BF[57120000]            	mov	edi, dcbnum
+  1500 00000C6D E874FFFFFF              	call	write_hex
+  1501 00000C72 66AD                    	lodsw	; Reserved
+  1502 00000C74 BF[72120000]            	mov	edi, rsvd9
+  1503 00000C79 E857FFFFFF              	call	write_dhex
+  1504 00000C7E AC                      	lodsb	; Reserved
+  1505 00000C7F BF[8F120000]            	mov	edi, rsvd11
+  1506 00000C84 E85DFFFFFF              	call	write_hex
+  1507 00000C89 66AD                    	lodsw	; Landing Zone (Obsolete)
+  1508 00000C8B BF[AA120000]            	mov	edi, lzonenum
+  1509 00000C90 E840FFFFFF              	call	write_dhex
+  1510 00000C95 AC                      	lodsb	; Sectors per Track
+  1511 00000C96 BF[C7120000]            	mov	edi, psptnum
+  1512 00000C9B E846FFFFFF              	call	write_hex
+  1513 00000CA0 AC                      	lodsb	; Reserved
+  1514 00000CA1 BF[E2120000]            	mov	edi, rsvd15
+  1515 00000CA6 E83BFFFFFF              	call	write_hex
+  1516                                  	;
+  1517                                  	; (extension, not in original bios function)
+  1518 00000CAB 66AD                    	lodsw	; I/O Port Base Address
+  1519 00000CAD BF[FF120000]            	mov	edi, bPortAddr
+  1520 00000CB2 E81EFFFFFF              	call	write_dhex
+  1521                                  	; 06/01/2015
+  1522 00000CB7 66AD                    	lodsw	; Control Port Address
+  1523 00000CB9 BF[1C130000]            	mov	edi, cPortAddr
+  1524 00000CBE E812FFFFFF              	call	write_dhex
+  1525 00000CC3 AC                      	lodsb	; Head Register Upper Nibble 
+  1526 00000CC4 BF[39130000]            	mov	edi, hregupnib
+  1527 00000CC9 E818FFFFFF              	call	write_hex
+  1528                                  	;
+  1529 00000CCE A0[5D180000]            	mov     al, [drv]
+  1530 00000CD3 88C3                    	mov	bl, al
+  1531 00000CD5 0430                    	add	al, '0'
+  1532 00000CD7 A2[79110000]                    mov     [dsknum], al
+  1533                                  	;	      
+  1534 00000CDC C0E302                  	shl	bl, 2
+  1535 00000CDF 0FB6F3                  	movzx	esi, bl
+  1536 00000CE2 81C6[88180000]                  add     esi, drv_size
+  1537 00000CE8 668B4602                	mov	ax, [esi+2]
+  1538 00000CEC BF[56130000]                    mov     edi, disksize
+  1539 00000CF1 E8DFFEFFFF              	call	write_dhex
+  1540 00000CF6 668B06                  	mov	ax, [esi]
+  1541 00000CF9 BF[5A130000]            	mov	edi, disksize+4
+  1542 00000CFE E8D2FEFFFF              	call	write_dhex	
+  1543                                  	;
+  1544 00000D03 BE[71110000]                    mov     esi, HDPT
+  1545 00000D08 E8E6000000              	call	print_msg
+  1546 00000D0D C3                      	retn
+  1547                                  
+  1548                                  print_thdpt:
+  1549                                  	; Writing the Translated FDPT on screen
+  1550                                  	; (PHOENIX - EDD specification v1.1)
+  1551 00000D0E 66AD                    	lodsw 	; Logical Numbers of Cylinders, Limit 1024
+  1552 00000D10 BF[AF130000]            	mov	edi, lcylnum
+  1553 00000D15 E8BBFEFFFF              	call	write_dhex
+  1554 00000D1A AC                      	lodsb	; Logical Numbers of Heads, Limit 256
+  1555 00000D1B BF[CC130000]            	mov	edi, lheadnum
+  1556 00000D20 E8C1FEFFFF              	call	write_hex
+  1557 00000D25 AC                      	lodsb	; A0h signature, indicates translated table
+  1558 00000D26 BF[E7130000]            	mov	edi, tsignum
+  1559 00000D2B E8B6FEFFFF              	call	write_hex
+  1560 00000D30 AC                      	lodsb	; Physical Sectors per Track
+  1561 00000D31 BF[02140000]            	mov	edi, tpsptnum
+  1562 00000D36 E8ABFEFFFF              	call	write_hex
+  1563 00000D3B 66AD                    	lodsw	; Precompensation (Obsolete)
+  1564 00000D3D BF[1D140000]            	mov	edi, tpcompnum
+  1565 00000D42 E88EFEFFFF              	call	write_dhex
+  1566 00000D47 AC                      	lodsb	; Reserved
+  1567 00000D48 BF[46140000]            	mov	edi, trsvd7
+  1568 00000D4D E894FEFFFF              	call	write_hex
+  1569 00000D52 AC                      	lodsb	; Drive Control Byte
+  1570 00000D53 BF[61140000]            	mov	edi, tdcbnum
+  1571 00000D58 E889FEFFFF              	call	write_hex
+  1572 00000D5D 66AD                    	lodsw	; Physical Cylinders, limit 65536
+  1573 00000D5F BF[7C140000]            	mov	edi, tpcylnum
+  1574 00000D64 E86CFEFFFF              	call	write_dhex
+  1575 00000D69 AC                      	lodsb	; Physical Heads, limit 16
+  1576 00000D6A BF[99140000]            	mov	edi, tpheadnum
+  1577 00000D6F E872FEFFFF              	call	write_hex
+  1578 00000D74 66AD                    	lodsw	; Landing Zone (Obsolete)
+  1579 00000D76 BF[B4140000]            	mov	edi, tlzonenum
+  1580 00000D7B E855FEFFFF              	call	write_dhex
+  1581 00000D80 AC                      	lodsb	; Logical Sectors per Track, Limit 63
+  1582 00000D81 BF[DD140000]            	mov	edi, lsptnum
+  1583 00000D86 E85BFEFFFF              	call	write_hex
+  1584 00000D8B AC                      	lodsb	; Checksum for translated FDPT 
+  1585 00000D8C BF[F8140000]            	mov	edi, checksum
+  1586 00000D91 E850FEFFFF              	call	write_hex
+  1587                                  	;
+  1588                                  	; (extension, not in original bios function)
+  1589 00000D96 66AD                    	lodsw	; I/O Port Base Address
+  1590 00000D98 BF[15150000]            	mov	edi, tbPortAddr
+  1591 00000D9D E833FEFFFF              	call	write_dhex
+  1592                                  	; 06/01/2015
+  1593 00000DA2 66AD                    	lodsw	; Control Port Address
+  1594 00000DA4 BF[32150000]            	mov	edi, tcPortAddr
+  1595 00000DA9 E827FEFFFF              	call	write_dhex
+  1596 00000DAE AC                      	lodsb	; Head Register Upper Nibble 
+  1597 00000DAF BF[4F150000]            	mov	edi, thregupnib
+  1598 00000DB4 E82DFEFFFF              	call	write_hex
+  1599                                  	;
+  1600 00000DB9 A0[5D180000]            	mov     al, [drv]
+  1601 00000DBE 88C3                    	mov	bl, al
+  1602 00000DC0 0430                    	add	al, '0'
+  1603 00000DC2 A2[6C130000]                    mov     [tdsknum], al
+  1604                                  	;  
+  1605 00000DC7 C0E302                  	shl	bl, 2
+  1606 00000DCA 0FB6F3                  	movzx	esi, bl
+  1607 00000DCD 81C6[88180000]                  add     esi, drv_size
+  1608 00000DD3 668B4602                	mov	ax, [esi+2]
+  1609 00000DD7 BF[6C150000]            	mov	edi, tdisksize
+  1610 00000DDC E8F4FDFFFF              	call	write_dhex
+  1611 00000DE1 668B06                  	mov	ax, [esi]
+  1612 00000DE4 BF[70150000]            	mov	edi, tdisksize+4
+  1613 00000DE9 E8E7FDFFFF              	call	write_dhex	
+  1614                                  	;
+  1615 00000DEE BE[64130000]            	mov     esi, THDPT
+  1616                                  	;call	print_msg
+  1617                                  	;retn
+  1618                                  
+  1619                                  print_msg:
+  1620 00000DF3 66BB0700                	mov	bx, 7
+  1621 00000DF7 B40E                            mov     ah, 0Eh
+  1622                                  pmsg_loop:
+  1623 00000DF9 AC                      	lodsb
+  1624 00000DFA 20C0                    	and	al, al
+  1625 00000DFC 7404                    	jz	short pmsg_ok
+  1626 00000DFE CD31                    	int	31h	; TRDOS 386 video interrupt
+  1627 00000E00 EBF7                    	jmp	short pmsg_loop	
+  1628                                  pmsg_ok:
+  1629 00000E02 B410                    	mov	ah, 10h ; Getchar
+  1630 00000E04 CD32                    	int	32h	; TRDOS 386 keyboard interrupt
+  1631 00000E06 C3                      	retn
+  1632                                  
+  1633                                  	; 28/08/2020
+  1634                                  dskvprm:
+  1635                                  	; DISPLAY (LBA) DISK SIZE AND VIRTUAL CHS PARAMETERS
+  1636                                  	;
+  1637                                  	; INPUT -> DL = Disk/Drive #
+  1638                                  	; 
+  1639 00000E07 8815[5D180000]          	mov	byte [drv], dl  ; 0,1,80h,81h,82h,83h 
+  1640                                  	;
+  1641 00000E0D F6C280                  	test	dl, 80h
+  1642 00000E10 7403                    	jz	short dskvprm0
+  1643 00000E12 80EA7E                  	sub	dl, 7Eh ; hd0 = 2
+  1644                                  dskvprm0:
+  1645 00000E15 0FB6F2                  	movzx	esi, dl
+  1646                                  
+  1647 00000E18 80BE[5E180000]80        	cmp	byte [esi+drv_status], 80h  ; existing ?
+  1648 00000E1F 0F82A6FCFFFF            	jb	rfdp_err
+  1649                                  	;
+  1650 00000E25 E883FCFFFF              	call	clear_screen	 ; clear video page 0	
+  1651                                  	;
+  1652                                  
+  1653 00000E2A 66C1E602                	shl	si, 2 ; * 4
+  1654 00000E2E 668B86[8A180000]        	mov	ax, [esi+drv_size+2]
+  1655 00000E35 BF[30170000]            	mov	edi, lbadisksize
+  1656 00000E3A E896FDFFFF              	call	write_dhex
+  1657 00000E3F 668B86[88180000]        	mov	ax, [esi+drv_size]
+  1658 00000E46 BF[34170000]            	mov	edi, lbadisksize+4
+  1659 00000E4B E885FDFFFF              	call	write_dhex
+  1660 00000E50 66D1EE                  	shr	si, 1
+  1661 00000E53 668B86[64180000]        	mov	ax, [esi+drv_cylinders]
+  1662 00000E5A BF[51170000]            	mov	edi, vcylinders
+  1663 00000E5F E871FDFFFF              	call	write_dhex	
+  1664 00000E64 8A86[70180000]          	mov	al, [esi+drv_heads]
+  1665 00000E6A BF[64170000]            	mov	edi, vheads
+  1666 00000E6F E872FDFFFF              	call	write_hex
+  1667 00000E74 8A86[7C180000]          	mov	al, [esi+drv_spt]
+  1668 00000E7A BF[75170000]            	mov	edi, vspt
+  1669 00000E7F E862FDFFFF              	call	write_hex
+  1670                                  
+  1671 00000E84 6689F0                  	mov	ax, si
+  1672 00000E87 D0E8                    	shr	al, 1
+  1673 00000E89 0430                    	add	al, '0'
+  1674 00000E8B A2[FA160000]            	mov	[vprm_drv], al
+  1675                                  
+  1676 00000E90 BE[F2160000]                    mov     esi, VPRMS
+  1677 00000E95 E859FFFFFF              	call	print_msg
+  1678 00000E9A C3                      	retn
+  1679                                  
+  1680                                  ;
+  1681                                  FLPDPT:
+  1682 00000E9B 07                      	db 07h
+  1683 00000E9C 0D0A                    	db 0Dh, 0Ah	
+  1684 00000E9E 4469736B20              	db 'Disk '
+  1685                                  flpdnum:
+  1686 00000EA3 58202D20                	db 'X - '
+  1687 00000EA7 4449534B4554544520-     	db 'DISKETTE PARAMETER TABLE'
+  1687 00000EB0 504152414D45544552-
+  1687 00000EB9 205441424C45       
+  1688 00000EBF 0D0A0D0A                	db 0Dh, 0Ah, 0Dh, 0Ah
+  1689 00000EC3 547970652020202020-     	db 'Type                 : '
+  1689 00000ECC 202020202020202020-
+  1689 00000ED5 2020203A20         
+  1690                                  flpdtype:
+  1691 00000EDA 58202020                	db 'X   '
+  1692 00000EDE 5B2031203D20333630-     	db '[ 1 = 360K, 2 = 1.2M, 3 = 720K, 4 = 1.44M ]'
+  1692 00000EE7 4B2C2032203D20312E-
+  1692 00000EF0 324D2C2033203D2037-
+  1692 00000EF9 32304B2C2034203D20-
+  1692 00000F02 312E34344D205D     
+  1693 00000F09 0D0A0D0A                	db 0Dh, 0Ah, 0DH, 0Ah 
+  1694 00000F0D 535254202D20486561-     	db 'SRT - Head Unld Time : '
+  1694 00000F16 6420556E6C64205469-
+  1694 00000F1F 6D65203A20         
+  1695                                  rSrtHdUnld:
+  1696 00000F24 585868202862697473-     	db 'XXh (bits 0-3: SRT, bits 4-7: head unload time)'
+  1696 00000F2D 20302D333A20535254-
+  1696 00000F36 2C206269747320342D-
+  1696 00000F3F 373A20686561642075-
+  1696 00000F48 6E6C6F61642074696D-
+  1696 00000F51 6529               
+  1697 00000F53 0D0A                    	db 0Dh, 0Ah
+  1698 00000F55 444D41202D20486561-     	db 'DMA - Head Load Time : '
+  1698 00000F5E 64204C6F6164205469-
+  1698 00000F67 6D65203A20         
+  1699                                  rDmaHdLd:
+  1700 00000F6C 585868202862697420-     	db 'XXh (bit 0: 1 = DMA, bits 2-7: head load time)'
+  1700 00000F75 303A2031203D20444D-
+  1700 00000F7E 412C20626974732032-
+  1700 00000F87 2D373A206865616420-
+  1700 00000F90 6C6F61642074696D65-
+  1700 00000F99 29                 
+  1701 00000F9A 0D0A                    	db 0Dh, 0Ah
+  1702 00000F9C 4D6F746F72204F6666-     	db 'Motor Off Count      : '
+  1702 00000FA5 20436F756E74202020-
+  1702 00000FAE 2020203A20         
+  1703                                  bMotorOff:
+  1704 00000FB3 585868202877697468-     	db 'XXh (with 55ms icrements before turning off)'
+  1704 00000FBC 2035356D7320696372-
+  1704 00000FC5 656D656E7473206265-
+  1704 00000FCE 666F7265207475726E-
+  1704 00000FD7 696E67206F666629   
+  1705 00000FDF 0D0A                    	db 0Dh, 0Ah
+  1706 00000FE1 536563746F72205369-     	db 'Sector Size          : '
+  1706 00000FEA 7A6520202020202020-
+  1706 00000FF3 2020203A20         
+  1707                                  bSectSize:
+  1708 00000FF8 585868202832203D20-     	db 'XXh (2 = 512 bytes)'
+  1708 00001001 353132206279746573-
+  1708 0000100A 29                 
+  1709 0000100B 0D0A                    	db 0Dh, 0Ah	
+  1710 0000100D 4C6173742053656374-     	db 'Last Sect on a Track : '
+  1710 00001016 206F6E206120547261-
+  1710 0000101F 636B203A20         
+  1711                                  bLastTrack:
+  1712 00001024 585868                  	db 'XXh'
+  1713 00001027 0D0A                    	db 0Dh, 0Ah
+  1714 00001029 476170204C656E6774-     	db 'Gap Length  (R/W)    : '
+  1714 00001032 68202028522F572920-
+  1714 0000103B 2020203A20         
+  1715                                  bGapLen:
+  1716 00001040 585868                  	db 'XXh'
+  1717 00001043 0D0A                    	db 0Dh, 0Ah
+  1718 00001045 44617461205472616E-     	db 'Data Transfer Length : '
+  1718 0000104E 73666572204C656E67-
+  1718 00001057 7468203A20         
+  1719                                  bDTL:
+  1720 0000105C 585868                  	db 'XXh'
+  1721 0000105F 0D0A                    	db 0Dh, 0Ah		
+  1722 00001061 476170204C656E6774-     	db 'Gap Length (Format)  : '
+  1722 0000106A 682028466F726D6174-
+  1722 00001073 2920203A20         
+  1723                                  bGapFmt:
+  1724 00001078 585868                  	db 'XXh'
+  1725 0000107B 0D0A                    	db 0Dh, 0Ah
+  1726 0000107D 46696C6C2043686172-     	db 'Fill Char for format : '
+  1726 00001086 20666F7220666F726D-
+  1726 0000108F 6174203A20         
+  1727                                  bFillChar:
+  1728 00001094 58586820286E6F726D-     	db 'XXh (normally F6h)'
+  1728 0000109D 616C6C792046366829 
+  1729 000010A6 0D0A                    	db 0Dh, 0Ah
+  1730 000010A8 486561642053657474-     	db 'Head Settle Time     : '
+  1730 000010B1 6C652054696D652020-
+  1730 000010BA 2020203A20         
+  1731                                  bHdSettle:
+  1732 000010BF 585868206D696C6C69-     	db 'XXh milliseconds'
+  1732 000010C8 7365636F6E6473     
+  1733 000010CF 0D0A                    	db 0Dh, 0Ah
+  1734 000010D1 4D6F746F7220537461-     	db 'Motor Startup Time   : '
+  1734 000010DA 727475702054696D65-
+  1734 000010E3 2020203A20         
+  1735                                  bMotorOn:
+  1736 000010E8 5858682028696E2031-     	db 'XXh (in 1/8th second intervals)'
+  1736 000010F1 2F387468207365636F-
+  1736 000010FA 6E6420696E74657276-
+  1736 00001103 616C7329           
+  1737 00001107 0D0A                    	db 0Dh, 0Ah
+  1738                                  	; 19/12/2014
+  1739 00001109 0D0A                    	db 0Dh, 0Ah
+  1740 0000110B 4D6178696D756D2054-     	db 'Maximum Track Number : '
+  1740 00001114 7261636B204E756D62-
+  1740 0000111D 6572203A20         
+  1741                                  bMaxTrack:
+  1742 00001122 585868                  	db 'XXh'
+  1743 00001125 0D0A                    	db 0Dh, 0Ah
+  1744 00001127 44617461205472616E-     	db 'Data Transfer Rate   : '
+  1744 00001130 736665722052617465-
+  1744 00001139 2020203A20         
+  1745                                  bDataRate:
+  1746 0000113E 585868202830306820-     	db 'XXh (00h = 500KBS, 40h = 300KBS, 80H = 250KBS)'
+  1746 00001147 3D203530304B42532C-
+  1746 00001150 20343068203D203330-
+  1746 00001159 304B42532C20383048-
+  1746 00001162 203D203235304B4253-
+  1746 0000116B 29                 
+  1747 0000116C 0D0A                    	db 0Dh, 0Ah
+  1748 0000116E 0D0A00                  	db 0Dh, 0Ah, 0
+  1749                                  
+  1750                                  HDPT:
+  1751 00001171 07                      	db 07h
+  1752 00001172 0D0A                    	db 0Dh, 0Ah
+  1753 00001174 4469736B20              	db 'Disk '
+  1754                                  dsknum:
+  1755 00001179 58202D20                	db 'X - '	
+  1756 0000117D 464958454420444953-     	db 'FIXED DISK PARAMETER TABLE'
+  1756 00001186 4B20504152414D4554-
+  1756 0000118F 4552205441424C45   
+  1757 00001197 0D0A0D0A                	db 0Dh, 0Ah, 0Dh, 0Ah 
+  1758 0000119B 4E756D626572206F66-     	db 'Number of Cylinders : '
+  1758 000011A4 2043796C696E646572-
+  1758 000011AD 73203A20           
+  1759                                  cylnum:
+  1760 000011B1 5858585868              	db 'XXXXh'
+  1761 000011B6 0D0A                    	db 0Dh, 0Ah
+  1762 000011B8 4E756D626572206F66-     	db 'Number of Heads     : '
+  1762 000011C1 204865616473202020-
+  1762 000011CA 20203A20           
+  1763                                  headnum:
+  1764 000011CE 585868                  	db 'XXh'
+  1765 000011D1 0D0A                    	db 0Dh, 0Ah
+  1766 000011D3 526573657276656420-     	db 'Reserved            : '
+  1766 000011DC 202020202020202020-
+  1766 000011E5 20203A20           
+  1767                                  rsvd3:
+  1768 000011E9 585868                  	db 'XXh'
+  1769 000011EC 0D0A                    	db 0Dh, 0Ah
+  1770 000011EE 526573657276656420-     	db 'Reserved            : '
+  1770 000011F7 202020202020202020-
+  1770 00001200 20203A20           
+  1771                                  rsvd4:
+  1772 00001204 585868                  	db 'XXh'
+  1773 00001207 0D0A                    	db 0Dh, 0Ah	
+  1774 00001209 507265636F6D70656E-     	db 'Precompensation     : '
+  1774 00001212 736174696F6E202020-
+  1774 0000121B 20203A20           
+  1775                                  pcompnum:
+  1776 0000121F 5858585868              	db 'XXXXh'
+  1777 00001224 0D0A                    	db 0Dh, 0Ah
+  1778 00001226 526573657276656420-     	db 'Reserved            : '
+  1778 0000122F 202020202020202020-
+  1778 00001238 20203A20           
+  1779                                  rsvd7:
+  1780 0000123C 585868                  	db 'XXh'
+  1781 0000123F 0D0A                    	db 0Dh, 0Ah
+  1782 00001241 447269766520436F6E-     	db 'Drive Control Byte  : '
+  1782 0000124A 74726F6C2042797465-
+  1782 00001253 20203A20           
+  1783                                  dcbnum:
+  1784 00001257 585868                  	db 'XXh'
+  1785 0000125A 0D0A                    	db 0Dh, 0Ah		
+  1786 0000125C 526573657276656420-     	db 'Reserved            : '
+  1786 00001265 202020202020202020-
+  1786 0000126E 20203A20           
+  1787                                  rsvd9:
+  1788 00001272 5858585868              	db 'XXXXh'
+  1789 00001277 0D0A                    	db 0Dh, 0Ah
+  1790 00001279 526573657276656420-     	db 'Reserved            : '
+  1790 00001282 202020202020202020-
+  1790 0000128B 20203A20           
+  1791                                  rsvd11:
+  1792 0000128F 585868                  	db 'XXh'
+  1793 00001292 0D0A                    	db 0Dh, 0Ah
+  1794 00001294 4C616E64696E67205A-     	db 'Landing Zone        : '
+  1794 0000129D 6F6E65202020202020-
+  1794 000012A6 20203A20           
+  1795                                  lzonenum:
+  1796 000012AA 5858585868              	db 'XXXXh'
+  1797 000012AF 0D0A                    	db 0Dh, 0Ah
+  1798 000012B1 536563746F72732070-     	db 'Sectors per Track   : '
+  1798 000012BA 657220547261636B20-
+  1798 000012C3 20203A20           
+  1799                                  psptnum:
+  1800 000012C7 585868                  	db 'XXh'
+  1801 000012CA 0D0A                    	db 0Dh, 0Ah
+  1802 000012CC 526573657276656420-     	db 'Reserved            : '
+  1802 000012D5 202020202020202020-
+  1802 000012DE 20203A20           
+  1803                                  rsvd15:
+  1804 000012E2 585868                  	db 'XXh'
+  1805 000012E5 0D0A                    	db 0Dh, 0Ah
+  1806 000012E7 0D0A                    	db 0Dh, 0Ah
+  1807 000012E9 492F4F20506F727420-     	db 'I/O Port Base Addr  : '
+  1807 000012F2 426173652041646472-
+  1807 000012FB 20203A20           
+  1808                                  bPortAddr:
+  1809 000012FF 5858585868              	db 'XXXXh'
+  1810 00001304 0D0A                    	db 0Dh, 0Ah
+  1811 00001306 436F6E74726F6C2050-     	db 'Control Port Addr   : '
+  1811 0000130F 6F7274204164647220-
+  1811 00001318 20203A20           
+  1812                                  cPortAddr:
+  1813 0000131C 5858585868              	db 'XXXXh'
+  1814 00001321 0D0A                    	db 0Dh, 0Ah
+  1815 00001323 486561642052656720-     	db 'Head Reg Upp Nibb   : '
+  1815 0000132C 557070204E69626220-
+  1815 00001335 20203A20           
+  1816                                  hregupnib:
+  1817 00001339 585868                  	db 'XXh'
+  1818 0000133C 0D0A                    	db 0Dh, 0Ah
+  1819 0000133E 0D0A                    	db 0Dh, 0Ah
+  1820 00001340 53697A652028696E20-     	db 'Size (in sectors)   : '
+  1820 00001349 736563746F72732920-
+  1820 00001352 20203A20           
+  1821                                  disksize:
+  1822 00001356 585858585858585868      	db 'XXXXXXXXh'
+  1823 0000135F 0D0A                    	db 0Dh, 0Ah
+  1824 00001361 0D0A00                  	db 0Dh, 0Ah, 0
+  1825                                  
+  1826                                  THDPT:
+  1827 00001364 07                      	db 07h
+  1828 00001365 0D0A                    	db 0Dh, 0Ah
+  1829 00001367 4469736B20              	db 'Disk '
+  1830                                  tdsknum:
+  1831 0000136C 58202D20                	db 'X - '	
+  1832 00001370 5452414E534C415445-     	db 'TRANSLATED FIXED DISK PARAMETER TABLE'
+  1832 00001379 442046495845442044-
+  1832 00001382 49534B20504152414D-
+  1832 0000138B 45544552205441424C-
+  1832 00001394 45                 
+  1833 00001395 0D0A0D0A                	db 0Dh, 0Ah, 0Dh, 0Ah 
+  1834 00001399 4C6F676963616C2043-     	db 'Logical Cylinders   : '
+  1834 000013A2 796C696E6465727320-
+  1834 000013AB 20203A20           
+  1835                                  lcylnum:
+  1836 000013AF 5858585868              	db 'XXXXh'
+  1837 000013B4 0D0A                    	db 0Dh, 0Ah
+  1838 000013B6 4C6F676963616C2048-     	db 'Logical Heads       : '
+  1838 000013BF 656164732020202020-
+  1838 000013C8 20203A20           
+  1839                                  lheadnum:
+  1840 000013CC 585868                  	db 'XXh'
+  1841 000013CF 0D0A                    	db 0Dh, 0Ah
+  1842 000013D1 5369676E6174757265-     	db 'Signature           : '
+  1842 000013DA 202020202020202020-
+  1842 000013E3 20203A20           
+  1843                                  tsignum:
+  1844 000013E7 585868                  	db 'XXh'
+  1845 000013EA 0D0A                    	db 0Dh, 0Ah
+  1846 000013EC 506879205365632070-     	db 'Phy Sec per Track   : '
+  1846 000013F5 657220547261636B20-
+  1846 000013FE 20203A20           
+  1847                                  tpsptnum:
+  1848 00001402 585868                  	db 'XXh'
+  1849 00001405 0D0A                    	db 0Dh, 0Ah	
+  1850 00001407 507265636F6D70656E-     	db 'Precompensation     : '
+  1850 00001410 736174696F6E202020-
+  1850 00001419 20203A20           
+  1851                                  tpcompnum:
+  1852 0000141D 58585858682020284F-     	db 'XXXXh  (Obsolete)'
+  1852 00001426 62736F6C65746529   
+  1853 0000142E 0D0A                    	db 0Dh, 0Ah
+  1854 00001430 526573657276656420-     	db 'Reserved            : '
+  1854 00001439 202020202020202020-
+  1854 00001442 20203A20           
+  1855                                  trsvd7:
+  1856 00001446 585868                  	db 'XXh'
+  1857 00001449 0D0A                    	db 0Dh, 0Ah
+  1858 0000144B 447269766520436F6E-     	db 'Drive Control Byte  : '
+  1858 00001454 74726F6C2042797465-
+  1858 0000145D 20203A20           
+  1859                                  tdcbnum:
+  1860 00001461 585868                  	db 'XXh'
+  1861 00001464 0D0A                    	db 0Dh, 0Ah		
+  1862 00001466 506879736963616C20-     	db 'Physical Cylinders  : '
+  1862 0000146F 43796C696E64657273-
+  1862 00001478 20203A20           
+  1863                                  tpcylnum:
+  1864 0000147C 5858585868              	db 'XXXXh'
+  1865 00001481 0D0A                    	db 0Dh, 0Ah
+  1866 00001483 506879736963616C20-     	db 'Physical Heads      : '
+  1866 0000148C 486561647320202020-
+  1866 00001495 20203A20           
+  1867                                  tpheadnum:
+  1868 00001499 585868                  	db 'XXh'
+  1869 0000149C 0D0A                    	db 0Dh, 0Ah
+  1870 0000149E 4C616E64696E67205A-     	db 'Landing Zone        : '
+  1870 000014A7 6F6E65202020202020-
+  1870 000014B0 20203A20           
+  1871                                  tlzonenum:
+  1872 000014B4 58585858682020284F-     	db 'XXXXh  (Obsolete)'
+  1872 000014BD 62736F6C65746529   
+  1873 000014C5 0D0A                    	db 0Dh, 0Ah
+  1874 000014C7 4C6F67696320536563-     	db 'Logic Sec per Trk   : '
+  1874 000014D0 207065722054726B20-
+  1874 000014D9 20203A20           
+  1875                                  lsptnum:
+  1876 000014DD 585868                  	db 'XXh'
+  1877 000014E0 0D0A                    	db 0Dh, 0Ah
+  1878 000014E2 436865636B73756D20-     	db 'Checksum            : '
+  1878 000014EB 202020202020202020-
+  1878 000014F4 20203A20           
+  1879                                  checksum:
+  1880 000014F8 585868                  	db 'XXh'
+  1881 000014FB 0D0A                    	db 0Dh, 0Ah
+  1882 000014FD 0D0A                    	db 0Dh, 0Ah
+  1883 000014FF 492F4F20506F727420-     	db 'I/O Port Base Addr  : '
+  1883 00001508 426173652041646472-
+  1883 00001511 20203A20           
+  1884                                  tbPortAddr:
+  1885 00001515 5858585868              	db 'XXXXh'
+  1886 0000151A 0D0A                    	db 0Dh, 0Ah
+  1887 0000151C 436F6E74726F6C2050-     	db 'Control Port Addr   : '
+  1887 00001525 6F7274204164647220-
+  1887 0000152E 20203A20           
+  1888                                  tcPortAddr:
+  1889 00001532 5858585868              	db 'XXXXh'
+  1890 00001537 0D0A                    	db 0Dh, 0Ah
+  1891 00001539 486561642052656720-     	db 'Head Reg Upp Nibb   : '
+  1891 00001542 557070204E69626220-
+  1891 0000154B 20203A20           
+  1892                                  thregupnib:
+  1893 0000154F 585868                  	db 'XXh'
+  1894 00001552 0D0A                    	db 0Dh, 0Ah
+  1895 00001554 0D0A                    	db 0Dh, 0Ah
+  1896 00001556 53697A652028696E20-     	db 'Size (in sectors)   : '
+  1896 0000155F 736563746F72732920-
+  1896 00001568 20203A20           
+  1897                                  tdisksize:
+  1898 0000156C 585858585858585868      	db 'XXXXXXXXh'
+  1899 00001575 0D0A                    	db 0Dh, 0Ah
+  1900 00001577 0D0A00                  	db 0Dh, 0Ah, 0
+  1901                                  
+  1902                                  hex_digits:
+  1903                                  hexchrs:
+  1904 0000157A 303132333435363738-     	db '0123456789ABCDEF'
+  1904 00001583 39414243444546     
+  1905                                  
+  1906                                  ds_drv:
+  1907 0000158A FF                      	db 0FFh ; Current drive (on display)
+  1908 0000158B 00                       	db 0    ; Current half (0 or >0)
+  1909                                  
+  1910                                  drv_names:
+  1911 0000158C 666430206664312068-     	db 'fd0 fd1 hd0 hd1 hd2 hd3 '
+  1911 00001595 643020686431206864-
+  1911 0000159E 322068643320       
+  1912                                  
+  1913                                  dpheader:
+  1914 000015A4 204472697665203A20      	db ' Drive : '
+  1915                                  drv_name:
+  1916 000015AD 3030302020              	db '000  '
+  1917 000015B2 536563746F72203A20      	db  'Sector : '
+  1918                                  sector_num:
+  1919 000015BB 464646464646464668      	db  'FFFFFFFFh'
+  1920 000015C4 00                              db 0
+  1921                                  
+  1922                                  sdline:
+  1923 000015C5 204279746520            	db ' Byte '
+  1924                                  sdline_1:
+  1925 000015CB 30303068                	db '000h'
+  1926 000015CF 202D2020                	db ' -  '
+  1927                                  sdline_2:
+  1928 000015D3 303020303020303020-     	db '00 00 00 00 00 00 00 00 '
+  1928 000015DC 303020303020303020-
+  1928 000015E5 303020303020       
+  1929 000015EB 303020303020303020-     	db '00 00 00 00 00 00 00 00 '
+  1929 000015F4 303020303020303020-
+  1929 000015FD 303020303020       
+  1930 00001603 20                      	db ' '
+  1931                                  sdline_3:
+  1932 00001604 2E2E2E2E2E2E2E2E2E-     	db '................'
+  1932 0000160D 2E2E2E2E2E2E2E     
+  1933 00001614 20                      	db 20h
+  1934                                  
+  1935                                  dpfooter1:
+  1936 00001615 204631203D20436861-     	db ' F1 = Change Drive  '
+  1936 0000161E 6E6765204472697665-
+  1936 00001627 2020               
+  1937 00001629 486F6D65203D204669-     	db 'Home = First Sector '
+  1937 00001632 72737420536563746F-
+  1937 0000163B 7220               
+  1938 0000163D 50675570203D205072-     	db 'PgUp = Previous Sector '
+  1938 00001646 6576696F7573205365-
+  1938 0000164F 63746F7220         
+  1939 00001654 455343203D20455849-     	db 'ESC = EXIT'
+  1939 0000165D 54                 
+  1940 0000165E 00                      	db 0
+  1941                                  dpfooter2:
+  1942 0000165F 204632203D20436861-     	db ' F2 = Change Sector '
+  1942 00001668 6E676520536563746F-
+  1942 00001671 7220               
+  1943 00001673 456E64203D204C6173-     	db 'End = Last Sector   '
+  1943 0000167C 7420536563746F7220-
+  1943 00001685 2020               
+  1944 00001687 5067446F776E203D20-     	db 'PgDown = Next Sector   ' 
+  1944 00001690 4E6578742053656374-
+  1944 00001699 6F72202020         
+  1945 0000169E 454E544552203D2050-     	db 'ENTER = Prv/Nxt'
+  1945 000016A7 72762F4E7874       
+  1946 000016AD 00                      	db 0
+  1947                                  
+  1948                                  F1_ib:
+  1949 000016AE 10                      	db 16	; box width (columns)
+  1950 000016AF 03                      	db 3	; box height (rows)
+  1951 000016B0 01                      	db 1	; label offset (vertical)
+  1952 000016B1 01                      	db 1	; label offset (horizontal)
+  1953 000016B2 01                      	db 1	; text (input) size
+  1954 000016B3 4E                      	db 4Eh	; box color
+  1955 000016B4 44726976653A20          	db 'Drive: '  ; Label
+  1956 000016BB 00                      	db 0
+  1957                                  
+  1958                                  F2_ib:
+  1959 000016BC 14                      	db 20	; box width (columns)
+  1960 000016BD 03                      	db 3	; box height (rows)
+  1961 000016BE 01                      	db 1	; label offset (vertical)
+  1962 000016BF 01                      	db 1	; label offset (horizontal)
+  1963 000016C0 08                      	db 8	; text (input) size
+  1964 000016C1 4E                      	db 4Eh	; box color
+  1965 000016C2 536563746F72203A20      	db 'Sector : '  ; Label
+  1966 000016CB 00                      	db 0
+  1967                                  
+  1968                                  dskr_err:
+  1969 000016CC 21                      	db 33	; box width (columns)
+  1970                                  	;db 17	
+  1971 000016CD 03                      	db 3	; box height (rows)
+  1972 000016CE 01                      	db 1	; label offset (vertical)
+  1973 000016CF 01                      	db 1	; label offset (horizontal)
+  1974 000016D0 00                      	db 0	; text (input) size
+  1975 000016D1 4E                      	db 4Eh	; box color
+  1976 000016D2 4472697665206E6F74-     	db 'Drive not ready or read error !'  ; Label
+  1976 000016DB 207265616479206F72-
+  1976 000016E4 207265616420657272-
+  1976 000016ED 6F722021           
+  1977                                  	;db ' Error : '
+  1978                                  ;err_code_str:
+  1979                                  ;	db '00h ! '	
+  1980 000016F1 00                      	db 0
+  1981                                  
+  1982                                  	; 28/08/2020
+  1983                                  VPRMS:
+  1984 000016F2 07                      	db 07h
+  1985 000016F3 0D0A                    	db 0Dh, 0Ah
+  1986 000016F5 4469736B20              	db 'Disk '
+  1987                                  vprm_drv:
+  1988 000016FA 58202D20                	db 'X - '	
+  1989 000016FE 4449534B2053495A45-     	db 'DISK SIZE AND (VIRTUAL) CHS VALUES'
+  1989 00001707 20414E442028564952-
+  1989 00001710 5455414C2920434853-
+  1989 00001719 2056414C554553     
+  1990 00001720 0D0A0D0A                	db 0Dh, 0Ah, 0Dh, 0Ah
+  1991 00001724 4469736B2053697A65-     	db 'Disk Size : '
+  1991 0000172D 203A20             
+  1992                                  lbadisksize:
+  1993 00001730 585858585858585868-     	db 'XXXXXXXXh sectors'		
+  1993 00001739 20736563746F7273   
+  1994 00001741 0D0A0D0A                 	db 0Dh, 0Ah, 0Dh, 0Ah
+  1995                                  
+  1996 00001745 43796C696E64657273-     	db 'Cylinders : '
+  1996 0000174E 203A20             
+  1997                                  vcylinders:
+  1998 00001751 5858585868              	db 'XXXXh'
+  1999 00001756 0D0A                    	db 0Dh, 0Ah
+  2000 00001758 486561647320202020-     	db 'Heads     : '
+  2000 00001761 203A20             
+  2001                                  vheads:
+  2002 00001764 585868                  	db 'XXh'
+  2003 00001767 0D0A                    	db 0Dh, 0Ah
+  2004 00001769 536563746F72732020-     	db 'Sectors   : '
+  2004 00001772 203A20             
+  2005                                  vspt:
+  2006 00001775 585868                  	db 'XXh'
+  2007 00001778 0D0A                    	db 0Dh, 0Ah
+  2008 0000177A 0D0A00                  	db 0Dh, 0Ah, 0	
+  2009                                  
+  2010                                  ; Additional functions, variables/pointers for 
+  2011                                  ; Real Mode adaption (out of unix386.s) variables/pointers
+  2012                                  
+  2013                                  set_cpos:
+  2014 0000177D 668B15[50180000]        	mov	dx, [cursor_posn] ; dh = row, dl = column
+  2015                                  set_cposx:
+  2016                                  	; DX = cursor position
+  2017 00001784 B402                    	mov	ah, 2		; Set cursor position
+  2018 00001786 30FF                    	xor	bh, bh		; for video page 0
+  2019 00001788 CD31                    	int	31h		; TRDOS 386 video interrupt
+  2020 0000178A C3                      	retn
+  2021                                  
+  2022 0000178B 90                      align 2
+  2023                                  
+  2024                                  prg_msg:
+  2025 0000178C 0D0A07                  	db 0Dh, 0Ah, 07h
+  2026 0000178F 4469736B2052656164-     	db 'Disk Read Utility - TRDOS 386 v2 Disk I/O and timer test.'
+  2026 00001798 205574696C69747920-
+  2026 000017A1 2D205452444F532033-
+  2026 000017AA 383620763220446973-
+  2026 000017B3 6B20492F4F20616E64-
+  2026 000017BC 2074696D6572207465-
+  2026 000017C5 73742E             
+  2027 000017C8 0D0A                    	db 0Dh, 0Ah	
+  2028                                  	;db 'by Erdogan Tan  [07/07/2016]'
+  2029 000017CA 6279204572646F6761-     	db 'by Erdogan Tan  [29/08/2020]'   ; LBA disk (>8GB) bugfix
+  2029 000017D3 6E2054616E20205B32-
+  2029 000017DC 392F30382F32303230-
+  2029 000017E5 5D                 
+  2030 000017E6 0D0A0D0A                	db 0Dh, 0Ah, 0Dh, 0Ah
+  2031 000017EA 28507265737320616E-             db '(Press any key to continue...)'
+  2031 000017F3 79206B657920746F20-
+  2031 000017FC 636F6E74696E75652E-
+  2031 00001805 2E2E29             
+  2032 00001808 0D0A00                  	db 0Dh, 0Ah, 0
+  2033                                  
+  2034                                  drv_not_ready:
+  2035 0000180B 070D0A                  	db 07h, 0Dh, 0Ah 
+  2036 0000180E 4472697665206E6F74-     	db 'Drive not ready !'
+  2036 00001817 2072656164792021   
+  2037 0000181F 0D0A00                  	db 0Dh, 0Ah, 0
+  2038                                  
+  2039 00001822 30                      fd0_type: db '0'
+  2040 00001823 30                      fd1_type: db '0'
+  2041                                  
+  2042                                  rtc_msg:
+  2043 00001824 5265616C2054696D65-     	db "Real Time Clock - "
+  2043 0000182D 20436C6F636B202D20 
+  2044                                  datestr:
+  2045 00001836 30302F30302F303030-     	db "00/00/0000"
+  2045 0000183F 30                 
+  2046 00001840 2020                    	db "  "
+  2047                                  timestr:	
+  2048 00001842 30303A30303A3030                db "00:00:00"
+  2049                                  rtc_msg_end:
+  2050 0000184A 00                      	db 0
+  2051                                  
+  2052                                  timer_event:
+  2053 0000184B 00                      	db 0 
+  2054                                  
+  2055                                  align 4 ; dword alignment
+  2056                                  
+  2057 0000184C [641B0000]              current_txtpos: dd video_buffer
+  2058                                  
+  2059                                  bss_start:
+  2060                                  
+  2061                                  ABSOLUTE bss_start
+  2062                                  
+  2063 00001850 <res 00000002>          cursor_posn: resw 1
+  2064 00001852 <res 00000002>          cursor_shp:  resw 1
+  2065 00001854 <res 00000002>          cursor_posb: resw 1 ; (cursor position backup, for video page 0)
+  2066                                  
+  2067 00001856 <res 00000001>          txtposoff:   resb 1 ; txtpos offset for sector number input	
+  2068 00001857 <res 00000001>          dscmd:	     resb 1 ; 0 = change drive
+  2069                                  	            ; 1 = change sector
+  2070                                  	            ; 2 = display disk parameters
+  2071                                  
+  2072 00001858 <res 00000001>          inds:	     resb 1 	 
+  2073 00001859 <res 00000001>          paragr:	     resb 1	 
+  2074                                  
+  2075 0000185A <res 00000001>          ibcp:	     resb 1 ; input box - row position
+  2076 0000185B <res 00000001>          	     resb 1 ; input box - column position
+  2077                                  
+  2078 0000185C <res 00000001>          retry_count: resb 1
+  2079 0000185D <res 00000001>          drv:	     resb 1  ; physical drive number (0, 1, 80h, 81h, 82h, 83h)
+  2080                                  
+  2081 0000185E <res 00000002>          drv_status:  resb 2  ; fd0, fd1 (FFh = failure, 80h = existing)		
+  2082 00001860 <res 00000004>          	     resb 4  ; hd0, hd1 hd2, hd3 (FFh = failure)
+  2083                                                      ;                   (80h - 87h = existing)
+  2084                                                      ;                   (bit 0 = 1 : LBA ready)
+  2085                                  
+  2086 00001864 <res 0000000C>          drv_cylinders :	resw 6
+  2087 00001870 <res 0000000C>          drv_heads     :	resw 6
+  2088 0000187C <res 0000000C>          drv_spt       :	resw 6
+  2089                                  alignb 4
+  2090 00001888 <res 00000018>          drv_size :	resd 6
+  2091                                  
+  2092 000018A0 <res 00000010>          fd0_dpt: resb 16
+  2093 000018B0 <res 00000010>          fd1_dpt: resb 16
+  2094 000018C0 <res 00000020>          hd0_dpt: resb 32
+  2095 000018E0 <res 00000020>          hd1_dpt: resb 32
+  2096 00001900 <res 00000020>          hd2_dpt: resb 32
+  2097 00001920 <res 00000020>          hd3_dpt: resb 32
+  2098                                  
+  2099                                  ds_sec:
+  2100 00001940 <res 00000004>          	resd 1 ; Current sector (on display), drv 0		
+  2101 00001944 <res 00000004>          	resd 1 ; Current sector (on display), drv 1
+  2102 00001948 <res 00000004>          	resd 1 ; Current sector (on display), drv 2
+  2103 0000194C <res 00000004>          	resd 1 ; Current sector (on display), drv 3
+  2104 00001950 <res 00000004>          	resd 1 ; Current sector (on display), drv 4
+  2105 00001954 <res 00000004>          	resd 1 ; Current sector (on display), drv 5
+  2106                                  
+  2107 00001958 <res 00000004>          prev_sec: resd 1  ; previous sector (before reading)	
+  2108                                  
+  2109                                  sector_buffer:
+  2110 0000195C <res 00000200>          	resb 512
+  2111                                  
+  2112                                  date_day:
+  2113 00001B5C <res 00000001>          	resb 1
+  2114                                  date_month:
+  2115 00001B5D <res 00000001>          	resb 1
+  2116                                  date_year:
+  2117 00001B5E <res 00000001>          	resb 1
+  2118                                  date_century:
+  2119 00001B5F <res 00000001>          	resb 1
+  2120                                  
+  2121                                  time_second:
+  2122 00001B60 <res 00000001>          	resb 1
+  2123                                  time_minute:
+  2124 00001B61 <res 00000001>          	resb 1
+  2125                                  time_hour:
+  2126 00001B62 <res 00000001>          	resb 1
+  2127                                  	
+  2128 00001B63 <res 00000001>          	resb 1
+  2129                                  
+  2130                                  video_buffer:
+  2131 00001B64 <res 00000FA0>          	resb	4000 ; 80*25*2
+  2132                                  
+  2133                                  timer_event_number:
+  2134 00002B04 <res 00000001>          	resb 1
+  2135                                  
+  2136 00002B05 <res 00000001>          hdc:	resb 1
+  2137 00002B06 <res 00000001>          fdc:	resb 1
+  2138                                  
+  2139                                  prev_drv:
+  2140 00002B07 <res 00000001>          	resb 1
+  2141                                  
+  2142                                  alignb 4
+  2143                                  
+  2144                                  bss_end:
+  2145                                  	
+  2146                                  _end:

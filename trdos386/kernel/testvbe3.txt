@@ -1,0 +1,86 @@
+     1                                  ; ****************************************************************************
+     2                                  ; testvbe3 - TRDOS 386 (TRDOS v2.0) Test Program - 16 bit PM vbios test 
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ;
+     5                                  ; 01/12/2020
+     6                                  ;
+     7                                  ; ****************************************************************************
+     8                                  
+     9                                  struc PMInfo  ;  VESA VBE3 PMInfoBlock ('PMID' block)
+    10                                  
+    11 00000000 <res 00000004>           .Signature:	resb 4  ; db 'PMID' ; PM Info Block Signature
+    12 00000004 <res 00000002>           .EntryPoint:	resw 1	; Offset of PM entry point within BIOS
+    13 00000006 <res 00000002>           .PMInitialize: resw 1	; Offset of PM initialization entry point
+    14 00000008 <res 00000002>           .BIOSDataSel:	resw 1 	; Selector to BIOS data area emulation block
+    15 0000000A <res 00000002>           .A0000Sel:	resw 1	; Selector to access A0000h physical mem
+    16 0000000C <res 00000002>           .B0000Sel:	resw 1  ; Selector to access B0000h physical mem
+    17 0000000E <res 00000002>           .B8000Sel:	resw 1	; Selector to access B8000h physical mem
+    18 00000010 <res 00000002>           .CodeSegSel:	resw 1	; Selector to access code segment as data
+    19 00000012 <res 00000001>           .InProtectMode: resb 1 ; Set to 1 when in protected mode
+    20 00000013 <res 00000001>           .Checksum:	resb 1	; Checksum byte for structure
+    21                                   .size:
+    22                                  
+    23                                  endstruc
+    24                                  ;========================================================================
+    25                                  ; TEST VESA VBE 3 16 BIT PROTECTED MODE INTERFACE FAR CALL FOR TRDOS 386 
+    26                                  ;========================================================================
+    27                                  
+    28                                  [BITS 16]	; 16-bit intructions
+    29                                  
+    30                                  [ORG 0] 
+    31                                  START_CODE:
+    32 00000000 EB0B                    		jmp	short pmentry
+    33                                  pminit:
+    34 00000002 2E8E1E[3C00]            		mov	ds, [cs:CodeSegSel]
+    35 00000007 A3[2A00]                		mov	[_5345], ax
+    36 0000000A A3[4000]                		mov	[_5349], ax			
+    37                                  pmentry:
+    38 0000000D E80100                  		call	show_message
+    39 00000010 CB                      		retf		
+    40                                  show_message:
+    41 00000011 8E06[3A00]              		mov	es, [B8000Sel]
+    42 00000015 2E8E1E[3C00]            		mov	ds, [cs:CodeSegSel]
+    43 0000001A B44E                    		mov	ah, 4Eh
+    44 0000001C BE[4700]                		mov	si, message
+    45 0000001F 31FF                    		xor	di, di
+    46                                  smsg_1:						
+    47 00000021 AC                      		lodsb
+    48 00000022 08C0                    		or	al, al
+    49 00000024 7403                    		jz	short smsg_2
+    50 00000026 AB                      		stosw
+    51 00000027 EBF8                    		jmp	short smsg_1
+    52                                  smsg_2:
+    53 00000029 C3                      		retn
+    54                                  _5345:
+    55 0000002A 0000                    		dw	0
+    56 0000002C 504D4944                PMInfoBlock:	db	'PMID'
+    57 00000030 [4200]                  PM_EntryPoint:  dw 	pm_entry
+    58 00000032 [4400]                  PM_Initialize:  dw	pm_init
+    59 00000034 0000                    BIOSDataSel:	dw	0   
+    60 00000036 00A0                    A0000Sel        dw	0A000h
+    61 00000038 00B0                    B0000Sel        dw	0B000h
+    62 0000003A 00B8                    B8000Sel        dw	0B800h
+    63 0000003C 00C0                    CodeSegSel      dw	0C000h
+    64 0000003E 00                      InProtectMode   db	0
+    65 0000003F 88                      CheckSum        db	88h
+    66                                  _5349:		
+    67 00000040 0000                    		dw	0
+    68                                  pm_entry:
+    69 00000042 EBC9                    		jmp	pmentry
+    70                                  pm_init:
+    71 00000044 EBBC                    		jmp	pminit
+    72                                  		
+    73 00000046 00                      		db	0
+    74                                  
+    75                                  ;-----------------------------------------------------------------
+    76                                  ;  MESSAGE
+    77                                  ;-----------------------------------------------------------------
+    78                                  
+    79                                  message:
+    80 00000047 564553412056424533-     	db	"VESA VBE3 16 bit protected mode test for TRDOS 386"
+    80 00000050 203136206269742070-
+    80 00000059 726F74656374656420-
+    80 00000062 6D6F64652074657374-
+    80 0000006B 20666F72205452444F-
+    80 00000074 5320333836         
+    81 00000079 00                      	db	0 
