@@ -1,0 +1,1818 @@
+     1                                  ; ****************************************************************************
+     2                                  ; tinyplay.asm (for MSDOS)
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; TINYPLAY.COM ! MOD PLAYER & VGA DEMO program ! NASM version by Erdogan TAN
+     5                                  ;
+     6                                  ; 12/02/2017
+     7                                  ;
+     8                                  ; [ Last Modification: 04/03/2017 ]
+     9                                  ;
+    10                                  ; Derived from source code of 'PLAY.EXE' (TINYPLAY) by Carlos Hasan (1993)
+    11                                  ;          PLAY.EXE: PLAY.ASM, MODLOAD.ASM, MODPLAY.ASM, SB.ASM
+    12                                  ;
+    13                                  ; Assembler: NASM 2.11
+    14                                  ; ----------------------------------------------------------------------------
+    15                                  ;	   nasm  tinyplay.asm -l tinyplay.lst -o TINYPLAY.COM	
+    16                                  ; ****************************************************************************
+    17                                  
+    18                                  ; Tiny MOD Player v0.1b by Carlos Hasan.
+    19                                  ;		July 14th, 1993.
+    20                                  
+    21                                  ;=============================================================================
+    22                                  ;               PLAY.ASM
+    23                                  ;=============================================================================
+    24                                  
+    25                                  [BITS 16]
+    26                                  [org 100h]
+    27                                  
+    28                                  Start:
+    29                                  GetFileName:    				; Parse  the Command line...
+    30 00000000 BE8000                  		mov	si, 80h
+    31 00000003 8A1C                    		mov	bl, [si]
+    32                                  		;xor	bh, bh
+    33 00000005 43                      		inc	bx
+    34 00000006 C60000                  		mov	byte [si+bx], 0		; make AsciiZ filename.
+    35 00000009 46                      		inc	si
+    36                                  ScanName:       
+    37 0000000A AC                      		lodsb
+    38 0000000B 84C0                    		test	al, al
+    39 0000000D 0F84BA00                		je	pmsg_2017
+    40 00000011 3C20                    		cmp	al, 20h
+    41 00000013 74F5                    		je	short ScanName		; scan start of name.
+    42 00000015 89F7                    		mov	di, si
+    43 00000017 4F                      		dec	di
+    44                                  ScanPeriod:
+    45 00000018 AC                      		lodsb
+    46 00000019 3C2E                    		cmp	al, '.'			; if period NOT found,
+    47 0000001B 7410                    		je	short PrintMesg		; then add a .MOD extension.
+    48 0000001D 84C0                    		test	al, al
+    49 0000001F 75F7                    		jnz	short ScanPeriod
+    50 00000021 4E                      		dec	si
+    51                                  SetExt:
+    52                                  		;mov	byte [si+0], '.'
+    53                                  		;mov	byte [si+1], 'M'
+    54                                  		;mov	byte [si+2], 'O'
+    55                                  		;mov	byte [si+3], 'D'
+    56 00000022 66C7042E4D4F44          		mov	dword [si], '.MOD'
+    57 00000029 C6440400                		mov	byte [si+4], 0
+    58                                  
+    59 0000002D B80009                  PrintMesg:      mov     ax, 0900h		; Prints the Credits Text.
+    60                                  		;lea    dx, [Credits]
+    61 00000030 BA[FC0A]                		mov	dx, Credits
+    62 00000033 CD21                    		int     21h
+    63                                  
+    64 00000035 E89D00                  		call    DetectSb		; Detect the SB Addr, Irq.
+    65                                  LoadMod:  
+    66                                  		; es:di = Filename address
+    67 00000038 06                      		push	es
+    68 00000039 57                      		push	di
+    69 0000003A E82304                  		call    LoadModule		; Load the MODule...
+    70                                  
+    71 0000003D 833E[1A14]00            		cmp     word [ErrorInfo], 0	; any error loading?
+    72 00000042 740A                    		je      short PlayNow
+    73                                  
+    74 00000044 B80009                  		mov     ax, 0900h		; yes, print error and Exit.
+    75                                  		;lea    dx, [ErrorMesg]
+    76 00000047 BA[300B]                		mov	dx, ErrorMesg
+    77 0000004A CD21                    		int     21h
+    78 0000004C EB75                    		jmp     short Exit
+    79                                  
+    80                                  PlayNow:        
+    81 0000004E C706[5818]F055          		mov     word [MixSpeed], 22000	; Mixing at 22 kHz
+    82                                  
+    83                                  ;		call    StartPlaying            ; PLAY!
+    84                                  
+    85 00000054 E86702                  		call    SbInit
+    86                                  
+    87 00000057 B81300                  		mov     ax, 0013h		; Set Mode 320x200x256
+    88 0000005A CD10                    		int     10h
+    89                                  
+    90 0000005C B98000                  		mov     cx, 128			; Make a lookup table
+    91 0000005F 31DB                    		xor     bx, bx			; for fastest pixel
+    92 00000061 BA002D                  		mov     dx, 320*(100-64)	; addressing.
+    93                                  MakeOfs:        
+    94 00000064 8997[2075]              		mov     [RowOfs+bx], dx
+    95 00000068 8997[2275]              		mov     [RowOfs+bx+2], dx
+    96 0000006C 81C24001                		add     dx, 320
+    97 00000070 83C304                  		add     bx, 4
+    98 00000073 E2EF                    		loop    MakeOfs
+    99                                  
+   100 00000075 B800A0                  		mov     ax, 0A000h 		; ES points to VideoMem
+   101 00000078 8EC0                    		mov     es, ax			; segment area.
+   102                                  
+   103 0000007A FC                      		cld
+   104                                  
+   105                                  ; Note: Normally IRQ 0 calls the ModPlay Polling at 18.2Hz thru
+   106                                  ;       the software interrupt 1Ch. If the IRQ 0 is disabled, then
+   107                                  ;       the INT 1Ch MUST BE CALLED at least MixSpeed/1024 times per
+   108                                  ;       second, or the module will sound "looped".
+   109                                  ;       Because we need better sync with the ModPlayer to draw the scope,
+   110                                  ;       the polling is called from my routine, and then the irq 0 must be
+   111                                  ;       disabled. The [DmaBuffer] points to the current buffer of 8-bit
+   112                                  ;       samples played by the Sound Blaster. Note that some samples are
+   113                                  ;       discarded in the next code, just for fun!
+   114                                  
+   115                                  		;in     al, 21h			; disable irq 0!
+   116                                  		;or     al, 00000001b
+   117                                  		;out    21h, al
+   118                                  ScopeLoop:
+   119                                  		;int	1Ch			; ModPlay Polling!
+   120 0000007B E8F401                  		call    SbPoll
+   121                                  
+   122 0000007E 8B36[0E0C]              		mov     si, [DmaBuffer]		; get current samples
+   123 00000082 31C9                    		xor     cx, cx			; to be drawed ...
+   124 00000084 31D2                    		xor     dx, dx
+   125                                  DrawLoop:       
+   126 00000086 89D3                    		mov     bx, dx			; (save Index)
+   127 00000088 8BBF[A072]              		mov     di, [Scope+bx]		; get old SCOPE pixel address
+   128 0000008C 26C60500                		mov     byte [es:di], 0		; erase it!
+   129 00000090 AC                      		lodsb				; get a sample (8-bit)
+   130 00000091 88C3                    		mov     bl, al			; calc new pixel address...
+   131 00000093 30FF                    		xor     bh, bh
+   132 00000095 D1E3                    		shl     bx, 1
+   133 00000097 8BBF[2075]              		mov     di, [RowOfs+bx]
+   134 0000009B 01CF                    		add     di, cx
+   135 0000009D 89D3                    		mov     bx, dx			; (restore Index)
+   136 0000009F 89BF[A072]              		mov     [Scope+bx], di		; save new address...
+   137 000000A3 26C6050A                		mov     byte [es:di], 10	; and DRAW.
+   138 000000A7 83C202                  		add     dx, 2			; the next pixel...
+   139 000000AA 41                      		inc     cx
+   140 000000AB 81F94001                		cmp     cx, 320			; 320 pixels drawed?
+   141 000000AF 72D5                    		jb      short DrawLoop
+   142                                  CheckAnyKey:
+   143 000000B1 B401                    		mov     ah, 1			; any key pressed?
+   144 000000B3 CD16                    		int     16h			; no, Loop.
+   145 000000B5 74C4                    		jz	short ScopeLoop
+   146                                  
+   147 000000B7 B400                    		mov     ah, 0			; flush key buffer...
+   148 000000B9 CD16                    		int     16h
+   149                                  
+   150                                  		;in	al, 21h			; enable irq 0!
+   151                                  		;and	al, 11111110b
+   152                                  		;out	21h, al
+   153                                  
+   154 000000BB B80300                  		mov     ax, 0003h		; Set Text Mode 80x25x16
+   155 000000BE CD10                    		int     10h
+   156                                  
+   157                                  		;call	StopPlaying		; STOP!
+   158 000000C0 E83A03                  		call	SbDone
+   159                                  Exit:           
+   160 000000C3 E8FA04                  		call    FreeModule              ; Free MODule core.
+   161                                  
+   162 000000C6 B8004C                  		mov     ax, 4C00h		; Bye!
+   163 000000C9 CD21                    		int     21h
+   164                                  
+   165                                  pmsg_2017:
+   166 000000CB B80009                  		mov     ax, 0900h		; Prints the Credits Text.
+   167                                  		;lea    dx, [msg_2017]
+   168 000000CE BA[A60A]                		mov	dx, msg_2017
+   169 000000D1 CD21                    		int     21h
+   170 000000D3 EBEE                    		jmp	short Exit
+   171                                  
+   172                                  DetectSb:
+   173 000000D5 60                      		pusha
+   174 000000D6 06                      		push    es
+   175                                  ScanPort:
+   176 000000D7 BB1002                  		mov     bx, 210h		; start scanning ports
+   177                                  						; 210h, 220h, .. 260h
+   178                                  ResetDSP:       
+   179 000000DA 89DA                    		mov     dx, bx			; try to reset the DSP.
+   180 000000DC 83C206                  		add     dx, 06h
+   181 000000DF B001                    		mov     al, 1
+   182 000000E1 EE                      		out     dx, al
+   183 000000E2 EC                      		in      al, dx
+   184 000000E3 EC                      		in      al, dx
+   185 000000E4 EC                      		in      al, dx
+   186 000000E5 EC                      		in      al, dx
+   187 000000E6 30C0                    		xor     al, al
+   188 000000E8 EE                      		out     dx, al
+   189 000000E9 83C208                  		add     dx, 08h
+   190 000000EC B96400                  		mov     cx, 100
+   191                                  WaitID:
+   192 000000EF EC                      		in      al, dx
+   193 000000F0 08C0                    		or      al, al
+   194 000000F2 7804                    		js      short GetID
+   195 000000F4 E2F9                    		loop    WaitID
+   196 000000F6 EB0D                    		jmp     short NextPort
+   197                                  GetID:          
+   198 000000F8 83EA04                  		sub     dx, 04h
+   199 000000FB EC                      		in      al, dx
+   200 000000FC 3CAA                    		cmp     al, 0AAh
+   201 000000FE 7411                    		je      short Found
+   202 00000100 83C204                  		add     dx, 04h
+   203 00000103 E2EA                    		loop    WaitID
+   204                                  NextPort:
+   205 00000105 83C310                  		add     bx, 10h			; if not response,
+   206 00000108 81FB6002                		cmp     bx, 260h		; try the next port.
+   207 0000010C 76CC                    		jbe     short ResetDSP
+   208 0000010E E9F200                  		jmp     Fail
+   209                                  Found:
+   210 00000111 891E[A20A]              		mov     [SbAddr], bx		; SB Port Address Found!
+   211                                  ScanIRQ:
+   212 00000115 FA                      		cli
+   213                                  
+   214 00000116 E421                    		in      al, 21h			; save the IMR.
+   215 00000118 88C3                    		mov     bl, al
+   216                                  
+   217 0000011A B0FF                    		mov     al, 11111111b		; disable all the IRQs.
+   218 0000011C E621                    		out     21h, al
+   219                                  
+   220 0000011E 31C0                    		xor     ax, ax			; trap the IRQs 2,3,5,7.
+   221 00000120 8EC0                    		mov     es, ax
+   222                                  SaveIrqs:
+   223 00000122 26A12800                		mov     ax, [es:28h]		; irq2
+   224 00000126 268B162A00              		mov     dx, [es:2Ah]
+   225 0000012B 50                      		push    ax
+   226 0000012C 52                      		push    dx
+   227                                  
+   228 0000012D 26A12C00                		mov     ax, [es:2Ch]		; irq3
+   229 00000131 268B162E00              		mov     dx, [es:2Eh]
+   230 00000136 50                      		push    ax
+   231 00000137 52                      		push    dx
+   232                                  
+   233 00000138 26A13400                		mov     ax, [es:34h]		; irq5
+   234 0000013C 268B163600              		mov     dx, [es:36h]
+   235 00000141 50                      		push    ax
+   236 00000142 52                      		push    dx
+   237                                  
+   238 00000143 26A13C00                		mov     ax, [es:3Ch]		; irq7
+   239 00000147 268B163E00              		mov     dx, [es:3Eh]
+   240 0000014C 50                      		push    ax
+   241 0000014D 52                      		push    dx
+   242                                  SetIrqs:        
+   243 0000014E B8[1102]                		mov     ax, TrapIrq2		; irq2
+   244 00000151 26A32800                		mov     [es:28h], ax
+   245 00000155 268C0E2A00              		mov     [es:2Ah], cs
+   246                                  
+   247 0000015A B8[1702]                		mov     ax, TrapIrq3		; irq3
+   248 0000015D 26A32C00                		mov     [es:2Ch], ax
+   249 00000161 268C0E2E00              		mov     [es:2Eh], cs
+   250                                  
+   251 00000166 B8[1D02]                		mov     ax, TrapIrq5		; irq5
+   252 00000169 26A33400                		mov     [es:34h], ax
+   253 0000016D 268C0E3600              		mov     [es:36h], cs
+   254                                  
+   255 00000172 B8[2302]                		mov     ax, TrapIrq7		; irq7
+   256 00000175 26A33C00                		mov     [es:3Ch], ax
+   257 00000179 268C0E3E00              		mov     [es:3Eh], cs
+   258                                  
+   259 0000017E 88D8                    EnableIrqs:     mov     al, bl			; enable IRQs 2,3,5,7.
+   260 00000180 2453                    		and     al, 01010011b
+   261 00000182 E621                    		out     21h, al
+   262                                  
+   263 00000184 FB                      		sti
+   264                                  
+   265 00000185 C606[A40A]00            		mov     byte [SbIrq], 0		; clear the IRQ level.
+   266                                  
+   267 0000018A 8B16[A20A]              		mov     dx, [SbAddr]		; tells to the SB to
+   268 0000018E 83C20C                  		add     dx, 0Ch			; generate a IRQ!
+   269 00000191 EC                      WaitSb:         in      al, dx
+   270 00000192 08C0                    		or      al, al
+   271 00000194 78FB                    		js      short WaitSb
+   272 00000196 B0F2                    		mov     al, 0F2h
+   273 00000198 EE                      		out     dx, al
+   274                                  
+   275 00000199 31C9                    		xor     cx, cx			; wait until IRQ level
+   276                                  WaitIRQ:        
+   277 0000019B 833E[A40A]00            		cmp     word [SbIrq], 0		; is changed or timeout.
+   278 000001A0 7502                    		jne     short IrqOk
+   279 000001A2 E2F7                    		loop    WaitIRQ
+   280                                  IrqOk:
+   281 000001A4 88D8                    		mov     al, bl			; restore IMR.
+   282 000001A6 E621                    		out     21h, al
+   283                                  RestoreIrqs:    
+   284 000001A8 FA                      		cli				; restore IRQ vectors.
+   285                                  
+   286 000001A9 31C0                    		xor     ax, ax
+   287 000001AB 8EC0                    		mov     es, ax
+   288                                  
+   289 000001AD 5A                      		pop     dx		      ; irq7
+   290 000001AE 58                      		pop     ax
+   291 000001AF 26A33C00                		mov     [es:3Ch], ax
+   292 000001B3 2689163E00              		mov     [es:3Eh], dx
+   293                                  
+   294 000001B8 5A                      		pop     dx		      ; irq5
+   295 000001B9 58                      		pop     ax
+   296 000001BA 26A33400                		mov     [es:34h], ax
+   297 000001BE 2689163600              		mov     [es:36h], dx
+   298                                  
+   299 000001C3 5A                      		pop     dx		      ; irq3
+   300 000001C4 58                      		pop     ax
+   301 000001C5 26A32C00                		mov     [es:2Ch], ax
+   302 000001C9 2689162E00              		mov     [es:2Eh], dx
+   303                                  
+   304 000001CE 5A                      		pop     dx		      ; irq2
+   305 000001CF 58                      		pop     ax
+   306 000001D0 26A32800                		mov     [es:28h], ax
+   307 000001D4 2689162A00              		mov     [es:2Ah], dx
+   308                                  
+   309                                  		;cli
+   310                                  
+   311 000001D9 833E[A40A]00            		cmp     word [SbIrq], 0		; IRQ level was changed?
+   312 000001DE 7423                    		je      short Fail		; no, fail.
+   313                                  Success:        
+   314 000001E0 8B16[A20A]              		mov     dx, [SbAddr]		; Print Sucessful message.
+   315 000001E4 8B0E[A40A]              		mov     cx, [SbIrq]
+   316 000001E8 C0EA04                  		shr     dl, 4
+   317 000001EB 80C230                  		add     dl, '0'
+   318 000001EE 8816[950B]              		mov     [PortText], dl
+   319 000001F2 80C130                  		add     cl, '0'
+   320 000001F5 880E[9E0B]              		mov     [IrqText], cl
+   321 000001F9 B409                    		mov     ah, 9
+   322 000001FB BA[750B]                		mov     dx, MsgFound
+   323 000001FE CD21                    		int     21h
+   324 00000200 07                      		pop     es
+   325 00000201 61                      		popa				; Return to caller.
+   326 00000202 C3                      		retn
+   327                                  
+   328 00000203 B409                    Fail:           mov     ah, 9			; Print Failed Message,
+   329 00000205 BA[4D0B]                		mov     dx, MsgNotFound		; and exit to DOS.
+   330 00000208 CD21                    		int     21h
+   331 0000020A B8004C                  		mov     ax, 4C00h
+   332 0000020D CD21                    		int     21h
+   333                                  
+   334                                  here:
+   335 0000020F EBFE                    		jmp	short here
+   336                                  
+   337                                  TrapIrq2:	
+   338 00000211 50                      		push	ax
+   339 00000212 B80200                  		mov	ax, 2
+   340 00000215 EB10                    		jmp     TrapIrq
+   341                                  TrapIrq3:
+   342 00000217 50                      		push	ax
+   343 00000218 B80300                  		mov	ax, 3
+   344 0000021B EB0A                    		jmp     TrapIrq
+   345                                  TrapIrq5:
+   346 0000021D 50                      		push	ax
+   347 0000021E B80500                  		mov	ax, 5
+   348 00000221 EB04                    		jmp     TrapIrq
+   349                                  TrapIrq7:
+   350 00000223 50                      		push	ax
+   351 00000224 B80700                  		mov	ax, 7
+   352                                  TrapIrq:
+   353 00000227 52                      		push	dx			; General IRQ trapper				
+   354 00000228 1E                      		push    ds			; used for IRQ autodetect.
+   355 00000229 8CCA                    		mov     dx, cs
+   356 0000022B 8EDA                    		mov     ds, dx
+   357 0000022D A3[A40A]                		mov     [SbIrq], ax		; save IRQ level.
+   358 00000230 8B16[A20A]              		mov     dx, [SbAddr]
+   359 00000234 83C20E                  		add     dx, 0Eh
+   360 00000237 EC                      		in      al, dx			; SB acknowledge.
+   361 00000238 B020                    		mov     al, 20h
+   362 0000023A E620                    		out     20h, al			; Hardware acknowledge.
+   363 0000023C 1F                      		pop     ds
+   364 0000023D 5A                      		pop     dx
+   365 0000023E 58                      		pop     ax
+   366 0000023F CF                      		iret				; bye!
+   367                                  
+   368                                  
+   369                                  ;=============================================================================
+   370                                  ;               SB.ASM
+   371                                  ;=============================================================================
+   372                                  
+   373                                  ;  Sound Blaster DMA Driver v0.1b by Carlos Hasan.
+   374                                  ;		July 24th, 1993.
+   375                                  
+   376                                  ; EQUATES
+   377                                  
+   378                                  DmaBufSize 	equ	2048
+   379                                  
+   380                                  ; MACROS
+   381                                  
+   382                                  %macro	SbOut	1
+   383                                  %%Wait:
+   384                                  	in	al, dx
+   385                                  	or	al, al
+   386                                  	js	short %%Wait
+   387                                  	mov	al, %1
+   388                                  	out	dx, al
+   389                                  %endmacro
+   390                                  
+   391                                  ; CODE
+   392                                  
+   393                                  ;--------------------------------------------------------------------------
+   394                                  ; SbIrqHandler:  Sound Blaster IRQ handler.
+   395                                  ;--------------------------------------------------------------------------
+   396                                  
+   397                                  SbIrqHandler:
+   398 00000240 50                      		push    ax
+   399 00000241 52                      		push    dx
+   400 00000242 1E                      		push    ds
+   401                                  
+   402 00000243 8CC8                    		mov     ax, cs
+   403 00000245 8ED8                    		mov     ds, ax
+   404                                  
+   405 00000247 8B16[A20A]              		mov     dx, [SbAddr]
+   406 0000024B 83C20E                  		add     dx, 0Eh
+   407 0000024E EC                      		in      al, dx
+   408                                  
+   409 0000024F 83EA02                  		sub     dx, 02h
+   410                                  		SbOut	14h
+   410                              <1> %%Wait:
+   410 00000252 EC                  <1>  in al, dx
+   410 00000253 08C0                <1>  or al, al
+   410 00000255 78FB                <1>  js short %%Wait
+   410 00000257 B014                <1>  mov al, %1
+   410 00000259 EE                  <1>  out dx, al
+   411                                  		SbOut	0FFh
+   411                              <1> %%Wait:
+   411 0000025A EC                  <1>  in al, dx
+   411 0000025B 08C0                <1>  or al, al
+   411 0000025D 78FB                <1>  js short %%Wait
+   411 0000025F B0FF                <1>  mov al, %1
+   411 00000261 EE                  <1>  out dx, al
+   412                                  		SbOut	0FFh
+   412                              <1> %%Wait:
+   412 00000262 EC                  <1>  in al, dx
+   412 00000263 08C0                <1>  or al, al
+   412 00000265 78FB                <1>  js short %%Wait
+   412 00000267 B0FF                <1>  mov al, %1
+   412 00000269 EE                  <1>  out dx, al
+   413                                  
+   414 0000026A B020                    		mov     al, 20h
+   415 0000026C E620                    		out     20h, al
+   416                                  
+   417 0000026E 1F                      		pop     ds
+   418 0000026F 5A                      		pop     dx
+   419 00000270 58                      		pop     ax
+   420 00000271 CF                      		iret
+   421                                  
+   422                                  ;--------------------------------------------------------------------------
+   423                                  ; SbPoll:  Sound Blaster Polling.
+   424                                  ;--------------------------------------------------------------------------
+   425                                  
+   426                                  SbPoll:
+   427 00000272 60                      		pusha
+   428 00000273 1E                      		push    ds
+   429 00000274 06                      		push    es
+   430                                  
+   431 00000275 8CC8                    		mov     ax, cs
+   432 00000277 8ED8                    		mov     ds, ax
+   433                                  GetDmaCount:
+   434 00000279 E403                    		in      al, 03h
+   435 0000027B 88C1                    		mov     cl, al
+   436 0000027D E403                    		in      al, 03h
+   437 0000027F 88C5                    		mov     ch, al
+   438                                  
+   439 00000281 A1[0C0C]                		mov     ax, [DmaFlag]
+   440 00000284 85C0                    		test    ax, ax
+   441 00000286 7519                    		jnz     short SecondHalf
+   442                                  FirstHalf:
+   443 00000288 81F90004                		cmp     cx, DmaBufSize/2
+   444 0000028C 732C                    		jae     short Bye
+   445 0000028E 8B36[0E0C]              		mov     si, [DmaBuffer]
+   446 00000292 B90004                  		mov     cx, DmaBufSize/2
+   447 00000295 1E                      		push	ds ; segment
+   448 00000296 56                      		push	si ; offset
+   449 00000297 51                      		push	cx ; count
+   450 00000298 E81507                  		call    GetSamples
+   451 0000029B FF06[0C0C]              		inc     word [DmaFlag]
+   452 0000029F EB19                    		jmp     short Bye
+   453                                  SecondHalf:     
+   454 000002A1 81F90004                		cmp     cx, DmaBufSize/2
+   455 000002A5 7213                    		jb      short Bye
+   456 000002A7 8B36[0E0C]              		mov     si, [DmaBuffer]
+   457 000002AB B90004                  		mov     cx, DmaBufSize/2
+   458 000002AE 01CE                    		add     si, cx
+   459 000002B0 1E                      		push	ds
+   460 000002B1 56                      		push	si
+   461 000002B2 51                      		push	cx
+   462 000002B3 E8FA06                  		call    GetSamples
+   463 000002B6 FF0E[0C0C]              		dec     word [DmaFlag]
+   464                                  Bye:
+   465 000002BA 07                      		pop     es
+   466 000002BB 1F                      		pop     ds
+   467 000002BC 61                      		popa
+   468 000002BD C3                      		retn     ;<==== IRET
+   469                                  
+   470                                  ;--------------------------------------------------------------------------
+   471                                  ; SbInit: Initializes the Sound Blaster Driver.
+   472                                  ;--------------------------------------------------------------------------
+   473                                  
+   474                                  SbInit:
+   475 000002BE 60                      		pusha
+   476 000002BF 1E                      		push    ds
+   477 000002C0 06                      		push    es
+   478                                  
+   479 000002C1 E85D07                  		call    StartPlaying
+   480                                  
+   481 000002C4 FA                      		cli
+   482                                  
+   483 000002C5 E421                    		in      al, 21h
+   484 000002C7 50                      		push    ax
+   485                                  
+   486 000002C8 B0FF                    		mov     al, 11111111b
+   487 000002CA E621                    		out     21h, al
+   488                                  SetBuffer:
+   489 000002CC C706[0C0C]0000          		mov     word [DmaFlag], 0
+   490 000002D2 B8[180C]                		mov     ax, DoubleBuffer
+   491 000002D5 A3[0E0C]                		mov     [DmaBuffer], ax
+   492 000002D8 8CDA                    		mov     dx, ds
+   493 000002DA 89D3                    		mov     bx, dx
+   494 000002DC C0EE04                  		shr     dh, 4
+   495 000002DF C1E304                  		shl     bx, 4
+   496 000002E2 01D8                    		add     ax, bx
+   497 000002E4 80D600                  		adc     dh, 0
+   498 000002E7 89C1                    		mov     cx, ax
+   499 000002E9 F7D9                    		neg     cx
+   500 000002EB 81F90008                		cmp     cx, DmaBufSize
+   501 000002EF 7309                    		jae     short SetDma
+   502 000002F1 010E[0E0C]              		add     [DmaBuffer], cx
+   503 000002F5 01C8                    		add     ax, cx
+   504 000002F7 80D600                  		adc     dh, 0
+   505                                  SetDma:
+   506 000002FA 89C3                    		mov     bx, ax
+   507 000002FC B90008                  		mov     cx, DmaBufSize
+   508 000002FF 49                      		dec     cx
+   509                                  
+   510 00000300 B005                    		mov     al, 05h
+   511 00000302 E60A                    		out     0Ah, al
+   512                                  
+   513 00000304 30C0                    		xor     al, al
+   514 00000306 E60C                    		out     0Ch, al
+   515                                  
+   516 00000308 88D8                    		mov     al, bl
+   517 0000030A E602                    		out     02h, al
+   518 0000030C 88F8                    		mov     al, bh
+   519 0000030E E602                    		out     02h, al
+   520 00000310 88F0                    		mov     al, dh
+   521 00000312 E683                    		out     83h, al
+   522                                  
+   523 00000314 88C8                    		mov     al, cl
+   524 00000316 E603                    		out     03h, al
+   525 00000318 88E8                    		mov     al, ch
+   526 0000031A E603                    		out     03h, al
+   527                                  
+   528 0000031C B059                    		mov     al, 59h
+   529 0000031E E60B                    		out     0Bh, al
+   530                                  
+   531 00000320 B001                    		mov     al, 01h
+   532 00000322 E60A                    		out     0Ah, al
+   533                                  ClearBuffer:
+   534 00000324 8B3E[0E0C]              		mov     di, [DmaBuffer]
+   535 00000328 B90008                  		mov     cx, DmaBufSize
+   536 0000032B 8CD8                    		mov     ax, ds
+   537 0000032D 8EC0                    		mov     es, ax
+   538 0000032F B080                    		mov     al, 80h
+   539 00000331 FC                      		cld
+   540 00000332 F3AA                    		rep     stosb
+   541                                  SetIrq:
+   542 00000334 31C0                    		xor     ax, ax
+   543 00000336 8EC0                    		mov     es, ax
+   544                                  
+   545 00000338 8B1E[A40A]              		mov     bx, [SbIrq]
+   546 0000033C 83C308                  		add     bx, 08h
+   547 0000033F C1E302                  		shl     bx, 2
+   548                                  
+   549 00000342 268B07                  		mov     ax, [es:bx]
+   550 00000345 268B5702                		mov     dx, [es:bx+2]
+   551 00000349 A3[100C]                		mov     [DmaHandler], ax
+   552 0000034C 8916[120C]              		mov     [DmaHandler+2], dx
+   553                                  
+   554 00000350 B8[4002]                		mov     ax, SbIrqHandler
+   555 00000353 268907                  		mov     [es:bx], ax
+   556 00000356 268C4F02                		mov     [es:bx+2], cs
+   557                                  SetTimer:
+   558 0000035A 26A17000                		mov     ax, [es:70h]
+   559 0000035E 268B167200              		mov     dx, [es:72h]
+   560 00000363 A3[140C]                		mov     [TimerHandler], ax
+   561 00000366 8916[160C]              		mov     [TimerHandler+2], dx
+   562                                  
+   563                                  		;;;
+   564                                  		;mov     ax, SbPoll
+   565                                  		;mov     [es:70h], ax
+   566                                  		;mov     [es:72h], cs
+   567                                  		;;;
+   568                                  ResetDsp:
+   569 0000036A 8B16[A20A]              		mov     dx, [SbAddr]
+   570 0000036E 83C206                  		add     dx, 06h
+   571 00000371 B001                    		mov     al, 1
+   572 00000373 EE                      		out     dx, al
+   573 00000374 EC                      		in      al, dx
+   574 00000375 EC                      		in      al, dx
+   575 00000376 EC                      		in      al, dx
+   576 00000377 EC                      		in      al, dx
+   577 00000378 30C0                    		xor     al, al
+   578 0000037A EE                      		out     dx, al
+   579 0000037B B96400                  		mov     cx, 100
+   580                                  WaitId:         
+   581 0000037E 8B16[A20A]              		mov     dx, [SbAddr]
+   582 00000382 83C20E                  		add     dx, 0Eh
+   583 00000385 EC                      		in      al, dx
+   584 00000386 08C0                    		or      al, al
+   585 00000388 7804                    		js      short sb_GetId
+   586 0000038A E2F2                    		loop    WaitId
+   587 0000038C EB5B                    		jmp     short sb_Exit
+   588                                  sb_GetId:          
+   589 0000038E 8B16[A20A]              		mov     dx, [SbAddr]
+   590 00000392 83C20A                  		add     dx, 0Ah
+   591 00000395 EC                      		in      al, dx
+   592 00000396 3CAA                    		cmp     al, 0AAh
+   593 00000398 7404                    		je      short SbOk
+   594 0000039A E2E2                    		loop    WaitId
+   595 0000039C EB4B                    		jmp     short sb_Exit
+   596                                  SbOk:
+   597 0000039E 8B16[A20A]              		mov     dx, [SbAddr]
+   598 000003A2 83C20C                  		add     dx, 0Ch
+   599                                  		SbOut   0D1h
+   599                              <1> %%Wait:
+   599 000003A5 EC                  <1>  in al, dx
+   599 000003A6 08C0                <1>  or al, al
+   599 000003A8 78FB                <1>  js short %%Wait
+   599 000003AA B0D1                <1>  mov al, %1
+   599 000003AC EE                  <1>  out dx, al
+   600 000003AD B8E803                  		mov     ax, 1000
+   601 000003B0 F7E0                    		mul     ax
+   602 000003B2 F736[5818]              		div     word [MixSpeed]
+   603 000003B6 F6D8                    		neg     al
+   604 000003B8 88C4                    		mov     ah, al
+   605 000003BA 8B16[A20A]              		mov     dx, [SbAddr]
+   606 000003BE 83C20C                  		add     dx, 0Ch
+   607                                  		SbOut   40h
+   607                              <1> %%Wait:
+   607 000003C1 EC                  <1>  in al, dx
+   607 000003C2 08C0                <1>  or al, al
+   607 000003C4 78FB                <1>  js short %%Wait
+   607 000003C6 B040                <1>  mov al, %1
+   607 000003C8 EE                  <1>  out dx, al
+   608                                  		SbOut   ah
+   608                              <1> %%Wait:
+   608 000003C9 EC                  <1>  in al, dx
+   608 000003CA 08C0                <1>  or al, al
+   608 000003CC 78FB                <1>  js short %%Wait
+   608 000003CE 88E0                <1>  mov al, %1
+   608 000003D0 EE                  <1>  out dx, al
+   609                                  StartDma:       
+   610                                  		SbOut   14h
+   610                              <1> %%Wait:
+   610 000003D1 EC                  <1>  in al, dx
+   610 000003D2 08C0                <1>  or al, al
+   610 000003D4 78FB                <1>  js short %%Wait
+   610 000003D6 B014                <1>  mov al, %1
+   610 000003D8 EE                  <1>  out dx, al
+   611                                  		SbOut   0FFh
+   611                              <1> %%Wait:
+   611 000003D9 EC                  <1>  in al, dx
+   611 000003DA 08C0                <1>  or al, al
+   611 000003DC 78FB                <1>  js short %%Wait
+   611 000003DE B0FF                <1>  mov al, %1
+   611 000003E0 EE                  <1>  out dx, al
+   612                                  		SbOut   0FFh
+   612                              <1> %%Wait:
+   612 000003E1 EC                  <1>  in al, dx
+   612 000003E2 08C0                <1>  or al, al
+   612 000003E4 78FB                <1>  js short %%Wait
+   612 000003E6 B0FF                <1>  mov al, %1
+   612 000003E8 EE                  <1>  out dx, al
+   613                                  sb_Exit:           
+   614 000003E9 58                      		pop     ax
+   615 000003EA 8B0E[A40A]              		mov     cx, [SbIrq]
+   616 000003EE B401                    		mov     ah, 1
+   617 000003F0 D2E4                    		shl     ah, cl
+   618 000003F2 F6D4                    		not     ah
+   619 000003F4 20E0                    		and     al, ah
+   620 000003F6 E621                    		out     21h, al
+   621                                  
+   622 000003F8 FB                      		sti
+   623                                  
+   624 000003F9 07                      		pop     es
+   625 000003FA 1F                      		pop     ds
+   626 000003FB 61                      		popa
+   627 000003FC C3                      		retn
+   628                                  
+   629                                  ;--------------------------------------------------------------------------
+   630                                  ; SbDone:  Shut Down the Sound Blaster Driver.
+   631                                  ;--------------------------------------------------------------------------
+   632                                  
+   633                                  SbDone:
+   634 000003FD 60                      		pusha
+   635 000003FE 1E                      		push    ds
+   636 000003FF 06                      		push    es
+   637                                  
+   638 00000400 FA                      		cli
+   639                                  
+   640 00000401 E421                    		in      al, 21h
+   641 00000403 50                      		push    ax
+   642                                  
+   643 00000404 B0FF                    		mov     al, 11111111b
+   644 00000406 E621                    		out     21h, al
+   645                                  
+   646 00000408 31C0                    		xor     ax, ax
+   647 0000040A 8EC0                    		mov     es, ax
+   648                                  
+   649 0000040C 8B1E[A40A]              		mov     bx, [SbIrq]
+   650 00000410 83C308                  		add     bx, 08h
+   651 00000413 C1E302                  		shl     bx, 2
+   652                                  
+   653 00000416 A1[100C]                		mov     ax, [DmaHandler]
+   654 00000419 8B16[120C]              		mov     dx, [DmaHandler+2]
+   655 0000041D 268907                  		mov     [es:bx], ax
+   656 00000420 26895702                		mov     [es:bx+2], dx
+   657                                  
+   658 00000424 A1[140C]                		mov     ax, [TimerHandler]
+   659 00000427 8B16[160C]              		mov     dx, [TimerHandler+2]
+   660 0000042B 26A37000                		mov     [es:70h], ax
+   661 0000042F 2689167200              		mov     [es:72h], dx
+   662                                  
+   663 00000434 8B16[A20A]              		mov     dx, [SbAddr]
+   664 00000438 83C20C                  		add     dx, 0Ch
+   665                                  		SbOut   0D0h
+   665                              <1> %%Wait:
+   665 0000043B EC                  <1>  in al, dx
+   665 0000043C 08C0                <1>  or al, al
+   665 0000043E 78FB                <1>  js short %%Wait
+   665 00000440 B0D0                <1>  mov al, %1
+   665 00000442 EE                  <1>  out dx, al
+   666                                  		SbOut   0D3h
+   666                              <1> %%Wait:
+   666 00000443 EC                  <1>  in al, dx
+   666 00000444 08C0                <1>  or al, al
+   666 00000446 78FB                <1>  js short %%Wait
+   666 00000448 B0D3                <1>  mov al, %1
+   666 0000044A EE                  <1>  out dx, al
+   667                                  
+   668 0000044B 58                      		pop     ax
+   669 0000044C 8B0E[A40A]              		mov     cx, [SbIrq]
+   670 00000450 B401                    		mov     ah, 1
+   671 00000452 D2E4                    		shl     ah, cl
+   672 00000454 08E0                    		or      al, ah
+   673 00000456 E621                    		out     21h, al
+   674                                  
+   675 00000458 FB                      		sti
+   676                                  
+   677 00000459 E84506                  		call    StopPlaying
+   678                                  
+   679 0000045C 07                      		pop     es
+   680 0000045D 1F                      		pop     ds
+   681 0000045E 61                      		popa
+   682 0000045F C3                      		retn
+   683                                  
+   684                                  ;=============================================================================
+   685                                  ;               MODLOAD.ASM
+   686                                  ;=============================================================================
+   687                                  
+   688                                  ; Amiga Module Loader v0.1b by Carlos Hasan.
+   689                                  ;		July 10th, 1993.
+   690                                  
+   691                                  ; STRUCTURES
+   692                                  
+   693                                  struc ModSample
+   694 00000000 <res 00000016>          .msName:	resb 22
+   695 00000016 <res 00000002>          .msLength:	resw 1
+   696 00000018 <res 00000001>          .msFinetune:	resb 1
+   697 00000019 <res 00000001>          .msVolume:	resb 1
+   698 0000001A <res 00000002>          .msRepeat:	resw 1
+   699 0000001C <res 00000002>          .msRepLen:	resw 1
+   700                                  .size:
+   701                                  endstruc
+   702                                  
+   703                                  struc ModHeader
+   704 00000000 <res 00000014>          .mhName:	resb 20
+   705 00000014 <res 000003A2>          .mhSamples:	resb ModSample.size*31
+   706 000003B6 <res 00000001>          .mhOrderLen:	resb 1
+   707 000003B7 <res 00000001>          .mhReStart:	resb 1
+   708 000003B8 <res 00000080>          .mhOrder:	resb 128
+   709 00000438 <res 00000004>          .mhSign:	resw 2
+   710                                  .size:	
+   711                                  endstruc
+   712                                  
+   713                                  struc ModInfoRec
+   714 00000000 <res 00000001>          .OrderLen:	resb 1
+   715 00000001 <res 00000001>          .ReStart:	resb 1
+   716 00000002 <res 00000080>          .Order:		resb 128
+   717 00000082 <res 00000004>          .Patterns:	resd 1
+   718 00000086 <res 0000003E>          .SampOfs:	resw 31
+   719 000000C4 <res 0000003E>          .SampSeg:	resw 31
+   720 00000102 <res 0000003E>          .SampLen:	resw 31
+   721 00000140 <res 0000003E>          .SampRep:	resw 31
+   722 0000017E <res 0000003E>          .SampRepLen:	resw 31
+   723 000001BC <res 0000003E>          .SampVol:	resw 31
+   724                                  .size:	
+   725                                  endstruc
+   726                                  
+   727                                  ; CODE
+   728                                  
+   729                                  LoadModule:
+   730                                  		;es:di = filename
+   731                                  
+   732                                  		;[sp+4] = es
+   733                                  		;[sp+2] = di
+   734                                  
+   735                                  		FileName equ 4		
+   736                                  
+   737 00000460 55                      		push    bp
+   738 00000461 89E5                    		mov     bp, sp
+   739 00000463 60                      		pusha
+   740 00000464 1E                      		push    ds
+   741 00000465 06                      		push    es
+   742                                  
+   743 00000466 C706[1A14]0100          		mov	word [ErrorInfo], 1
+   744                                  
+   745 0000046C E85101                  		call    ClearModInfo
+   746                                  OpenFile:       
+   747 0000046F 1E                      		push    ds
+   748 00000470 B8003D                  		mov     ax, 3D00h
+   749 00000473 C55604                  		lds     dx, [bp+FileName]
+   750 00000476 CD21                    		int     21h
+   751 00000478 1F                      		pop     ds
+   752 00000479 0F823C01                		jc      Failed
+   753 0000047D A3[1814]                		mov     [FileHandle], ax
+   754                                  
+   755                                  ReadHeader:     
+   756 00000480 B8003F                  		mov     ax, 3F00h
+   757 00000483 8B1E[1814]              		mov     bx, [FileHandle]
+   758 00000487 B93C04                  		mov     cx, ModHeader.size
+   759                                  		;lea    dx, [Header]
+   760 0000048A BA[1C14]                		mov	dx, Header
+   761 0000048D CD21                    		int     21h
+   762 0000048F 0F821D01                		jc      CloseFile
+   763                                  CheckMK:        
+   764 00000493 813E[5418]4D2E          		cmp     word [Header+ModHeader.mhSign], 'M.'
+   765 00000499 7508                    		jne     short CheckFLT4
+   766 0000049B 813E[5618]4B2E          		cmp     word [Header+ModHeader.mhSign+2], 'K.'
+   767 000004A1 7439                    		je      short IsModFile
+   768                                  CheckFLT4:
+   769 000004A3 813E[5418]464C          		cmp     word [Header+ModHeader.mhSign], 'FL'
+   770 000004A9 7508                    		jne     short Is15Inst
+   771 000004AB 813E[5618]5434          		cmp     word [Header+ModHeader.mhSign+2], 'T4'
+   772 000004B1 7429                    		je      short IsModFile
+   773                                  Is15Inst:
+   774 000004B3 BE[F215]                		mov     si, (Header+ModHeader.mhSamples) + (15*ModSample.size)
+   775 000004B6 BF[D217]                		mov     di, Header+ModHeader.mhOrderLen
+   776 000004B9 8CD8                    		mov     ax, ds
+   777 000004BB 8EC0                    		mov     es, ax
+   778 000004BD FC                      		cld
+   779 000004BE B98200                  		mov     cx, 130
+   780 000004C1 F3A4                    		rep     movsb
+   781 000004C3 BF[F215]                		mov     di, Header+ModHeader.mhSamples + (15*ModSample.size)
+   782 000004C6 31C0                    		xor     ax, ax
+   783 000004C8 B9E001                  		mov     cx, 16*ModSample.size
+   784 000004CB F3AA                    		rep     stosb
+   785                                  SeekPatterns:   
+   786 000004CD B80042                  		mov     ax, 4200h
+   787 000004D0 8B1E[1814]              		mov     bx, [FileHandle]
+   788 000004D4 B90000                  		mov     cx, 0
+   789 000004D7 BA5802                  		mov     dx, 600
+   790 000004DA CD21                    		int     21h
+   791                                  IsModFile:  
+   792 000004DC A0[D217]                		mov     al, [Header+ModHeader.mhOrderLen]
+   793 000004DF A2[5A18]                		mov     [ModInfo.OrderLen], al
+   794                                  
+   795 000004E2 A0[D317]                		mov     al, [Header+ModHeader.mhReStart]
+   796 000004E5 3A06[D217]              		cmp     al, [Header+ModHeader.mhOrderLen]
+   797 000004E9 7202                    		jb      short SetReStart
+   798 000004EB B07F                    		mov     al, 7Fh
+   799                                  SetReStart:
+   800 000004ED A2[5B18]                		mov     [ModInfo.ReStart], al
+   801                                  
+   802 000004F0 B98000                  		mov     cx, 128
+   803 000004F3 31C0                    		xor     ax, ax
+   804 000004F5 31DB                    		xor     bx, bx
+   805                                  CopyOrder:
+   806 000004F7 8AA7[D417]              		mov     ah, [Header+ModHeader.mhOrder+bx]
+   807 000004FB 88A7[5C18]              		mov     [ModInfo.Order+bx], ah
+   808 000004FF 38C4                    		cmp     ah, al
+   809 00000501 7202                    		jb      short NextOrder
+   810 00000503 88E0                    		mov     al, ah
+   811                                  NextOrder:
+   812 00000505 43                      		inc     bx
+   813 00000506 E2EF                    		loop    CopyOrder
+   814                                  AllocPatterns:  
+   815                                  		; Erdogan Tan (13/02/2017)
+   816 00000508 30E4                    		xor	ah, ah
+   817 0000050A FEC0                    		inc	al
+   818                                  		; al = count of 1024 bytes
+   819 0000050C 89C3                    		mov	bx, ax
+   820                                  		; count of paragraphs = al*64 
+   821 0000050E C1E006                  		shl	ax, 6 ; *64
+   822 00000511 89C5                    		mov	bp, ax
+   823 00000513 8CCA                    		mov	dx, cs ; current (code) segment
+   824 00000515 81C20010                		add	dx, 1000h ; next 64K (4096*16)
+   825                                  		;
+   826 00000519 C706[DC18]0000          		mov	word [ModInfo.Patterns], 0
+   827 0000051F 8916[DE18]              		mov	[ModInfo.Patterns+2], dx
+   828                                  		;
+   829 00000523 01D5                    		add	bp, dx ; next segment for samples
+   830                                  ReadPatterns:   
+   831 00000525 1E                      		push    ds
+   832 00000526 B8003F                  		mov     ax, 3F00h
+   833 00000529 89D9                    		mov     cx, bx ; count of 1024 bytes
+   834 0000052B C1E10A                  		shl     cx, 10 ; byte count (cx*1024)
+   835 0000052E 8B1E[1814]              		mov     bx, [FileHandle]
+   836                                  		;lds    dx, [ModInfo.Patterns]
+   837 00000532 8EDA                    		mov	ds, dx
+   838 00000534 31D2                    		xor	dx, dx
+   839 00000536 CD21                    		int     21h
+   840 00000538 1F                      		pop     ds
+   841 00000539 7275                    		jc      CloseFile
+   842                                  
+   843                                  		;lea	si, [Header+ModHeader.mhSamples]
+   844 0000053B BE[3014]                		mov	si, Header+ModHeader.mhSamples
+   845 0000053E 31FF                    		xor     di, di
+   846                                  CopySamples:
+   847 00000540 8B4416                  		mov     ax, [si+ModSample.msLength]
+   848 00000543 86C4                    		xchg    al, ah
+   849 00000545 D1E0                    		shl     ax, 1
+   850 00000547 8985[5C19]              		mov     [ModInfo.SampLen+di], ax
+   851 0000054B 8A4419                  		mov     al, [si+ModSample.msVolume]
+   852 0000054E 30E4                    		xor     ah, ah
+   853 00000550 8985[161A]              		mov     [ModInfo.SampVol+di], ax
+   854 00000554 8B441A                  		mov     ax, [si+ModSample.msRepeat]
+   855 00000557 86C4                    		xchg    al, ah
+   856 00000559 D1E0                    		shl     ax, 1
+   857 0000055B 8985[9A19]              		mov     [ModInfo.SampRep+di], ax
+   858 0000055F 8B441C                  		mov     ax, [si+ModSample.msRepLen]
+   859 00000562 86C4                    		xchg    al, ah
+   860 00000564 D1E0                    		shl     ax, 1
+   861 00000566 8985[D819]              		mov     [ModInfo.SampRepLen+di], ax
+   862 0000056A 83C61E                  		add     si, ModSample.size
+   863 0000056D 83C702                  		add     di, 2
+   864 00000570 83FF3E                  		cmp     di, 2*31
+   865 00000573 72CB                    		jb      short CopySamples
+   866                                  
+   867 00000575 31F6                    		xor     si, si
+   868                                  AllocSamples:
+   869                                  		; Erdogan Tan (13/02/2017)
+   870                                  		;mov	bx, [ModInfo.SampLen+si]
+   871 00000577 8B8C[5C19]              		mov	cx, [ModInfo.SampLen+si]
+   872 0000057B 89CB                    		mov	bx, cx
+   873 0000057D C1EB04                  		shr     bx, 4 ; byte count / 16
+   874 00000580 7420                    		jz      short NextSample
+   875 00000582 43                      		inc	bx ; number of paragraphs
+   876 00000583 C784[E018]0000          		mov	word [ModInfo.SampOfs+si], 0
+   877 00000589 89AC[1E19]              		mov     [ModInfo.SampSeg+si], bp
+   878 0000058D 89EA                    		mov	dx, bp
+   879 0000058F 01DD                    		add	bp, bx ; next segment for sample 
+   880                                  ReadSample:
+   881 00000591 1E                      		push    ds
+   882 00000592 B8003F                  		mov     ax, 3F00h
+   883 00000595 8B1E[1814]              		mov     bx, [FileHandle]
+   884                                  		;mov    cx, [ModInfo.SampLen+si]
+   885                                  		;mov    dx, [ModInfo.SampOfs+si]
+   886                                  		;mov    ds, [ModInfo.SampSeg+si]
+   887 00000599 8EDA                    		mov	ds, dx
+   888 0000059B 31D2                    		xor	dx, dx	
+   889 0000059D CD21                    		int     21h
+   890 0000059F 1F                      		pop     ds
+   891 000005A0 720E                    		jc      short CloseFile
+   892                                  NextSample:
+   893 000005A2 83C602                  		add     si, 2
+   894 000005A5 83FE3E                  		cmp     si, 2*31
+   895 000005A8 72CD                    		jb      short AllocSamples
+   896                                  
+   897 000005AA C706[1A14]0000          		mov     word [ErrorInfo], 0
+   898                                  CloseFile:      
+   899 000005B0 B8003E                  		mov     ax, 3E00h
+   900 000005B3 8B1E[1814]              		mov     bx, [FileHandle]
+   901 000005B7 CD21                    		int     21h
+   902                                  Failed:         
+   903 000005B9 07                      		pop     es
+   904 000005BA 1F                      		pop     ds
+   905 000005BB 61                      		popa
+   906 000005BC 5D                      		pop     bp
+   907 000005BD C20400                  		ret	4
+   908                                  
+   909                                  FreeModule:
+   910                                  		; Erdogan Tan (13/02/2017)
+   911                                  		; nothing to do here for memory de-allocation
+   912                                  ClearModInfo:
+   913 000005C0 60                      		pusha
+   914 000005C1 06                      		push    es
+   915 000005C2 8CD8                    		mov     ax, ds
+   916 000005C4 8EC0                    		mov     es, ax
+   917                                  		;lea    di, [ModInfo]
+   918 000005C6 BF[5A18]                		mov	di, ModInfo
+   919 000005C9 B9FA01                  		mov     cx, ModInfoRec.size
+   920 000005CC FC                      		cld
+   921 000005CD 31C0                    		xor     ax, ax
+   922 000005CF F3AA                    		rep     stosb
+   923 000005D1 07                      		pop     es
+   924 000005D2 61                      		popa
+   925 000005D3 C3                      		retn
+   926                                  
+   927                                  ;=============================================================================
+   928                                  ;               MODPLAY.ASM
+   929                                  ;=============================================================================
+   930                                  
+   931                                  ; Amiga Module Loader v0.3b by Carlos Hasan.
+   932                                  ;		July 23th, 1993.
+   933                                  
+   934                                  ; EQUATES
+   935                                  
+   936                                  NumTracks       equ 4
+   937                                  DefTempo        equ 6
+   938                                  DefBpm          equ 125
+   939                                  MidCRate        equ 8448
+   940                                  MixBufSize      equ 4096
+   941                                  
+   942                                  ; STRUCTURES
+   943                                  
+   944                                  struc TrackInfo
+   945 00000000 <res 00000004>          .Samples:	resd 1
+   946 00000004 <res 00000002>          .Position:	resw 1
+   947 00000006 <res 00000002>          .Len:		resw 1
+   948 00000008 <res 00000002>          .Repeat:	resw 1
+   949 0000000A <res 00000002>          .RepLen:	resw 1
+   950 0000000C <res 00000001>          .Volume: 	resb 1
+   951 0000000D <res 00000001>          .Error:		resb 1
+   952 0000000E <res 00000002>          .Period:	resw 1
+   953 00000010 <res 00000002>          .Pitch:		resw 1
+   954 00000012 <res 00000002>          .Effect:	resw 1
+   955 00000014 <res 00000002>          .PortTo:	resw 1
+   956 00000016 <res 00000001>          .PortParm:	resb 1
+   957 00000017 <res 00000001>          .VibPos:	resb 1
+   958 00000018 <res 00000001>          .VibParm:	resb 1
+   959 00000019 <res 00000001>          .OldSampOfs:	resb 1
+   960 0000001A <res 00000006>          .Arp:		resw 3
+   961 00000020 <res 00000002>          .ArpIndex:	resw 1
+   962                                  .size:
+   963                                  endstruc
+   964                                  
+   965                                  ; CODE
+   966                                  
+   967                                  ;--------------------------------------------------------------------------
+   968                                  ; BeatTrack:  Process the next beat in one track.
+   969                                  ;  In:
+   970                                  ;    ds:di -  Track info Address.
+   971                                  ;--------------------------------------------------------------------------
+   972                                  
+   973                                  BeatTrack:
+   974 000005D4 8B5512                  		mov     dx, [di+TrackInfo.Effect]
+   975 000005D7 85D2                    		test    dx, dx
+   976 000005D9 7430                    		je      short None
+   977 000005DB 80FE00                  		cmp     dh, 00h
+   978 000005DE 742C                    		je      short Arpeggio
+   979 000005E0 80FE01                  		cmp     dh, 01h
+   980 000005E3 743E                    		je      short PortUp
+   981 000005E5 80FE02                  		cmp     dh, 02h
+   982 000005E8 7455                    		je      short PortDown
+   983 000005EA 80FE03                  		cmp     dh, 03h
+   984 000005ED 746D                    		je      short TonePort
+   985 000005EF 80FE04                  		cmp     dh, 04h
+   986 000005F2 0F849100                		je      Vibrato
+   987 000005F6 80FE05                  		cmp     dh, 05h
+   988 000005F9 0F84D600                		je      PortSlide
+   989 000005FD 80FE06                  		cmp     dh, 06h
+   990 00000600 0F84D700                		je      VibSlide
+   991 00000604 80FE0A                  		cmp     dh, 0Ah
+   992 00000607 0F84D800                		je      VolSlide
+   993                                  None:           
+   994 0000060B C3                      		retn
+   995                                  Arpeggio:
+   996 0000060C 8B5D20                  		mov     bx, [di+TrackInfo.ArpIndex]
+   997 0000060F 8B411A                  		mov     ax, [di+TrackInfo.Arp+bx]
+   998 00000612 894510                  		mov     [di+TrackInfo.Pitch], ax
+   999 00000615 83C302                  		add     bx, 2
+  1000 00000618 83FB06                  		cmp     bx, 6
+  1001 0000061B 7202                    		jb      short SetArpIndex
+  1002 0000061D 31DB                    		xor     bx,bx
+  1003                                  SetArpIndex:
+  1004 0000061F 895D20                  		mov     [di+TrackInfo.ArpIndex], bx
+  1005 00000622 C3                      		retn
+  1006                                  PortUp:
+  1007 00000623 30F6                    		xor     dh, dh
+  1008 00000625 8B5D0E                  		mov     bx, [di+TrackInfo.Period]
+  1009 00000628 29D3                    		sub     bx, dx
+  1010 0000062A 83FB71                  		cmp     bx, 113
+  1011 0000062D 7D03                    		jge     short NotSmall
+  1012 0000062F BB7100                  		mov     bx, 113
+  1013                                  NotSmall:
+  1014 00000632 895D0E                  		mov     [di+TrackInfo.Period], bx
+  1015 00000635 01DB                    		add     bx, bx
+  1016 00000637 8B87[541A]              		mov     ax, [PitchTable+bx]
+  1017 0000063B 894510                  		mov     [di+TrackInfo.Pitch], ax
+  1018 0000063E C3                      		retn
+  1019                                  PortDown:
+  1020 0000063F 30F6                    		xor     dh, dh
+  1021 00000641 8B5D0E                  		mov     bx, [di+TrackInfo.Period]
+  1022 00000644 01D3                    		add     bx, dx
+  1023 00000646 81FB5803                		cmp     bx, 856
+  1024 0000064A 7E03                    		jle     short NotBig
+  1025 0000064C BB5803                  		mov     bx, 856
+  1026 0000064F 895D0E                  NotBig:         mov     [di+TrackInfo.Period], bx
+  1027 00000652 01DB                    		add     bx, bx
+  1028 00000654 8B87[541A]              		mov     ax, [PitchTable+bx]
+  1029 00000658 894510                  		mov     [di+TrackInfo.Pitch], ax
+  1030 0000065B C3                      		retn
+  1031                                  TonePort:
+  1032 0000065C 30F6                    		xor     dh, dh
+  1033 0000065E 8B4514                  		mov     ax, [di+TrackInfo.PortTo]
+  1034 00000661 8B5D0E                  		mov     bx, [di+TrackInfo.Period]
+  1035 00000664 39C3                    		cmp     bx, ax
+  1036 00000666 741E                    		je      short NoPort
+  1037 00000668 7F0A                    		jg      short PortToUp
+  1038                                  PortToDown:     
+  1039 0000066A 01D3                    		add     bx, dx
+  1040 0000066C 39C3                    		cmp     bx, ax
+  1041 0000066E 7E0A                    		jle     short SetPort
+  1042                                  FixPort:        
+  1043 00000670 89C3                    		mov     bx, ax
+  1044 00000672 EB06                    		jmp     short SetPort
+  1045                                  PortToUp:
+  1046 00000674 29D3                    		sub     bx, dx
+  1047 00000676 39C3                    		cmp     bx, ax
+  1048 00000678 7CF6                    		jl      short FixPort
+  1049                                  SetPort:        
+  1050 0000067A 895D0E                  		mov     [di+TrackInfo.Period], bx
+  1051 0000067D 01DB                    		add     bx, bx
+  1052 0000067F 8B87[541A]              		mov     ax, [PitchTable+bx]
+  1053 00000683 894510                  		mov     [di+TrackInfo.Pitch], ax
+  1054                                  NoPort:         
+  1055 00000686 C3                      		retn
+  1056                                  Vibrato:
+  1057 00000687 88D6                    		mov     dh, dl
+  1058 00000689 80E20F                  		and     dl, 0Fh
+  1059 0000068C C0EE04                  		shr     dh, 4
+  1060 0000068F C0E602                  		shl     dh, 2
+  1061 00000692 007517                  		add     [di+TrackInfo.VibPos], dh
+  1062 00000695 8A7517                  		mov     dh, [di+TrackInfo.VibPos]
+  1063 00000698 88F3                    		mov     bl, dh
+  1064 0000069A C0EB02                  		shr     bl, 2
+  1065 0000069D 83E31F                  		and     bx, 1Fh
+  1066 000006A0 8A87[A30B]              		mov     al, [SinTable+bx]
+  1067 000006A4 F6E2                    		mul     dl
+  1068 000006A6 D1C0                    		rol     ax, 1
+  1069 000006A8 86C4                    		xchg    al, ah
+  1070 000006AA 80E401                  		and     ah, 1
+  1071 000006AD 84F6                    		test    dh, dh
+  1072 000006AF 7902                    		jns     short VibUp
+  1073 000006B1 F7D8                    		neg     ax
+  1074                                  VibUp:          
+  1075 000006B3 03450E                  		add     ax, [di+TrackInfo.Period]
+  1076 000006B6 89C3                    		mov     bx, ax
+  1077 000006B8 83FB71                  		cmp     bx, 113
+  1078 000006BB 7D03                    		jge     short NoLoVib
+  1079 000006BD BB7100                  		mov     bx, 113
+  1080                                  NoLoVib:        
+  1081 000006C0 81FB5803                		cmp     bx, 856
+  1082 000006C4 7E03                    		jle     short NoHiVib
+  1083 000006C6 BB5803                  		mov     bx, 856
+  1084                                  NoHiVib:        
+  1085 000006C9 01DB                    		add     bx, bx
+  1086 000006CB 8B87[541A]              		mov     ax, [PitchTable+bx]
+  1087 000006CF 894510                  		mov     [di+TrackInfo.Pitch], ax
+  1088 000006D2 C3                      		retn
+  1089                                  PortSlide:
+  1090 000006D3 E80D00                  		call    VolSlide
+  1091 000006D6 8A5516                  		mov     dl, [di+TrackInfo.PortParm]
+  1092 000006D9 EB81                    		jmp     short TonePort
+  1093                                  VibSlide:
+  1094 000006DB E80500                  		call    VolSlide
+  1095 000006DE 8A5518                  		mov     dl, [di+TrackInfo.VibParm]
+  1096 000006E1 EBA4                    		jmp     short Vibrato
+  1097                                  VolSlide:
+  1098 000006E3 88D6                    		mov     dh, dl
+  1099 000006E5 80E20F                  		and     dl, 0Fh
+  1100 000006E8 C0EE04                  		shr     dh, 4
+  1101 000006EB 8A450C                  		mov     al, [di+TrackInfo.Volume]
+  1102 000006EE 28D0                    		sub     al, dl
+  1103 000006F0 7D02                    		jge     short NoLoVol
+  1104 000006F2 30C0                    		xor     al, al
+  1105                                  NoLoVol:        
+  1106 000006F4 00F0                    		add     al, dh
+  1107 000006F6 3C40                    		cmp     al, 64
+  1108 000006F8 7602                    		jbe     short NoHiVol
+  1109 000006FA B040                    		mov     al, 64
+  1110                                  NoHiVol:        
+  1111 000006FC 88450C                  		mov     [di+TrackInfo.Volume], al
+  1112 000006FF C3                      		retn
+  1113                                  
+  1114                                  ;--------------------------------------------------------------------------
+  1115                                  ; GetTrack:   Get the next Note from a pattern.
+  1116                                  ;  In:
+  1117                                  ;    ds:di -  Track info Address.
+  1118                                  ;    es:si -  Pattern Note Address.
+  1119                                  ; Out:
+  1120                                  ;    es:si -  The Next Pattern Note address.
+  1121                                  ;--------------------------------------------------------------------------
+  1122                                  
+  1123                                  GetTrack:
+  1124 00000700 26AD                    		es lodsw
+  1125 00000702 86C4                    		xchg    al, ah
+  1126 00000704 88E3                    		mov     bl, ah
+  1127 00000706 80E40F                  		and     ah, 0Fh
+  1128 00000709 89C1                    		mov     cx, ax
+  1129 0000070B 26AD                    		es lodsw
+  1130 0000070D 86C4                    		xchg    al, ah
+  1131 0000070F 88E7                    		mov     bh, ah
+  1132 00000711 80E40F                  		and     ah, 0Fh
+  1133 00000714 89C2                    		mov     dx, ax
+  1134 00000716 895512                  		mov     [di+TrackInfo.Effect], dx
+  1135 00000719 80E3F0                  		and     bl, 0F0h
+  1136 0000071C C0EF04                  		shr     bh, 4
+  1137 0000071F 08FB                    		or      bl, bh
+  1138 00000721 742E                    		je      short SetPeriod
+  1139                                  SetSample:
+  1140 00000723 30FF                    		xor     bh, bh
+  1141 00000725 4B                      		dec     bx
+  1142 00000726 01DB                    		add     bx, bx
+  1143 00000728 8B87[161A]              		mov     ax, [ModInfo.SampVol+bx]
+  1144 0000072C 88450C                  		mov     [di+TrackInfo.Volume], al
+  1145 0000072F 8B87[E018]              		mov     ax, [ModInfo.SampOfs+bx]
+  1146 00000733 8905                    		mov     [di+TrackInfo.Samples], ax
+  1147 00000735 8B87[1E19]              		mov     ax, [ModInfo.SampSeg+bx]
+  1148 00000739 894502                  		mov     [di+TrackInfo.Samples+2], ax
+  1149 0000073C 8B87[5C19]              		mov     ax, [ModInfo.SampLen+bx]
+  1150 00000740 894506                  		mov     [di+TrackInfo.Len], ax
+  1151 00000743 8B87[9A19]              		mov     ax, [ModInfo.SampRep+bx]
+  1152 00000747 894508                  		mov     [di+TrackInfo.Repeat], ax
+  1153 0000074A 8B87[D819]              		mov     ax, [ModInfo.SampRepLen+bx]
+  1154 0000074E 89450A                  		mov     [di+TrackInfo.RepLen], ax
+  1155                                  SetPeriod:      
+  1156 00000751 85C9                    		test    cx, cx
+  1157 00000753 741B                    		je      short SetEffect
+  1158                                  
+  1159 00000755 894D14                  		mov     [di+TrackInfo.PortTo], cx
+  1160 00000758 80FE03                  		cmp     dh, 03h
+  1161 0000075B 7413                    		je      short SetEffect
+  1162                                  
+  1163 0000075D 894D0E                  		mov     [di+TrackInfo.Period], cx
+  1164 00000760 89CB                    		mov     bx, cx
+  1165 00000762 01DB                    		add     bx, bx
+  1166 00000764 8B87[541A]              		mov     ax, [PitchTable+bx]
+  1167 00000768 894510                  		mov     [di+TrackInfo.Pitch], ax
+  1168 0000076B C745040000              		mov     word [di+TrackInfo.Position], 0
+  1169                                  SetEffect:
+  1170 00000770 85D2                    		test    dx, dx
+  1171 00000772 742A                    		je      short InitNone
+  1172 00000774 80FE00                  		cmp     dh, 00h
+  1173 00000777 0F84C400                		je      InitArpeggio
+  1174 0000077B 80FE03                  		cmp     dh, 03h
+  1175 0000077E 741F                    		je      short InitTonePort
+  1176 00000780 80FE04                  		cmp     dh, 04h
+  1177 00000783 7428                    		je      short InitVibrato
+  1178 00000785 80FE09                  		cmp     dh, 09h
+  1179 00000788 744A                    		je      short SampleOfs
+  1180 0000078A 80FE0B                  		cmp     dh, 0Bh
+  1181 0000078D 7457                    		je      short PosJump
+  1182 0000078F 80FE0C                  		cmp     dh, 0Ch
+  1183 00000792 745C                    		je      short SetVolume
+  1184 00000794 80FE0D                  		cmp     dh, 0Dh
+  1185 00000797 7462                    		je      short Break
+  1186 00000799 80FE0F                  		cmp     dh, 0Fh
+  1187 0000079C 7478                    		je      short SetSpeed
+  1188                                  InitNone:
+  1189 0000079E C3                      		retn
+  1190                                  InitTonePort:
+  1191 0000079F 84D2                    		test    dl, dl
+  1192 000007A1 7503                    		jne     short SetPortParm
+  1193 000007A3 8A5516                  		mov     dl, [di+TrackInfo.PortParm]
+  1194                                  SetPortParm:    
+  1195 000007A6 885516                  		mov     [di+TrackInfo.PortParm], dl
+  1196 000007A9 895512                  		mov     [di+TrackInfo.Effect], dx
+  1197 000007AC C3                      		retn
+  1198                                  InitVibrato:
+  1199 000007AD 8A4518                  		mov     al, [di+TrackInfo.VibParm]
+  1200 000007B0 88C4                    		mov     ah, al
+  1201 000007B2 240F                    		and     al, 0Fh
+  1202 000007B4 80E4F0                  		and     ah, 0F0h
+  1203 000007B7 F6C20F                  		test    dl, 0Fh
+  1204 000007BA 7502                    		jne     short OkDepth
+  1205 000007BC 08C2                    		or      dl, al
+  1206                                  OkDepth:        
+  1207 000007BE F6C2F0                  		test    dl, 0F0h
+  1208 000007C1 7502                    		jne     short OkRate
+  1209 000007C3 08E2                    		or      dl, ah
+  1210                                  OkRate:         
+  1211 000007C5 885518                  		mov     [di+TrackInfo.VibParm], dl
+  1212 000007C8 895512                  		mov     [di+TrackInfo.Effect], dx
+  1213 000007CB 85C9                    		test    cx, cx
+  1214 000007CD 7404                    		je      short OkPos
+  1215 000007CF C6451700                		mov     byte [di+TrackInfo.VibPos], 0
+  1216                                  OkPos:          
+  1217 000007D3 C3                      		retn
+  1218                                  SampleOfs:      
+  1219 000007D4 84D2                    		test    dl, dl
+  1220 000007D6 7503                    		jne     short SetSampleOfs
+  1221 000007D8 8A5519                  		mov     dl, [di+TrackInfo.OldSampOfs]
+  1222                                  SetSampleOfs:
+  1223 000007DB 885519                  		mov     [di+TrackInfo.OldSampOfs], dl
+  1224 000007DE 88D6                    		mov     dh, dl
+  1225 000007E0 30D2                    		xor     dl, dl
+  1226 000007E2 895504                  		mov     [di+TrackInfo.Position], dx
+  1227 000007E5 C3                      		retn
+  1228                                  PosJump:
+  1229 000007E6 8816[0672]              		mov     [OrderPos], dl
+  1230 000007EA C606[0A72]40            		mov     byte [Row], 64
+  1231 000007EF C3                      		retn
+  1232                                  SetVolume:
+  1233 000007F0 80FA40                  		cmp     dl, 64
+  1234 000007F3 7602                    		jbe     short OkVol
+  1235 000007F5 B240                    		mov     dl, 64
+  1236                                  OkVol:
+  1237 000007F7 88550C                  		mov     [di+TrackInfo.Volume], dl
+  1238 000007FA C3                      		retn
+  1239                                  Break:
+  1240 000007FB 88D6                    		mov     dh, dl
+  1241 000007FD 80E20F                  		and     dl, 0Fh
+  1242 00000800 C0EE04                  		shr     dh, 4
+  1243 00000803 00F6                    		add     dh, dh
+  1244 00000805 00F2                    		add     dl, dh
+  1245 00000807 C0E602                  		shl     dh, 2
+  1246 0000080A 00F2                    		add     dl, dh
+  1247 0000080C 8816[0B72]              		mov     [BreakRow], dl
+  1248 00000810 C606[0A72]40            		mov     byte [Row], 64
+  1249 00000815 C3                      		retn
+  1250                                  SetSpeed:
+  1251 00000816 84D2                    		test    dl,dl
+  1252 00000818 7424                    		je      Skip
+  1253 0000081A 80FA1F                  		cmp     dl,31
+  1254 0000081D 7709                    		ja      short SetBpm
+  1255                                  SetTempo:       
+  1256 0000081F 8816[0772]              		mov     [Tempo], dl
+  1257 00000823 8816[0872]              		mov     [TempoWait], dl
+  1258 00000827 C3                      		retn
+  1259                                  SetBpm:
+  1260 00000828 8816[0972]              		mov     [Bpm], dl
+  1261 0000082C B067                    		mov     al, 103
+  1262 0000082E F6E2                    		mul     dl
+  1263 00000830 88E3                    		mov     bl, ah
+  1264 00000832 30FF                    		xor     bh, bh
+  1265 00000834 A1[5818]                		mov     ax, [MixSpeed]
+  1266 00000837 31D2                    		xor     dx, dx
+  1267 00000839 F7F3                    		div     bx
+  1268 0000083B A3[0C72]                		mov     [BpmSamples], ax
+  1269                                  Skip:           
+  1270 0000083E C3                      		retn
+  1271                                  InitArpeggio:
+  1272 0000083F 88D6                    		mov     dh, dl
+  1273 00000841 80E20F                  		and     dl, 0Fh
+  1274 00000844 C0EE04                  		shr     dh, 4
+  1275 00000847 B92400                  		mov     cx, 36
+  1276 0000084A 31DB                    		xor     bx, bx
+  1277 0000084C 8B450E                  		mov     ax, [di+TrackInfo.Period]
+  1278                                  gt_ScanPeriod:
+  1279 0000084F 3B87[C30B]              		cmp     ax, [PeriodTable+bx]
+  1280 00000853 7305                    		jae     short SetArp
+  1281 00000855 83C302                  		add     bx, 2
+  1282 00000858 E2F5                    		loop    gt_ScanPeriod
+  1283                                  SetArp:         
+  1284 0000085A 01D2                    		add     dx, dx
+  1285 0000085C 00DE                    		add     dh, bl
+  1286 0000085E 00DA                    		add     dl, bl
+  1287 00000860 8B9F[C30B]              		mov     bx, [PeriodTable+bx]
+  1288 00000864 01DB                    		add     bx, bx
+  1289 00000866 8B87[541A]              		mov     ax, [PitchTable+bx]
+  1290 0000086A 89451A                  		mov     [di+TrackInfo.Arp], ax
+  1291 0000086D 88F3                    		mov     bl, dh
+  1292 0000086F 30FF                    		xor     bh, bh
+  1293 00000871 8B9F[C30B]              		mov     bx, [PeriodTable+bx]
+  1294 00000875 01DB                    		add     bx, bx
+  1295 00000877 8B87[541A]              		mov     ax, [PitchTable+bx]
+  1296 0000087B 89451C                  		mov     [di+TrackInfo.Arp+2], ax
+  1297 0000087E 88D3                    		mov     bl, dl
+  1298 00000880 30FF                    		xor     bh, bh
+  1299 00000882 8B9F[C30B]              		mov     bx, [PeriodTable+bx]
+  1300 00000886 01DB                    		add     bx, bx
+  1301 00000888 8B87[541A]              		mov     ax, [PitchTable+bx]
+  1302 0000088C 89451E                  		mov     [di+TrackInfo.Arp+4], ax
+  1303 0000088F C745200000              		mov     word [di+TrackInfo.ArpIndex], 0
+  1304 00000894 C3                      		retn
+  1305                                  
+  1306                                  ;--------------------------------------------------------------------------
+  1307                                  ; UpdateTracks:  Main code to process the next tick to be played.
+  1308                                  ;--------------------------------------------------------------------------
+  1309                                  
+  1310                                  UpdateTracks:
+  1311 00000895 FE0E[0872]              		dec     byte [TempoWait]
+  1312 00000899 740F                    		jz      short GetTracks
+  1313                                  
+  1314 0000089B B90400                  		mov	cx, NumTracks
+  1315 0000089E BF[1872]                		mov	di, Tracks
+  1316                                  BeatTracks:
+  1317 000008A1 E830FD                  		call	BeatTrack	
+  1318 000008A4 83C722                  		add	di, TrackInfo.size
+  1319 000008A7 E2F8                    		loop	BeatTracks
+  1320 000008A9 C3                      		retn
+  1321                                  GetTracks:
+  1322 000008AA A0[0772]                		mov     al, [Tempo]
+  1323 000008AD A2[0872]                		mov     [TempoWait], al
+  1324                                  
+  1325 000008B0 C436[1472]              		les     si, [Note]
+  1326 000008B4 803E[0A72]40            		cmp     byte [Row], 64
+  1327 000008B9 7246                    		jb      short NoPattWrap
+  1328                                  
+  1329 000008BB C436[DC18]              		les     si, [ModInfo.Patterns]
+  1330 000008BF 8A1E[0672]              		mov     bl, [OrderPos]
+  1331 000008C3 3A1E[5A18]              		cmp     bl, [ModInfo.OrderLen]
+  1332 000008C7 720E                    		jb      short NoOrderWrap
+  1333 000008C9 8A1E[5B18]              		mov     bl, [ModInfo.ReStart]
+  1334 000008CD 881E[0672]              		mov     [OrderPos], bl
+  1335 000008D1 3A1E[5A18]              		cmp     bl, [ModInfo.OrderLen]
+  1336 000008D5 7343                    		jae     short NoUpdate
+  1337                                  NoOrderWrap:    
+  1338 000008D7 30FF                    		xor     bh, bh
+  1339 000008D9 8A9F[5C18]              		mov     bl, [ModInfo.Order+bx]
+  1340 000008DD C1E30A                  		shl     bx, 10
+  1341 000008E0 01DE                    		add     si, bx
+  1342 000008E2 8A1E[0B72]              		mov     bl, [BreakRow]
+  1343 000008E6 881E[0A72]              		mov     [Row], bl
+  1344 000008EA 30FF                    		xor     bh, bh
+  1345 000008EC 883E[0B72]              		mov     [BreakRow], bh
+  1346 000008F0 C1E304                  		shl     bx, 4
+  1347 000008F3 01DE                    		add     si, bx
+  1348 000008F5 8936[1472]              		mov     [Note], si
+  1349 000008F9 8C06[1672]              		mov     [Note+2], es
+  1350 000008FD FE06[0672]              		inc     byte [OrderPos]
+  1351                                  NoPattWrap:     
+  1352 00000901 FE06[0A72]              		inc     byte [Row]
+  1353                                  
+  1354 00000905 FC                      		cld
+  1355 00000906 B90400                  		mov	cx, NumTracks
+  1356 00000909 BF[1872]                		mov	di, Tracks
+  1357                                  GetTracks_next:
+  1358 0000090C 51                      		push	cx		
+  1359 0000090D E8F0FD                  		call	GetTrack
+  1360 00000910 59                      		pop	cx
+  1361 00000911 83C722                  		add	di, TrackInfo.size
+  1362 00000914 E2F6                    		loop	GetTracks_next
+  1363                                  
+  1364 00000916 8936[1472]              		mov     [Note], si
+  1365                                  NoUpdate:
+  1366 0000091A C3                      		retn
+  1367                                  
+  1368                                  ;--------------------------------------------------------------------------
+  1369                                  ; MixTrack:  Mixes one track into a CLEAN buffer.
+  1370                                  ;  In:
+  1371                                  ;   ds:si -  Track Info Address.
+  1372                                  ;   ds:di -  Buffer Address.
+  1373                                  ;    cx   -  Buffer Size.
+  1374                                  ;--------------------------------------------------------------------------
+  1375                                  
+  1376                                  MixTrack:
+  1377 0000091B 837C0A02                		cmp     word [si+TrackInfo.RepLen], 2
+  1378 0000091F 7742                    		ja      short MixLooped
+  1379                                  MixNonLooped:   
+  1380 00000921 C414                    		les     dx, [si+TrackInfo.Samples]
+  1381 00000923 8B5C04                  		mov     bx, [si+TrackInfo.Position]
+  1382 00000926 8B6C06                  		mov     bp, [si+TrackInfo.Len]
+  1383 00000929 52                      		push    dx
+  1384 0000092A 56                      		push    si
+  1385 0000092B 01D3                    		add     bx, dx
+  1386 0000092D 01D5                    		add     bp, dx
+  1387 0000092F 8B5410                  		mov     dx, [si+TrackInfo.Pitch]
+  1388 00000932 8A440C                  		mov     al, [si+TrackInfo.Volume]
+  1389 00000935 8A640D                  		mov     ah, [si+TrackInfo.Error]
+  1390 00000938 89DE                    		mov     si, bx
+  1391 0000093A 88C7                    		mov     bh, al
+  1392 0000093C 88D0                    		mov     al, dl
+  1393 0000093E 88F2                    		mov     dl, dh
+  1394 00000940 30F6                    		xor     dh, dh
+  1395                                  nlMixSamp:      
+  1396 00000942 39EE                    		cmp     si, bp
+  1397 00000944 7310                    		jae     short nlMixBye
+  1398 00000946 268A1C                  		mov     bl, [es:si]
+  1399 00000949 8A9F[0621]              		mov     bl, [VolTable+bx]
+  1400 0000094D 001D                    		add     [di], bl
+  1401 0000094F 47                      		inc     di
+  1402 00000950 00C4                    		add     ah, al
+  1403 00000952 11D6                    		adc     si, dx
+  1404 00000954 E2EC                    		loop    nlMixSamp
+  1405                                  nlMixBye:       
+  1406 00000956 89F3                    		mov     bx, si
+  1407 00000958 5E                      		pop     si
+  1408 00000959 5A                      		pop     dx
+  1409 0000095A 29D3                    		sub     bx, dx
+  1410 0000095C 895C04                  		mov     [si+TrackInfo.Position], bx
+  1411 0000095F 88640D                  		mov     [si+TrackInfo.Error], ah
+  1412 00000962 C3                      		retn
+  1413                                  MixLooped:
+  1414 00000963 C414                    		les     dx, [si+TrackInfo.Samples]
+  1415 00000965 8B5C04                  		mov     bx, [si+TrackInfo.Position]
+  1416 00000968 8B6C0A                  		mov     bp, [si+TrackInfo.RepLen]
+  1417 0000096B 892E[1272]              		mov     [BufRep], bp
+  1418 0000096F 036C08                  		add     bp, [si+TrackInfo.Repeat]
+  1419 00000972 52                      		push    dx
+  1420 00000973 56                      		push    si
+  1421 00000974 01D3                    		add     bx, dx
+  1422 00000976 01D5                    		add     bp, dx
+  1423 00000978 8B5410                  		mov     dx, [si+TrackInfo.Pitch]
+  1424 0000097B 8A440C                  		mov     al, [si+TrackInfo.Volume]
+  1425 0000097E 8A640D                  		mov     ah, [si+TrackInfo.Error]
+  1426 00000981 89DE                    		mov     si, bx
+  1427 00000983 88C7                    		mov     bh, al
+  1428 00000985 88D0                    		mov     al, dl
+  1429 00000987 88F2                    		mov     dl, dh
+  1430 00000989 30F6                    		xor     dh, dh
+  1431                                  lpMixSamp:      
+  1432 0000098B 39EE                    		cmp     si, bp
+  1433 0000098D 7204                    		jb      short lpMixNow
+  1434 0000098F 2B36[1272]              		sub     si, [BufRep]
+  1435                                  lpMixNow:       
+  1436 00000993 268A1C                  		mov     bl, [es:si]
+  1437 00000996 8A9F[0621]              		mov     bl, [VolTable+bx]
+  1438 0000099A 001D                    		add     [di], bl
+  1439 0000099C 47                      		inc     di
+  1440 0000099D 00C4                    		add     ah, al
+  1441 0000099F 11D6                    		adc     si, dx
+  1442 000009A1 E2E8                    		loop    lpMixSamp
+  1443                                  lpMixBye:       
+  1444 000009A3 89F3                    		mov     bx, si
+  1445 000009A5 5E                      		pop     si
+  1446 000009A6 5A                      		pop     dx
+  1447 000009A7 29D3                    		sub     bx, dx
+  1448 000009A9 895C04                  		mov     [si+TrackInfo.Position], bx
+  1449 000009AC 88640D                  		mov     [si+TrackInfo.Error], ah
+  1450 000009AF C3                      		retn
+  1451                                  
+  1452                                  ;--------------------------------------------------------------------------
+  1453                                  ; GetSamples:  Returns the next chunk of samples to be played.
+  1454                                  ;  In:
+  1455                                  ;    Buffer  - Buffer Address.
+  1456                                  ;    Count   - Buffer Size.
+  1457                                  ;--------------------------------------------------------------------------
+  1458                                  
+  1459                                  GetSamples:
+  1460                                  		;ds:si = buffer address
+  1461                                  		;cx = count
+  1462                                  
+  1463                                  		;[sp+6] = ds
+  1464                                  		;[sp+4] = si
+  1465                                  		;[sp+2] = count
+  1466                                  
+  1467                                  		Count	equ 4
+  1468                                  		Buffer	equ 6 
+  1469                                  
+  1470 000009B0 55                      		push	bp
+  1471 000009B1 89E5                    		mov	bp, sp
+  1472                                  
+  1473 000009B3 60                      		pusha
+  1474 000009B4 1E                      		push    ds
+  1475 000009B5 06                      		push    es
+  1476 000009B6 FC                      		cld
+  1477                                  
+  1478 000009B7 C47E06                  		les     di, [bp+Buffer]
+  1479 000009BA 8B5E04                  		mov     bx, [bp+Count]
+  1480                                  
+  1481 000009BD 833E[1072]00            NextChunk:      cmp     word [BufLen], 0
+  1482 000009C2 7538                    		jne     short CopyChunk
+  1483                                  
+  1484 000009C4 53                      		push    bx
+  1485 000009C5 57                      		push    di
+  1486 000009C6 06                      		push    es
+  1487                                  MixChunk:       
+  1488                                  		;lea     di, [MixBuffer]
+  1489 000009C7 BF[0662]                		mov	di, MixBuffer
+  1490 000009CA 8B0E[0C72]              		mov     cx, [BpmSamples]
+  1491 000009CE 893E[0E72]              		mov     [BufPtr], di
+  1492 000009D2 890E[1072]              		mov     [BufLen], cx
+  1493                                  
+  1494 000009D6 8CD8                    		mov     ax, ds
+  1495 000009D8 8EC0                    		mov     es, ax
+  1496 000009DA B080                    		mov     al, 80h
+  1497 000009DC F3AA                    		rep     stosb
+  1498                                  
+  1499 000009DE B90400                  		mov	cx, NumTracks
+  1500 000009E1 BE[F671]                		mov	si, Tracks - TrackInfo.size
+  1501                                  GetSamples_next:
+  1502 000009E4 51                      		push	cx
+  1503 000009E5 83C622                  		add	si, TrackInfo.size
+  1504 000009E8 8B0E[1072]              		mov	cx, [BufLen]
+  1505 000009EC 8B3E[0E72]              		mov	di, [BufPtr]
+  1506 000009F0 E828FF                  		call	MixTrack
+  1507 000009F3 59                      		pop	cx
+  1508 000009F4 E2EE                    		loop	GetSamples_next		
+  1509                                  
+  1510 000009F6 E89CFE                  		call    UpdateTracks
+  1511                                  
+  1512 000009F9 07                      		pop     es
+  1513 000009FA 5F                      		pop     di
+  1514 000009FB 5B                      		pop     bx
+  1515                                  CopyChunk:      
+  1516 000009FC 8B0E[1072]              		mov     cx, [BufLen]
+  1517 00000A00 39D9                    		cmp     cx, bx
+  1518 00000A02 7602                    		jbe     short MoveChunk
+  1519 00000A04 89D9                    		mov     cx, bx
+  1520                                  MoveChunk:
+  1521 00000A06 8B36[0E72]              		mov     si, [BufPtr]
+  1522 00000A0A 010E[0E72]              		add     [BufPtr], cx
+  1523 00000A0E 290E[1072]              		sub     [BufLen], cx
+  1524 00000A12 29CB                    		sub     bx, cx
+  1525 00000A14 F3A4                    		rep     movsb
+  1526 00000A16 85DB                    		test    bx, bx
+  1527 00000A18 75A3                    		jne     short NextChunk
+  1528                                  
+  1529 00000A1A 07                      		pop     es
+  1530 00000A1B 1F                      		pop     ds
+  1531 00000A1C 61                      		popa
+  1532 00000A1D 5D                      		pop	bp
+  1533 00000A1E C20600                  		ret	6
+  1534                                  
+  1535                                  ;--------------------------------------------------------------------------
+  1536                                  ; StartPlaying: Initializes the Sound System.
+  1537                                  ;  In:
+  1538                                  ;   Module Information Resources.
+  1539                                  ;--------------------------------------------------------------------------
+  1540                                  
+  1541                                  StartPlaying:
+  1542 00000A21 60                      		pusha
+  1543 00000A22 1E                      		push    ds
+  1544 00000A23 06                      		push    es
+  1545                                  SetModParms:    
+  1546 00000A24 C606[0672]00            		mov     byte [OrderPos], 0
+  1547 00000A29 C606[0772]06            		mov     byte [Tempo], DefTempo
+  1548 00000A2E C606[0872]06            		mov     byte [TempoWait], DefTempo
+  1549 00000A33 C606[0972]7D            		mov     byte [Bpm], DefBpm
+  1550 00000A38 C606[0A72]40            		mov     byte [Row], 64
+  1551 00000A3D C606[0B72]00            		mov     byte [BreakRow], 0
+  1552 00000A42 A1[5818]                		mov     ax, [MixSpeed]
+  1553 00000A45 31D2                    		xor     dx, dx
+  1554 00000A47 BB3200                  		mov     bx, 24*DefBpm/60
+  1555 00000A4A F7F3                    		div     bx
+  1556 00000A4C A3[0C72]                		mov     [BpmSamples], ax
+  1557                                  ClearTracks:    
+  1558 00000A4F BF[1872]                		mov     di, Tracks
+  1559 00000A52 8CD8                    		mov     ax, ds
+  1560 00000A54 8EC0                    		mov     es, ax
+  1561 00000A56 B98800                  		mov     cx, NumTracks*TrackInfo.size
+  1562 00000A59 31C0                    		xor     ax, ax
+  1563 00000A5B FC                      		cld
+  1564 00000A5C F3AA                    		rep     stosb
+  1565                                  
+  1566 00000A5E A3[0E72]                		mov     [BufPtr], ax
+  1567 00000A61 A3[1072]                		mov     [BufLen], ax
+  1568                                  MakePitch:
+  1569 00000A64 B80021                  		mov     ax, MidCRate
+  1570 00000A67 BBAC01                  		mov     bx, 428
+  1571 00000A6A F7E3                    		mul     bx
+  1572 00000A6C F736[5818]              		div     word [MixSpeed]
+  1573 00000A70 30F6                    		xor     dh, dh
+  1574 00000A72 88E2                    		mov     dl, ah
+  1575 00000A74 88C4                    		mov     ah, al
+  1576 00000A76 30C0                    		xor     al, al
+  1577 00000A78 B95903                  		mov     cx, 857
+  1578 00000A7B 31DB                    		xor     bx, bx
+  1579 00000A7D BF[541A]                		mov     di, PitchTable
+  1580                                  PitchLoop:      
+  1581 00000A80 50                      		push    ax
+  1582 00000A81 52                      		push    dx
+  1583 00000A82 39DA                    		cmp     dx, bx
+  1584 00000A84 7302                    		jae     short NoDiv
+  1585 00000A86 F7F3                    		div     bx
+  1586                                  NoDiv:          
+  1587 00000A88 AB                      		stosw
+  1588 00000A89 5A                      		pop     dx
+  1589 00000A8A 58                      		pop     ax
+  1590 00000A8B 43                      		inc     bx
+  1591 00000A8C E2F2                    		loop    PitchLoop
+  1592                                  MakeVolume:     
+  1593 00000A8E B90041                  		mov     cx, 16640
+  1594 00000A91 89CB                    		mov     bx, cx
+  1595                                  VolLoop:
+  1596 00000A93 4B                      		dec     bx
+  1597 00000A94 88D8                    		mov     al, bl
+  1598 00000A96 F6EF                    		imul    bh
+  1599 00000A98 88A7[0621]              		mov     [VolTable+bx], ah
+  1600 00000A9C E2F5                    		loop    VolLoop
+  1601                                  
+  1602 00000A9E 07                      		pop     es
+  1603 00000A9F 1F                      		pop     ds
+  1604 00000AA0 61                      		popa
+  1605                                  		;retn
+  1606                                  
+  1607                                  ;--------------------------------------------------------------------------
+  1608                                  ; StopPlaying: ShutDown the Sound System.
+  1609                                  ;--------------------------------------------------------------------------
+  1610                                  
+  1611                                  StopPlaying:
+  1612 00000AA1 C3                      		retn
+  1613                                  
+  1614                                  ;=============================================================================
+  1615                                  ;               preinitialized data
+  1616                                  ;=============================================================================
+  1617                                  
+  1618                                  ;=============================================================================
+  1619                                  ;               SB.ASM - DATA
+  1620                                  ;=============================================================================
+  1621                                  
+  1622 00000AA2 2002                    SbAddr:		dw      220h
+  1623 00000AA4 0700                    SbIrq:		dw      7
+  1624                                  
+  1625                                  ;=============================================================================
+  1626                                  ;               PLAY.ASM - DATA
+  1627                                  ;=============================================================================
+  1628                                  
+  1629                                  msg_2017:
+  1630 00000AA6 54696E79204D4F4420-     		db	'Tiny MOD Player by Erdogan Tan. March 2017.',10,13
+  1630 00000AAF 506C61796572206279-
+  1630 00000AB8 204572646F67616E20-
+  1630 00000AC1 54616E2E204D617263-
+  1630 00000ACA 6820323031372E0A0D 
+  1631 00000AD3 75736167653A207469-     		db	'usage: tinyplay filename.mod', 10, 13, '$'
+  1631 00000ADC 6E79706C6179206669-
+  1631 00000AE5 6C656E616D652E6D6F-
+  1631 00000AEE 640A0D24           
+  1632 00000AF2 30342F30332F323031-     		db	'04/03/2017'
+  1632 00000AFB 37                 
+  1633                                  
+  1634 00000AFC 54696E79204D4F4420-     Credits:	db	'Tiny MOD Player v0.1b by Carlos Hasan. July 1993.'
+  1634 00000B05 506C61796572207630-
+  1634 00000B0E 2E3162206279204361-
+  1634 00000B17 726C6F732048617361-
+  1634 00000B20 6E2E204A756C792031-
+  1634 00000B29 3939332E           
+  1635 00000B2D 0A0D24                  		db	10,13,'$'
+  1636 00000B30 4572726F72206C6F61-     ErrorMesg:	db	'Error loading Module file.',10,13,'$'
+  1636 00000B39 64696E67204D6F6475-
+  1636 00000B42 6C652066696C652E0A-
+  1636 00000B4B 0D24               
+  1637 00000B4D 536F756E6420426C61-     MsgNotFound:	db	'Sound Blaster not found or IRQ error.',10,13,'$'
+  1637 00000B56 73746572206E6F7420-
+  1637 00000B5F 666F756E64206F7220-
+  1637 00000B68 495251206572726F72-
+  1637 00000B71 2E0A0D24           
+  1638 00000B75 536F756E6420426C61-     MsgFound:	db	'Sound Blaster found at Address 2'
+  1638 00000B7E 7374657220666F756E-
+  1638 00000B87 642061742041646472-
+  1638 00000B90 6573732032         
+  1639 00000B95 7830682C2049525120      PortText:	db	'x0h, IRQ '
+  1640 00000B9E 782E0A0D24              IrqText:	db	'x.',10,13,'$'
+  1641                                  
+  1642                                  ;=============================================================================
+  1643                                  ;               MODPLAY.ASM - DATA
+  1644                                  ;=============================================================================
+  1645                                  
+  1646                                  ;Credits:	db	'Amiga Module Player v0.3b by Carlos Hasan.'
+  1647                                  
+  1648 00000BA3 0019324A62788EA2B4-     SinTable:	db	0,25,50,74,98,120,142,162,180,197,212,225
+  1648 00000BAC C5D4E1             
+  1649 00000BAF ECF4FAFEFFFEFAF4EC-     		db	236,244,250,254,255,254,250,244,236,225
+  1649 00000BB8 E1                 
+  1650 00000BB9 D4C5B4A28E78624A32-     		db	212,197,180,162,142,120,98,74,50,25
+  1650 00000BC2 19                 
+  1651                                  
+  1652 00000BC3 58032803FA02D002A6-     PeriodTable:	dw	856,808,762,720,678,640,604,570,538,508,480,453
+  1652 00000BCC 0280025C023A021A02-
+  1652 00000BD5 FC01E001C501       
+  1653 00000BDB AC0194017D01680153-     		dw	428,404,381,360,339,320,302,285,269,254,240,226
+  1653 00000BE4 0140012E011D010D01-
+  1653 00000BED FE00F000E200       
+  1654 00000BF3 D600CA00BE00B400AA-     		dw	214,202,190,180,170,160,151,143,135,127,120,113
+  1654 00000BFC 00A00097008F008700-
+  1654 00000C05 7F0078007100       
+  1655                                  
+  1656                                  bss_start:
+  1657                                  
+  1658                                  ABSOLUTE bss_start
+  1659                                  
+  1660 00000C0B <res 00000001>          alignb 2
+  1661                                  
+  1662                                  ;=============================================================================
+  1663                                  ;        	uninitialized data
+  1664                                  ;=============================================================================
+  1665                                  
+  1666                                  ; SB.ASM
+  1667 00000C0C <res 00000002>          DmaFlag:	resw 1
+  1668 00000C0E <res 00000002>          DmaBuffer:	resw 1
+  1669 00000C10 <res 00000004>          DmaHandler:	resd 1
+  1670 00000C14 <res 00000004>          TimerHandler:	resd 1
+  1671                                  
+  1672 00000C18 <res 00000800>          DoubleBuffer:	resb DmaBufSize ; 04/03/2017
+  1673                                  
+  1674                                  ; MODLOAD.ASM
+  1675 00001418 <res 00000002>          FileHandle:	resw	1
+  1676 0000141A <res 00000002>          ErrorInfo:	resw	1
+  1677 0000141C <res 0000043C>          Header:		resb	ModHeader.size
+  1678                                  
+  1679                                  ; MODPLAY.ASM
+  1680 00001858 <res 00000002>          MixSpeed:	    resw 1
+  1681                                  
+  1682                                  ModInfo:
+  1683 0000185A <res 00000001>          ModInfo.OrderLen:   resb 1
+  1684 0000185B <res 00000001>          ModInfo.ReStart:    resb 1
+  1685 0000185C <res 00000080>          ModInfo.Order:	    resb 128
+  1686 000018DC <res 00000004>          ModInfo.Patterns:   resd 1
+  1687                                  
+  1688 000018E0 <res 0000003E>          ModInfo.SampOfs:    resw 31
+  1689 0000191E <res 0000003E>          ModInfo.SampSeg:    resw 31
+  1690 0000195C <res 0000003E>          ModInfo.SampLen:    resw 31
+  1691 0000199A <res 0000003E>          ModInfo.SampRep:    resw 31
+  1692 000019D8 <res 0000003E>          ModInfo.SampRepLen: resw 31
+  1693 00001A16 <res 0000003E>          ModInfo.SampVol:    resw 31
+  1694                                  
+  1695                                  ; MODPLAY.ASM
+  1696 00001A54 <res 000006B2>          PitchTable:	resw	857
+  1697 00002106 <res 00004100>          VolTable:	resb	16640
+  1698 00006206 <res 00001000>          MixBuffer       resb	MixBufSize
+  1699                                  
+  1700                                  ; MODPLAY.ASM
+  1701 00007206 <res 00000001>          OrderPos:	resb 1
+  1702 00007207 <res 00000001>          Tempo:		resb 1
+  1703 00007208 <res 00000001>          TempoWait:	resb 1
+  1704 00007209 <res 00000001>          Bpm:		resb 1
+  1705 0000720A <res 00000001>          Row:		resb 1
+  1706 0000720B <res 00000001>          BreakRow:	resb 1
+  1707 0000720C <res 00000002>          BpmSamples:	resw 1
+  1708 0000720E <res 00000002>          BufPtr:		resw 1
+  1709 00007210 <res 00000002>          BufLen:		resw 1
+  1710 00007212 <res 00000002>          BufRep:		resw 1
+  1711 00007214 <res 00000004>          Note:		resd 1
+  1712 00007218 <res 00000088>          Tracks:		resb TrackInfo.size*NumTracks
+  1713                                  
+  1714                                  alignb 16
+  1715                                  
+  1716                                  ; PLAY.ASM
+  1717 000072A0 <res 00000280>          Scope:		resw	320
+  1718 00007520 <res 00000200>          RowOfs:		resw	256
+  1719                                  
+  1720                                  EOF:
