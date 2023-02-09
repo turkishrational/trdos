@@ -1,0 +1,2139 @@
+     1                                  ; ****************************************************************************
+     2                                  ; BOOTFILE.ASM (BOOTFILE.COM) 
+     3                                  ; TRDOS 386, Singlix FS1 (A1h) File System STARTUP FILE Configuration Code
+     4                                  ; 						      (for MSDOS/WINDOWS)
+     5                                  ; ****************************************************************************
+     6                                  ; Last Update: 28/01/2018
+     7                                  ; ----------------------------------------------------------------------------
+     8                                  ; Beginning: 27/01/2018
+     9                                  ; ----------------------------------------------------------------------------
+    10                                  ; Assembler: NASM version 2.11
+    11                                  ; ----------------------------------------------------------------------------
+    12                                  ; Modified from 'BOOTFILE.ASM' (TRDOS v1.0) source code by Erdogan Tan
+    13                                  ; (21/02/2010) 
+    14                                  ; ****************************************************************************
+    15                                  ; nasm bootfile.s -l bootfile.lst -o BOOTFILE.COM
+    16                                  
+    17                                  ; DTA (PSP+80h= Offset 128)
+    18                                  DTA_Attrib	equ 149 ; PDP+21
+    19                                  DTA_Time	equ 150 ; PSP+22
+    20                                  DTA_Date	equ 152 ; PSP 24
+    21                                  DTA_FileSize	equ 154 ; PSP + 26
+    22                                  DTA_FileName	equ 158 ; PSP + 30
+    23                                  
+    24                                  ; Masterboot / Partition Table at Beginning+1BEh
+    25                                  ptBootable      equ 0
+    26                                  ptBeginHead     equ 1
+    27                                  ptBeginSector   equ 2
+    28                                  ptBeginCylinder equ 3
+    29                                  ptFileSystemID	equ 4
+    30                                  ptEndHead       equ 5
+    31                                  ptEndSector     equ 6
+    32                                  ptEndCylinder   equ 7
+    33                                  ptStartSector   equ 8
+    34                                  ptSectors       equ 12
+    35                                  
+    36                                  ; TR-SINGLIX FS1 BootSector Identification (Data) Block
+    37                                  ; Singlix OS project Issue:1, Revision:14
+    38                                  ; (07/01/2018)
+    39                                  bsFSystemID	equ 3
+    40                                  bsBytesPerSec	equ 6
+    41                                  bsMediaAttrib	equ 8
+    42                                  bsPartitionID	equ 9
+    43                                  bsFSVersionMaj	equ 10
+    44                                  bsFSVersionMin	equ 11
+    45                                  bsBootSector	equ 12 
+    46                                  bsVolumeSize	equ 16
+    47                                  bsStartupFD	equ 20
+    48                                  bsMATLocation	equ 24
+    49                                  bsRootDirD	equ 28
+    50                                  bsSystemConfFD	equ 32
+    51                                  bsSwapFD	equ 36
+    52                                  bsUndeleteDirD	equ 40
+    53                                  bsDriveNumber	equ 44
+    54                                  bs_LBA_Ready	equ 45
+    55                                  bsMagicWord	equ 46
+    56                                  bs_Disk_SecPerTrack equ 46
+    57                                  bs_Disk_Heads	equ 47 
+    58                                  bsOperationSys	equ 48
+    59                                  bs_terminator	equ 64
+    60                                  
+    61                                  ; MAT
+    62                                  ; TR-SINGLIX FS1 Master Allocation Table
+    63                                  ; Singlix OS project Issue:5, Revision:5
+    64                                  ; (07/01/2018)
+    65                                  MAT_DAT_Address	equ 12
+    66                                  MAT_SectorCount	equ 16
+    67                                  MAT_FreeSectors	equ 20
+    68                                  MAT_FirstFreeSector equ 24
+    69                                  
+    70                                  ; FDT
+    71                                  ; TR-SINGLIX FS1 File Description Table
+    72                                  ; Singlix OS project Issue:2, Revision:14
+    73                                  ; (07/01/2018)
+    74                                  fdtSectorCount	equ 16
+    75                                  fdtFileSize	equ 28
+    76                                  fdtLMDate	equ 56
+    77                                  fdtLMTime	equ 60
+    78                                  fdtFileName	equ 64
+    79                                  
+    80                                  ;-----------------------------------------------------------------
+    81                                  ;  CODE
+    82                                  ;-----------------------------------------------------------------
+    83                                  
+    84                                  [BITS 16]
+    85                                  [ORG 100h]
+    86 00000000 BB[DB1A]                		mov	bx, SizeOfFile+100
+    87 00000003 83C30F                  		add	bx, 15
+    88 00000006 D1EB                    		shr	bx, 1
+    89 00000008 D1EB                            	shr	bx, 1
+    90 0000000A D1EB                    		shr	bx, 1
+    91 0000000C D1EB                    		shr	bx, 1
+    92 0000000E B44A                    		mov	ah, 4Ah ; modify memory allocation
+    93                                                 ;push	cs
+    94                                                 ;pop	es
+    95 00000010 CD21                    		int	21h 
+    96                                  				  
+    97                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    98                                  ; see if drive specified
+    99                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   100                                                
+   101 00000012 BE8000                  		mov	si, 80h			; PSP command tail
+   102 00000015 8A0C                    		mov	cl, [si]
+   103 00000017 08C9                    		or	cl, cl		               
+   104 00000019 0F84AC01                		jz	BF_9			; jump if zero
+   105                                  BF_1:
+   106 0000001D 46                      		inc	si
+   107 0000001E 8A04                    		mov	al, [si]
+   108 00000020 3C20                    		cmp	al, ' '			; is it SPACE ?
+   109 00000022 7507                    		jne	short BF_2
+   110                                  
+   111 00000024 FEC9                    		dec	cl				  
+   112 00000026 75F5                    		jne	short BF_1		  
+   113 00000028 E99E01                  		jmp	BF_9
+   114                                  BF_2:
+   115 0000002B 3C66                    		cmp	al, 'f'
+   116 0000002D 7564                    		jne	short BF_3
+   117 0000002F 46                      		inc	si
+   118 00000030 8A04                    		mov	al, [si]
+   119 00000032 3C64                    		cmp	al, 'd'
+   120 00000034 0F859101                		jne	BF_9
+   121 00000038 46                      		inc	si
+   122 00000039 8A04                    		mov	al, [si]
+   123 0000003B 3C30                    		cmp	al, '0'		            
+   124 0000003D 0F828801                		jb	BF_9
+   125 00000041 3C31                    		cmp	al, '1'
+   126 00000043 0F878201                		ja	BF_9
+   127 00000047 A2[7A0E]                		mov	[SINGLIX_FD_Number], al
+   128 0000004A 88C2                    		mov	dl, al
+   129 0000004C 80EA30                  		sub	dl, '0'
+   130 0000004F 8816[9C0B]              		mov	[PhysicalDriveNumber], dl
+   131 00000053 B408                    		mov	ah, 08h
+   132 00000055 CD13                    		int	13h
+   133                                  		; ES <> DS
+   134 00000057 0F822805                		jc	BF_16
+   135 0000005B FEC6                    		inc	dh
+   136 0000005D 8836[9D0B]              		mov	[Physical_Disk_Heads], dh
+   137 00000061 80E13F                  		and	cl, 00111111b
+   138 00000064 880E[9F0B]              		mov	[Physical_Disk_SecPerTrack], cl
+   139                                  		;; 27/01/2018
+   140                                  		;;mov	byte [Physical_Disk_Heads], 2
+   141                                  		;;mov	byte [Physical_Disk_SecPerTrack], 18
+   142                                  		;mov	[LBA_Ready], 0
+   143 00000068 1E                                      push	ds
+   144 00000069 07                                      pop	es
+   145 0000006A 8A16[9C0B]              		mov	dl, [PhysicalDriveNumber]
+   146 0000006E E8EB06                  		call	load_masterboot
+   147                                                 ;mov	si, BSBUFFER
+   148 00000071 BE[6910]                		mov	si, MasterBootBuff
+   149 00000074 817C034653              		cmp	word [si+bsFSystemID], 'FS'
+   150 00000079 7409                    		je	short loc_check_fd_bs_A1h_sign
+   151                                  loc_not_singlix_fs_fd:
+   152 0000007B BE[C60E]                		mov	si, Msg_Not_Singlix_FS
+   153 0000007E E86D05                  		call	print_msg
+   154 00000081 E9E504                  		jmp	BF_13
+   155                                  loc_check_fd_bs_A1h_sign:
+   156 00000084 807C09A1                		cmp	byte [si+bsPartitionID], 0A1h
+   157 00000088 75F1                    		jne	short loc_not_singlix_fs_fd
+   158 0000008A B8[9206]                		mov	ax, write_chs_sector  
+   159 0000008D A3[9A0B]                		mov	[write_sector], ax
+   160                                  		;; 28/01/2018
+   161                                  		;cmp	byte [si+bs_LBA_Ready], 0
+   162                                  		;ja	BF_6 ; ?
+   163                                  		;; Update CHS parameters (according to boot sector)
+   164                                  		;mov	ax, [si+bs_Disk_SecPerTrack]
+   165                                  		;mov	[Physical_Disk_SecPerTrack], al
+   166                                  		;mov	[Physical_Disk_Heads], ah
+   167 00000090 E9F700                  		jmp	BF_6
+   168                                  BF_3:
+   169 00000093 3C68                    		cmp	al, 'h'
+   170 00000095 0F853001                		jne	BF_9
+   171 00000099 46                      		inc	si
+   172 0000009A 8A04                    		mov	al, [si]
+   173 0000009C 3C64                    		cmp	al, 'd'
+   174 0000009E 0F852701                		jne	BF_9
+   175 000000A2 46                      		inc	si
+   176 000000A3 8A04                    		mov	al, [si]
+   177 000000A5 3C30                    		cmp	al, '0'		            
+   178 000000A7 0F821E01                		jb	BF_9
+   179 000000AB 3C33                    		cmp	al, '3'
+   180 000000AD 0F871801                		ja	BF_9
+   181 000000B1 A2[680E]                		mov	[SINGLIX_HD_Number], al
+   182 000000B4 46                      		inc	si
+   183 000000B5 8B04                    		mov	ax, [si]
+   184 000000B7 80FC20                  		cmp	ah, 20h
+   185 000000BA 0F870B01                		ja	BF_9
+   186 000000BE 3C66                    		cmp	al, 'f'
+   187 000000C0 7410                    		je	short BF_4
+   188 000000C2 3C73                    		cmp	al, 's'
+   189 000000C4 740C                    		je	short BF_4		   
+   190 000000C6 3C31                    		cmp	al, '1'
+   191 000000C8 0F82FD00                		jb	BF_9
+   192 000000CC 3C34                    		cmp	al, '4'
+   193 000000CE 0F87F700                		ja	BF_9
+   194                                  BF_4:
+   195 000000D2 A2[690E]                		mov	[SINGLIX_HD_Number+1], al
+   196 000000D5 8A16[680E]              		mov	dl, [SINGLIX_HD_Number]
+   197 000000D9 80C250                  		add	dl, 80h-'0'
+   198 000000DC 8816[9C0B]              		mov	[PhysicalDriveNumber], dl
+   199                                  BF_4_check_int13h_extensions:
+   200                                                 ; 05/01/2010 
+   201 000000E0 B441                    		mov	ah, 41h ; Check INT 13h Extensions Present
+   202 000000E2 BBAA55                  		mov	bx, 55AAh
+   203 000000E5 CD13                    		int	13h
+   204 000000E7 7214                    		jc	short BF_4_lba_not_ready
+   205 000000E9 81FB55AA                		cmp	bx, 0AA55h
+   206 000000ED 750E                    		jne	short BF_4_lba_not_ready
+   207 000000EF 80E101                  		and	cl, 1		   ; Fixed disk access subset check
+   208 000000F2 7409                    		jz	short BF_4_lba_not_ready 
+   209                                  BF_4_lba_ready:
+   210 000000F4 B8[6E06]                		mov	ax, write_lba_sector
+   211                                  		;mov	[LBA_Ready], cl ; 1
+   212 000000F7 FE06[C70B]              		inc	byte [LBA_Ready]
+   213 000000FB EB18                    		jmp	short BF_4_set_disk_write_procedure  
+   214                                  BF_4_lba_not_ready:
+   215                                  		;mov	[LBA_Ready], cl ; 0
+   216 000000FD B408                    		mov	ah, 08h
+   217                                  		;mov	dl, [PhysicalDriveNumber]
+   218 000000FF CD13                    		int	13h
+   219                                  		; ES <> DS
+   220 00000101 0F827E04                		jc	BF_16
+   221 00000105 FEC6                    		inc	dh
+   222 00000107 8836[9D0B]              		mov	[Physical_Disk_Heads], dh
+   223 0000010B 80E13F                  		and	cl, 00111111b
+   224 0000010E 880E[9F0B]              		mov	[Physical_Disk_SecPerTrack], cl
+   225 00000112 B8[9206]                		mov	ax, write_chs_sector  
+   226                                  BF_4_set_disk_write_procedure:
+   227 00000115 A3[9A0B]                		mov	[write_sector], ax
+   228                                  BF_4_load_masterboot:
+   229 00000118 1E                      		push	ds
+   230 00000119 07                      		pop	es 
+   231 0000011A 8A16[9C0B]              		mov	dl, [PhysicalDriveNumber]
+   232 0000011E E83B06                  		call	load_masterboot
+   233 00000121 0F825E04                		jc	BF_16
+   234 00000125 BE[2712]                		mov	si, PartitionTable
+   235 00000128 A0[690E]                		mov	al, [SINGLIX_HD_Number+1]
+   236 0000012B 3C66                    		cmp	al, 'f'
+   237 0000012D 751F                    		jne	short pass_check_first_singlix_partition
+   238 0000012F 30C0                    		xor	al, al
+   239 00000131 B90400                  		mov	cx, 4
+   240                                  loc_check_fs_f_partition:
+   241 00000134 FEC0                    		inc	al
+   242 00000136 807C04A1                		cmp	byte [si+ptFileSystemID], 0A1h
+   243 0000013A 750A                    		jne	short check_for_first_fs_partition_again
+   244                                  loc_fs_partition_found:
+   245 0000013C A2[CB0F]                		mov	[fsPartitionNumber], al 
+   246 0000013F 0430                    		add	al, '0'
+   247 00000141 A2[690E]                		mov	[SINGLIX_HD_Number+1],al
+   248 00000144 EB37                    		jmp	short BF_5
+   249                                  check_for_first_fs_partition_again:
+   250 00000146 83C610                  		add	si, 10h
+   251 00000149 E2E9                    		loop	loc_check_fs_f_partition
+   252 0000014B E93504                  		jmp	BF_16
+   253                                  pass_check_first_singlix_partition:
+   254 0000014E 3C73                    		cmp	al, 's'
+   255 00000150 751B                    		jne	short pass_check_second_singlix_partition
+   256 00000152 30C0                    		xor	al, al 
+   257 00000154 B90400                  		mov	cx, 4
+   258                                  loc_check_fs_s_partition:  
+   259 00000157 807C04A1                		cmp	byte [si+ptFileSystemID], 0A1h
+   260 0000015B 7508                    		jne	short check_for_second_fs_partition_again
+   261 0000015D FEC0                    		inc	al
+   262 0000015F 3C02                    		cmp	al, 2
+   263 00000161 7502                    		jne	short check_for_second_fs_partition_again
+   264 00000163 EBD7                    		jmp	short loc_fs_partition_found
+   265                                  check_for_second_fs_partition_again:
+   266 00000165 83C610                  		add	si, 10h
+   267 00000168 E2ED                    		loop	loc_check_fs_s_partition
+   268 0000016A E91604                  		jmp	BF_16
+   269                                  pass_check_second_singlix_partition :
+   270 0000016D 2C31                    		sub	al, '1'
+   271 0000016F B410                    		mov	ah, 10h
+   272 00000171 F6E4                    		mul	ah   
+   273 00000173 01C6                    		add	si, ax
+   274 00000175 807C04A1                		cmp	byte [si+ptFileSystemID], 0A1h
+   275 00000179 0F850604                		jne	BF_16
+   276                                  BF_5:
+   277 0000017D 8B4408                  		mov	ax, [si+ptStartSector] 
+   278 00000180 8B540A                  		mov	dx, [si+ptStartSector+2]
+   279 00000183 A3[8C0B]                		mov	[fsBootSector], ax
+   280 00000186 8916[8E0B]              		mov	[fsBootSector+2], dx
+   281                                  
+   282                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   283                                  ; Write message
+   284                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   285                                  BF_6:
+   286 0000018A BE[310E]                		mov	si, Msg_DoYouWantToWrite
+   287 0000018D E85E04                  		call	print_msg
+   288 00000190 803E[9C0B]80            		cmp	byte [PhysicalDriveNumber], 80h
+   289 00000195 7308                    		jnb	short BF_7
+   290 00000197 BE[780E]                		mov	si, SINGLIX_FD_Name
+   291 0000019A E85104                  		call	print_msg
+   292 0000019D EB06                    		jmp	short BF_7_yn
+   293                                  BF_7:   
+   294 0000019F BE[660E]                		mov	si, SINGLIX_HD_Name
+   295 000001A2 E84904                  		call	print_msg
+   296                                  BF_7_yn: 
+   297 000001A5 BE[6D0E]                		mov	si, msg_yes_no
+   298 000001A8 E84304                  		call	print_msg
+   299                                  BF_8:
+   300 000001AB 31C0                    		xor	ax, ax
+   301 000001AD CD16                    		int	16h			; wait for keyboard command
+   302 000001AF 3C03                    		cmp	al, 'C'-40h
+   303 000001B1 0F84B403                		je	BF_13		   
+   304 000001B5 3C1B                    		cmp	al, 27
+   305 000001B7 0F84AE03                		je	BF_13
+   306 000001BB 24DF                    		and	al, 0DFh
+   307 000001BD 3C59                    		cmp	al, 'Y'			; Yes?
+   308 000001BF 7411                    		je	short BF_10		; write
+   309 000001C1 3C4E                    		cmp	al, 'N'			; No?
+   310 000001C3 0F84B403                		je	BF_15			; no write (exit)
+   311 000001C7 EBE2                    		jmp	short BF_8
+   312                                  BF_9:
+   313 000001C9 BE[0A0C]                		mov	si, SINGLIX_Welcome
+   314 000001CC E81F04                  		call	print_msg
+   315 000001CF E99703                  		jmp	BF_13
+   316                                  
+   317                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   318                                  ; get drive parameters
+   319                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   320                                  BF_10:
+   321 000001D2 BE[670F]                		mov	si, msg_YES
+   322 000001D5 E81604                  		call	print_msg
+   323                                  loc_load_fs_boot_sector:
+   324 000001D8 BE[6910]                		mov	si, BSBUFFER ; 28/01/2018
+   325 000001DB 803E[9C0B]80            		cmp	byte [PhysicalDriveNumber], 80h
+   326 000001E0 7226                    		jb	short loc_check_current_sfdt_adress_fd
+   327 000001E2 A1[8C0B]                		mov	ax, [fsBootSector]
+   328 000001E5 8B16[8E0B]              		mov	dx, [fsBootSector+2]
+   329                                   		;mov	bx, BSBUFFER
+   330 000001E9 89F3                    		mov	bx, si ; 28/01/2018
+   331 000001EB E86A04                  		call	disk_read
+   332 000001EE 0F829103                		jc	BF_16
+   333 000001F2 817C034653              		cmp	word [si+bsFSystemID], 'FS'
+   334 000001F7 7506                    		jne	short loc_not_singlix_fs_hdp
+   335                                  loc_check_hdp_bs_A1h_sign:
+   336 000001F9 807C09A1                		cmp	byte [si+bsPartitionID], 0A1h
+   337 000001FD 7409                    		je	short loc_check_current_sfdt_adress
+   338                                  loc_not_singlix_fs_hdp:
+   339 000001FF BE[C60E]                		mov	si, Msg_Not_Singlix_FS
+   340 00000202 E8E903                  		call	print_msg
+   341 00000205 E96103                  		jmp	BF_13
+   342                                  loc_check_current_sfdt_adress_fd:
+   343                                  		;mov	si, BSBUFFER  
+   344                                  loc_check_current_sfdt_adress:
+   345                                  		; 28/01/2018
+   346 00000208 807C2D00                		cmp	byte [si+bs_LBA_Ready], 0
+   347 0000020C 770A                    		ja	short pass_update_chs_parameters
+   348                                  		; Update CHS parameters (according to boot sector)
+   349 0000020E 8B442E                  		mov	ax, [si+bs_Disk_SecPerTrack]
+   350 00000211 A2[9F0B]                		mov	[Physical_Disk_SecPerTrack], al
+   351 00000214 8826[9D0B]              		mov	[Physical_Disk_Heads], ah
+   352                                  pass_update_chs_parameters:
+   353 00000218 8B4414                  		mov	ax, [si+bsStartupFD]
+   354 0000021B 8B5416                  		mov	dx, [si+bsStartupFD+2]
+   355 0000021E 09C0                    		or	ax, ax
+   356 00000220 7548                    		jnz	short loc_startup_file_exists
+   357 00000222 09D2                    		or	dx, dx
+   358 00000224 7544                    		jnz	short loc_startup_file_exists		  
+   359                                  BF_11:
+   360 00000226 BE[330F]                		mov	si, Msg_DosFile_Name
+   361 00000229 E8C203                  		call	print_msg
+   362 0000022C E89C04                  		call	rw_char
+   363 0000022F 7210                    		jc	short pass_write_file_name_chr0
+   364 00000231 BF[C80B]                		mov	di, StartupFile_Name
+   365 00000234 803C20                  		cmp	byte [si], 20h
+   366 00000237 7608                    		jna	short pass_write_file_name_chr0
+   367 00000239 B94000                  		mov	cx, 64
+   368                                  loc_write_file_name_chr0:
+   369 0000023C AC                      		lodsb
+   370 0000023D 3C20                    		cmp	al, 20h
+   371                                  		;jnb	short loc_write_file_name_chr1 
+   372                                  		; 27/01/2018
+   373 0000023F 7708                    		ja	short loc_write_file_name_chr1 
+   374                                  pass_write_file_name_chr0:
+   375 00000241 C60500                  		mov	byte [di], 0
+   376 00000244 47                      		inc	di
+   377 00000245 E2FA                    		loop	pass_write_file_name_chr0
+   378 00000247 EB05                    		jmp	short loc_find_dos_file
+   379                                  loc_write_file_name_chr1:
+   380 00000249 8805                    		mov	[di], al
+   381 0000024B 47                      		inc	di
+   382 0000024C E2EE                    		loop	loc_write_file_name_chr0
+   383                                  loc_find_dos_file:	
+   384 0000024E BE[700F]                		mov	si, SINGLIX_CRLF
+   385 00000251 E89A03                   		call	print_msg
+   386 00000254 BA[C80B]                		mov	dx, StartupFile_Name
+   387 00000257 B92700                  		mov	cx, 27h ; File Attributes
+   388 0000025A B44E                    		mov	ah, 4Eh ; MS Dos Function = Find First File
+   389 0000025C CD21                    		int	21h
+   390 0000025E 7355                    		jnc	short loc_open_dos_file_1
+   391 00000260 83F802                  		cmp	ax, 2
+   392 00000263 0F851C03                		jne	BF_16
+   393 00000267 E94301                  		jmp	loc_dos_file_notfound
+   394                                  loc_startup_file_exists:
+   395 0000026A A3[900B]                		mov	[StartupFile_FDT], ax
+   396 0000026D 8916[920B]              		mov	[StartupFile_FDT+2], dx
+   397 00000271 BE[CC0F]                		mov	si, msg_Startup_File_Exists
+   398 00000274 E87703                  		call	print_msg
+   399                                  loc_startup_file_exist_select_option:
+   400 00000277 30E4                    		xor	ah, ah
+   401 00000279 CD16                    		int	16h
+   402 0000027B 3C1B                    		cmp	al, 1Bh
+   403 0000027D 0F84E802                		je	BF_13
+   404 00000281 3C0D                    		cmp	al, 0Dh	
+   405 00000283 750B                    		jne	short loc_check_startupfile_delete_decision
+   406 00000285 E81008                  		call	display_startupfile_info
+   407 00000288 BE[E60F]                		mov	si, msg_please_select_an_option
+   408 0000028B E86003                  		call	print_msg
+   409 0000028E EBE7                    		jmp	short loc_startup_file_exist_select_option 
+   410                                  loc_check_startupfile_delete_decision:
+   411 00000290 80FC53                  		cmp	ah, 53h
+   412 00000293 75E2                    		jne	short loc_startup_file_exist_select_option
+   413 00000295 BE[6910]                		mov	si, BSBUFFER 
+   414 00000298 E8CF06                  		call	delete_fs_startupfile
+   415 0000029B 730F                    		jnc	short loc_startup_file_deleted_msg
+   416 0000029D 3C0B                    		cmp	al, 0Bh
+   417 0000029F 0F85E002                		jne	BF_16
+   418 000002A3 BE[A90F]                		mov	si, msg_invalid_format
+   419 000002A6 E84503                  		call	print_msg
+   420 000002A9 E9BD02                  		jmp	BF_13
+   421                                  loc_startup_file_deleted_msg:
+   422 000002AC BE[E90E]                		mov	si, Msg_startup_file_deleted
+   423 000002AF E83C03                  		call	print_msg
+   424                                                 ;jmp	short BF_11 
+   425 000002B2 E9B402                  		jmp	BF_13
+   426                                  loc_open_dos_file_1:
+   427 000002B5 BE9E00                  		mov	si, DTA_FileName
+   428 000002B8 BF[C80B]                		mov	di, StartupFile_Name
+   429 000002BB B94000                  		mov	cx, 64
+   430                                  loc_copy_found_file_name_chr0:
+   431 000002BE AC                      		lodsb
+   432 000002BF 3C20                    		cmp	al, 20h
+   433 000002C1 7708                    		ja	short loc_copy_found_file_name_chr1 
+   434                                  pass_copy_found_file_name_chr0:
+   435 000002C3 C60500                  		mov	byte [di], 0
+   436 000002C6 47                      		inc	di
+   437 000002C7 E2FA                    		loop	pass_copy_found_file_name_chr0
+   438 000002C9 EB05                    		jmp	short loc_set_startupfile_decriptor_table
+   439                                  loc_copy_found_file_name_chr1:
+   440 000002CB 8805                    		mov	byte [di], al
+   441 000002CD 47                      		inc	di
+   442 000002CE E2EE                    		loop	loc_copy_found_file_name_chr0
+   443                                  loc_set_startupfile_decriptor_table:
+   444 000002D0 BE9A00                  		mov 	si, DTA_FileSize
+   445 000002D3 8B04                    		mov     ax, [si]
+   446 000002D5 8B5402                  		mov 	dx, [si+2]
+   447 000002D8 A3[8516]                		mov 	[fdt_file_size], ax
+   448 000002DB 8916[8716]              		mov 	[fdt_file_size+2], dx
+   449 000002DF BE9800                  		mov     si, DTA_Date
+   450 000002E2 8B04                    		mov 	ax, [si]
+   451 000002E4 50                      		push 	ax
+   452 000002E5 83E01F                  		and 	ax, 00011111b		; Day Mask
+   453 000002E8 D40A                    		aam				; Q([AL]/10)->AH
+   454                                  						; R([AL]/10)->AL
+   455                                  						; [AH]+[AL]= Day as BCD
+   456 000002EA D0E4                    		shl 	ah, 1
+   457 000002EC D0E4                    		shl 	ah, 1
+   458 000002EE D0E4                    		shl 	ah, 1
+   459 000002F0 D0E4                    		shl 	ah, 1 
+   460 000002F2 00C4                    		add 	ah, al     
+   461 000002F4 8826[9C16]              		mov 	[fdt_make_day], ah
+   462 000002F8 58                      		pop 	ax
+   463 000002F9 50                      		push 	ax 
+   464 000002FA B105                    		mov     cl, 5
+   465 000002FC D3E8                    		shr     ax, cl			; shift right 5 times
+   466 000002FE 83E00F                  		and     ax, 00001111b		; Month Mask
+   467 00000301 D0E4                      		shl 	ah, 1
+   468 00000303 D0E4                    		shl 	ah, 1
+   469 00000305 D0E4                    		shl 	ah, 1
+   470 00000307 D0E4                    		shl 	ah, 1 
+   471 00000309 D40A                    		aam
+   472 0000030B 00C4                    		add	ah, al     
+   473 0000030D 8826[9B16]              		mov	[fdt_make_month], ah
+   474 00000311 58                      		pop	ax
+   475 00000312 B109                    		mov	cl, 9
+   476 00000314 D3E8                    		shr	ax, cl
+   477                                  	       ;and	ax, 01111111b		; Result = Year - 1980
+   478 00000316 05BC07                  		add	ax, 1980
+   479 00000319 31D2                    		xor	dx, dx
+   480 0000031B B96400                  		mov	cx, 100
+   481 0000031E F7F1                    		div	cx		
+   482 00000320 D40A                    		aam
+   483 00000322 B104                      		mov	cl, 4
+   484 00000324 D2E4                    		shl	ah, cl
+   485 00000326 00C4                    		add	ah, al     
+   486 00000328 8826[9916]              		mov	[fdt_make_year], ah
+   487 0000032C 88D0                     		mov	al, dl
+   488 0000032E D40A                    		aam
+   489                                    	       ;mov	cl, 4
+   490 00000330 D2E4                    		shl	ah, cl
+   491 00000332 00C4                    		add	ah, al      
+   492 00000334 8826[9A16]              		mov	[fdt_make_year+1], ah
+   493 00000338 BE9600                  		mov	si, DTA_Time
+   494 0000033B 8B04                    		mov	ax, [si]
+   495 0000033D 50                      		push	ax
+   496                                  		; 28/01/2018
+   497 0000033E 83E01F                  		and	ax, 000011111b		; Second Mask
+   498 00000341 D0E0                    		shl	al, 1
+   499 00000343 D40A                    		aam
+   500                                    	       ;mov	cl, 4
+   501 00000345 D2E4                    		shl	ah, cl
+   502 00000347 00C4                    		add	ah, al
+   503 00000349 8826[9F16]              		mov	[fdt_make_second], ah
+   504 0000034D 58                      		pop	ax
+   505 0000034E 50                      		push	ax
+   506 0000034F B105                    		mov	cl, 5
+   507 00000351 D3E8                    		shr	ax, cl			; shift right 5 times
+   508 00000353 83E03F                  		and	ax, 0000111111b		; Minute Mask
+   509 00000356 D40A                    		aam
+   510 00000358 B104                      		mov	cl, 4
+   511 0000035A D2E4                    		shl	ah, cl
+   512 0000035C 00C4                    		add	ah, al
+   513 0000035E 8826[9E16]              		mov     [fdt_make_minute], ah
+   514 00000362 58                      		pop	ax
+   515 00000363 B10B                    		mov	cl, 11
+   516 00000365 D3E8                    		shr	ax, cl			; ax = hour
+   517 00000367 D40A                    		aam
+   518 00000369 B104                      	        mov	cl, 4
+   519 0000036B D2E4                    		shl	ah, cl 
+   520 0000036D 00C4                    		add	ah, al
+   521 0000036F 8826[9D16]              		mov	[fdt_make_hour], ah
+   522 00000373 B402                     		mov	ah, 02h			; Return Current Time
+   523 00000375 CD1A                    		int	1Ah
+   524 00000377 86E9                    		xchg	ch, cl
+   525 00000379 890E[A516]              		mov	[fdt_lm_hour], cx
+   526 0000037D 86F2                    		xchg	dh, dl
+   527 0000037F 8916[A716]              		mov	[fdt_lm_second], dx
+   528 00000383 890E[A516]              		mov	[fdt_lm_hour], cx
+   529 00000387 8916[A716]              		mov	[fdt_lm_second], dx
+   530 0000038B B404                    		mov	ah, 04h			; Return Current Date
+   531 0000038D CD1A                    		int	1Ah
+   532 0000038F 86E9                    		xchg	ch,cl
+   533 00000391 890E[A116]              		mov	[fdt_lm_year], cx
+   534 00000395 86F2                    		xchg	dh,dl
+   535 00000397 8916[A316]              		mov	[fdt_lm_month], dx
+   536                                  loc_open_dos_file_2:
+   537 0000039B BA[C80B]                		mov	dx, StartupFile_Name
+   538 0000039E B43D                    		mov	ah, 3Dh ; MS Dos Function = Open File
+   539 000003A0 30C0                    		xor	al, al  
+   540 000003A2 CD21                    		int	21h
+   541 000003A4 7310                    		jnc	short loc_save_filehandle
+   542 000003A6 83F802                  	        cmp	ax, 2
+   543 000003A9 0F85D601                		jne	BF_16		
+   544                                  loc_dos_file_notfound:
+   545 000003AD BE[B30E]                		mov	si, Msg_File_Not_Found
+   546 000003B0 E83B02                  		call	print_msg
+   547 000003B3 E9B301                  		jmp	BF_13
+   548                                  loc_save_filehandle:
+   549 000003B6 A3[8A0B]                		mov	[FileHandle], ax
+   550                                  loc_display_startup_file_name:
+   551 000003B9 BE[460F]                		mov	si, Msg_StartupFile_Name
+   552 000003BC E82F02                  		call	print_msg
+   553 000003BF B403                    		mov	ah, 03h
+   554                                                 ;xor	bh, bh
+   555 000003C1 CD10                    		int	10h
+   556                                                 ;push	dx         
+   557 000003C3 BE[C80B]                		mov	si, StartupFile_Name
+   558 000003C6 E82502                  		call	print_msg
+   559                                                 ;pop	dx
+   560 000003C9 B402                    		mov	ah, 02h
+   561                                                 ;xor	bh, bh
+   562 000003CB CD10                    		int	10h
+   563 000003CD E8FB02                  		call	rw_char
+   564 000003D0 0F829501                		jc	BF_13
+   565 000003D4 803C20                  		cmp	byte [si], 20h
+   566 000003D7 0F868E01                		jna	BF_13
+   567 000003DB BF[A916]                		mov	di, fdt_file_name
+   568 000003DE B94000                  		mov	cx, 64
+   569                                  loc_rename_file_name_chr0:
+   570 000003E1 AC                      		lodsb
+   571 000003E2 3C20                    		cmp	al, 20h
+   572 000003E4 7708                    		ja	short loc_rename_file_name_chr1 
+   573                                  pass_rename_file_name_chr0:
+   574 000003E6 C60500                  		mov	byte [di], 0
+   575 000003E9 47                      		inc	di
+   576 000003EA E2FA                    		loop	pass_rename_file_name_chr0
+   577 000003EC EB05                    		jmp	short loc_get_SFDT_Address
+   578                                  loc_rename_file_name_chr1:
+   579 000003EE 8805                    		mov	[di], al
+   580 000003F0 47                      		inc	di
+   581 000003F1 E2EE                    		loop	loc_rename_file_name_chr0
+   582                                  loc_get_SFDT_Address:
+   583 000003F3 BE[700F]                		mov	si, SINGLIX_CRLF
+   584 000003F6 E8F501                   		call	print_msg
+   585 000003F9 A1[8516]                		mov	ax, [fdt_file_size]
+   586 000003FC 8B16[8716]              		mov	dx, [fdt_file_size+2]
+   587 00000400 05FF01                  		add	ax, 511
+   588 00000403 83D200                  		adc	dx, 0
+   589 00000406 B90002                  		mov	cx, 512
+   590 00000409 E84607                  		call	Div32
+   591 0000040C A3[7916]                		mov	[fdt_scount], ax
+   592 0000040F 8916[7B16]              		mov	[fdt_scount+2], dx
+   593 00000413 83C001                  		add	ax, 1
+   594 00000416 83D200                  		adc	dx, 0
+   595 00000419 09D2                    		or	dx, dx
+   596 0000041B 0F856401                		jnz	BF_16
+   597 0000041F 89C1                    		mov	cx, ax
+   598 00000421 BE[6910]                		mov	si, BSBUFFER
+   599 00000424 E80404                  		call	get_first_free_section
+   600 00000427 0F825801                		jc	BF_16
+   601 0000042B A3[900B]                		mov	[StartupFile_FDT], ax
+   602 0000042E 8916[920B]              		mov	[StartupFile_FDT+2], dx
+   603                                  loc_write_SF:
+   604 00000432 BE[0E0F]                		mov	si, Msg_writing_sf
+   605 00000435 E8B601                  		call	print_msg
+   606 00000438 A1[900B]                		mov	ax, [StartupFile_FDT]
+   607 0000043B 8B16[920B]              		mov	dx, [StartupFile_FDT+2]
+   608                                  		; 28/01/2018
+   609 0000043F A3[7116]                		mov	[fdt_location], ax
+   610 00000442 8916[7316]              		mov	[fdt_location+2], dx
+   611 00000446 0306[8C0B]              		add	ax, [fsBootSector]
+   612 0000044A 1316[8E0B]              		adc	dx, [fsBootSector+2]
+   613 0000044E BB[6916]                		mov	bx, FDTBUFFER     
+   614 00000451 FF16[9A0B]              		call	word [write_sector]
+   615 00000455 0F822A01                		jc	BF_16
+   616 00000459 A1[900B]                		mov	ax, [StartupFile_FDT]
+   617 0000045C 8B16[920B]              		mov	dx, [StartupFile_FDT+2]
+   618 00000460 BE[6910]                		mov	si, BSBUFFER
+   619 00000463 894414                  		mov	[si+bsStartupFD], ax
+   620 00000466 895416                   		mov	[si+bsStartupFD+2], dx 
+   621 00000469 83C001                                	add	ax, 1
+   622 0000046C 83D200                  		adc	dx, 0
+   623 0000046F A3[900B]                 		mov	[StartupFile_FDT], ax
+   624 00000472 8916[920B]              		mov	[StartupFile_FDT+2], dx    
+   625                                  BF_12_rp:		
+   626 00000476 B43F                    		mov	ah, 3Fh ; Read File
+   627 00000478 B90002                  		mov	cx, 512
+   628 0000047B BA[6918]                		mov	dx, SECBUFFER
+   629 0000047E 8B1E[8A0B]              		mov	bx, [FileHandle]
+   630 00000482 CD21                    		int	21h
+   631 00000484 7235                    		jc	short BF_12_c
+   632 00000486 50                      		push	ax
+   633 00000487 A1[900B]                		mov	ax, [StartupFile_FDT]
+   634 0000048A 8B16[920B]              		mov	dx, [StartupFile_FDT+2]
+   635 0000048E 0306[8C0B]              		add	ax, [fsBootSector]
+   636 00000492 1316[8E0B]              		adc	dx, [fsBootSector+2]
+   637 00000496 BB[6918]                		mov	bx, SECBUFFER     
+   638 00000499 FF16[9A0B]              		call	word [write_sector]
+   639 0000049D 58                      		pop	ax
+   640 0000049E 721B                    		jc	short BF_12_c
+   641 000004A0 3D0002                  		cmp	ax, 512
+   642 000004A3 7515                    		jne	short BF_12_cmc
+   643 000004A5 31D2                    		xor	dx, dx
+   644 000004A7 A1[900B]                		mov	ax, [StartupFile_FDT]
+   645 000004AA 83C001                  		add	ax, 1
+   646 000004AD 1316[920B]              		adc	dx, [StartupFile_FDT+2]
+   647 000004B1 A3[900B]                 		mov	[StartupFile_FDT], ax
+   648 000004B4 8916[920B]              		mov	[StartupFile_FDT+2], dx    
+   649 000004B8 EBBC                                   	jmp	short BF_12_rp
+   650                                  BF_12_cmc:
+   651 000004BA F5                      		cmc 
+   652                                  BF_12_c:
+   653 000004BB 9C                      	        pushf
+   654 000004BC B43E                    		mov	ah, 3Eh ; Close File
+   655 000004BE 8B1E[8A0B]              		mov	bx, [FileHandle]
+   656 000004C2 CD21                    		int	21h
+   657 000004C4 9D                      		popf 
+   658 000004C5 0F82BA00                		jc	BF_16
+   659                                    	       ;mov	si, BSBUFFER
+   660 000004C9 8B4414                  		mov	ax, [si+bsStartupFD]
+   661 000004CC 8B5416                   		mov	dx, [si+bsStartupFD+2] 
+   662 000004CF A3[900B]                		mov	[StartupFile_FDT], ax
+   663 000004D2 8916[920B]              		mov	[StartupFile_FDT+2], dx
+   664 000004D6 B306                    		mov	bl, 06h
+   665 000004D8 E89602                  		call	update_dat
+   666 000004DB 0F829400                		jc	BF_14
+   667 000004DF 8B0E[7916]              		mov	cx, [fdt_scount]		
+   668                                  BF_12_loop:
+   669 000004E3 A1[900B]                		mov	ax, [StartupFile_FDT]
+   670 000004E6 8B16[920B]              		mov	dx, [StartupFile_FDT+2]		
+   671 000004EA 83C001                  		add	ax, 1
+   672 000004ED 83D200                  		adc	dx, 0
+   673 000004F0 A3[900B]                 		mov	[StartupFile_FDT], ax
+   674 000004F3 8916[920B]              		mov	[StartupFile_FDT+2], dx
+   675 000004F7 51                      		push	cx
+   676 000004F8 B307                    		mov	bl, 07h
+   677 000004FA E87402                  		call	update_dat
+   678 000004FD 59                      		pop	cx  
+   679 000004FE 7273                    		jc	short BF_14
+   680 00000500 E2E1                    		loop	BF_12_loop
+   681 00000502 803E[A20B]00            		cmp	byte [DAT_Buffer_Updated], 0
+   682 00000507 760C                    		jna	short BF_12_um
+   683 00000509 A1[A30B]                		mov	ax, [DAT_Buffer_Sector]
+   684 0000050C 8B16[A50B]              		mov	dx, [DAT_Buffer_Sector+2]
+   685 00000510 E8F902                  		call	write_dat_sector
+   686 00000513 725E                    		jc	short BF_14
+   687                                  BF_12_um:
+   688 00000515 BE[6910]                		mov	si, BSBUFFER
+   689 00000518 B90200                  		mov	cx, 2 ; FDT(DDT) + 1 sector data
+   690 0000051B E80D03                  		call	get_first_free_section
+   691 0000051E 7305                    		jnc	short BF_12_wm
+   692                                  		; Invalid data => 0FFFFFFFFh sign
+   693 00000520 31C0                    		xor	ax, ax
+   694 00000522 48                      		dec	ax 
+   695 00000523 89C2                    		mov	dx, ax
+   696                                  BF_12_wm:
+   697 00000525 8B0E[7916]              		mov	cx, [fdt_scount]
+   698 00000529 41                      		inc	cx
+   699 0000052A 290E[7D12]              		sub	[mat_dat_free_s], cx
+   700 0000052E 831E[7F12]00            		sbb	word [mat_dat_free_s+2], 0
+   701 00000533 A3[8112]                		mov	[mat_dat_ffs], ax
+   702 00000536 8916[8312]              		mov	[mat_dat_ffs+2], dx
+   703                                   	       ;mov	bx, MATBUFFER
+   704 0000053A 89F3                    		mov	bx, si
+   705 0000053C BE[6910]                		mov	si, BSBUFFER
+   706 0000053F 8B4418                  		mov	ax, [si+bsMATLocation]
+   707 00000542 8B541A                   		mov	dx, [si+bsMATLocation+2] 
+   708 00000545 0306[8C0B]              		add	ax, [fsBootSector]
+   709 00000549 1316[8E0B]              		adc	dx, [fsBootSector+2]
+   710 0000054D FF16[9A0B]              		call	word [write_sector]
+   711 00000551 7220                    		jc	short BF_14 
+   712                                  BF_12_bs:
+   713 00000553 BB[6910]                   		mov	bx, BSBUFFER
+   714 00000556 A1[8C0B]                		mov	ax, [fsBootSector]
+   715 00000559 8B16[8E0B]              		mov	dx, [fsBootSector+2]
+   716 0000055D FF16[9A0B]              		call	word [write_sector]
+   717 00000561 7210                    		jc	short BF_14
+   718                                  BF_12:        
+   719 00000563 BE[600F]                		mov	si, Msg_OK
+   720 00000566 E88500                  		call	print_msg
+   721                                  BF_13:
+   722 00000569 BE[700F]                		mov	si, SINGLIX_CRLF
+   723 0000056C E87F00                  		call	print_msg
+   724 0000056F CD20                    		int	20h
+   725 00000571 CD19                    		int	19h 
+   726                                  BF_14:  
+   727 00000573 BE[730F]                		mov	si, msg_singlix_drv_write_error
+   728 00000576 E87500                  		call	print_msg
+   729 00000579 EB0E                    		jmp	short BF_17
+   730                                  BF_15:
+   731 0000057B BE[6C0F]                		mov	si, msg_NO
+   732 0000057E E86D00                  		call	print_msg
+   733 00000581 EBE6                    		jmp	short BF_13 
+   734                                  BF_16:
+   735 00000583 BE[7E0E]                		mov	si, msg_singlix_drv_read_error
+   736 00000586 E86500                  		call	print_msg
+   737                                  BF_17:
+   738 00000589 31C0                    		xor	ax, ax
+   739 0000058B CD16                    		int	16h			; wait for keyboard command
+   740 0000058D 3C03                    		cmp	al, 'C'-40h
+   741 0000058F 74D8                    		je	short BF_13		   
+   742 00000591 3C1B                    		cmp	al, 27
+   743 00000593 74D4                    		je	short BF_13
+   744 00000595 24DF                    		and	al, 0DFh
+   745 00000597 3C59                    		cmp	al, 'Y'
+   746 00000599 7406                    		je	short BF_18		; Retry
+   747 0000059B 3C4E                    		cmp	al, 'N'
+   748 0000059D 74CA                    		je	short BF_13		; Exit
+   749 0000059F EBE8                    		jmp	short BF_17
+   750                                  BF_18:
+   751 000005A1 8A16[9C0B]              		mov	dl, [PhysicalDriveNumber]
+   752 000005A5 B408                    		mov	ah, 08h
+   753 000005A7 CD13                    		int	13h			; return disk parameters
+   754 000005A9 0E                      		push	cs
+   755 000005AA 07                      		pop	es			; restore es
+   756 000005AB 72D6                    		jc	short BF_16
+   757 000005AD 80FB04                  		cmp	bl, 4			; Drive Type
+   758 000005B0 72D1                    		jb	short BF_16
+   759 000005B2 30E4                    		xor	ah, ah
+   760 000005B4 8A16[9C0B]              		mov	dl, [PhysicalDriveNumber]
+   761 000005B8 CD13                    		int	13h 
+   762 000005BA 72C7                    		jc	short BF_16  
+   763 000005BC E919FC                  		jmp	loc_load_fs_boot_sector
+   764                                  
+   765                                  ;-----------------------------------------------------------------
+   766                                  ; convert binary number to decimar string
+   767                                  ;-----------------------------------------------------------------
+   768                                  
+   769                                  bin_to_decimal:
+   770                                  		; 6-5-2009
+   771                                  		;  Erdogan Tan
+   772                                  		; INPUT: 
+   773                                  		;	DX:AX = Binary Number
+   774                                  		; OUTPUT:
+   775                                  		;	Decimal chars at DS:SI
+   776                                  		; CX, AX, DX, SI, BX, BP will be changed.
+   777                                  		;
+   778 000005BF 55                      		push	bp
+   779 000005C0 BE[8B1A]                		mov	si, Decimal_Str
+   780 000005C3 56                      		push	si
+   781 000005C4 B90900                  		mov	cx, 9
+   782                                  loc_reset_str_NumberInput:
+   783 000005C7 C60430                  		mov	byte [si], '0'
+   784 000005CA 46                      		inc	si
+   785 000005CB E2FA                    		loop	loc_reset_str_NumberInput
+   786 000005CD 89E5                    		mov	bp, sp
+   787 000005CF B10A                    		mov	cl, 10
+   788                                  loc_rediv_NumberInput:
+   789 000005D1 E87E05                  		call	Div32
+   790 000005D4 80C330                  		add	bl,'0'
+   791 000005D7 53                      		push	bx
+   792 000005D8 4E                      		dec	si
+   793 000005D9 83F800                  		cmp	ax, 0
+   794 000005DC 77F3                    		ja	short loc_rediv_NumberInput
+   795 000005DE 83FA00                  		cmp	dx, 0
+   796 000005E1 77EE                    		ja	short loc_rediv_NumberInput
+   797                                  loop_popbx_NumberInput: 
+   798 000005E3 5B                      		pop	bx
+   799 000005E4 881C                    		mov	[si], bl
+   800 000005E6 46                      		inc	si
+   801 000005E7 39E5                    		cmp	bp, sp
+   802 000005E9 75F8                    		jne	short loop_popbx_NumberInput
+   803 000005EB 5E                      		pop	si
+   804 000005EC 5D                      		pop	bp  
+   805 000005ED C3                      		retn
+   806                                  
+   807                                  ;-----------------------------------------------------------------
+   808                                  ; print message
+   809                                  ;-----------------------------------------------------------------
+   810                                  
+   811                                  print_msg:
+   812                                  		; DS:SI -> Message address
+   813                                  print_msg_LOOP:
+   814 000005EE AC                      		lodsb				; Load byte at DS:SI to AL
+   815 000005EF 20C0                    		and     al, al            
+   816 000005F1 7409                    		jz      short print_msg_OK       
+   817 000005F3 B40E                    		mov     AH, 0Eh
+   818 000005F5 BB0700                  		mov     BX, 07h             
+   819 000005F8 CD10                    		int     10h			; BIOS Service func ( ah ) = 0Eh
+   820                                  						; Write char as TTY
+   821                                                                                  ;INPUT: AL-char BH-page BL-color
+   822 000005FA EBF2                    		jmp	short print_msg_LOOP           
+   823                                  print_msg_OK:
+   824 000005FC C3                                      retn
+   825                                  
+   826                                  ;#############################################################################
+   827                                  ;#
+   828                                  ;#              PROCEDURE CHS_read
+   829                                  ;#
+   830                                  ;#############################################################################
+   831                                  
+   832                                  CHS_read:
+   833                                  		; 27/01/2018
+   834                                  		; 31/01/2010
+   835                                  		; INPUT -> DX:AX = Logical Block Address
+   836                                  		; ES:BX = Destination Buffer
+   837                                  		; OUTPUT -> clc or stc
+   838 000005FD 56                      		push	si
+   839 000005FE 51                      		push	cx            
+   840 000005FF BF0500                  		mov	di, 5   
+   841                                  loc_read_disk_chs:
+   842 00000602 50                      		push	ax			; Linear sector #
+   843 00000603 52                      		push	dx			; DX_AX = Linear address (sector)
+   844 00000604 8B0E[9F0B]              		mov	cx, [Physical_Disk_SecPerTrack]
+   845 00000608 53                      		push	bx
+   846 00000609 E84605                  		call	Div32			; Special 32 bit divide !!!
+   847                                  						; (To fix large disk problem.)
+   848                                  						; by Erdogan Tan
+   849                                  						; (October 20th, 1999)
+   850 0000060C 89D9                    		mov	cx, bx			; Sector (zero based)
+   851 0000060E 41                      		inc	cx			; To make it 1 based
+   852 0000060F 51                      		push	cx
+   853 00000610 8B0E[9D0B]              		mov	cx, [Physical_Disk_Heads]
+   854 00000614 E83B05                  		call	Div32			; Convert track to head & cyl
+   855 00000617 88DE                    		mov	dh, bl			; BX = Head (max. FFh)
+   856 00000619 59                      		pop	cx			; AX=Cyl, DH=Head, CX=Sector
+   857 0000061A 5B                      		pop	bx			; ES:BX = Buffer
+   858 0000061B 8A16[9C0B]              		mov	dl, [PhysicalDriveNumber]
+   859 0000061F 88C5                    		mov	ch, al                   
+   860 00000621 D0CC                    		ror	ah, 1			; Rotate right
+   861 00000623 D0CC                    		ror	ah, 1                   
+   862 00000625 08E1                    		or	cl, ah                   
+   863 00000627 B80102                  		mov	ax, 0201h
+   864 0000062A CD13                    		int	13h			; BIOS Service func ( ah ) = 2
+   865                                  						; Read disk sectors
+   866                                  						;INPUT:
+   867                                  						; AL-sec num CH-track CL-sec
+   868                                  						; DH-head DL-drive ES:BX-buffer
+   869                                  						;OUTPUT:
+   870                                  						; CF-flag AH-stat AL-sec read
+   871                                  						; If CF = 1 then (If AH > 0)
+   872 0000062C 5A                      		pop	dx
+   873 0000062D 58                      		pop	ax
+   874 0000062E 7303                    		jnc	short pass_read_disk_chs_error              
+   875 00000630 4F                      		dec	di
+   876                                  		;jz	short pass_read_disk_chs_error     
+   877                                  		;xor	ah, ah                   
+   878                                  		;mov	dl, [PhysicalDriveNumber]
+   879                                  		;int	13h			; BIOS Service func ( ah ) = 0
+   880                                  						; Reset disk system
+   881 00000631 75CF                    		jnz	short loc_read_disk_chs                  
+   882                                  		;jmp	short loc_read_disk_chs          
+   883                                  pass_read_disk_chs_error:
+   884 00000633 59                      		pop	cx
+   885 00000634 5E                      		pop	si
+   886 00000635 C3                      		retn				; db 0C3h
+   887                                  
+   888                                  
+   889                                  ;#############################################################################
+   890                                  ;#
+   891                                  ;#              PROCEDURE LBA_read
+   892                                  ;#
+   893                                  ;#############################################################################
+   894                                  
+   895                                  LBA_read:
+   896                                  		; 21/02/2010
+   897                                  		; 31/01/2010
+   898                                  		; INPUT -> DX:AX = LBA address
+   899                                  		; INPUT -> ES:BX = Buffer
+   900 00000636 BF0500                                  mov	di, 5 
+   901                                  loc_read_disk_lba:
+   902                                                 ;pusha				; db 60h
+   903 00000639 60                      		db	60h
+   904                                                 ;push	0			; db 6Ah, 00h
+   905 0000063A 6A00                                    db	6Ah, 0
+   906                                                 ;push	0			; db 6Ah, 00h
+   907 0000063C 6A00                                    db	6Ah, 0
+   908 0000063E 52                                      push	dx
+   909 0000063F 50                                      push	ax
+   910 00000640 06                                      push	es
+   911 00000641 53                                      push	bx
+   912                                                 ;push	1			; db 6Ah, 01h
+   913 00000642 6A01                                    db	6Ah, 01h                     
+   914                                                 ;push	10h			; db 6Ah, 10h
+   915 00000644 6A10                                    db	6Ah, 10h
+   916 00000646 89E6                                    mov	si, sp
+   917                                  		; DS:SI= DAP Location
+   918 00000648 B442                    		mov	ah, 42h  ; Extended Disk Read - LBA Read
+   919 0000064A 8A16[9C0B]              		mov	dl, [PhysicalDriveNumber]
+   920 0000064E CD13                    		int	13h
+   921                                  		;popa
+   922 00000650 61                      		db	61h
+   923                                  		;popa
+   924 00000651 61                      		db	61h
+   925 00000652 7303                    		jnc	short pass_read_disk_lba_error
+   926 00000654 4F                      		dec	di 
+   927 00000655 75E2                    		jnz	short loc_read_disk_lba
+   928                                  pass_read_disk_lba_error:
+   929 00000657 C3                      		retn
+   930                                  
+   931                                  ;#############################################################################
+   932                                  ;#
+   933                                  ;#              PROCEDURE disk_read
+   934                                  ;#
+   935                                  ;#############################################################################
+   936                                  
+   937                                  disk_read:
+   938                                  		; 31/01/2010
+   939                                  		; INPUT -> DX:AX = LBA address
+   940                                  		; INPUT -> ES:BX = Buffer
+   941 00000658 803E[C70B]00            		cmp	byte [LBA_Ready], 0
+   942 0000065D 7709                    		ja	short loc_read_lba_sectors
+   943                                  loc_read_chs_sectors:
+   944 0000065F E89BFF                  		call	CHS_read
+   945 00000662 7303                    		jnc	short retn_read_sectors
+   946                                  retn_read_sectors_stc:
+   947 00000664 B81500                  		mov	ax, 15h ; Drv not ready or read error !
+   948                                  retn_read_sectors:
+   949 00000667 C3                      		retn
+   950                                  loc_read_lba_sectors:
+   951 00000668 E8CBFF                  		call	LBA_read
+   952 0000066B 72F7                    		jc	short retn_read_sectors_stc
+   953 0000066D C3                      		retn
+   954                                  
+   955                                  ;#############################################################################
+   956                                  ;#
+   957                                  ;#              PROCEDURE write_lba_sector
+   958                                  ;#
+   959                                  ;#############################################################################
+   960                                  
+   961                                  write_lba_sector:
+   962                                  		; 31/01/2010
+   963                                  loc_write_lba_sectors:                
+   964 0000066E BF0500                  		mov	di, 5
+   965                                  loc_0FFh:
+   966                                  		;pusha				; db 60h
+   967 00000671 60                      		db	60h
+   968                                  		;push	0			; db 6Ah, 00h
+   969 00000672 6A00                    		db	6Ah, 0
+   970                                  		;push	0			; db 6Ah, 00h
+   971 00000674 6A00                    		db	6Ah, 0
+   972 00000676 52                      		push	dx
+   973 00000677 50                      		push	ax
+   974 00000678 06                      		push	es
+   975 00000679 53                      		push	bx
+   976                                  		;push	1			; db 6Ah, 01h
+   977 0000067A 6A01                    		db	6Ah, 01h                     
+   978                                  		;push	10h			; db 6Ah, 10h
+   979 0000067C 6A10                    		db	6Ah, 10h
+   980 0000067E 8A16[9C0B]              		mov	dl, [PhysicalDriveNumber] 
+   981 00000682 B443                    		mov	ah, 43h
+   982 00000684 30C0                    		xor	al, al			; Verify off
+   983 00000686 89E6                    		mov	si, sp
+   984 00000688 CD13                    		int	13h
+   985                                  		;popa
+   986 0000068A 61                      		db	61h
+   987                                  		;popa
+   988 0000068B 61                      		db	61h
+   989 0000068C 7303                                    jnc	short loc_12Bh
+   990 0000068E 4F                      		dec	di
+   991                                  		;jz	short loc_12Bh
+   992 0000068F 75E0                    		jnz	short loc_0FFh  
+   993                                  		;xor	ah, ah
+   994                                  		;mov	dl, [PhysicalDriveNumber] 
+   995                                  		;int	13h
+   996                                  		;jmp	short loc_0FFh                  
+   997                                  loc_12Bh:
+   998 00000691 C3                      		retn                            ; db 0C3h
+   999                                                          
+  1000                                  
+  1001                                  ;#############################################################################
+  1002                                  ;#
+  1003                                  ;#              PROCEDURE write_chs_sector
+  1004                                  ;#
+  1005                                  ;#############################################################################
+  1006                                  
+  1007                                  write_chs_sector:
+  1008                                  		; 31/01/2010
+  1009                                  loc_write_chs_sector:
+  1010 00000692 56                      		push	si
+  1011 00000693 51                      		push	cx            
+  1012                                  loc_09Bh:
+  1013 00000694 BF0500                  		mov	di, 5                    
+  1014                                  loc_0CAh:               
+  1015 00000697 50                      		push	ax			; Linear sector #
+  1016 00000698 52                      		push	dx			; DX_AX = Linear address (sectors)
+  1017 00000699 8B0E[9F0B]              		mov	cx, [Physical_Disk_SecPerTrack]
+  1018 0000069D 53                      		push	bx
+  1019 0000069E E8B104                  		call	Div32			; Special 32 bit divide !!!
+  1020                                  						; (To fix large disk problem.)
+  1021                                    						; by Erdogan Tan
+  1022                                  						; (October 20th, 1999)
+  1023 000006A1 89D9                    		mov	cx, bx			; Sector (zero based)
+  1024 000006A3 41                      		inc	cx			; To make it 1 based
+  1025 000006A4 51                      		push	cx
+  1026 000006A5 8B0E[9D0B]              		mov	cx, [Physical_Disk_Heads]
+  1027 000006A9 E8A604                  		call	Div32			; Convert track to head & cyl
+  1028 000006AC 88DE                    		mov	dh, bl			; BX = Head (max. FFh)
+  1029 000006AE 59                      		pop	cx			; AX=Cyl, DH=Head, CX=Sector
+  1030 000006AF 5B                      		pop	bx			; ES:BX = Buffer
+  1031 000006B0 8A16[9C0B]              		mov	dl, [PhysicalDriveNumber]
+  1032 000006B4 88C5                    		mov	ch, al                   
+  1033 000006B6 D0CC                    		ror	ah, 1			; Rotate right
+  1034 000006B8 D0CC                    		ror	ah, 1                   
+  1035 000006BA 08E1                    		or	cl, ah                   
+  1036 000006BC B80103                  		mov	ax, 0301h
+  1037 000006BF CD13                    		int	13h			; BIOS Service func ( ah ) = 3
+  1038                                  						; Write disk sectors
+  1039                                  						;INPUT:
+  1040                                  						; AL-sec num CH-track CL-sec
+  1041                                  						; DH-head DL-drive ES:BX-buffer
+  1042                                  						;OUTPUT: 
+  1043                                  						; CF-flag AH-stat AL-sec read
+  1044                                  						; If CF = 1 then (If AH > 0)
+  1045 000006C1 5A                      		pop	dx
+  1046 000006C2 58                      		pop	ax
+  1047 000006C3 7303                    		jnc	short loc_chs_12Bh              
+  1048 000006C5 4F                      		dec	di                      
+  1049                                  		;jz	short loc_chs_12Bh              
+  1050                                                  ;xor	ah, ah                   
+  1051                                  		;mov	dl, [PhysicalDriveNumber]
+  1052                                  		;int	13h			; BIOS Service func ( ah ) = 0
+  1053                                  						; Reset disk system
+  1054 000006C6 75CF                    		jnz	short loc_0CAh                  
+  1055                                  		;jmp	short loc_0CAh          
+  1056                                  loc_chs_12Bh:
+  1057 000006C8 59                      		pop	cx
+  1058 000006C9 5E                      		pop	si
+  1059 000006CA C3                      		retn				; db 0C3h
+  1060                                  
+  1061                                  ;-----------------------------------------------------------------
+  1062                                  ; read character from keyboard and write it to screen
+  1063                                  ;-----------------------------------------------------------------
+  1064                                  
+  1065                                  rw_char:
+  1066                                  		; OUTPUT -> DS:SI = Entered String (ASCIIZ)
+  1067 000006CB BE[C80B]                		mov	si, StartupFile_Name
+  1068 000006CE BB0700                  		mov	bx, 7
+  1069 000006D1 B403                    		mov	ah, 3
+  1070 000006D3 CD10                    		int	10h
+  1071 000006D5 8916[940B]              		mov	[Cursor_Pos], dx
+  1072                                  read_next_char:
+  1073 000006D9 30E4                    		xor	ah, ah
+  1074 000006DB CD16                    		int	16h
+  1075 000006DD 20C0                    		and	al, al
+  1076 000006DF 743B                    		jz	short loc_arrow    
+  1077 000006E1 3CE0                    		cmp	al, 0E0h          
+  1078 000006E3 7437                    		je	short loc_arrow
+  1079 000006E5 3C08                    		cmp	al, 08h
+  1080 000006E7 753F                    		jne	short char_return
+  1081                                  loc_back:
+  1082 000006E9 B307                    		mov	bl, 7
+  1083 000006EB B403                    		mov	ah, 3
+  1084 000006ED CD10                    		int	10h
+  1085 000006EF 3A16[940B]              		cmp	dl, [Cursor_Pos]
+  1086 000006F3 7708                    		ja      short prev_column
+  1087                                  loc_beep:
+  1088 000006F5 B40E                    		mov     ah, 0Eh
+  1089 000006F7 B007                    		mov     al, 7
+  1090 000006F9 CD10                    		int     10h
+  1091 000006FB EBDC                    		jmp     short read_next_char
+  1092                                  prev_column:
+  1093 000006FD FECA                    		dec	dl
+  1094                                  set_cursor_pos:
+  1095 000006FF B402                    		mov	ah, 2
+  1096 00000701 CD10                    		int	10h
+  1097 00000703 88D3                    		mov	bl, dl
+  1098 00000705 2A1E[940B]              		sub	bl, [Cursor_Pos] 
+  1099 00000709 B90100                  		mov	cx, 1
+  1100 0000070C B409                    		mov	ah, 9
+  1101 0000070E B020                    		mov	al, 20h
+  1102 00000710 8800                    		mov	[si+bx], al
+  1103                                  loc_write_it:
+  1104 00000712 B307                    		mov	bl, 7
+  1105 00000714 CD10                    		int	10h
+  1106 00000716 8B16[940B]              		mov	dx, [Cursor_Pos]
+  1107 0000071A EBBD                    		jmp	short read_next_char
+  1108                                  loc_arrow:    
+  1109 0000071C 80FC4B                  		cmp	ah, 4Bh
+  1110 0000071F 74C8                    		je	short loc_back
+  1111 00000721 80FC53                  		cmp	ah, 53h
+  1112 00000724 74C3                    		je	short loc_back
+  1113 00000726 EBB1                    		jmp	short read_next_char
+  1114                                  char_return:
+  1115 00000728 B307                    		mov	bl, 7
+  1116 0000072A B403                    		mov	ah, 3
+  1117 0000072C CD10                    		int	10h
+  1118 0000072E 88D3                    		mov	bl, dl
+  1119 00000730 2A1E[940B]              		sub	bl, [Cursor_Pos] 
+  1120 00000734 3C20                    		cmp	al, 20h
+  1121 00000736 721E                    		jb	short loc_escape
+  1122 00000738 80FB3F                  		cmp	bl, 63
+  1123 0000073B 77B8                    		ja	short loc_beep
+  1124                                  		;cmp	al, 'z'
+  1125                                  		;ja	short read_next_char
+  1126                                  		;cmp	al, 'a'
+  1127                                  		;jb	short pass_capitalize
+  1128                                  		;and	al, 0DFh
+  1129                                  pass_capitalize:
+  1130 0000073D 30E4                    		xor	ah, ah
+  1131 0000073F 8900                    		mov	[si+bx], ax
+  1132 00000741 B40E                    		mov	ah, 0Eh
+  1133 00000743 B307                    		mov	bl, 7
+  1134 00000745 CD10                    		int	10h
+  1135 00000747 EB90                    		jmp	short read_next_char
+  1136                                  pass_escape:
+  1137 00000749 3C0D                    		cmp	al, 0Dh
+  1138 0000074B 758C                    		jne	short read_next_char
+  1139                                  		;mov	bl, 7
+  1140 0000074D B40E                    		mov	ah, 0Eh
+  1141 0000074F CD10                    		int	10h
+  1142 00000751 B00A                    		mov	al, 0Ah
+  1143 00000753 CD10                    		int	10h
+  1144 00000755 C3                      		retn
+  1145                                  loc_escape:
+  1146 00000756 3C1B                    		cmp	al, 1Bh
+  1147 00000758 75EF                    		jne	short pass_escape
+  1148 0000075A F9                      		stc
+  1149 0000075B C3                      		retn
+  1150                                  
+  1151                                  ;-----------------------------------------------------------------
+  1152                                  ; read/load masterboopt sector
+  1153                                  ;-----------------------------------------------------------------
+  1154                                  
+  1155                                  load_masterboot:
+  1156                                  		; input -> dl = drive number
+  1157 0000075C 30E4                    		xor	ah, ah
+  1158 0000075E CD13                    		int	13h
+  1159                                  		;jnc	short pass_reset_error
+  1160 00000760 720E                    		jc	short ret_from_load_mb ; 23/4/2009 FSFDISK.COM
+  1161                                  ;harddisk_error:
+  1162                                  ;		retn
+  1163                                  pass_reset_error:
+  1164 00000762 BB[6910]                		mov	bx, MasterBootBuff
+  1165 00000765 B80102                  		mov	ax, 0201h
+  1166 00000768 B90100                                  mov	cx, 1
+  1167 0000076B 30F6                    		xor	dh, dh
+  1168                                  		;push	ds
+  1169                                  		;pop	es
+  1170 0000076D CD13                    		int	13h
+  1171                                  		;jc	short harddisk_error
+  1172                                  		;cmp	word [MBIDCode],0AA55h ; 23/4/2009 FSFDISK.COM
+  1173                                  		;jne	short loc_not_masterboot
+  1174 0000076F C3                                      retn
+  1175                                  ;loc_not_masterboot:
+  1176                                  ;		stc
+  1177                                  ret_from_load_mb:   ; 23/4/2009 FSFDISK.COM
+  1178 00000770 C3                      		retn
+  1179                                  
+  1180                                  ;-----------------------------------------------------------------
+  1181                                  ; update disk allocation table
+  1182                                  ;-----------------------------------------------------------------
+  1183                                  
+  1184                                  update_dat:
+  1185                                  		; 28/01/2018
+  1186                                  		; 27/01/2018 (bit allocation)
+  1187                                                  ; 20/02/2010 [DAT_Buffer_Offset]
+  1188                                                  ; 13/02/2010
+  1189                                                  ;
+  1190                                                  ; 02/05/2009
+  1191                                                  ; DX:AX = Disk Sector (Beginning Sector, with Descriptor)
+  1192                                                  ; BL = Allocation Type (Identifier)
+  1193                                  		; 27/01/2018	
+  1194                                  		;	BL = 90h --> Deallocation	
+  1195                                  		;	BL <> 90h --> Allocation 
+  1196                                  		;
+  1197 00000771 881E[A10B]                              mov	[DAT_Identifier], bl
+  1198 00000775 B90010                                  mov	cx, 8*512 ; 27/01/2018
+  1199 00000778 E8D703                                  call	Div32
+  1200 0000077B 3916[A50B]                              cmp	[DAT_Buffer_Sector+2], dx
+  1201 0000077F 7531                                    jne	short loc_write_prev_DAT_sector
+  1202 00000781 3906[A30B]                              cmp	[DAT_Buffer_Sector], ax
+  1203 00000785 752B                                    jne	short loc_write_prev_DAT_sector
+  1204                                                  ;mov	byte [DAT_Buffer_Updated], 0                
+  1205                                  loc_update_dat_buffer_x:
+  1206 00000787 56                                      push	si
+  1207 00000788 89DE                                    mov	si, bx	; Bit offset (0 to 4095)	
+  1208 0000078A 88D9                    		mov	cl, bl
+  1209 0000078C 80E107                  		and	cl, 7
+  1210 0000078F B001                    		mov	al, 1
+  1211 00000791 D2E0                    		shl	al, cl
+  1212 00000793 8A1E[A10B]              		mov	bl, [DAT_Identifier]
+  1213 00000797 C1EE03                  		shr	si, 3 ; convert bit offset to byte offset
+  1214 0000079A 81C6[6914]              		add	si, DATBUFFER
+  1215 0000079E 80FB90                  		cmp	bl, 90h ; Deallocation
+  1216 000007A1 7406                    		je	short loc_update_dat_buffer_y ; deallocation
+  1217                                  		; Allocation
+  1218 000007A3 F6D0                    		not	al ; Allocation bit is 0, others are 1
+  1219 000007A5 2004                    		and	[si], al
+  1220 000007A7 EB02                    		jmp	short loc_update_dat_buffer_z		
+  1221                                  loc_update_dat_buffer_y: ; Deallocation
+  1222                                  		; Allocation bit is 1 (free), others are 0
+  1223 000007A9 0804                    		or	[si], al
+  1224                                  loc_update_dat_buffer_z:
+  1225 000007AB C606[A20B]01                            mov	byte [DAT_Buffer_Updated], 1   
+  1226 000007B0 5E                                      pop	si 
+  1227                                  return_from_dat_update:
+  1228 000007B1 C3                                      retn
+  1229                                  loc_write_prev_DAT_sector:
+  1230 000007B2 891E[A70B]                              mov	[DAT_Buffer_Offset], bx ; Bit offset
+  1231 000007B6 803E[A20B]00                            cmp	byte [DAT_Buffer_Updated], 0
+  1232 000007BB 7618                                    jna	short loc_read_DAT_sector
+  1233 000007BD 52                                      push	dx
+  1234 000007BE 50                                      push	ax 
+  1235 000007BF A1[A30B]                                mov	ax, [DAT_Buffer_Sector]
+  1236 000007C2 8B16[A50B]                              mov	dx, [DAT_Buffer_Sector+2]
+  1237 000007C6 E84300                                  call	write_dat_sector
+  1238 000007C9 7308                                    jnc	short loc_read_DAT_sector_pop_ax_dx
+  1239 000007CB 5A                                      pop	dx
+  1240 000007CC 5A                                      pop	dx
+  1241 000007CD 8A1E[A10B]                              mov	bl, [DAT_Identifier]
+  1242 000007D1 EBDE                                    jmp	short return_from_dat_update
+  1243                                  loc_read_DAT_sector_pop_ax_dx:
+  1244 000007D3 58                                      pop	ax
+  1245 000007D4 5A                                      pop	dx
+  1246                                  loc_read_DAT_sector:
+  1247 000007D5 E80800                                  call	load_dat_sector
+  1248 000007D8 72D7                                    jc	short return_from_dat_update 
+  1249 000007DA 8B1E[A70B]              		mov	bx, [DAT_Buffer_Offset] ; Bit offset
+  1250 000007DE EBA7                                    jmp	short loc_update_dat_buffer_x
+  1251                                  
+  1252                                  load_dat_sector:
+  1253                                  		; 13/02/2010
+  1254                                  		; Input ->  ; DX:AX = DAT Sector (Offset)
+  1255                                  		; Output -> clc : load error (err code in al)
+  1256                                  		;           clc -> loading successed
+  1257                                  		; DX:AX = DAT Sector (Offset) Address
+  1258                                  		; BX = DAT Buffer Address
+  1259                                  		; [DAT_Buffer_Sector] is updated
+  1260                                  		;
+  1261 000007E0 52                      		push	dx
+  1262 000007E1 50                      		push	ax
+  1263 000007E2 0306[7112]              		add	ax, [mat_begin_sec]
+  1264 000007E6 1316[7312]              		adc	dx, [mat_begin_sec+2]
+  1265 000007EA 0306[7512]              		add	ax, [mat_dat_lba]
+  1266 000007EE 1316[7712]              		adc	dx, [mat_dat_lba+2]
+  1267 000007F2 BB[6914]                		mov	bx, DATBUFFER               
+  1268 000007F5 E860FE                  		call	disk_read
+  1269 000007F8 7303                    		jnc	short loc_load_DAT_sector_clc
+  1270 000007FA 5A                      		pop	dx
+  1271 000007FB 5A                      		pop	dx
+  1272 000007FC C3                      		retn
+  1273                                  loc_load_DAT_sector_clc:
+  1274 000007FD 58                      		pop	ax
+  1275 000007FE 5A                      		pop	dx
+  1276 000007FF A3[A30B]                		mov	[DAT_Buffer_Sector], ax
+  1277 00000802 8916[A50B]              		mov	[DAT_Buffer_Sector+2], dx
+  1278 00000806 C606[A20B]00            		mov	byte [DAT_Buffer_Updated], 0
+  1279 0000080B C3                      		retn
+  1280                                  
+  1281                                  write_dat_sector:
+  1282                                                  ; 20/02/2010
+  1283                                                  ; Input ->  ; DX:AX = DAT Sector (Offset)
+  1284                                                  ; Output -> clc : write error (err code in al)
+  1285                                                  ;           clc -> write successed
+  1286                                                  ; DX:AX = DAT Sector (Offset) Address
+  1287                                                  ; BX = DAT Buffer Address
+  1288                                  		;
+  1289 0000080C 0306[7112]              		add	ax, [mat_begin_sec]
+  1290 00000810 1316[7312]              		adc	dx, [mat_begin_sec+2]
+  1291 00000814 0306[7512]              		add	ax, [mat_dat_lba]
+  1292 00000818 1316[7712]              		adc	dx, [mat_dat_lba+2]
+  1293 0000081C BB[6914]                		mov	bx, DATBUFFER               
+  1294 0000081F FF16[9A0B]              		call	word [write_sector]
+  1295 00000823 7205                    		jc	short loc_write_DAT_sector_stc_retn
+  1296                                  loc_write_DAT_sector_clc:
+  1297                                  	       ;mov	[DAT_Buffer_Sector], ax
+  1298                                  	       ;mov	[DAT_Buffer_Sector+2], dx
+  1299 00000825 C606[A20B]00                            mov	byte [DAT_Buffer_Updated], 0
+  1300                                  loc_write_DAT_sector_stc_retn:
+  1301 0000082A C3                      		retn
+  1302                                  
+  1303                                  ;-----------------------------------------------------------------
+  1304                                  ; get first free section
+  1305                                  ;-----------------------------------------------------------------
+  1306                                  
+  1307                                  get_first_free_section:
+  1308                                  		; 28/01/2018
+  1309                                  	   	; 27/01/2018
+  1310                                  		; 13/02/2010, 20/02/2010
+  1311                                  		; 31/01/2010, 07/02/2010
+  1312                                  		; INPUT -> DS:SI = FS Boot Sector Buffer
+  1313                                  		;          CX = Sector Count
+  1314                                  		; OUTPUT -> DX:AX = First Free Section
+  1315                                  		;           DS:SI = MAT Sector Buffer
+  1316                                  		;
+  1317 0000082B 890E[A90B]                              mov	[CSectorCount], cx
+  1318 0000082F C706[AB0B]0000                          mov	word [CSCounter], 0 
+  1319 00000835 BB[6912]                                mov	bx, MATBUFFER
+  1320 00000838 813F4D41                                cmp	word [bx], 'MA'
+  1321 0000083C 7506                                    jne	short loc_gfss_load_MAT
+  1322 0000083E 807F0254                                cmp	byte [bx+2], 'T'
+  1323 00000842 7421                                    je	short loc_check_MAT_sign_ok
+  1324                                  loc_gfss_load_MAT:
+  1325 00000844 8B4418                   		mov	ax, [si+bsMATLocation]
+  1326 00000847 8B541A                                  mov	dx, [si+bsMATLocation+2]
+  1327 0000084A 0306[8C0B]                              add	ax, [fsBootSector]
+  1328 0000084E 1316[8E0B]                              adc	dx, [fsBootSector+2]
+  1329 00000852 89DE                                    mov	si, bx ; MATBUFFER
+  1330 00000854 E801FE                                  call	disk_read
+  1331 00000857 7248                                    jc	short loc_gffs_stc_retn
+  1332                                  loc_check_MAT_sign:
+  1333                                                 ;mov	si, MATBUFFER
+  1334 00000859 813C4D41                                cmp	word [si], 'MA'
+  1335 0000085D 753F                                    jne	loc_not_valid_fs_mat
+  1336 0000085F 807C0254                                cmp	byte [si+2], 'T'
+  1337 00000863 7539                                    jne	short loc_not_valid_fs_mat
+  1338                                  loc_check_MAT_sign_ok:             
+  1339 00000865 8B4410                                  mov	ax, [si+MAT_SectorCount]
+  1340 00000868 8B5412                                  mov	dx, [si+MAT_SectorCount+2]
+  1341 0000086B 83E801                                  sub	ax, 1
+  1342 0000086E 83DA00                                  sbb	dx, 0
+  1343 00000871 A3[AD0B]                                mov	[DAT_LastSector], ax
+  1344 00000874 8916[AF0B]                              mov	[DAT_LastSector+2], dx
+  1345 00000878 8B4418                                  mov	ax, [si+MAT_FirstFreeSector]
+  1346 0000087B 8B541A                                  mov	dx, [si+MAT_FirstFreeSector+2]
+  1347                                  		; 28/01/2018
+  1348 0000087E B9FFFF                  		mov	cx, 0FFFFh
+  1349 00000881 39C8                    		cmp	ax, cx
+  1350 00000883 7509                    		jne	short loc_check_MAT_valid_ok
+  1351 00000885 39CA                    		cmp	dx, cx
+  1352 00000887 7505                    		jne	short loc_check_MAT_valid_ok
+  1353 00000889 31D2                    		xor	dx, dx
+  1354 0000088B B80100                  		mov	ax, 1 ; BS+14
+  1355                                  loc_check_MAT_valid_ok:   		
+  1356 0000088E A3[B50B]                                mov	[Current_FS_Sector], ax
+  1357 00000891 8916[B70B]                              mov	[Current_FS_Sector+2], dx
+  1358 00000895 A3[B10B]                                mov	[CFDT_Address], ax
+  1359 00000898 8916[B30B]                              mov	[CFDT_Address+2], dx
+  1360 0000089C EB07                                   	jmp	short loc_gffs_load_dat_sector
+  1361                                  loc_not_valid_fs_mat:
+  1362 0000089E B80B00                                  mov	ax, 0Bh ; Invalid Format 
+  1363                                  loc_gffs_stc_retn:
+  1364 000008A1 31C9                                    xor	cx, cx
+  1365 000008A3 F9                                      stc 
+  1366 000008A4 C3                                      retn
+  1367                                  loc_gffs_load_dat_sector:
+  1368 000008A5 B90010                                  mov	cx, 8*512 ; 27/01/2018
+  1369 000008A8 E8A702                                  call	Div32
+  1370 000008AB 89DE                    		mov	si, bx ; 27/01/2018
+  1371 000008AD 3B16[AF0B]                              cmp	dx, [DAT_LastSector+2]
+  1372 000008B1 0F878600                                ja	loc_gffs_end_of_DAT_sectors
+  1373 000008B5 7206                                    jb	short pass_gffs_check_scount_ax
+  1374 000008B7 3B06[AD0B]                              cmp	ax, [DAT_LastSector]
+  1375 000008BB 777E                                    ja	short loc_gffs_end_of_DAT_sectors
+  1376                                  pass_gffs_check_scount_ax:                 
+  1377 000008BD E820FF                                  call	load_dat_sector
+  1378 000008C0 72DF                                    jc	short loc_gffs_stc_retn
+  1379                                  loc_gffs_check_dat_cell_value:
+  1380                                  		; 27/01/2018
+  1381 000008C2 89F3                    		mov	bx, si
+  1382 000008C4 88D9                    		mov	cl, bl
+  1383 000008C6 C1EB03                  		shr	bx, 3  ; convert bit offset to byte offset
+  1384 000008C9 81C3[6914]              		add	bx, DATBUFFER
+  1385 000008CD 80E107                  		and	cl, 7
+  1386 000008D0 B001                    		mov	al, 1
+  1387 000008D2 D2E0                    		shl	al, cl ; bit position in allocation byte
+  1388 000008D4 8407                                    test	[bx], al ; test allocation bit (1 = free)
+  1389 000008D6 7546                                    jnz	short loc_gffs_inc_cscounter
+  1390 000008D8 8B0E[AB0B]                              mov	cx, [CSCounter]
+  1391 000008DC 3B0E[BD0B]                              cmp	cx, [CSCounter_MAX]
+  1392 000008E0 7612                                    jna	short pass_gffs_update_cscounter_max
+  1393 000008E2 890E[BD0B]                              mov	[CSCounter_MAX], cx
+  1394 000008E6 A1[B10B]                                mov	ax, [CFDT_Address]
+  1395 000008E9 8B16[B30B]                              mov	dx, [CFDT_Address+2]
+  1396 000008ED A3[B90B]                                mov	[CFDT_Address_MAX], ax
+  1397 000008F0 8916[BB0B]                              mov	[CFDT_Address_MAX+2], dx 
+  1398                                  pass_gffs_update_cscounter_max:
+  1399 000008F4 C706[AB0B]0000                          mov	word [CSCounter], 0
+  1400 000008FA A1[B50B]                                mov	ax, [Current_FS_Sector]
+  1401 000008FD 8B16[B70B]                              mov	dx, [Current_FS_Sector+2]
+  1402 00000901 83C001                                  add	ax, 1
+  1403 00000904 83D200                                  adc	dx, 0
+  1404 00000907 A3[B10B]                                mov	[CFDT_Address], ax
+  1405 0000090A 8916[B30B]                              mov	[CFDT_Address+2], dx
+  1406                                  loc_gffs_check_cfs:
+  1407 0000090E A3[B50B]                                mov	[Current_FS_Sector], ax
+  1408 00000911 8916[B70B]                              mov	[Current_FS_Sector+2], dx
+  1409 00000915 46                                      inc	si
+  1410                                  		; 27/01/2018
+  1411 00000916 81FE0010                		cmp	si, 8*512
+  1412 0000091A 72A6                    		jb	short loc_gffs_check_dat_cell_value
+  1413 0000091C EB87                    		jmp	short loc_gffs_load_dat_sector
+  1414                                  loc_gffs_inc_cscounter:
+  1415 0000091E FF06[AB0B]                              inc	word [CSCounter]
+  1416 00000922 8B0E[AB0B]                              mov	cx, [CSCounter]
+  1417 00000926 3B0E[A90B]                              cmp	cx, [CSectorCount]
+  1418 0000092A 7333                                    jnb	short loc_gffs_return_ffs
+  1419 0000092C A1[B50B]                                mov	ax, [Current_FS_Sector]
+  1420 0000092F 8B16[B70B]                              mov	dx, [Current_FS_Sector+2]
+  1421 00000933 83C001                                  add	ax, 1
+  1422 00000936 83D200                                  adc	dx, 0
+  1423 00000939 EBD3                                    jmp	short loc_gffs_check_cfs
+  1424                                  loc_gffs_end_of_DAT_sectors:
+  1425 0000093B 8B0E[AB0B]                              mov	cx, [CSCounter]
+  1426                                                 ;cmp	cx, [CSectorCount]
+  1427                                                 ;jnb	short loc_gffs_return_ffs
+  1428 0000093F BE[6912]                		mov	si, MATBUFFER
+  1429 00000942 390E[BD0B]                              cmp	[CSCounter_MAX], cx
+  1430 00000946 721A                                    jb	short loc_gffs_end_of_DAT_sectors_stc
+  1431 00000948 8B0E[BD0B]                              mov	cx, [CSCounter_MAX]
+  1432 0000094C 09C9                                    or	cx, cx
+  1433 0000094E 7506                                    jnz	short pass_gffs_reset_CFDT_address
+  1434 00000950 89C8                                    mov	ax, cx
+  1435 00000952 89CA                                    mov	dx, cx
+  1436 00000954 F9                                      stc
+  1437 00000955 C3                                      retn
+  1438                                  pass_gffs_reset_CFDT_address: 
+  1439 00000956 A1[B90B]                 		mov	ax, [CFDT_Address_MAX]
+  1440 00000959 8B16[BB0B]                              mov	dx, [CFDT_Address_MAX+2]
+  1441 0000095D F9                                      stc
+  1442 0000095E C3                                      retn
+  1443                                  loc_gffs_return_ffs:
+  1444 0000095F BE[6912]                                mov	si, MATBUFFER
+  1445                                  loc_gffs_end_of_DAT_sectors_stc: 
+  1446 00000962 A1[B10B]                                mov	ax, [CFDT_Address]
+  1447 00000965 8B16[B30B]                              mov	dx, [CFDT_Address+2]
+  1448 00000969 C3                                      retn
+  1449                                  
+  1450                                  ;-----------------------------------------------------------------
+  1451                                  ; delete current startup file
+  1452                                  ;-----------------------------------------------------------------
+  1453                                  
+  1454                                  delete_fs_startupfile:
+  1455                                  		; 13/02/2010
+  1456                                  		; 09/02/2010
+  1457                                  		; 07/02/2010
+  1458                                  		; INPUT -> DS:SI = FS Boot Sector Buffer
+  1459                                  		; OUTPUT -> CLC = No error
+  1460 0000096A 8B4418                  		mov	ax, [si+bsMATLocation]
+  1461 0000096D 8B541A                                  mov	dx, [si+bsMATLocation+2]
+  1462 00000970 0306[8C0B]                              add	ax, [fsBootSector]
+  1463 00000974 1316[8E0B]                              adc	dx, [fsBootSector+2]
+  1464 00000978 A3[C30B]                                mov	[CSFS_MAT_Address], ax
+  1465 0000097B 8916[C50B]                              mov	[CSFS_MAT_Address+2], dx
+  1466 0000097F BB[6912]                                mov	bx, MATBUFFER
+  1467 00000982 E8D3FC                                  call	disk_read
+  1468 00000985 724D                                    jc	short loc_delfs_stc_retn
+  1469                                  loc_delsf_check_MAT_sign:
+  1470 00000987 BE[6912]                                mov	si, MATBUFFER
+  1471 0000098A 813C4D41                                cmp	word [si], 'MA'
+  1472 0000098E 0F850CFF                                jne	loc_not_valid_fs_mat
+  1473 00000992 807C0254                                cmp	byte [si+2], 'T'
+  1474 00000996 0F8504FF                                jne	loc_not_valid_fs_mat
+  1475                                  loc_delsf_read_SF_FDT:
+  1476 0000099A A1[900B]                                mov	ax, [StartupFile_FDT]
+  1477 0000099D 8B16[920B]                              mov	dx, [StartupFile_FDT+2]
+  1478 000009A1 0306[8C0B]                              add	ax, [fsBootSector]
+  1479 000009A5 1316[8E0B]                              adc	dx, [fsBootSector+2]
+  1480 000009A9 BB[6918]                                mov	bx, SECBUFFER
+  1481 000009AC E8A9FC                                  call	disk_read
+  1482 000009AF 7223                                    jc	short loc_delfs_stc_retn 
+  1483                                  loc_check_FDT_sign:
+  1484 000009B1 BE[6918]                                mov	si, SECBUFFER
+  1485 000009B4 813C4644                                cmp	word [si], 'FD'
+  1486 000009B8 7516                                    jne	short loc_delsf_not_valid_fs_fdt
+  1487 000009BA 807C0254                                cmp	byte [si+2], 'T'
+  1488 000009BE 7510                                    jne	short loc_delsf_not_valid_fs_fdt
+  1489 000009C0 8B4410                                  mov	ax, [si+fdtSectorCount]
+  1490 000009C3 8B5412                                  mov	dx, [si+fdtSectorCount+2]
+  1491 000009C6 83C001                                  add	ax, 1
+  1492 000009C9 83D200                                  adc	dx, 0
+  1493 000009CC 09D2                                    or	dx, dx
+  1494 000009CE 7405                                    jz	short loc_delsf_save_csfs_sectorcount
+  1495                                  loc_delsf_not_valid_fs_fdt:
+  1496                                  loc_delsf_invalid_format:
+  1497 000009D0 B80B00                                  mov	ax, 0Bh ; Invalid format
+  1498 000009D3 F9                                      stc
+  1499                                  loc_delfs_stc_retn:
+  1500 000009D4 C3                                      retn
+  1501                                  loc_delsf_save_csfs_sectorcount:                 
+  1502 000009D5 A3[BF0B]                                mov	[CSFS_SectorCount], ax  
+  1503 000009D8 8916[C10B]                              mov	[CSFS_SectorCount+2], dx
+  1504                                  loc_delsf_set_fdt_deleted_sign:
+  1505 000009DC C6440245                                mov	byte [si+2], 'E'
+  1506 000009E0 A1[7112]                                mov	ax, [mat_begin_sec]
+  1507 000009E3 8B16[7312]                              mov	dx, [mat_begin_sec+2]
+  1508 000009E7 0306[900B]                              add	ax, [StartupFile_FDT]
+  1509 000009EB 1316[920B]                              adc	dx, [StartupFile_FDT+2]  
+  1510 000009EF BB[6918]                                mov	bx, SECBUFFER               
+  1511 000009F2 FF16[9A0B]                              call	word [write_sector]
+  1512 000009F6 72DC                                    jc	short loc_delfs_stc_retn
+  1513                                  loc_delsf_update_DAT:
+  1514 000009F8 31C0                                    xor	ax, ax
+  1515 000009FA 31D2                                    xor	dx, dx 
+  1516 000009FC E8E1FD                                  call	load_dat_sector
+  1517 000009FF 72D3                                    jc	short loc_delfs_stc_retn
+  1518                                  
+  1519 00000A01 B390                                    mov	bl, 90h ; Free Sector sign
+  1520 00000A03 8B0E[BF0B]                              mov	cx, [CSFS_SectorCount]
+  1521 00000A07 09C9                                    or	cx, cx 
+  1522 00000A09 74C5                                    jz	short loc_delsf_not_valid_fs_fdt
+  1523 00000A0B A1[900B]                                mov	ax, [StartupFile_FDT]
+  1524 00000A0E 8B16[920B]                              mov	dx, [StartupFile_FDT+2]
+  1525                                  loc_delsf_update_DAT_loop:
+  1526 00000A12 52                                      push	dx
+  1527 00000A13 50                                      push	ax
+  1528 00000A14 51                                      push	cx 
+  1529 00000A15 E859FD                                  call	update_dat
+  1530 00000A18 59                                      pop	cx
+  1531 00000A19 7304                                    jnc	short loc_delsf_update_DAT_loop_next
+  1532 00000A1B 5A                                      pop	dx ; pushed ax
+  1533 00000A1C 5A                                      pop	dx
+  1534 00000A1D EBB5                                    jmp	short loc_delfs_stc_retn
+  1535                                  loc_delsf_update_DAT_loop_next:
+  1536 00000A1F 58                                      pop	ax
+  1537 00000A20 5A                                      pop	dx 
+  1538 00000A21 83C001                                  add	ax, 1
+  1539 00000A24 83D200                                  adc	dx, 0
+  1540 00000A27 E2E9                                    loop	loc_delsf_update_DAT_loop
+  1541                                  
+  1542 00000A29 803E[A20B]00                            cmp	byte [DAT_Buffer_Updated], 0 
+  1543 00000A2E 760C                                    jna	short loc_delfs_update_MAT
+  1544                                                         
+  1545 00000A30 A1[A30B]                                mov	ax, [DAT_Buffer_Sector]
+  1546 00000A33 8B16[A50B]                              mov	dx, [DAT_Buffer_Sector+2]
+  1547 00000A37 E8D2FD                                  call	write_dat_sector
+  1548 00000A3A 7298                                    jc	short loc_delfs_stc_retn
+  1549                                  loc_delfs_update_MAT:
+  1550 00000A3C A1[900B]                                mov	ax, [StartupFile_FDT]
+  1551 00000A3F 8B16[920B]                              mov	dx, [StartupFile_FDT+2]
+  1552 00000A43 3B16[8312]                              cmp	dx, [mat_dat_ffs+2]
+  1553 00000A47 770F                                    ja	short pass_delfs_update_MAT_ffs
+  1554 00000A49 7206                                    jb	short loc_delfs_update_MAT_ffs
+  1555 00000A4B 3B06[8112]                              cmp	ax, [mat_dat_ffs]
+  1556 00000A4F 7307                                    jnb	short pass_delfs_update_MAT_ffs
+  1557                                  loc_delfs_update_MAT_ffs:
+  1558 00000A51 A3[8112]                		mov	[mat_dat_ffs], ax
+  1559 00000A54 8916[8312]                              mov	[mat_dat_ffs+2], dx
+  1560                                  pass_delfs_update_MAT_ffs:
+  1561 00000A58 A1[BF0B]                                mov	ax, [CSFS_SectorCount]  
+  1562 00000A5B 8B16[C10B]                              mov	dx, [CSFS_SectorCount+2]
+  1563 00000A5F 0106[7D12]                              add	[mat_dat_free_s], ax
+  1564 00000A63 1116[7F12]                              adc	[mat_dat_free_s+2], dx
+  1565                                  
+  1566 00000A67 A1[C30B]                                mov	ax, [CSFS_MAT_Address]
+  1567 00000A6A 8B16[C50B]                              mov	dx, [CSFS_MAT_Address+2]
+  1568 00000A6E BB[6912]                                mov	bx, MATBUFFER               
+  1569 00000A71 FF16[9A0B]                              call	word [write_sector]
+  1570 00000A75 7301                                    jnc	short loc_reset_fsbs_sf_pointers
+  1571 00000A77 C3                                      retn 
+  1572                                  loc_reset_fsbs_sf_pointers:
+  1573 00000A78 31C0                                    xor	ax, ax
+  1574 00000A7A 31D2                                    xor	dx, dx
+  1575                                                  ; 27/01/2018
+  1576 00000A7C BB[6910]                		mov	bx, BSBUFFER
+  1577 00000A7F 894714                  		mov	[bx+bsStartupFD], ax
+  1578 00000A82 895716                   		mov	[bx+bsStartupFD+2], dx 
+  1579 00000A85 A3[900B]                                mov	[StartupFile_FDT], ax
+  1580 00000A88 8916[920B]                              mov	[StartupFile_FDT+2], dx
+  1581 00000A8C A1[8C0B]                   		mov	ax, [fsBootSector]
+  1582 00000A8F 8B16[8E0B]                              mov	dx, [fsBootSector+2]
+  1583 00000A93 FF16[9A0B]                              call	word [write_sector]
+  1584 00000A97 C3                                      retn
+  1585                                  
+  1586                                  display_startupfile_info:
+  1587                                  		; 01/02/2010
+  1588 00000A98 E8C400                  		call 	clear_screen
+  1589 00000A9B A1[900B]                                mov	ax, [StartupFile_FDT]
+  1590 00000A9E 8B16[920B]                              mov	dx, [StartupFile_FDT+2]
+  1591 00000AA2 0306[8C0B]                              add	ax, [fsBootSector]
+  1592 00000AA6 1316[8E0B]                              adc	dx, [fsBootSector+2]
+  1593 00000AAA BB[6918]                                mov	bx, SECBUFFER
+  1594 00000AAD E8A8FB                                  call	disk_read
+  1595 00000AB0 7301                                    jnc	short loc_pdsf_check_FDT_sign
+  1596 00000AB2 C3                                      retn  
+  1597                                  loc_pdsf_check_FDT_sign:
+  1598 00000AB3 BE[6918]                                mov	si, SECBUFFER
+  1599 00000AB6 813C4644                                cmp	word [si], 'FD'
+  1600 00000ABA 754A                                    jne	short loc_pdsf_not_valid_FDT
+  1601 00000ABC 83C602                                  add	si, 2
+  1602 00000ABF 803C54                                  cmp	byte [si], 'T'
+  1603 00000AC2 7542                                    jne	short loc_pdsf_not_valid_FDT
+  1604                                  loc_pdsf_print_fshd_name:
+  1605 00000AC4 803E[9C0B]80                            cmp	byte [PhysicalDriveNumber], 80h
+  1606 00000AC9 7208                                    jb	short loc_pdsf_print_fsfd_name
+  1607 00000ACB BE[660E]                                mov	si, SINGLIX_HD_Name
+  1608 00000ACE E81DFB                                  call	print_msg
+  1609 00000AD1 EB06                                    jmp	short loc_pdsf_print_sfn
+  1610                                  loc_pdsf_print_fsfd_name:
+  1611 00000AD3 BE[780E]                                mov	si, SINGLIX_FD_Name
+  1612 00000AD6 E815FB                                  call	print_msg
+  1613                                  loc_pdsf_print_sfn:
+  1614 00000AD9 BE[460F]                                mov	si, Msg_StartupFile_Name
+  1615 00000ADC E80FFB                                  call	print_msg
+  1616 00000ADF BE[6918]                                mov	si, SECBUFFER
+  1617 00000AE2 56                                      push	si
+  1618 00000AE3 83C640                                  add	si, fdtFileName
+  1619 00000AE6 E805FB                                  call	print_msg
+  1620 00000AE9 5E                                      pop	si
+  1621 00000AEA 83C61C                                  add	si, fdtFileSize
+  1622 00000AED 8B04                                    mov	ax, [si]
+  1623 00000AEF 8B5402                                  mov	dx, [si+2]
+  1624                                  		;mov	si, Decimal_Str
+  1625 00000AF2 E8CAFA                                  call	bin_to_decimal 
+  1626 00000AF5 BE[6B1A]                                mov	si, Str_startup_file_size
+  1627 00000AF8 E8F3FA                                  call	print_msg
+  1628 00000AFB BE[8B1A]                		mov	si, Decimal_Str
+  1629                                  loc_pdsf_print_sfs_loop:
+  1630 00000AFE 803C30                                  cmp	byte [si], '0'
+  1631 00000B01 7508                                    jne	short loc_pdsf_print_sfs
+  1632 00000B03 46                                      inc	si
+  1633 00000B04 EBF8                                    jmp	short loc_pdsf_print_sfs_loop
+  1634                                  loc_pdsf_not_valid_FDT:
+  1635 00000B06 B80B00                                  mov	ax, 0Bh ; Invalid Format 
+  1636 00000B09 F9                                      stc
+  1637 00000B0A C3                                      retn
+  1638                                  loc_pdsf_print_sfs:
+  1639 00000B0B E8E0FA                                  call	print_msg
+  1640 00000B0E BE[841A]                                mov	si, Str_Bytes	
+  1641 00000B11 E8DAFA                                  call	print_msg
+  1642                                  loc_pdsf_print_sfdatetime:                
+  1643                                                  ; 13/02/2010
+  1644 00000B14 BE[951A]                                mov	si, Str_startup_file_date_time
+  1645 00000B17 E8D4FA                                  call	print_msg
+  1646 00000B1A BE[6918]                		mov	si, SECBUFFER
+  1647 00000B1D 83C638                                  add	si, fdtLMDate
+  1648                                                  ;mov	al, [si]
+  1649 00000B20 AC                                      lodsb ; 27/01/2018
+  1650 00000B21 E85000                  		call	bin_to_hex
+  1651 00000B24 A3[B21A]                                mov	[Sf_Year_Str], ax
+  1652                                                  ;inc	si
+  1653                                                  ;mov	al, [si]
+  1654 00000B27 AC                                      lodsb
+  1655 00000B28 E84900                  		call	bin_to_hex
+  1656 00000B2B A3[B41A]                                mov	[Sf_Year_Str+2], ax
+  1657                                   		;inc	si
+  1658                                  		;mov	al, [si]
+  1659 00000B2E AC                                      lodsb
+  1660 00000B2F E84200                  		call	bin_to_hex
+  1661 00000B32 A3[AF1A]                 		mov	[Sf_Month_Str], ax 
+  1662                                                  ;inc	si
+  1663                                  		;mov	al, [si]
+  1664 00000B35 AC                                      lodsb
+  1665 00000B36 E83B00                  		call	bin_to_hex
+  1666 00000B39 A3[AC1A]                 		mov	[Sf_Day_Str], ax
+  1667                                                  ;inc	si
+  1668                                                  ;mov	al, [si]
+  1669 00000B3C AC                                      lodsb
+  1670 00000B3D E83400                  		call	bin_to_hex       
+  1671 00000B40 A3[B81A]                		mov	[Sf_Hour_Str], ax
+  1672                                   		;inc	si
+  1673 00000B43 8A04                    		mov	al, [si]
+  1674 00000B45 E82C00                                  call	bin_to_hex
+  1675 00000B48 A3[BB1A]                		mov	[Sf_Minute_Str], ax                
+  1676 00000B4B BE[AC1A]                		mov	si, Sf_Date_Time_Str
+  1677 00000B4E E89DFA                                  call	print_msg              
+  1678 00000B51 C3                                 	retn  
+  1679                                  
+  1680                                  ;------------------------------------------------------------;
+  1681                                  ; RXDOS  32 bit Divide                                       ;
+  1682                                  ; (Special version by Erdogan Tan)                           ;
+  1683                                  ;------------------------------------------------------------;
+  1684                                  ;                                                            ;
+  1685                                  ; input -> DX_AX = 32 bit dividend                           ;
+  1686                                  ; input -> CX = 16 bit divisor                               ;
+  1687                                  ; output -> DX_AX = 32 bit quotient                          ;
+  1688                                  ; output -> BX = 16 bit remainder                            ;
+  1689                                  ;                                                            ;
+  1690                                  ;  This procedure divides the requested 32 bit number        ;
+  1691                                  ;  and gives the result in DX, AX and BX (remainder)         ;
+  1692                                  ;                                                            ;
+  1693                                  ; Original Procedure by Michael Podanoffsky / Real Time DOS  ;
+  1694                                  ; Erdogan TAN - 1999                        [ RXDOSBIO.ASM ] ;
+  1695                                  ;------------------------------------------------------------;
+  1696                                  
+  1697                                  Div32:
+  1698 00000B52 89D3                    		mov	bx, dx
+  1699 00000B54 93                      		xchg	ax, bx
+  1700 00000B55 31D2                    		xor	dx, dx
+  1701 00000B57 F7F1                    		div	cx	; at first, divide DX
+  1702 00000B59 93                      		xchg	ax, bx	; remainder is in DX
+  1703                                  				; now, BX has quotient
+  1704                                  				; save remainder
+  1705 00000B5A F7F1                    		div	cx 	; so, DX_AX divided and
+  1706                                  				; AX has quotient
+  1707                                  				; DX has remainder
+  1708 00000B5C 87D3                    		xchg	dx, bx	; finally, BX has remainder
+  1709                                  
+  1710 00000B5E C3                      		retn
+  1711                                  
+  1712                                  clear_screen:	;21/09/2009
+  1713 00000B5F B80006                  		mov	ax, 0600h
+  1714 00000B62 B707                    		mov	bh, 7
+  1715 00000B64 31C9                    		xor	cx, cx
+  1716 00000B66 BA4F18                  		mov	dx, 184Fh
+  1717 00000B69 CD10                    		int	10h
+  1718 00000B6B B402                    		mov	ah, 2
+  1719 00000B6D 30FF                    		xor	bh, bh
+  1720 00000B6F 31D2                    		xor	dx, dx
+  1721 00000B71 CD10                    		int	10h
+  1722                                  
+  1723                                                 ;2004-2005
+  1724                                                 ;mov	ah, 0Fh 
+  1725                                                 ;int	10h
+  1726                                                 ;mov	ah, 0
+  1727                                                 ;int	10h
+  1728                                  
+  1729 00000B73 C3                                      retn
+  1730                                  
+  1731                                  ;------------------------------------------------------------;
+  1732                                  ; From binary (byte) to hexadecimal (character) converter    ;
+  1733                                  ;                                                            ;
+  1734                                  ; input -> AL = byte (binary number) to be converted         ;
+  1735                                  ; output -> AH = First character of hexadecimal number       ;
+  1736                                  ; output -> AL = Second character of hexadecimal number      ;
+  1737                                  ;------------------------------------------------------------;
+  1738                                  ; Erdogan Tan - 1998, 1999
+  1739                                  
+  1740                                  bin_to_hex:
+  1741 00000B74 D410                    		db	0D4h, 10h	; Undocumented inst. AAM
+  1742                                  					; AH = AL / 10h
+  1743                                  					; AL = AL MOD 10h
+  1744 00000B76 0D3030                  		or	ax, '00'	; Make it ZERO (ASCII) based
+  1745                                  
+  1746 00000B79 86E0                                    xchg	ah, al 
+  1747                                  ; 1999
+  1748 00000B7B 3C39                    		cmp	al, '9'
+  1749 00000B7D 7602                    		jna	short pass_cc_al
+  1750 00000B7F 0407                    		add	al, 7
+  1751                                  pass_cc_al:
+  1752 00000B81 80FC39                  		cmp	ah, '9'
+  1753 00000B84 7603                    		jna	short pass_cc_ah
+  1754 00000B86 80C407                  		add	ah, 7
+  1755                                  pass_cc_ah:
+  1756                                  ; 1998
+  1757 00000B89 C3                      		retn
+  1758                                  
+  1759                                  ;-----------------------------------------------------------------
+  1760                                  ;  DATA
+  1761                                  ;-----------------------------------------------------------------
+  1762                                  
+  1763 00000B8A 0000                    FileHandle:	dw 0
+  1764 00000B8C 00000000                fsBootSector:	dd 0
+  1765 00000B90 00000000                StartupFile_FDT: dd 0
+  1766                                  
+  1767 00000B94 0000                    Cursor_Pos:	dw 0
+  1768 00000B96 0000                    Cursor_Type:	dw 0
+  1769                                  
+  1770 00000B98 0000                    read_sector:	dw 0
+  1771 00000B9A 0000                    write_sector:	dw 0
+  1772                                  
+  1773 00000B9C 00                      PhysicalDriveNumber: db 0
+  1774 00000B9D 0000                    Physical_Disk_Heads: dw 0
+  1775 00000B9F 0000                    Physical_Disk_SecPerTrack: dw 0
+  1776                                  
+  1777                                  ;DAT_Buffer_Drv: db 0
+  1778 00000BA1 00                      DAT_Identifier:	db 0
+  1779 00000BA2 00                      DAT_Buffer_Updated: db 0
+  1780 00000BA3 00000000                DAT_Buffer_Sector: dd 0
+  1781 00000BA7 0000                    DAT_Buffer_Offset: dw 0
+  1782                                  
+  1783 00000BA9 0000                    CSectorCount:	dw 0
+  1784 00000BAB 0000                    CSCounter:	dw 0
+  1785 00000BAD 00000000                DAT_LastSector: dd 0
+  1786 00000BB1 00000000                CFDT_Address:	dd 0
+  1787 00000BB5 00000000                Current_FS_Sector: dd 0
+  1788 00000BB9 00000000                CFDT_Address_MAX: dd 0
+  1789 00000BBD 0000                    CSCounter_MAX:	dw 0
+  1790                                  
+  1791 00000BBF 00000000                CSFS_SectorCount: dd 0
+  1792 00000BC3 00000000                CSFS_MAT_Address: dd 0   
+  1793                                  
+  1794 00000BC7 00                      LBA_Ready: db 0
+  1795                                  
+  1796 00000BC8 00<rept>                StartupFile_Name: times 66 db 0
+  1797                                  
+  1798                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  1799                                  ;  messages
+  1800                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  1801                                  
+  1802                                  SINGLIX_Welcome:
+  1803 00000C0A 0D0A                                    db 0Dh, 0Ah
+  1804 00000C0C 54522D53494E474C49-                     db 'TR-SINGLIX FS1 Startup File Configuration Utility'
+  1804 00000C15 582046533120537461-
+  1804 00000C1E 727475702046696C65-
+  1804 00000C27 20436F6E6669677572-
+  1804 00000C30 6174696F6E20557469-
+  1804 00000C39 6C697479           
+  1805 00000C3D 0D0A                                    db 0Dh, 0Ah
+  1806 00000C3F 76322E302E32383031-                     db 'v2.0.280118  (c) Erdogan TAN 2010-2018'
+  1806 00000C48 313820202863292045-
+  1806 00000C51 72646F67616E205441-
+  1806 00000C5A 4E20323031302D3230-
+  1806 00000C63 3138               
+  1807 00000C65 0D0A                                    db 0Dh,0Ah
+  1808 00000C67 0D0A                                    db 0Dh,0Ah
+  1809 00000C69 55736167653A20626F-                     db 'Usage: bootfile [Drive] '
+  1809 00000C72 6F7466696C65205B44-
+  1809 00000C7B 726976655D20       
+  1810 00000C81 0D0A                                    db 0Dh,0Ah
+  1811 00000C83 0D0A                                    db 0Dh,0Ah
+  1812 00000C85 4472697665206E616D-                     db "Drive names:"
+  1812 00000C8E 65733A             
+  1813 00000C91 0D0A                                    db 0Dh,0Ah
+  1814 00000C93 0D0A                                    db 0Dh,0Ah
+  1815 00000C95 666430202020202028-                     db "fd0     (Floppy Disk 1, A:)", 0Dh, 0Ah
+  1815 00000C9E 466C6F707079204469-
+  1815 00000CA7 736B20312C20413A29-
+  1815 00000CB0 0D0A               
+  1816 00000CB2 666431202020202028-                     db "fd1     (Floppy Disk 2, B:)", 0Dh, 0Ah
+  1816 00000CBB 466C6F707079204469-
+  1816 00000CC4 736B20322C20423A29-
+  1816 00000CCD 0D0A               
+  1817 00000CCF 0D0A                                    db 0Dh, 0Ah
+  1818 00000CD1 686430312020202028-                     db "hd01    (Hard Disk 1, partition 1)", 0Dh, 0Ah
+  1818 00000CDA 48617264204469736B-
+  1818 00000CE3 20312C207061727469-
+  1818 00000CEC 74696F6E2031290D0A 
+  1819 00000CF5 686430322020202028-                     db "hd02    (Hard Disk 1, partition 2)", 0Dh, 0Ah
+  1819 00000CFE 48617264204469736B-
+  1819 00000D07 20312C207061727469-
+  1819 00000D10 74696F6E2032290D0A 
+  1820 00000D19 2E2E2E0D0A                              db "...", 0Dh, 0Ah
+  1821 00000D1E 686431312020202028-                     db "hd11    (Hard Disk 2, partition 1)", 0Dh, 0Ah
+  1821 00000D27 48617264204469736B-
+  1821 00000D30 20322C207061727469-
+  1821 00000D39 74696F6E2031290D0A 
+  1822 00000D42 2E2E2E0D0A                              db "...", 0Dh, 0Ah
+  1823 00000D47 686433342020202028-                     db "hd34    (Hard Disk 4, partition 4)", 0Dh, 0Ah
+  1823 00000D50 48617264204469736B-
+  1823 00000D59 20342C207061727469-
+  1823 00000D62 74696F6E2034290D0A 
+  1824 00000D6B 0D0A                                    db 0Dh, 0Ah
+  1825 00000D6D 686430662020202028-                     db "hd0f    (Hard Disk 1, the first fs partition)", 0Dh, 0Ah
+  1825 00000D76 48617264204469736B-
+  1825 00000D7F 20312C207468652066-
+  1825 00000D88 697273742066732070-
+  1825 00000D91 6172746974696F6E29-
+  1825 00000D9A 0D0A               
+  1826 00000D9C 686430732020202028-                     db "hd0s    (Hard Disk 1, the second fs partition)", 0Dh, 0Ah
+  1826 00000DA5 48617264204469736B-
+  1826 00000DAE 20312C207468652073-
+  1826 00000DB7 65636F6E6420667320-
+  1826 00000DC0 706172746974696F6E-
+  1826 00000DC9 290D0A             
+  1827 00000DCC 2E2E2E0D0A                              db "...", 0Dh, 0Ah
+  1828 00000DD1 686433662020202028-                     db "hd3f    (Hard Disk 4, the first fs partition)", 0Dh, 0Ah
+  1828 00000DDA 48617264204469736B-
+  1828 00000DE3 20342C207468652066-
+  1828 00000DEC 697273742066732070-
+  1828 00000DF5 6172746974696F6E29-
+  1828 00000DFE 0D0A               
+  1829 00000E00 686433732020202028-                     db "hd3s    (Hard Disk 4, the second fs partition)", 0Dh, 0Ah
+  1829 00000E09 48617264204469736B-
+  1829 00000E12 20342C207468652073-
+  1829 00000E1B 65636F6E6420667320-
+  1829 00000E24 706172746974696F6E-
+  1829 00000E2D 290D0A             
+  1830 00000E30 00                                      db 0
+  1831                                  
+  1832                                  Msg_DoYouWantToWrite:
+  1833 00000E31 07                                      db 07h
+  1834 00000E32 0D0A                                    db 0Dh, 0Ah
+  1835 00000E34 446F20796F75207761-                     db 'Do you want to write FS1 Startup File onto drive ', 0
+  1835 00000E3D 6E7420746F20777269-
+  1835 00000E46 746520465331205374-
+  1835 00000E4F 61727475702046696C-
+  1835 00000E58 65206F6E746F206472-
+  1835 00000E61 6976652000         
+  1836                                  SINGLIX_HD_Name:
+  1837 00000E66 6864                                    db 'hd'
+  1838                                  SINGLIX_HD_Number:
+  1839 00000E68 30303A2000                              db '00: ', 0
+  1840                                  msg_yes_no:
+  1841 00000E6D 285965732F4E6F293F-                     db '(Yes/No)? ', 0
+  1841 00000E76 2000               
+  1842                                  
+  1843                                  SINGLIX_FD_Name:
+  1844 00000E78 6664                                    db 'fd'
+  1845                                  SINGLIX_FD_Number:
+  1846 00000E7A 303A2000                                db '0: ', 0
+  1847                                  
+  1848                                  msg_singlix_drv_read_error:
+  1849 00000E7E 0D0A                                    db 0Dh, 0Ah
+  1850 00000E80 4472697665206E6F74-                     db 'Drive not ready or read error! Try again? (Y/N) '
+  1850 00000E89 207265616479206F72-
+  1850 00000E92 207265616420657272-
+  1850 00000E9B 6F7221205472792061-
+  1850 00000EA4 6761696E3F2028592F-
+  1850 00000EAD 4E2920             
+  1851 00000EB0 0D0A                                    db 0Dh, 0Ah
+  1852 00000EB2 00                                      db 0
+  1853                                  
+  1854                                  Msg_File_Not_Found:
+  1855 00000EB3 0D0A                                    db 0Dh, 0Ah
+  1856 00000EB5 46696C65206E6F7420-                     db "File not found !", 0
+  1856 00000EBE 666F756E64202100   
+  1857                                  
+  1858                                  Msg_Not_Singlix_FS:
+  1859 00000EC6 0D0A                                    db 0Dh, 0Ah
+  1860 00000EC8 447269766520686173-                     db "Drive has not got a SINGLIX FS !", 0
+  1860 00000ED1 206E6F7420676F7420-
+  1860 00000EDA 612053494E474C4958-
+  1860 00000EE3 204653202100       
+  1861                                  
+  1862                                  Msg_startup_file_deleted:
+  1863 00000EE9 0D0A                                    db 0Dh, 0Ah
+  1864 00000EEB 53494E474C49582046-                     db "SINGLIX FS startup file deleted...", 0
+  1864 00000EF4 532073746172747570-
+  1864 00000EFD 2066696C652064656C-
+  1864 00000F06 657465642E2E2E00   
+  1865                                  
+  1866                                  Msg_writing_sf:
+  1867 00000F0E 0D0A                                    db 0Dh, 0Ah
+  1868 00000F10 57726974696E672053-                     db "Writing SINGLIX FS startup file...",0
+  1868 00000F19 494E474C4958204653-
+  1868 00000F22 207374617274757020-
+  1868 00000F2B 66696C652E2E2E00   
+  1869                                  
+  1870                                  Msg_DosFile_Name:
+  1871 00000F33 0D0A                                    db 0Dh, 0Ah
+  1872 00000F35 444F532046696C6520-                     db "DOS File Name : ", 0
+  1872 00000F3E 4E616D65203A2000   
+  1873                                  
+  1874                                  Msg_StartupFile_Name:
+  1875 00000F46 0D0A                                    db 0Dh, 0Ah
+  1876 00000F48 537461727475702046-                     db "Startup File Name : ", 0
+  1876 00000F51 696C65204E616D6520-
+  1876 00000F5A 3A2000             
+  1877                                  
+  1878 00000F5D 2E2E2E                  Msg_3dot_OK:    db "..."
+  1879                                  Msg_OK:
+  1880 00000F60 204F4B2E0D0A00                          db ' OK.', 0Dh, 0Ah, 0
+  1881                                  
+  1882 00000F67 20594553                msg_YES:        db ' YES'
+  1883 00000F6B 00                                      db 0
+  1884 00000F6C 204E4F                  msg_NO:         db ' NO'
+  1885 00000F6F 00                                      db 0   
+  1886                                  
+  1887                                  SINGLIX_CRLF:
+  1888 00000F70 0D0A00                                  db 0Dh, 0Ah, 0
+  1889                                  
+  1890                                  msg_singlix_drv_write_error:
+  1891 00000F73 0D0A                                    db 0Dh, 0Ah
+  1892 00000F75 4472697665206E6F74-                     db 'Drive not ready or write error! Try again? (Y/N) '
+  1892 00000F7E 207265616479206F72-
+  1892 00000F87 207772697465206572-
+  1892 00000F90 726F72212054727920-
+  1892 00000F99 616761696E3F202859-
+  1892 00000FA2 2F4E2920           
+  1893 00000FA6 0D0A                                    db 0Dh, 0Ah
+  1894 00000FA8 00                                      db 0
+  1895                                  
+  1896                                  msg_invalid_format:
+  1897 00000FA9 0D0A                                    db 0Dh, 0Ah
+  1898 00000FAB 496E76616C69642046-                     db 'Invalid FS descriptor format !', 0
+  1898 00000FB4 532064657363726970-
+  1898 00000FBD 746F7220666F726D61-
+  1898 00000FC6 74202100           
+  1899                                                                         
+  1900 00000FCA 00                      Error_Code:     db 0
+  1901                                  
+  1902 00000FCB 00                      fsPartitionNumber: db 0
+  1903                                  
+  1904                                  msg_Startup_File_Exists:
+  1905 00000FCC 0D0A0D0A                                db 0Dh, 0Ah, 0Dh, 0Ah
+  1906 00000FD0 537461727475702046-                     db 'Startup File Exists ! '
+  1906 00000FD9 696C65204578697374-
+  1906 00000FE2 73202120           
+  1907                                  msg_please_select_an_option:
+  1908                                                 ;db 'Please select an option: '
+  1909 00000FE6 0D0A                                    db 0Dh, 0Ah
+  1910 00000FE8 0D0A                                    db 0Dh, 0Ah
+  1911 00000FEA 5072657373203C4445-                     db 'Press <DELETE> to delete current startup file.'
+  1911 00000FF3 4C4554453E20746F20-
+  1911 00000FFC 64656C657465206375-
+  1911 00001005 7272656E7420737461-
+  1911 0000100E 727475702066696C65-
+  1911 00001017 2E                 
+  1912 00001018 0D0A                    		db 0Dh, 0Ah
+  1913 0000101A 5072657373203C454E-                     db 'Press <ENTER> to see current startup file information.'
+  1913 00001023 5445523E20746F2073-
+  1913 0000102C 65652063757272656E-
+  1913 00001035 742073746172747570-
+  1913 0000103E 2066696C6520696E66-
+  1913 00001047 6F726D6174696F6E2E 
+  1914 00001050 0D0A                    		db 0Dh, 0Ah
+  1915 00001052 5072657373203C4553-                     db 'Press <ESC> to exit.'
+  1915 0000105B 433E20746F20657869-
+  1915 00001064 742E               
+  1916 00001066 0D0A00                                  db 0Dh, 0Ah, 0
+  1917                                                         
+  1918                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  1919                                  ;  buffers
+  1920                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  1921                                  BSBUFFER:
+  1922                                  MasterBootBuff:
+  1923 00001069 00<rept>                MasterBootCode: times 1BEh db 0
+  1924 00001227 00<rept>                PartitionTable: times 64 db 0
+  1925 00001267 0000                    MBIDCode: dw 0
+  1926                                  
+  1927                                  MATBUFFER:
+  1928 00001269 000000                                  db 0,0,0 ; db 'MAT'               
+  1929 0000126C 00                                      db 0
+  1930 0000126D 00000000                mat_volume_size:dd 0    ; Volume Size 
+  1931 00001271 00000000                mat_begin_sec:  dd 0    ; Volume Beginning Sector
+  1932 00001275 00000000                mat_dat_lba:    dd 0    ; DAT LBA = 2
+  1933 00001279 00000000                mat_dat_secs:   dd 0    ; DAT Sectors
+  1934 0000127D 00000000                mat_dat_free_s: dd 0    ; Free Sectors on DAT
+  1935 00001281 00000000                mat_dat_ffs:    dd 0    ; First Free sector
+  1936 00001285 00<rept>                                times 484 db 0     
+  1937                                  DATBUFFER:
+  1938 00001469 00<rept>                                times 512 db 0
+  1939                                  END_OF_DATBUFFER:
+  1940                                  FDTBUFFER:
+  1941 00001669 464454                                  db 'FDT'; File Description Table
+  1942 0000166C 00                                      db 0 ; FDT Version
+  1943 0000166D 0002                                    dw 512 ; Bytes per Sector
+  1944 0000166F 0000                                    dw 0  ; FDT Number
+  1945 00001671 00000000                fdt_location:   dd 0  ; The First FDT Address
+  1946 00001675 00000000                                dd 0  ; Next FDT number                 
+  1947 00001679 00000000                fdt_scount:     dd 0  ; Sector Count
+  1948 0000167D 00000000                                dd 0  ; Directory DT Address
+  1949 00001681 00000000                                dd 0  ; Directory Serial Number  
+  1950                                  fdt_file_size:                
+  1951 00001685 00000000                                dd 0  ; File Size
+  1952 00001689 0000                                    dw 0  ; 
+  1953 0000168B 00                                      db 0  ; Attributes
+  1954 0000168C 00                                      db 0  ; Extended Attributes
+  1955 0000168D 00000000                                dd 0
+  1956 00001691 00000000                                dd 0
+  1957 00001695 00                      		db 0  ; Filename Type
+  1958 00001696 00                      		db 0  ; Longname Length	 		
+  1959                                                  ; Offset 46
+  1960 00001697 00                                      db 0 ; Country
+  1961 00001698 00                                      db 0 ; Time Zone (+11)
+  1962                                                  ; Offset 48
+  1963                                  fdt_make_year:
+  1964 00001699 0000                                    dw 0 ; Creating Year
+  1965                                  fdt_make_month:
+  1966 0000169B 00                                      db 0 ; Creating Month
+  1967                                  fdt_make_day:
+  1968 0000169C 00                                      db 0 ; Creating Day
+  1969                                  fdt_make_hour:
+  1970 0000169D 00                                      db 0 ; Creating Hour
+  1971                                  fdt_make_minute:
+  1972 0000169E 00                                      db 0 ; Creating Minute
+  1973                                  fdt_make_second:
+  1974 0000169F 00                                      db 0 ; Creating Second
+  1975                                  fdt_make_dlstm:
+  1976 000016A0 00                                      db 0 ; Daylight Saving Time Mode (0= standard time)
+  1977                                                  ; Offset 56
+  1978                                  fdt_lm_year:
+  1979 000016A1 0000                                    dw 0 ; Last Mofication Year
+  1980                                  fdt_lm_month:
+  1981 000016A3 00                                      db 0 ; Last Modification Month
+  1982                                  fdt_lm_day:
+  1983 000016A4 00                                      db 0 ; Last Modification Day
+  1984                                  fdt_lm_hour:
+  1985 000016A5 00                                      db 0 ; Last Modification Hour
+  1986                                  fdt_lm_minute:
+  1987 000016A6 00                                      db 0 ; Last Modification Minute
+  1988                                  fdt_lm_second:
+  1989 000016A7 00                                      db 0 ; Last Modification Second
+  1990                                  fdt_lm_dlstm:
+  1991 000016A8 00                                      db 0 ; Daylight Saving Time Mode (0= standard time)
+  1992                                  
+  1993                                                  ; Offset 64
+  1994                                  fdt_file_name:
+  1995 000016A9 00<rept>                		times 64 db 0
+  1996                                                  ; Offset 128
+  1997 000016E9 00<rept>                		times 128 db 0
+  1998                                                  ; Offset 256
+  1999 00001769 00<rept>                                times 256 db 0
+  2000                                      
+  2001                                  ; End Of FDT Buffer
+  2002                                  
+  2003                                  SECBUFFER:
+  2004 00001869 00<rept>                		times 512 db 0
+  2005                                  
+  2006 00001A69 0000                    RetryCount:     dw 0
+  2007                                  
+  2008                                  Str_startup_file_size:
+  2009 00001A6B 0D0A0D0A                                db 0Dh, 0Ah, 0Dh, 0Ah
+  2010 00001A6F 537461727475702046-                     db 'Startup File Size : ', 0
+  2010 00001A78 696C652053697A6520-
+  2010 00001A81 3A2000             
+  2011                                  Str_Bytes:
+  2012 00001A84 20627974657300                          db ' bytes', 0
+  2013                                  
+  2014 00001A8B 00<rept>                Decimal_Str:    times 10 db  0
+  2015                                  
+  2016                                  Str_startup_file_date_time:
+  2017 00001A95 0D0A                                    db 0Dh, 0Ah
+  2018 00001A97 4C4D20446174652026-                     db 'LM Date & Time    : ', 0
+  2018 00001AA0 2054696D6520202020-
+  2018 00001AA9 3A2000             
+  2019                                  Sf_Date_Time_Str:
+  2020 00001AAC 3030                    Sf_Day_Str:	db '00'
+  2021 00001AAE 2F                                      db '/'
+  2022 00001AAF 3030                    Sf_Month_Str:	db '00'
+  2023 00001AB1 2F                                      db '/'
+  2024 00001AB2 30303030                Sf_Year_Str:	db '0000'
+  2025 00001AB6 2020                                    db 20h, 20h
+  2026 00001AB8 3030                    Sf_Hour_Str: 	db '00'
+  2027 00001ABA 3A                                      db ':'
+  2028 00001ABB 3030                    Sf_Minute_Str:  db '00'
+  2029 00001ABD 00                                      db 0
+  2030                                  
+  2031                                  bootfile_CopyRight:
+  2032 00001ABE 286329204572646F67-                     db  '(c) Erdogan TAN - 28/01/2018'
+  2032 00001AC7 616E2054414E202D20-
+  2032 00001AD0 32382F30312F323031-
+  2032 00001AD9 38                 
+  2033                                  
+  2034 00001ADA 00                                      db  0
+  2035                                  
+  2036                                  SizeOfFile      equ $-100
