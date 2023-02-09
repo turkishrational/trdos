@@ -1,0 +1,608 @@
+     1                                  ; ****************************************************************************
+     2                                  ; srvs2.s - TRDOS 386 (TRDOS v2.0.3) Test Program - Save/Restore Video State
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ;
+     5                                  ; 24/01/2021 (23/01/2021)
+     6                                  ;
+     7                                  ; ****************************************************************************
+     8                                  ; nasm srvs2.s -l srvs2.txt -o SRVS2.PRG -Z error.txt
+     9                                  
+    10                                  ; restore video state after a child process ('sysfork', 'sysexec', 'sysvideo')
+    11                                  
+    12                                  ; 14/07/2020
+    13                                  ; 31/12/2017
+    14                                  ; TRDOS 386 (v2.0) system calls
+    15                                  _ver 	equ 0
+    16                                  _exit 	equ 1
+    17                                  _fork 	equ 2
+    18                                  _read 	equ 3
+    19                                  _write	equ 4
+    20                                  _open	equ 5
+    21                                  _close 	equ 6
+    22                                  _wait 	equ 7
+    23                                  _create	equ 8
+    24                                  _rename	equ 9
+    25                                  _delete	equ 10
+    26                                  _exec	equ 11
+    27                                  _chdir	equ 12
+    28                                  _time 	equ 13
+    29                                  _mkdir 	equ 14
+    30                                  _chmod	equ 15
+    31                                  _rmdir	equ 16
+    32                                  _break	equ 17
+    33                                  _drive	equ 18
+    34                                  _seek	equ 19
+    35                                  _tell 	equ 20
+    36                                  _memory	equ 21
+    37                                  _prompt	equ 22
+    38                                  _path	equ 23
+    39                                  _env	equ 24
+    40                                  _stime	equ 25
+    41                                  _quit	equ 26	
+    42                                  _intr	equ 27
+    43                                  _dir	equ 28
+    44                                  _emt 	equ 29
+    45                                  _ldrvt 	equ 30
+    46                                  _video 	equ 31
+    47                                  _audio	equ 32
+    48                                  _timer	equ 33
+    49                                  _sleep	equ 34
+    50                                  _msg    equ 35
+    51                                  _geterr	equ 36
+    52                                  _fpstat	equ 37
+    53                                  _pri	equ 38
+    54                                  _rele	equ 39
+    55                                  _fff	equ 40
+    56                                  _fnf	equ 41
+    57                                  _alloc	equ 42
+    58                                  _dalloc equ 43
+    59                                  _calbac equ 44
+    60                                  _dma	equ 45	
+    61                                  
+    62                                  %macro sys 1-4
+    63                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    64                                      ; 03/09/2015	
+    65                                      ; 13/04/2015
+    66                                      ; Retro UNIX 386 v1 system call.		
+    67                                      %if %0 >= 2   
+    68                                          mov ebx, %2
+    69                                          %if %0 >= 3    
+    70                                              mov ecx, %3
+    71                                              %if %0 = 4
+    72                                                 mov edx, %4   
+    73                                              %endif
+    74                                          %endif
+    75                                      %endif
+    76                                      mov eax, %1
+    77                                      ;int 30h
+    78                                      int 40h ; TRDOS 386 (TRDOS v2.0)		   
+    79                                  %endmacro
+    80                                  
+    81                                  ; Retro UNIX 386 v1 system call format:
+    82                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    83                                  
+    84                                  [BITS 32] ; We need 32-bit intructions for protected mode
+    85                                  
+    86                                  [ORG 0] 
+    87                                  
+    88                                  START_CODE:
+    89                                  	; clear bss
+    90 00000000 BF[18040000]            	mov	edi, bss_start
+    91 00000005 B91E040000              	mov	ecx, (bss_end - bss_start)/4
+    92                                  	;xor	eax, eax
+    93 0000000A F3AB                    	rep	stosd
+    94                                  
+    95                                  	; program message
+    96 0000000C BE[5D020000]            	mov	esi, program_msg
+    97 00000011 E891010000              	call	print_msg
+    98                                  
+    99                                  	; save video state
+   100                                  
+   101 00000016 B8044F0000              	mov	eax, 4F04h
+   102 0000001B 31D2                    	xor	edx, edx ; dl = 0 ; get buffer size  
+   103 0000001D B90F000000              	mov	ecx, 0Fh
+   104 00000022 CD31                    	int	31h 
+   105 00000024 83F84F                  	cmp	eax, 4Fh
+   106 00000027 7429                    	je	short _0
+   107                                  _save_err1:
+   108 00000029 BE[31030000]            	mov	esi, save_error_msg
+   109 0000002E E874010000              	call	print_msg
+   110                                  _terminate:
+   111                                  	sys	_exit
+   111                              <1> 
+   111                              <1> 
+   111                              <1> 
+   111                              <1> 
+   111                              <1>  %if %0 >= 2
+   111                              <1>  mov ebx, %2
+   111                              <1>  %if %0 >= 3
+   111                              <1>  mov ecx, %3
+   111                              <1>  %if %0 = 4
+   111                              <1>  mov edx, %4
+   111                              <1>  %endif
+   111                              <1>  %endif
+   111                              <1>  %endif
+   111 00000033 B801000000          <1>  mov eax, %1
+   111                              <1> 
+   111 00000038 CD40                <1>  int 40h
+   112                                  _hang:
+   113 0000003A EBFE                    	jmp	short _hang
+   114                                  _save_err2:
+   115 0000003C BE[31030000]            	mov	esi, save_error_msg
+   116 00000041 E861010000              	call	print_msg
+   117 00000046 BE[E4020000]            	mov	esi, vstate_size_msg
+   118 0000004B E857010000              	call	print_msg
+   119 00000050 EBE1                    	jmp	short _terminate
+   120                                  _0:
+   121 00000052 89D8                    	mov	eax, ebx
+   122 00000054 66C1E006                	shl	ax, 6 ; * 64
+   123 00000058 E8EB000000              	call	write_number
+   124                                  
+   125 0000005D B8044F0000              	mov	eax, 4F04h
+   126 00000062 B201                    	mov	dl, 1 ; save video state  
+   127 00000064 B90F000000              	mov	ecx, 0Fh
+   128 00000069 BB[90040000]            	mov	ebx, vstate
+   129 0000006E CD31                    	int	31h 
+   130 00000070 83F84F                  	cmp	eax, 4Fh
+   131 00000073 75C7                    	jne	short _save_err2
+   132                                  
+   133 00000075 BE[C2020000]            	mov	esi, save_ok_msg
+   134 0000007A E828010000              	call	print_msg
+   135                                   
+   136 0000007F E8E5000000              	call	file_name_input
+   137 00000084 7258                    	jc	short parent_return
+   138                                  		; restore video state and then exit
+   139                                  
+   140                                  	; EBX = EAX = file name or path address
+   141                                  	; CL = file attributes (archive = 20h, read only = 01h)
+   142                                  	;	(21h = Archived & Read Only files are included)
+   143                                  	; CH = 0 = basic parameters (24 bytes)
+   144                                  	; EDX = DTA = buffer address (24 bytes for basic parameters)
+   145                                  	; EAX = _fff = 'Find First File' system call for TRDOS 386
+   146                                  
+   147                                  	; Find First File
+   148                                  	sys	_fff, prg_file_name, 0021h, DTA
+   148                              <1> 
+   148                              <1> 
+   148                              <1> 
+   148                              <1> 
+   148                              <1>  %if %0 >= 2
+   148 00000086 BB[30040000]        <1>  mov ebx, %2
+   148                              <1>  %if %0 >= 3
+   148 0000008B B921000000          <1>  mov ecx, %3
+   148                              <1>  %if %0 = 4
+   148 00000090 BA[18040000]        <1>  mov edx, %4
+   148                              <1>  %endif
+   148                              <1>  %endif
+   148                              <1>  %endif
+   148 00000095 B828000000          <1>  mov eax, %1
+   148                              <1> 
+   148 0000009A CD40                <1>  int 40h
+   149 0000009C 730C                    	jnc	short _2
+   150                                  _1:
+   151 0000009E BE[4D030000]            	mov	esi, not_found_msg
+   152 000000A3 E8FF000000              	call	print_msg
+   153                                  
+   154 000000A8 EB89                    	jmp	short _terminate
+   155                                  _2:
+   156                                  	; check file attributes
+   157 000000AA F605[18040000]1E        	test	byte [DTA], 1Eh ; 10h = directory, 08h = volume label
+   158                                  				; 04h = system, 02h = hidden
+   159 000000B1 75EB                    	jnz	short _1   ; attributes are not proper
+   160                                  
+   161                                  	; atributes are proper 
+   162 000000B3 BE[69030000]            	mov	esi, press_any_key_msg
+   163 000000B8 E8EA000000              	call	print_msg
+   164                                  
+   165 000000BD 30E4                    	xor	ah, ah
+   166 000000BF CD32                    	int	32h
+   167                                  
+   168 000000C1 BE[97030000]            	mov	esi, nextline
+   169 000000C6 E8DC000000              	call	print_msg
+   170                                  
+   171 000000CB BB[18010000]            	mov	ebx, child_exec
+   172                                  	sys	_fork
+   172                              <1> 
+   172                              <1> 
+   172                              <1> 
+   172                              <1> 
+   172                              <1>  %if %0 >= 2
+   172                              <1>  mov ebx, %2
+   172                              <1>  %if %0 >= 3
+   172                              <1>  mov ecx, %3
+   172                              <1>  %if %0 = 4
+   172                              <1>  mov edx, %4
+   172                              <1>  %endif
+   172                              <1>  %endif
+   172                              <1>  %endif
+   172 000000D0 B802000000          <1>  mov eax, %1
+   172                              <1> 
+   172 000000D5 CD40                <1>  int 40h
+   173                                  
+   174                                  	sys	_wait
+   174                              <1> 
+   174                              <1> 
+   174                              <1> 
+   174                              <1> 
+   174                              <1>  %if %0 >= 2
+   174                              <1>  mov ebx, %2
+   174                              <1>  %if %0 >= 3
+   174                              <1>  mov ecx, %3
+   174                              <1>  %if %0 = 4
+   174                              <1>  mov edx, %4
+   174                              <1>  %endif
+   174                              <1>  %endif
+   174                              <1>  %endif
+   174 000000D7 B807000000          <1>  mov eax, %1
+   174                              <1> 
+   174 000000DC CD40                <1>  int 40h
+   175                                  
+   176                                  parent_return:
+   177                                  	; restore video state
+   178 000000DE B8044F0000              	mov	eax, 4F04h
+   179 000000E3 B202                    	mov	dl, 2 ; restore video state  
+   180 000000E5 B90F000000              	mov	ecx, 0Fh
+   181 000000EA BB[90040000]            	mov	ebx, vstate
+   182 000000EF CD31                    	int	31h 
+   183 000000F1 83F84F                  	cmp	eax, 4Fh
+   184 000000F4 740C                    	je	short _3
+   185                                  _restore_err:
+   186 000000F6 BE[9A030000]            	mov	esi, restore_error_msg
+   187 000000FB E8A7000000              	call	print_msg
+   188 00000100 EB3D                    	jmp	short terminate 
+   189                                  _3:
+   190 00000102 BE[B9030000]            	mov	esi, restore_ok
+   191 00000107 E89B000000              	call	print_msg
+   192 0000010C BE[12030000]            	mov	esi, msg_ok
+   193 00000111 E891000000              	call	print_msg
+   194 00000116 EB27                    	jmp	short terminate	
+   195                                  
+   196                                  child_exec:
+   197                                  	; execute (run) program
+   198                                  	sys	_exec, prg_file_name, prgp 
+   198                              <1> 
+   198                              <1> 
+   198                              <1> 
+   198                              <1> 
+   198                              <1>  %if %0 >= 2
+   198 00000118 BB[30040000]        <1>  mov ebx, %2
+   198                              <1>  %if %0 >= 3
+   198 0000011D B9[09040000]        <1>  mov ecx, %3
+   198                              <1>  %if %0 = 4
+   198                              <1>  mov edx, %4
+   198                              <1>  %endif
+   198                              <1>  %endif
+   198                              <1>  %endif
+   198 00000122 B80B000000          <1>  mov eax, %1
+   198                              <1> 
+   198 00000127 CD40                <1>  int 40h
+   199                                  
+   200                                  	; Error if child returns here
+   201                                  
+   202                                  	sys	_msg, error_msg, 255, 0Eh
+   202                              <1> 
+   202                              <1> 
+   202                              <1> 
+   202                              <1> 
+   202                              <1>  %if %0 >= 2
+   202 00000129 BB[F2030000]        <1>  mov ebx, %2
+   202                              <1>  %if %0 >= 3
+   202 0000012E B9FF000000          <1>  mov ecx, %3
+   202                              <1>  %if %0 = 4
+   202 00000133 BA0E000000          <1>  mov edx, %4
+   202                              <1>  %endif
+   202                              <1>  %endif
+   202                              <1>  %endif
+   202 00000138 B823000000          <1>  mov eax, %1
+   202                              <1> 
+   202 0000013D CD40                <1>  int 40h
+   203                                  terminate:
+   204                                  	sys	_exit
+   204                              <1> 
+   204                              <1> 
+   204                              <1> 
+   204                              <1> 
+   204                              <1>  %if %0 >= 2
+   204                              <1>  mov ebx, %2
+   204                              <1>  %if %0 >= 3
+   204                              <1>  mov ecx, %3
+   204                              <1>  %if %0 = 4
+   204                              <1>  mov edx, %4
+   204                              <1>  %endif
+   204                              <1>  %endif
+   204                              <1>  %endif
+   204 0000013F B801000000          <1>  mov eax, %1
+   204                              <1> 
+   204 00000144 CD40                <1>  int 40h
+   205                                  halt:
+   206 00000146 EBFE                    	jmp	short halt
+   207                                  	
+   208                                  write_number:
+   209 00000148 B908000000              	mov	ecx, 8
+   210 0000014D 89C2                    	mov	edx, eax
+   211 0000014F BF[00030000]            	mov	edi, number_txt
+   212                                  wn_0:	
+   213 00000154 C1C204                  	rol	edx, 4 ; move highest 4 bits to lowest pos
+   214 00000157 88D0                    	mov	al, dl
+   215 00000159 240F                    	and	al, 0Fh ; isolate lowest 4 bits
+   216 0000015B 3C09                    	cmp	al, 9
+   217 0000015D 7604                    	jna	short wn_1
+   218 0000015F 0437                    	add	al, 'A'-10
+   219 00000161 EB02                    	jmp	short wn_2
+   220                                  wn_1:
+   221 00000163 0430                    	add	al, '0'
+   222                                  wn_2:
+   223 00000165 AA                      	stosb
+   224 00000166 E2EC                    	loop	wn_0
+   225                                  
+   226 00000168 C3                      	retn
+   227                                  
+   228                                  file_name_input:
+   229                                  	; subroutine for entering file name to run
+   230                                  
+   231 00000169 BE[DF030000]            	mov	esi, prg_file_name_msg
+   232 0000016E E834000000              	call	print_msg
+   233 00000173 E840000000              	call	rw_char
+   234 00000178 7214                    	jc	short fni_1
+   235 0000017A BF[30040000]            	mov	edi, prg_file_name
+   236 0000017F 803E20                  	cmp	byte [esi], 20h
+   237 00000182 760A                    	jna	short short fni_1
+   238 00000184 B90C000000              	mov	ecx, 12
+   239                                  fni_0:
+   240 00000189 AC                      	lodsb
+   241 0000018A 3C20                    	cmp	al, 20h
+   242 0000018C 7306                    	jnb	short fni_2
+   243                                  fni_1:
+   244                                  	;mov	[edi], 0
+   245                                  	;inc	edi
+   246                                  	;loop	fni_1
+   247                                  	;jmp 	short fni_3 ; find_file
+   248                                  
+   249 0000018E 28C0                    	sub	al, al ; 0
+   250 00000190 F3AA                    	rep	stosb
+   251 00000192 EB05                    	jmp 	short fni_3 ; find_file
+   252                                  fni_2:
+   253 00000194 8807                    	mov	byte [edi], al
+   254 00000196 47                      	inc	edi
+   255 00000197 E2F0                    	loop	fni_0
+   256                                  fni_3:
+   257 00000199 803D[30040000]21        	cmp	byte [prg_file_name], 21h
+   258 000001A0 7215                    	jb	short fni_4 ; cf = 1
+   259                                  	
+   260                                  	; next line
+   261 000001A2 BE[97030000]            	mov	esi, nextline
+   262                                  print_msg:
+   263 000001A7 B40E                    	mov	ah, 0Eh
+   264 000001A9 BB07000000              	mov	ebx, 7
+   265                                  	;mov	bl, 7 ; char attribute & color
+   266                                  p_next_chr:
+   267 000001AE AC                      	lodsb
+   268 000001AF 08C0                    	or	al, al
+   269 000001B1 7404                    	jz	short fni_4 ; retn	
+   270 000001B3 CD31                    	int	31h
+   271 000001B5 EBF7                    	jmp	short p_next_chr
+   272                                  fni_4:
+   273 000001B7 C3                      	retn
+   274                                  
+   275                                  rw_char:
+   276                                  	; file name (text) input routine
+   277                                  	; OUTPUT -> esi = Entered String (ASCIIZ)
+   278 000001B8 BE[30040000]            	mov	esi, prg_file_name
+   279 000001BD BB07000000              	mov	ebx, 7
+   280 000001C2 B403                    	mov	ah, 3
+   281                                  	;int	10h
+   282 000001C4 CD31                    	int	31h
+   283 000001C6 668915[3E040000]        	mov	[cursor_pos], dx
+   284 000001CD EB0A                    	jmp	short read_next_char
+   285                                  loc_arrow:    
+   286 000001CF 80FC4B                  	cmp     ah, 4Bh
+   287 000001D2 7415                    	je      short loc_back
+   288 000001D4 80FC53                  	cmp     ah, 53h
+   289 000001D7 7410                    	je      short loc_back
+   290                                  read_next_char:
+   291 000001D9 30E4                    	xor	ah, ah
+   292                                  	;int	16h
+   293 000001DB CD32                    	int	32h
+   294 000001DD 20C0                    	and	al, al
+   295 000001DF 74EE                    	jz	short loc_arrow    
+   296 000001E1 3CE0                    	cmp	al, 0E0h          
+   297 000001E3 74EA                    	je	short loc_arrow
+   298 000001E5 3C08                    	cmp	al, 08h
+   299 000001E7 753C                    	jne	short char_return
+   300                                  loc_back:
+   301 000001E9 B307                    	mov	bl, 7
+   302 000001EB B403                    	mov	ah, 3
+   303                                  	;int	10h
+   304 000001ED CD31                    	int	31h
+   305 000001EF 3A15[3E040000]          	cmp	dl, [cursor_pos]
+   306 000001F5 7708                    	ja	short prev_column
+   307                                  loc_beep:
+   308 000001F7 B40E                    	mov	ah, 0Eh
+   309 000001F9 B007                    	mov	al, 7
+   310                                  	;int	10h
+   311 000001FB CD31                    	int	31h
+   312 000001FD EBDA                    	jmp	short read_next_char
+   313                                  prev_column:
+   314 000001FF FECA                    	dec	dl
+   315                                  set_cursor_pos:
+   316 00000201 B402                    	mov	ah, 02h
+   317                                  	;int	10h
+   318 00000203 CD31                    	int	31h
+   319 00000205 88D3                    	mov	bl, dl
+   320 00000207 2A1D[3E040000]          	sub	bl, [cursor_pos] 
+   321 0000020D 66B90100                	mov	cx, 1
+   322 00000211 B409                    	mov	ah, 09h
+   323 00000213 B020                    	mov	al, 20h
+   324 00000215 88041E                  	mov	[esi+ebx], al
+   325                                  loc_write_it:
+   326 00000218 B307                    	mov	bl, 7
+   327                                  	;int	10h
+   328 0000021A CD31                    	int	31h
+   329 0000021C 668B15[3E040000]        	mov	dx, [cursor_pos]
+   330 00000223 EBB4                    	jmp	short read_next_char
+   331                                  ;loc_arrow:    
+   332                                  ;	cmp     ah, 4Bh
+   333                                  ;	je      short loc_back
+   334                                  ;	cmp     AH, 53h
+   335                                  ;	je      short loc_back
+   336                                  ;	jmp	short read_next_char
+   337                                  char_return:
+   338 00000225 B307                    	mov	bl, 7
+   339 00000227 B403                    	mov	ah, 3
+   340                                  	;int	10h
+   341 00000229 CD31                    	int	31h
+   342 0000022B 88D3                    	mov	bl, dl
+   343 0000022D 2A1D[3E040000]          	sub	bl, [cursor_pos] 
+   344 00000233 3C20                    	cmp	al, 20h
+   345 00000235 7220                    	jb	short loc_escape
+   346 00000237 80FB3F                  	cmp	bl, 63
+   347 0000023A 77BB                    	ja	short loc_beep
+   348                                  	;cmp	al, "z"
+   349                                  	;ja	short read_next_char
+   350                                  	;cmp	al, "a"
+   351                                  	;jb	short pass_capitalize
+   352                                  	;and	al, 0DFh
+   353                                  pass_capitalize:
+   354 0000023C 30E4                    	xor	ah, ah
+   355 0000023E 6689041E                	mov	[esi+ebx], ax
+   356 00000242 B40E                    	mov	ah, 0Eh
+   357 00000244 B307                    	mov	bl, 7
+   358                                  	;int	10h
+   359 00000246 CD31                    	int	31h
+   360 00000248 EB8F                    	jmp	short read_next_char
+   361                                  pass_escape:
+   362 0000024A 3C0D                    	cmp	al, 0Dh
+   363 0000024C 758B                    	jne	short read_next_char
+   364 0000024E B307                    	mov	bl, 7
+   365                                  	;int	10h
+   366 00000250 CD31                    	int	31h
+   367 00000252 B00A                    	mov	al, 0Ah
+   368                                  	;int	10h
+   369 00000254 CD31                    	int	31h
+   370 00000256 C3                      	retn
+   371                                  loc_escape:
+   372 00000257 3C1B                    	cmp	al, 1Bh
+   373 00000259 75EF                    	jne	short pass_escape
+   374 0000025B F9                      	stc
+   375 0000025C C3                      	retn
+   376                                  		
+   377                                  program_msg:
+   378 0000025D 5452444F5320333836-     	db "TRDOS 386 v2.0.3 - Save/Restore Video State ('sysvideo') Test Program"
+   378 00000266 2076322E302E33202D-
+   378 0000026F 20536176652F526573-
+   378 00000278 746F72652056696465-
+   378 00000281 6F2053746174652028-
+   378 0000028A 27737973766964656F-
+   378 00000293 272920546573742050-
+   378 0000029C 726F6772616D       
+   379 000002A2 0D0A                    	db 0Dh, 0Ah
+   380 000002A4 6279204572646F6761-     	db "by Erdogan Tan - 24/01/2021"
+   380 000002AD 6E2054616E202D2032-
+   380 000002B6 342F30312F32303231 
+   381 000002BF 0D0A00                  	db 0Dh, 0Ah, 0
+   382                                  save_ok_msg:
+   383 000002C2 0D0A                    	db 0Dh, 0Ah
+   384 000002C4 566964656F20537461-     	db "Video State has been saved ..."
+   384 000002CD 746520686173206265-
+   384 000002D6 656E20736176656420-
+   384 000002DF 2E2E2E             
+   385 000002E2 0D0A                    	db 0Dh, 0Ah
+   386                                  vstate_size_msg:
+   387 000002E4 0D0A                    	db 0Dh, 0Ah
+   388 000002E6 566964656F20537461-     	db "Video State Buffer Size : "
+   388 000002EF 746520427566666572-
+   388 000002F8 2053697A65203A20   
+   389                                  number_txt:
+   390 00000300 585858585858585868-     	db "XXXXXXXXh bytes"
+   390 00000309 206279746573       
+   391 0000030F 0D0A00                  	db 0Dh, 0Ah, 0
+   392                                  
+   393                                  msg_ok:
+   394                                  	;db 0Dh, 0Ah
+   395 00000312 2852657475726E2074-     	db "(Return to parent is) OK."
+   395 0000031B 6F20706172656E7420-
+   395 00000324 697329204F4B2E     
+   396 0000032B 0D0A00                  	db 0Dh, 0Ah, 0
+   397 0000032E 0D0A00                  	db 0Dh, 0Ah, 0
+   398                                  
+   399                                  save_error_msg:
+   400 00000331 0D0A                    	db 0Dh, 0Ah
+   401 00000333 566964656F20537461-     	db "Video State Save Error!"
+   401 0000033C 746520536176652045-
+   401 00000345 72726F7221         
+   402 0000034A 0D0A00                  	db 0Dh, 0Ah, 0
+   403                                  
+   404                                  not_found_msg:
+   405 0000034D 0D0A                    	db 0Dh, 0Ah
+   406 0000034F 50726F6772616D2066-     	db "Program file not found!"
+   406 00000358 696C65206E6F742066-
+   406 00000361 6F756E6421         
+   407 00000366 0D0A00                  	db 0Dh, 0Ah, 0	
+   408                                  
+   409                                  press_any_key_msg:
+   410 00000369 0D0A                    	db 0Dh, 0Ah
+   411 0000036B 507265737320616E79-     	db "Press any key to run (child) program file .."
+   411 00000374 206B657920746F2072-
+   411 0000037D 756E20286368696C64-
+   411 00000386 292070726F6772616D-
+   411 0000038F 2066696C65202E2E   
+   412                                  nextline:
+   413 00000397 0D0A00                  	db 0Dh, 0Ah, 0	
+   414                                  
+   415                                  restore_error_msg:
+   416 0000039A 0D0A                    	db 0Dh, 0Ah
+   417 0000039C 566964656F20537461-     	db "Video State Restore Error!"
+   417 000003A5 746520526573746F72-
+   417 000003AE 65204572726F7221   
+   418 000003B6 0D0A00                  	db 0Dh, 0Ah, 0
+   419                                  
+   420                                  restore_ok:
+   421 000003B9 0D0A                    	db 0Dh, 0Ah
+   422 000003BB 566964656F20537461-     	db "Video State has been restored ..."
+   422 000003C4 746520686173206265-
+   422 000003CD 656E20726573746F72-
+   422 000003D6 6564202E2E2E       
+   423 000003DC 0D0A00                  	db 0Dh, 0Ah, 0
+   424                                  
+   425                                  prg_file_name_msg:
+   426 000003DF 0D0A                    	db 0Dh, 0Ah
+   427 000003E1 5052472046696C6520-     	db "PRG File Name : ", 0
+   427 000003EA 4E616D65203A2000   
+   428                                  
+   429                                  error_msg:
+   430 000003F2 0D0A07                  	db 0Dh, 0Ah, 07h
+   431 000003F5 277379736578656327-     	db "'sysexec' error !"
+   431 000003FE 206572726F722021   
+   432 00000406 0D0A                    	db 0Dh, 0Ah
+   433 00000408 00                      	db 0
+   434                                  
+   435 00000409 [30040000]              prgp:	dd prg_file_name
+   436 0000040D [40040000]              	dd arguments
+   437 00000411 00000000                	dd 0
+   438                                  
+   439                                  bss:
+   440                                  
+   441                                  ABSOLUTE bss
+   442                                  
+   443 00000415 <res 00000003>          alignb 4
+   444                                  
+   445                                  bss_start:
+   446                                  
+   447 00000418 <res 00000018>          DTA:	resb 24
+   448                                  
+   449                                  alignb 16
+   450                                  
+   451                                  prg_file_name: 
+   452 00000430 <res 0000000D>          	resb 13
+   453 0000043D <res 00000001>          	resb 1
+   454                                  
+   455                                  cursor_pos:
+   456 0000043E <res 00000002>          	resw 1
+   457                                  
+   458                                  arguments:
+   459 00000440 <res 00000050>          	resb 80
+   460                                  
+   461                                  vstate:
+   462 00000490 <res 00001000>          	resb 4096
+   463                                  
+   464                                  bss_end:

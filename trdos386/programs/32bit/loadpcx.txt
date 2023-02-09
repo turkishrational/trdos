@@ -1,0 +1,336 @@
+     1                                  ; ****************************************************************************
+     2                                  ; loadpcx.s (TRDOS 386, TRDOS v2.0 - sample binary file, 'loadpcx.prg')
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; LOADPCX.PRG ! 'sysopen' and 'sysread' and VGA TEST program for TRDOS 386 !
+     5                                  ;
+     6                                  ; 14/10/2016
+     7                                  ;
+     8                                  ; [ Last Modification: 14/10/2016 ]
+     9                                  ;
+    10                                  ; Derived from: MICROPCX.ASM (1994, Lord Debugger. Poznan, Poland.)
+    11                                  ;
+    12                                  ; Note: This program displays 320x200x256 pcx files only.
+    13                                  ; ****************************************************************************
+    14                                  ;
+    15                                  ; 29/04/2016
+    16                                  ; TRDOS 386 system calls (temporary list!)
+    17                                  _ver 	equ 0
+    18                                  _exit 	equ 1
+    19                                  _fork 	equ 2
+    20                                  _read 	equ 3
+    21                                  _write	equ 4
+    22                                  _open	equ 5
+    23                                  _close 	equ 6
+    24                                  _wait 	equ 7
+    25                                  _creat 	equ 8
+    26                                  _link 	equ 9
+    27                                  _unlink	equ 10
+    28                                  _exec	equ 11
+    29                                  _chdir	equ 12
+    30                                  _time 	equ 13
+    31                                  _mkdir 	equ 14
+    32                                  _chmod	equ 15
+    33                                  _chown	equ 16
+    34                                  _break	equ 17
+    35                                  _stat	equ 18
+    36                                  _seek	equ 19
+    37                                  _tell 	equ 20
+    38                                  _mount	equ 21
+    39                                  _umount	equ 22
+    40                                  _setuid	equ 23
+    41                                  _getuid	equ 24
+    42                                  _stime	equ 25
+    43                                  _quit	equ 26	
+    44                                  _intr	equ 27
+    45                                  _fstat	equ 28
+    46                                  _emt 	equ 29
+    47                                  _mdate 	equ 30
+    48                                  _stty 	equ 31
+    49                                  _gtty	equ 32
+    50                                  _ilgins	equ 33
+    51                                  _sleep	equ 34
+    52                                  _msg    equ 35
+    53                                  
+    54                                  %macro sys 1-4
+    55                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    56                                      ; 03/09/2015	
+    57                                      ; 13/04/2015
+    58                                      ; Retro UNIX 386 v1 system call.		
+    59                                      %if %0 >= 2   
+    60                                          mov ebx, %2
+    61                                          %if %0 >= 3    
+    62                                              mov ecx, %3
+    63                                              %if %0 = 4
+    64                                                 mov edx, %4   
+    65                                              %endif
+    66                                          %endif
+    67                                      %endif
+    68                                      mov eax, %1
+    69                                      ;int 30h
+    70                                      int 40h ; TRDOS 386 (TRDOS v2.0)		   
+    71                                  %endmacro
+    72                                  
+    73                                  ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
+    74                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    75                                  
+    76                                  [BITS 32] ; We need 32-bit intructions for protected mode
+    77                                  
+    78                                  [ORG 0] 
+    79                                  
+    80                                  START_CODE:
+    81 00000000 89E6                    	mov	esi, esp
+    82 00000002 AD                      	lodsd
+    83 00000003 83F802                  	cmp	eax, 2 ; two arguments (program file name & text file name)
+    84 00000006 0F82B9000000            	jb	terminate ; nothing top do
+    85 0000000C AD                      	lodsd ; program file name address 
+    86 0000000D AD                      	lodsd ; text file name address
+    87 0000000E 50                      	push	eax ; arg2 ; file name
+    88                                  
+    89                                  	sys	_open, eax, 0 ; open for reading
+    89                              <1> 
+    89                              <1> 
+    89                              <1> 
+    89                              <1> 
+    89                              <1>  %if %0 >= 2
+    89 0000000F 89C3                <1>  mov ebx, %2
+    89                              <1>  %if %0 >= 3
+    89 00000011 B900000000          <1>  mov ecx, %3
+    89                              <1>  %if %0 = 4
+    89                              <1>  mov edx, %4
+    89                              <1>  %endif
+    89                              <1>  %endif
+    89                              <1>  %endif
+    89 00000016 B805000000          <1>  mov eax, %1
+    89                              <1> 
+    89 0000001B CD40                <1>  int 40h
+    90 0000001D 0F82AB000000            	jc	open_error
+    91                                  
+    92 00000023 A3[13010000]            	mov	[fhandle], eax ; file handle/index number
+    93                                  
+    94                                  	; DIRECT VGA MEMORY ACCESS
+    95                                   	;xor    ebx, ebx
+    96 00000028 B705                     	mov     bh, 5 ; Direct access/map to VGA memory (0A0000h)
+    97                                   	;mov    eax, _video ; 1Fh
+    98 0000002A B01F                     	mov     al, 1Fh ; sys _video ; TRDOS 386 Video functions
+    99 0000002C CD40                     	int     40h   ; TRDOS 386 system call
+   100                                  
+   101                                  	sys	_read, [fhandle], BUFFER, 0FFFFFFFFh ; read all bytes of the file 
+   101                              <1> 
+   101                              <1> 
+   101                              <1> 
+   101                              <1> 
+   101                              <1>  %if %0 >= 2
+   101 0000002E 8B1D[13010000]      <1>  mov ebx, %2
+   101                              <1>  %if %0 >= 3
+   101 00000034 B9[A9010000]        <1>  mov ecx, %3
+   101                              <1>  %if %0 = 4
+   101 00000039 BAFFFFFFFF          <1>  mov edx, %4
+   101                              <1>  %endif
+   101                              <1>  %endif
+   101                              <1>  %endif
+   101 0000003E B803000000          <1>  mov eax, %1
+   101                              <1> 
+   101 00000043 CD40                <1>  int 40h
+   102 00000045 0F82A0000000             	jc	read_error  ; disk read or memory allocation error
+   103                                  
+   104                                  ; print file size (debug)
+   105                                  ;	push	eax
+   106                                  ;	mov	ecx, 10
+   107                                  ;	mov	ebp, esp
+   108                                  ;	sub	esp, ecx
+   109                                  ;	dec	ebp
+   110                                  ;	mov	[ebp], ch ; 0
+   111                                  ;dec_digit:
+   112                                  ;	xor	edx, edx
+   113                                  ;	div 	ecx
+   114                                  ;	dec	ebp
+   115                                  ;	add	dl, '0'
+   116                                  ;	mov	[ebp], dl
+   117                                  ;	and	eax, eax
+   118                                  ;	jnz	short dec_digit
+   119                                  ;	dec	ebp
+   120                                  ;	mov	byte [ebp], 0Ah
+   121                                  ;	dec	ebp
+   122                                  ;	mov	byte [ebp], 0Dh
+   123                                  ;	mov	esi, ebp
+   124                                  ;	call	print_msg
+   125                                  ;	add	esp, ecx
+   126                                  ;	;xor	ah, ah
+   127                                  ;	;int	32h
+   128                                  ;	pop	eax
+   129                                  		
+   130 0000004B 31C9                    	xor	ecx, ecx			
+   131 0000004D 89C7                    	mov	edi, eax ; file size (read bytes)
+   132                                  	
+   133                                  set_vga_mode:
+   134 0000004F 66B81300                	mov    	ax, 13h                  ; function 00h, mode 13h 
+   135                                  	;int    10h                      ; bios video interrupt
+   136 00000053 CD31                    	int     31h ; TRDOS 386 - Video interrupt
+   137                                  
+   138 00000055 81C7[AC010000]          	add	edi, BUFFER+3
+   139 0000005B 6683E7FC                	and	di, 0FFFCh ; dword alignment
+   140 0000005F 89FD                    	mov	ebp, edi
+   141 00000061 89EA                    	mov	edx, ebp
+   142 00000063 81C201FA0000            	add	edx, 64001
+   143 00000069 BE[29020000]            	mov	esi, BUFFER + 128 ; PCX header + data
+   144                                  ldlp1:
+   145 0000006E AC                      	lodsb		
+   146 0000006F 88C4                    	mov	ah, al
+   147 00000071 80E4C0                  	and	ah, 0C0h
+   148 00000074 80FCC0                  	cmp	ah, 0C0h
+   149 00000077 7509                    	jne	short single
+   150 00000079 243F                    	and	al, 3Fh
+   151 0000007B 88C1                    	mov	cl, al
+   152 0000007D AC                      	lodsb
+   153 0000007E F3AA                    ldlp2:  rep stosb
+   154 00000080 EB01                    	jmp	short cnt
+   155                                  single:
+   156 00000082 AA                      	stosb
+   157                                  cnt:
+   158 00000083 39D7                    	cmp	edi, edx ; 64001 ; end of pixel data
+   159 00000085 72E7                    	jb	short ldlp1
+   160                                  
+   161 00000087 89F2                    	mov	edx, esi	
+   162 00000089 89F7                    	mov	edi, esi
+   163 0000008B 66B90003                	mov	cx, 768
+   164                                  set256:
+   165 0000008F AC                      	lodsb
+   166 00000090 C0E802                  	shr	al, 2
+   167 00000093 AA                      	stosb
+   168 00000094 E2F9                    	loop    set256
+   169 00000096 66B81210                	mov	ax, 1012h 	; set palette registers
+   170 0000009A 31DB                    	xor	ebx, ebx
+   171 0000009C 66B90001                	mov	cx, 256
+   172                                  	;int	10h
+   173 000000A0 CD31                    	int	31h		; TRDOS 386 Video interrupt
+   174                                  
+   175                                  ; move_image_to_VGA_address:
+   176 000000A2 89EE                    	mov	esi, ebp
+   177 000000A4 66B9803E                	mov	cx, 16000
+   178 000000A8 BF00000A00              	mov	edi, 0A0000h
+   179 000000AD F3A5                    	rep	movsd	
+   180                                  
+   181 000000AF 30E4                    	xor	ah, ah
+   182                                  	;int	16h		; KEYBOARD - READ CHAR FROM BUFFER, WAIT IF EMPTY
+   183                                  				; Return: AH = scan code, AL = character
+   184 000000B1 CD32                    	int	32h		; TRDOS 386 Keyboard interrupt 
+   185                                  
+   186 000000B3 E854000000              	call	set_text_mode
+   187                                  cf_terminate:
+   188                                  	sys	_close, [fhandle] ; close file
+   188                              <1> 
+   188                              <1> 
+   188                              <1> 
+   188                              <1> 
+   188                              <1>  %if %0 >= 2
+   188 000000B8 8B1D[13010000]      <1>  mov ebx, %2
+   188                              <1>  %if %0 >= 3
+   188                              <1>  mov ecx, %3
+   188                              <1>  %if %0 = 4
+   188                              <1>  mov edx, %4
+   188                              <1>  %endif
+   188                              <1>  %endif
+   188                              <1>  %endif
+   188 000000BE B806000000          <1>  mov eax, %1
+   188                              <1> 
+   188 000000C3 CD40                <1>  int 40h
+   189                                  
+   190                                  terminate:
+   191                                  	sys 	_exit			   ; INT 40h
+   191                              <1> 
+   191                              <1> 
+   191                              <1> 
+   191                              <1> 
+   191                              <1>  %if %0 >= 2
+   191                              <1>  mov ebx, %2
+   191                              <1>  %if %0 >= 3
+   191                              <1>  mov ecx, %3
+   191                              <1>  %if %0 = 4
+   191                              <1>  mov edx, %4
+   191                              <1>  %endif
+   191                              <1>  %endif
+   191                              <1>  %endif
+   191 000000C5 B801000000          <1>  mov eax, %1
+   191                              <1> 
+   191 000000CA CD40                <1>  int 40h
+   192                                  here:
+   193 000000CC EBFE                    	jmp	short here
+   194                                  
+   195                                  open_error:
+   196 000000CE 50                      	push	eax
+   197 000000CF BE[6F010000]            	mov	esi, msg_open_error
+   198 000000D4 E823000000              	call	print_msg		   ; INT 31h
+   199 000000D9 58                      	pop	eax
+   200 000000DA 83F802                  	cmp	eax, 2
+   201 000000DD 75E6                    	jne	short terminate
+   202 000000DF BE[83010000]            	mov	esi, msg_not_found
+   203 000000E4 E813000000              	call	print_msg		   ; INT 31h
+   204 000000E9 EBDA                    	jmp	short terminate	
+   205                                  
+   206                                  read_error:
+   207 000000EB E81C000000              	call	set_text_mode
+   208 000000F0 BE[98010000]            	mov	esi, msg_read_error
+   209 000000F5 E802000000              	call	print_msg		   ; INT 31h
+   210 000000FA EBBC                    	jmp	short cf_terminate
+   211                                  
+   212                                  print_msg:
+   213 000000FC BB0E000000              	mov	ebx, 0Eh       ; yellow characters (bl)
+   214                                  		               ; video page 0 (bh)
+   215                                  	;mov	ah, 0Eh ; teletype output (write tty)
+   216 00000101 88DC                    	mov	ah, bl
+   217 00000103 AC                      	lodsb
+   218                                  _1:
+   219 00000104 CD31                    	int	31h
+   220 00000106 AC                      	lodsb
+   221 00000107 20C0                    	and	al, al
+   222 00000109 75F9                    	jnz	short _1
+   223                                  _2:
+   224 0000010B C3                      	retn
+   225                                  
+   226                                  set_text_mode:
+   227 0000010C 30E4                    	xor    ah, ah
+   228 0000010E B003                    	mov    al, 3                        
+   229                                   	;int   10h             ; al = 03h text mode, int 10 video
+   230 00000110 CD31                    	int    31h ; TRDOS 386 - Video interrupt
+   231 00000112 C3                      	retn
+   232                                  
+   233 00000113 00000000                fhandle: dd 0
+   234                                  
+   235                                  
+   236                                  ;-----------------------------------------------------------------
+   237                                  ;  messages
+   238                                  ;-----------------------------------------------------------------
+   239                                  
+   240                                  msg_program:
+   241 00000117 0D0A                    	db 0Dh, 0Ah
+   242 00000119 4C4F41445043582E50-     	db "LOADPCX.PRG /// TRDOS 386 sysopen, sysread test program"
+   242 00000122 5247202F2F2F205452-
+   242 0000012B 444F53203338362073-
+   242 00000134 79736F70656E2C2073-
+   242 0000013D 797372656164207465-
+   242 00000146 73742070726F677261-
+   242 0000014F 6D                 
+   243 00000150 0D0A                    	db 0Dh, 0Ah
+   244 00000152 6279204572646F6761-     	db "by Erdogan Tan, 14/10/2016", 0Dh, 0Ah, 0
+   244 0000015B 6E2054616E2C203134-
+   244 00000164 2F31302F323031360D-
+   244 0000016D 0A00               
+   245                                  msg_open_error:
+   246 0000016F 0D0A                    	db 0Dh, 0Ah
+   247 00000171 7379736F70656E2065-     	db 'sysopen error !'
+   247 0000017A 72726F722021       
+   248 00000180 0D0A00                  	db 0Dh, 0Ah, 0
+   249                                  msg_not_found:
+   250 00000183 0D0A                    	db 0Dh, 0Ah
+   251 00000185 66696C65206E6F7420-     	db 'file not found !'
+   251 0000018E 666F756E642021     
+   252 00000195 0D0A00                  	db 0Dh, 0Ah, 0
+   253                                  msg_read_error:
+   254 00000198 0D0A                    	db 0Dh, 0Ah
+   255 0000019A 72656164206572726F-     	db 'read error !'
+   255 000001A3 722021             
+   256                                  nextline:
+   257 000001A6 0D0A00                  	db 0Dh, 0Ah, 0
+   258                                  ;bss
+   259                                  
+   260                                  BUFFER:
