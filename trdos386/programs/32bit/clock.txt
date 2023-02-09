@@ -1,0 +1,180 @@
+     1                                  ; ****************************************************************************
+     2                                  ; clock.s (TRDOS 386, TRDOS v2.0 - sample binary file, 'clock.s')
+     3                                  ; ---------------------------------------------------------------------------
+     4                                  ; CLOCK.PRG ! TEST program !
+     5                                  ; TRDOS 386 date & time interrupt test program (by Erdogan Tan)
+     6                                  ;
+     7                                  ; 28/05/2016
+     8                                  ;
+     9                                  ; [ Last Modification: 31/05/2016 ]
+    10                                  ;
+    11                                  ; ****************************************************************************
+    12                                  
+    13                                  [BITS 32]
+    14 00000000 BE[10010000]                    mov     esi, prg_msg
+    15 00000005 E8F2000000              	call	print_msg
+    16                                  
+    17 0000000A B400                    	mov 	ah, 0   ; set video mode
+    18 0000000C B003                    	mov 	al, 3   ; 80x25 text mode, CGA colors
+    19 0000000E CD31                    	int	31h     ; TRDOS 386 video interrupt
+    20                                  			; (IBM PC/AT ROMBIOS, INT 10h) 
+    21                                  rtc_p_next:
+    22                                  	; Check keyboard buffer
+    23 00000010 B411                    	mov	ah, 11h
+    24 00000012 CD32                    	int 	32h ; TRDOS 386 keyboard interrupt
+    25                                  		    ; (IBM PC/AT ROMBIOS, INT 16h)			
+    26 00000014 741E                    	jz	short rtc_p ; keyboard buffer empty
+    27                                  
+    28 00000016 E8DC000000              	call	getch
+    29 0000001B 3C1B                    	cmp	al, 1Bh
+    30 0000001D 7715                    	ja	short rtc_p
+    31                                  
+    32                                  terminate:
+    33 0000001F B801000000              	mov	eax, 1	; 'sysexit'
+    34 00000024 CD40                    	int	40h	; TRDOS 386 system call
+    35                                  hang:
+    36 00000026 90                      	nop
+    37 00000027 90                      	nop
+    38 00000028 90                      	nop
+    39 00000029 EBFB                    	jmp	short hang
+    40                                  
+    41                                  bcd_to_ascii:
+    42                                  	; INPUT ->
+    43                                  	;	AL = Packed BCD number
+    44                                  	; OUTPUT ->
+    45                                  	;	AX = ASCII word/number
+    46                                  	;
+    47 0000002B D410                    	db	0D4h, 10h	; Undocumented inst. AAM
+    48                                  				; AH = AL / 10h
+    49                                  				; AL = AL MOD 10h
+    50 0000002D 660D3030                	or	ax, '00'	; Make it ASCII based
+    51 00000031 86E0                            xchg	ah, al 
+    52 00000033 C3                      	retn	
+    53                                  
+    54                                  rtc_p:
+    55                                  	; Set cursor position
+    56 00000034 6631D2                  	xor	dx, dx  ; row 0, column 0
+    57 00000037 30FF                    	xor	bh, bh  ; Video page 0
+    58 00000039 B402                    	mov	ah, 2	; set cursor position
+    59 0000003B CD31                    	int	31h 	; TRDOS 386 video interrupt
+    60                                  
+    61                                  	; Print Real Time Clock content
+    62                                  	;
+    63 0000003D B402                    	mov	ah, 2	; read the time
+    64 0000003F CD35                    	int	35h	; TRDOS 386 date&time interrupt
+    65 00000041 72DC                    	jc	short terminate
+    66                                  
+    67 00000043 3A35[A4010000]          	cmp	dh, [time_second]
+    68 00000049 74C5                            je      short rtc_p_next
+    69                                  	
+    70 0000004B 8835[A4010000]                  mov     [time_second], dh
+    71                                          ;mov    [time_minute], cl
+    72                                          ;mov    [time_hour], ch
+    73 00000051 66890D[A5010000]                mov     [time_minute], cx
+    74                                  	;
+    75 00000058 B404                    	mov	ah, 4	; read the date
+    76 0000005A CD35                    	int	35h	; TRDOS 386 date&time interrupt
+    77                                  			; (IBM PC/AT ROMBIOS, INT 1Ah)
+    78 0000005C 72C1                            jc      short terminate
+    79                                  
+    80                                  	;mov	[date_day], dl
+    81                                  	;mov	[date_month], dh
+    82 0000005E 668915[A0010000]        	mov	[date_day], dx
+    83                                  	;mov	[date_year], cl
+    84                                  	;mov	[date_century], ch
+    85 00000065 66890D[A2010000]        	mov	[date_year], cx
+    86                                  	;
+    87 0000006C A0[A3010000]            	mov	al, [date_century]
+    88 00000071 E8B5FFFFFF              	call	bcd_to_ascii
+    89 00000076 66A3[90010000]          	mov	[datestr+6], ax
+    90 0000007C A0[A2010000]            	mov	al, byte [date_year]
+    91 00000081 E8A5FFFFFF              	call	bcd_to_ascii
+    92 00000086 66A3[92010000]          	mov	[datestr+8], ax
+    93 0000008C A0[A1010000]            	mov	al, byte [date_month]
+    94 00000091 E895FFFFFF              	call	bcd_to_ascii
+    95 00000096 66A3[8D010000]          	mov	[datestr+3], ax
+    96 0000009C A0[A0010000]            	mov	al, byte [date_day]
+    97 000000A1 E885FFFFFF              	call	bcd_to_ascii
+    98 000000A6 66A3[8A010000]          	mov	[datestr], ax
+    99                                  	;
+   100 000000AC A0[A6010000]                    mov     al, byte [time_hour]
+   101 000000B1 E875FFFFFF              	call	bcd_to_ascii
+   102 000000B6 66A3[96010000]          	mov	[timestr], ax
+   103 000000BC A0[A5010000]                    mov     al, byte [time_minute]
+   104 000000C1 E865FFFFFF              	call	bcd_to_ascii
+   105 000000C6 66A3[99010000]          	mov	[timestr+3], ax
+   106 000000CC A0[A4010000]                    mov     al, byte [time_second]
+   107 000000D1 E855FFFFFF              	call	bcd_to_ascii
+   108 000000D6 66A3[9C010000]          	mov	[timestr+6], ax
+   109                                  	;		
+   110 000000DC BB[78010000]            	mov	ebx, rtc_msg ; message offset
+   111 000000E1 B9FF000000              	mov	ecx, 255 ; message length 
+   112 000000E6 BA0F000000              	mov	edx, 0Fh ; white color
+   113 000000EB B823000000              	mov	eax, 35  ; 'sysmsg'
+   114 000000F0 CD40                    	int	40h	 ; TRDOS 386 system call
+   115                                  
+   116 000000F2 E919FFFFFF              	jmp	rtc_p_next  
+   117                                  
+   118                                  getch:
+   119                                  	; Getchar by using keyboard interrupt
+   120 000000F7 B410                    	mov	ah, 10h
+   121 000000F9 CD32                    	int 	32h ; TRDOS 386 keyboard interrupt
+   122                                  		    ; (IBM PC/AT ROMBIOS, INT 16h)			
+   123 000000FB C3                      	retn
+   124                                  
+   125                                  print_msg:
+   126 000000FC 66BB0700                	mov	bx, 7
+   127 00000100 B40E                            mov     ah, 0Eh
+   128                                  pmsg_loop:
+   129 00000102 AC                      	lodsb
+   130 00000103 20C0                    	and	al, al
+   131 00000105 7404                    	jz	short pmsg_ok
+   132 00000107 CD31                    	int	31h	; TRDOS 386 video interrupt
+   133 00000109 EBF7                    	jmp	short pmsg_loop	
+   134                                  pmsg_ok:
+   135 0000010B B410                    	mov	ah, 10h ; Getchar
+   136 0000010D CD32                    	int	32h	; TRDOS 386 keyboard interrupt
+   137 0000010F C3                      	retn
+   138                                  
+   139                                  ; /// MESSAGE - DATA ///
+   140                                  
+   141                                  prg_msg:
+   142 00000110 0D0A07                  	db 0Dh, 0Ah, 07h
+   143 00000113 5452444F5320333836-     	db 'TRDOS 386 RTC interrupt test program by Erdogan Tan [31/05/2016]'
+   143 0000011C 2052544320696E7465-
+   143 00000125 727275707420746573-
+   143 0000012E 742070726F6772616D-
+   143 00000137 206279204572646F67-
+   143 00000140 616E2054616E205B33-
+   143 00000149 312F30352F32303136-
+   143 00000152 5D                 
+   144 00000153 0D0A0D0A                	db 0Dh, 0Ah, 0Dh, 0Ah
+   145 00000157 28507265737320616E-             db '(Press any key to continue...)'
+   145 00000160 79206B657920746F20-
+   145 00000169 636F6E74696E75652E-
+   145 00000172 2E2E29             
+   146 00000175 0D0A00                  	db 0Dh, 0Ah, 0
+   147                                  
+   148                                  rtc_msg:
+   149 00000178 5265616C2054696D65-     	db "Real Time Clock - "
+   149 00000181 20436C6F636B202D20 
+   150                                  datestr:
+   151 0000018A 30302F30302F303030-     	db "00/00/0000"
+   151 00000193 30                 
+   152 00000194 2020                    	db "  "
+   153                                  timestr:	
+   154 00000196 30303A30303A3030                db "00:00:00"
+   155 0000019E 20                      	db " "
+   156 0000019F 00                      	db 0 
+   157                                  
+   158 000001A0 30                      date_day:     db 30h
+   159 000001A1 05                      date_month:   db 05h
+   160 000001A2 16                      date_year:    db 16h
+   161 000001A3 20                      date_century: db 20h
+   162                                  
+   163 000001A4 99                      time_second:  db 99h
+   164 000001A5 23                      time_minute:  db 23h
+   165 000001A6 01                      time_hour:    db 01h
+   166                                  
+   167 000001A7 00                      db 0
+   168 000001A8 495354414E42554C        db 'ISTANBUL'

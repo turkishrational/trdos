@@ -1,0 +1,172 @@
+     1                                  ; ****************************************************************************
+     2                                  ; font2.s (TRDOS 386, TRDOS v2.0 - sample binary file, 'font2.prg')
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; FONT2.PRG ! TEST program !  TRDOS 386 Video Function (font) test !
+     5                                  ;
+     6                                  ; 28/07/2016
+     7                                  ;
+     8                                  ; [ Last Modification: 29/07/2016 ]
+     9                                  ;
+    10                                  ; Assembler: NASM 2.11
+    11                                  ;
+    12                                  ; ****************************************************************************
+    13                                  
+    14                                  ; 19/05/2016
+    15                                  ; 29/04/2016
+    16                                  ; TRDOS 386 system calls (temporary list!)
+    17                                  _ver 	equ 0
+    18                                  _exit 	equ 1
+    19                                  _fork 	equ 2
+    20                                  _read 	equ 3
+    21                                  _write	equ 4
+    22                                  _open	equ 5
+    23                                  _close 	equ 6
+    24                                  _wait 	equ 7
+    25                                  _creat 	equ 8
+    26                                  _link 	equ 9
+    27                                  _unlink	equ 10
+    28                                  _exec	equ 11
+    29                                  _chdir	equ 12
+    30                                  _time 	equ 13
+    31                                  _mkdir 	equ 14
+    32                                  _chmod	equ 15
+    33                                  _chown	equ 16
+    34                                  _break	equ 17
+    35                                  _stat	equ 18
+    36                                  _seek	equ 19
+    37                                  _tell 	equ 20
+    38                                  _mount	equ 21
+    39                                  _umount	equ 22
+    40                                  _setuid	equ 23
+    41                                  _getuid	equ 24
+    42                                  _stime	equ 25
+    43                                  _quit	equ 26	
+    44                                  _intr	equ 27
+    45                                  _fstat	equ 28
+    46                                  _emt 	equ 29
+    47                                  _mdate 	equ 30
+    48                                  _video	equ 31
+    49                                  _audio	equ 32
+    50                                  _ilgins	equ 33
+    51                                  _sleep	equ 34
+    52                                  _msg    equ 35
+    53                                  _geterr equ 36
+    54                                  _rsrvd1	equ 37
+    55                                  _pri	equ 38
+    56                                  _rele 	equ 39
+    57                                  
+    58                                  %macro sys 1-4
+    59                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    60                                      ; 03/09/2015	
+    61                                      ; 13/04/2015
+    62                                      ; Retro UNIX 386 v1 system call.	
+    63                                      %if %0 >= 2   
+    64                                          mov ebx, %2
+    65                                          %if %0 >= 3    
+    66                                              mov ecx, %3
+    67                                              %if %0 = 4
+    68                                                 mov edx, %4   
+    69                                              %endif
+    70                                          %endif
+    71                                      %endif
+    72                                      mov eax, %1
+    73                                      ;int 30h
+    74                                      int 40h ; TRDOS 386 (TRDOS v2.0)	   
+    75                                  %endmacro
+    76                                  
+    77                                  ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
+    78                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    79                                  
+    80                                  [BITS 32] ; We need 32-bit intructions for protected mode
+    81                                  
+    82                                  [ORG 0] 
+    83                                  
+    84                                  start: 
+    85                                  
+    86 00000000 BE[77000000]            mov     esi, prg_msg
+    87 00000005 E81F000000              call	print_msg
+    88                                  
+    89 0000000A 66B80411                mov	ax, 1104h ; load vga 8x16 font
+    90 0000000E CD31                    int	31h
+    91                                  
+    92 00000010 66B80311                mov	ax, 1103h ; activate vga 8x16 font
+    93 00000014 CD31                    int	31h
+    94                                  
+    95 00000016 BE[3D000000]            mov     esi, font_msg
+    96 0000001B E809000000              call	print_msg
+    97                                  
+    98                                  terminate:
+    99                                  	sys 	_exit   ; INT 40h
+    99                              <1> 
+    99                              <1> 
+    99                              <1> 
+    99                              <1> 
+    99                              <1>  %if %0 >= 2
+    99                              <1>  mov ebx, %2
+    99                              <1>  %if %0 >= 3
+    99                              <1>  mov ecx, %3
+    99                              <1>  %if %0 = 4
+    99                              <1>  mov edx, %4
+    99                              <1>  %endif
+    99                              <1>  %endif
+    99                              <1>  %endif
+    99 00000020 B801000000          <1>  mov eax, %1
+    99                              <1> 
+    99 00000025 CD40                <1>  int 40h
+   100                                  here:
+   101 00000027 EBFE                    	jmp	short here
+   102                                  
+   103                                  print_msg:
+   104 00000029 66BB0700                	mov	bx, 7
+   105 0000002D B40E                            mov     ah, 0Eh
+   106                                  pmsg_loop:
+   107 0000002F AC                      	lodsb
+   108 00000030 20C0                    	and	al, al
+   109 00000032 7404                    	jz	short pmsg_ok
+   110 00000034 CD31                    	int	31h	; TRDOS 386 video interrupt
+   111 00000036 EBF7                    	jmp	short pmsg_loop	
+   112                                  pmsg_ok:
+   113 00000038 B410                    	mov	ah, 10h ; Getchar
+   114 0000003A CD32                    	int	32h	; TRDOS 386 keyboard interrupt
+   115 0000003C C3                      	retn
+   116                                  
+   117                                  font_msg:
+   118 0000003D 0D0A                    db	0Dh, 0Ah
+   119 0000003F 0D0A                    db	0Dh, 0Ah
+   120 00000041 56474120464F4E5420-     db	'VGA FONT 8x16'
+   120 0000004A 38783136           
+   121 0000004E 0D0A                    db	0Dh, 0Ah
+   122 00000050 303132333435363738-     db	'0123456789ABCDEFGHIJKLMNOPQRSTUXVWYZ'
+   122 00000059 394142434445464748-
+   122 00000062 494A4B4C4D4E4F5051-
+   122 0000006B 52535455585657595A 
+   123 00000074 0D0A                    db	0Dh, 0Ah
+   124 00000076 00                      db	0
+   125                                  
+   126                                  prg_msg:
+   127 00000077 4552444F47414E2054-     db	'ERDOGAN TAN - TRDOS 386 - VGA FONT Test Program - FONT2.PRG'
+   127 00000080 414E202D205452444F-
+   127 00000089 5320333836202D2056-
+   127 00000092 474120464F4E542054-
+   127 0000009B 6573742050726F6772-
+   127 000000A4 616D202D20464F4E54-
+   127 000000AD 322E505247         
+   128 000000B2 0D0A                    db 	0Dh, 0Ah,
+   129 000000B4 32392F30372F323031-     db	'29/07/2016'
+   129 000000BD 36                 
+   130 000000BE 0D0A                    db	0Dh, 0Ah
+   131 000000C0 0D0A                    db	0Dh, 0Ah
+   132 000000C2 303132333435363738-     db	'0123456789ABCDEFGHIJKLMNOPQRSTUXVWYZ'
+   132 000000CB 394142434445464748-
+   132 000000D4 494A4B4C4D4E4F5051-
+   132 000000DD 52535455585657595A 
+   133 000000E6 0D0A                    db     0Dh, 0Ah
+   134 000000E8 0D0A                    db	0Dh, 0Ah
+   135 000000EA 507265737320616E79-     db	'Press any key to continue...'
+   135 000000F3 206B657920746F2063-
+   135 000000FC 6F6E74696E75652E2E-
+   135 00000105 2E                 
+   136 00000106 00                      db 	0
+   137 00000107 90                      align 2
+   138 00000108 [0A01]                  dw	_end
+   139                                  _end:

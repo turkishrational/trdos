@@ -1,0 +1,1042 @@
+     1                                  ; BOARDZ.S (NASM version of BOARDZ.ASM)
+     2                                  ;==============================================================================;
+     3                                  ;                                                                              ;
+     4                                  ;       Assembler program by Vulture.                                          ;
+     5                                  ;       This program scrolls a text and displays a 3d-starfield.               ;
+     6                                  ;       It's a BBS advertisement.                                              ;
+     7                                  ;                                                                              ;
+     8                                  ;       Current Date: 13-2-95         Vulture                                  ;
+     9                                  ;                                                                              ;
+    10                                  ;==============================================================================;
+    11                                  
+    12                                  ; NASM version: Erdogan Tan, 01/10/2016
+    13                                  
+    14                                  ; === MAIN PROGRAM ===
+    15                                  
+    16                                  [Bits 16]   ; Real Mode (MSDOS) Program
+    17                                  
+    18                                  [org 100h]  ; MSDOS COM File
+    19                                  
+    20                                  START:
+    21 00000000 FA                          cli                         ; Clear interrupt flag
+    22 00000001 E8C600                      call    SetVGA              ; Get in GFX-mode
+    23                                  
+    24                                  ; === Set the palette ===
+    25 00000004 8CC8                        mov     ax,cs               ; Move CS into AX
+    26 00000006 8ED8                        mov     ds,ax
+    27 00000008 8EC0                        mov     es,ax               ; es points to codesegment
+    28                                      ;mov    ss,ax
+    29                                  
+    30                                      ; clear BSS
+    31 0000000A 31C0                        xor     ax, ax
+    32 0000000C BF[CA12]                    mov     di, bss_start
+    33 0000000F B9CB0B                      mov     cx, (bss_end-bss_start)+1
+    34 00000012 D1E9                        shr     cx, 1
+    35 00000014 F3AB                        rep     stosw
+    36                                  
+    37 00000016 B81210                      mov     ax,1012h            ; Select write palette function
+    38 00000019 BB0000                      mov     bx,0                ; Start at color 0
+    39 0000001C B91700                      mov     cx,23               ; Write 23 colors
+    40 0000001F BA[8812]                    mov     dx,Palette   	; es:dx points to palette data
+    41 00000022 CD10                        int     10h                 ; Call VID interrupt & set palette
+    42 00000024 E8BD00                      call    SavePalette         ; And save palette into array
+    43                                  
+    44                                  ; === Initialize pointers ===
+    45 00000027 B800A0                      mov     ax,0a000h
+    46 0000002A 8EC0                        mov     es,ax               ; es points to VGA
+    47 0000002C 8CC8                        mov     ax,cs
+    48 0000002E 8ED8                        mov     ds,ax               ; ds points to codesegment (data)
+    49                                  
+    50                                  ; === Start scroll ===
+    51                                  Reset:
+    52 00000030 8D36[6E02]                  lea     si, [Text]          ; si points to start of Text
+    53                                  Mainthing:                      ; Main loop
+    54 00000034 AC                          lodsb                       ; Load a character in al    (si increased)
+    55 00000035 3C00                        cmp     al,0                ; Have we reached the end of da text ?
+    56 00000037 74F7                        je      short Reset         ; Yep => Start over
+    57 00000039 56                          push    si                  ; Save character-offset on stack
+    58 0000003A 89C3                        mov     bx,ax               ; Save the character into bx
+    59 0000003C B90000                      mov     cx,0                ; Set character-counter for position in font
+    60 0000003F 8D36[2F03]                  lea     si, [Order]         ; si points to offset Order
+    61                                  Again:
+    62 00000043 AC                          lodsb                       ; Load the order-character (abcdef etc...)
+    63 00000044 39D8                        cmp     ax,bx               ; Is it da same letter/character ?
+    64 00000046 7403                        je      short Found         ; Yeah => Found it. . .
+    65 00000048 41                          inc     cx                  ; Nope => Increase character-counter
+    66 00000049 EBF8                        jmp     short Again         ; Compare with next character
+    67                                  Found:
+    68 0000004B B80800                      mov     ax,8                ; 7 pixels + black pixel = 8 pixels
+    69 0000004E F7E1                        mul     cx                  ; ax=ax*cx    (e.g:  E := 4 * 10;)
+    70                                  
+    71 00000050 BB0400                      mov     bx,4                ; Draw 4 * 2 vertical lines
+    72                                  Hloop:
+    73 00000053 8D36[5603]                  lea     si, [Font]          ; si points to start of Font
+    74 00000057 01C6                        add     si,ax               ; si now points to character
+    75 00000059 BFC071                      mov     di,320*91           ; di points to startposition on VGA
+    76 0000005C B90900                      mov     cx,9                ; Write 9 horizontal
+    77                                  Vloop:
+    78 0000005F 51                          push    cx                  ; Save first loop-counter
+    79 00000060 B90200                      mov     cx,2                ; Draw 2 new horizontal pixels
+    80 00000063 F3A4                        repz    movsb               ; And go !
+    81 00000065 81C73E01                    add     di,318              ; Point to next location on VGA
+    82 00000069 81C63E01                    add     si,318              ; Point to next source-location
+    83 0000006D 59                          pop     cx                  ; Restore loop-counter
+    84 0000006E E2EF                        loop    Vloop               ; Loop 9 times
+    85                                  ; === Scroll the text and improve stars ===
+    86 00000070 50                          push    ax                  ; Save pointer to character
+    87 00000071 B800A0                      mov     ax,0a000h           ; VGA-segment
+    88 00000074 8ED8                        mov     ds,ax               ; ds points to VGA
+    89 00000076 BE8270                      mov     si,320*90+2         ; Destination offset
+    90 00000079 BF8070                      mov     di,320*90           ; Source offset
+    91 0000007C B9800C                      mov     cx,10*320           ; Repeat factor => Number of bytes to copy
+    92 0000007F F3A4                        rep     movsb               ; And go ! (Hint: why not use words instead)
+    93                                  
+    94 00000081 BF407E                      mov     di,320*101          ; On some slow VGA-cards we have to plot
+    95 00000084 B90500                      mov     cx,5                ; 5 black pixels just below the scroller
+    96 00000087 B000                        mov     al,0                ; on the left on the screen. Erase this
+    97 00000089 F3AA                        rep     stosb               ; code to see what I mean.
+    98                                  
+    99 0000008B 8CC8                        mov     ax, cs
+   100 0000008D 8ED8                        mov     ds, ax
+   101                                  	
+   102 0000008F E84400                      call    WaitVrt             ; Wait for vertical retrace
+   103 00000092 E8AB00                      call    CalcStar            ; Calculate new stars
+   104 00000095 E81801                      call    ShowStars           ; Show all stars on VGA
+   105                                  
+   106                                  ; === Want to quit ? ===
+   107                                      ;in     al,60h              ; Was ESCAPE pressed ?
+   108                                      ;cmp    al,1
+   109                                      ;je     QuitNow             ; If so, quit now. . .
+   110 00000098 B401                        mov	    ah, 1
+   111 0000009A CD16                        int     16h
+   112 0000009C 750A                        jnz     short check_CR_key
+   113                                  
+   114                                  ; === No quit ? then continue ===
+   115 0000009E 58                          pop     ax                  ; Restore pointer to character
+   116 0000009F 83C002                      add     ax,2                ; And add 2 to point to next 2 vertical lines
+   117 000000A2 4B                          dec     bx                  ; Decrease line-counter
+   118 000000A3 75AE                        jnz     short Hloop         ; If it's 0 then jump
+   119 000000A5 5E                          pop     si                  ; Restore character-offset to do next char
+   120 000000A6 EB8C                        jmp     short Mainthing     ; And start over again
+   121                                  
+   122                                  check_CR_key:
+   123 000000A8 58                          pop     ax
+   124 000000A9 5E                          pop     si
+   125                                  
+   126 000000AA 30E4                        xor	    ah, ah
+   127 000000AC CD16                        int     16h
+   128 000000AE 3C0D                        cmp     al, 13  ; Carriage Return (ENTER) Key ?
+   129 000000B0 7405                        je	    short QuitNow
+   130 000000B2 C606[3802]24                mov	    byte [NewMessage], '$' ; Hide the new (2016) message !
+   131                                  
+   132                                  QuitNow:                        ; Quit everything
+   133 000000B7 E84500                      call    FadeOut             ; Fade da screen to black
+   134 000000BA E81300                      call    SetText             ; Get in TXT-mode
+   135                                     
+   136                                      ; ds points to codesegment (data)
+   137 000000BD 8D16[2402]                  lea     dx, [Message]       ; Load offset message
+   138 000000C1 B409                        mov     ah,9                ; Select function 9 (print string)
+   139 000000C3 CD21                        int     21h                 ; Print the message
+   140 000000C5 B8004C                      mov     ax,4c00h            ; Quit program
+   141 000000C8 CD21                        int     21h
+   142                                  
+   143                                  ; === PROCEDURES ===
+   144                                  
+   145                                  SetVGA:				; Get into VGA mode
+   146 000000CA B81300                      mov     ax,0013h            ; Set the videomode 320*200*256
+   147 000000CD CD10                        int     10h                 ; Call VID interrupt
+   148 000000CF C3                          retn
+   149                                  
+   150                                  SetText:			; Get into character mode
+   151 000000D0 B80300                      mov     ax,0003h            ; Set 80x25x16 char mode
+   152 000000D3 CD10                        int     10h                 ; Call VID interrupt
+   153 000000D5 C3                          retn
+   154                                  
+   155                                  WaitVrt:			; Waits for vertical retrace to reduce "snow"
+   156 000000D6 BADA03                      mov     dx,3dah
+   157                                  Vrt:
+   158 000000D9 EC                          in      al,dx
+   159 000000DA A808                        test    al,8
+   160 000000DC 75FB                        jnz     short Vrt		; Wait until Verticle Retrace starts
+   161                                  NoVrt:
+   162 000000DE EC                          in      al,dx
+   163 000000DF A808                        test    al,8
+   164 000000E1 74FB                        jz      short NoVrt		; Wait until Verticle Retrace ends
+   165 000000E3 C3                          retn                        ; Return to main program
+   166                                  
+   167                                  SavePalette:			; Saves entire palette in array
+   168 000000E4 FA                          cli                         ; Disable interrupts
+   169 000000E5 BD[CA12]                    mov     bp, PaletteArray    ; Point to start of array
+   170 000000E8 B90003                      mov     cx,768              ; Save all R,G,B registers
+   171 000000EB BAC703                      mov     dx,03c7h            ; Read register
+   172 000000EE B000                        mov     al,0                ; Start at 0
+   173 000000F0 EE                          out     dx,al               ; Write to port
+   174 000000F1 BAC903                      mov     dx,03c9h            ; Read data register
+   175                                  Grab:
+   176 000000F4 EC                          in      al,dx               ; Read value from port
+   177 000000F5 243F                        and     al,3fh              ; Mask of upper 2 bits
+   178 000000F7 884600                      mov     byte [bp],al        ; Store the value in array
+   179 000000FA 45                          inc     bp                  ; Point to the next one
+   180 000000FB E2F7                        loop    Grab                ; Loop until cx = 0
+   181 000000FD FB                          sti                         ; Enable interrupts
+   182 000000FE C3                          retn                        ; Return to main program
+   183                                  
+   184                                  FadeOut:			; Fades screen to black
+   185 000000FF FA                          cli                         ; Disable interrupts
+   186 00000100 BD[CA12]                    mov     bp,PaletteArray     ; Point to start of array
+   187 00000103 B94000                      mov     cx,64               ; Repeat 64 times (0..63)
+   188                                  OneCycle:
+   189 00000106 BB0000                      mov     bx,0                ; Set counter
+   190                                  Decrease:
+   191 00000109 807E0000                    cmp     byte [bp],0         ; Is it 0 already ?
+   192 0000010D 7403                        je      short Fading        ; Yep => Do the next
+   193 0000010F FE4E00                      dec     byte [bp]           ; Nope => Decrease by one
+   194                                  Fading:
+   195 00000112 45                          inc     bp                  ; Point to next value
+   196 00000113 43                          inc     bx                  ; Increase counter
+   197 00000114 81FB0003                    cmp     bx,768              ; Have we reached the end ?
+   198 00000118 7CEF                        jl      short Decrease      ; No => Do another one
+   199 0000011A 51                          push    cx                  ; Save 1st loop counter
+   200 0000011B E8B8FF                      call    WaitVrt             ; Wait for retrace
+   201 0000011E 81ED0003                    sub     bp,768              ; Point to start
+   202 00000122 BB0000                      mov     bx,0                ; Reset counter
+   203 00000125 B90003                      mov     cx,768              ; Do all colors
+   204 00000128 BAC803                      mov     dx,03c8h            ; Write register
+   205 0000012B B000                        mov     al,0                ; Start at 0
+   206 0000012D EE                          out     dx,al               ; Write to port
+   207 0000012E 42                          inc     dx                  ; Writing => 03c8h + 1 = 03c9h
+   208                                  WriteAll:
+   209 0000012F 8A4600                      mov     al,byte [bp]    ; Store value in al
+   210 00000132 EE                          out     dx,al               ; Give it to the VGA
+   211 00000133 45                          inc     bp                  ; Point to next one
+   212 00000134 43                          inc     bx                  ; Increase counter
+   213 00000135 E2F8                        loop    WriteAll            ; Loop while cx > 0
+   214 00000137 59                          pop     cx                  ; Restore 1st loop counter
+   215 00000138 81ED0003                    sub     bp,768              ; Point to start
+   216 0000013C E2C8                        loop    OneCycle            ; Loop while cx > 0
+   217 0000013E FB                          sti                         ; Enable interrupts
+   218 0000013F C3                          retn                        ; Return to main program
+   219                                  
+   220                                  CalcStar:
+   221 00000140 60                          pusha                               ; Put all registers on stack
+   222 00000141 BE[CA15]                    mov     si, Stars                   ; si points to first star
+   223                                  StartCalc:                              ; Start searching for empty slots
+   224 00000144 813E[8612]FA00              cmp     word [NumActive], MaxStars  ; Check for room
+   225 0000014A 7362                        jae     short NoEmptySpace		; No room => exit
+   226                                  
+   227                                  SearchSlot:
+   228 0000014C 837C0400                    cmp     word [Stars_Z+si],MinZ  ; If Z = 0 then slot is empty
+   229 00000150 740B                        je      short FillSlot
+   230                                  
+   231 00000152 83C609                      add     si,StarStrucSize            ; si points to next star
+   232 00000155 81FE[941E]                  cmp     si,Stars+(StarStrucSize*MaxStars) ; Have we done entire array ?
+   233 00000159 72F1                        jb      short SearchSlot		; No => search again
+   234 0000015B EB51                        jmp     short NoEmptySpace		; Yes => exit
+   235                                  
+   236                                  FillSlot:
+   237 0000015D 8B3E[8012]                  mov     di,[XIndex]                 ; Grab Xindex and put it in di
+   238 00000161 01FF                        add     di,di                       ; Make WORD index
+   239 00000163 8B85[960E]                  mov     ax,[Numbers+di]             ; Get the number
+   240 00000167 C1E003                      shl     ax,3                        ; Multiply by 8   
+   241 0000016A 8904                        mov     [Stars_X+si],ax             ; Save the number
+   242                                  
+   243 0000016C 8B3E[8212]                  mov     di,[YIndex]                 ; Do the same for Y
+   244 00000170 01FF                        add     di,di
+   245 00000172 8B85[960E]                  mov     ax,[Numbers+di]
+   246 00000176 C1E003                      shl     ax,3
+   247 00000179 894402                      mov     [Stars_Y+si],ax
+   248                                  
+   249 0000017C C744040010                  mov     word [Stars_Z+si],MaxZ      ; Give star the Z offset
+   250 00000181 B000                        mov     al,0                        ; Also give it basecolor 0 (black)   
+   251 00000183 884408                      mov     [Stars_Col+si],al           ; Store the color
+   252                                  
+   253 00000186 FF06[8612]                  inc     word [NumActive]            ; Increase star counter
+   254                                  
+   255 0000018A FF06[8012]                  inc     word [XIndex]               ; Increase the X index
+   256 0000018E 813E[8012]F401              cmp     word [XIndex],MaxNumbers    ; Have we reached the end of the list?
+   257 00000194 7206                        jb      short XindNotMax            ; No => continue
+   258 00000196 C706[8012]0000              mov     word [XIndex],0             ; Yes => go to start of list
+   259                                  
+   260                                  XindNotMax:
+   261 0000019C FF06[8212]                  inc     word [YIndex]               ; Increase the Y index   
+   262 000001A0 813E[8212]F401              cmp     word [YIndex],MaxNumbers    ; Have we reached the end of the list?
+   263 000001A6 729C                        jb      short StartCalc             ; No => continue
+   264 000001A8 C706[8212]0000              mov     word [YIndex],0             ; Yes => go to start of list
+   265                                      
+   266                                  NoEmptySpace:
+   267 000001AE 61                          popa                                ; Restore all registers
+   268 000001AF C3                          retn                                ; Return to main program   
+   269                                  
+   270                                  ShowStars:
+   271 000001B0 60                          pusha                        ; Save all registers
+   272 000001B1 BE[CA15]                    mov     si, Stars            ; si points to first record
+   273                                  ShowLoop:
+   274 000001B4 8B4C04                      mov     cx,[Stars_Z+si]      ; Grab Z value of star
+   275 000001B7 83F900                      cmp     cx,0                 ; If Z = 0 then exit
+   276 000001BA 745D                        je      short ContinueStar   ; Do the next star
+   277                                  
+   278 000001BC 8B7C06                      mov     di,[Stars_Old+si]    ; Get old position of star
+   279 000001BF 26C60500                    mov     byte [es:di],0       ; Erase the old star
+   280                                  
+   281 000001C3 8B04                        mov     ax,[Stars_X+si]      ; Grab X value of star
+   282 000001C5 BA0001                      mov     dx,256               ; Multiply X with 256
+   283 000001C8 F7EA                        imul    dx
+   284 000001CA F7F9                        idiv    cx                   ; Divide by Z
+   285 000001CC 05A000                      add     ax,ScreenWidth/2     ; Add 160 to center it on the screen
+   286 000001CF 89C7                        mov     di,ax                ; di = X
+   287 000001D1 81FF4001                    cmp     di,ScreenWidth       ; Is the star in range ?
+   288 000001D5 7339                        jae     short TermStar       ; No => Do next star
+   289                                  
+   290 000001D7 8B4402                      mov     ax,[Stars_Y+si]      ; Grab an Y value
+   291 000001DA BA0001                      mov     dx,256               ; Multiply Y with 256
+   292 000001DD F7EA                        imul    dx
+   293 000001DF F7F9                        idiv    cx                   ; Divide by Z (a bit slow but who carez)
+   294 000001E1 83C064                      add     ax,ScreenHeight/2    ; Add 100 to center it on the screen
+   295 000001E4 3DC800                      cmp     ax,ScreenHeight      ; Is the star in range ?
+   296 000001E7 7327                        jae     short TermStar       ; No => Do next star
+   297 000001E9 83F85A                      cmp     ax,90                ; Do not affect scroller
+   298 000001EC 7C05                        jl      short InRange
+   299 000001EE 83F864                      cmp     ax,100               ; Text scrolls between 90 & 100
+   300 000001F1 761D                        jna     short TermStar       ; Star affects scroller so terminate it
+   301                                  
+   302                                  InRange:
+   303 000001F3 69C04001                    imul    ax,ScreenWidth       ; ax = Y * ScreenWidth
+   304 000001F7 01C7                        add     di,ax                ; di = X + (Y * 320) 
+   305                                  
+   306 000001F9 897C06                      mov     [Stars_Old+si],di    ; Save the position
+   307                                  
+   308 000001FC 026C08                      add     ch, [Stars_Col+si]   ; Divide Z by 256 & add basecolor 0
+   309 000001FF 88E8                        mov     al,ch                ; Move color into al
+   310 00000201 0405                        add     al,5                 ; Add 5 to avoid fontcolors
+   311                                  
+   312 00000203 268805                      mov     byte [es:di],al  	 ; Place the dot on the screen
+   313                                  
+   314 00000206 A1[8412]                    mov     ax,[WarpSpeed]
+   315 00000209 29C1                        sub     cx,ax                ; Decrease Z with WarpSpeed
+   316 0000020B 894C04                      mov     [Stars_Z+si],cx      ; Save the new Z
+   317                                  
+   318 0000020E EB09                        jmp     short ContinueStar   ; Do the next star
+   319                                  
+   320                                  TermStar:
+   321 00000210 C744040000                  mov     word [Stars_Z+si],MinZ ; Set Z to 0 => Star is terminated
+   322 00000215 FF0E[8612]                  dec     word [NumActive]     ; Decrease number of active stars
+   323                                  
+   324                                  ContinueStar:
+   325 00000219 83C609                      add     si,StarStrucSize     ; si points to next record
+   326 0000021C 81FE[941E]                  cmp     si,Stars+(StarStrucSize*MaxStars) ; Reached end of array ?
+   327 00000220 7292                        jb      short ShowLoop       ; Continue with next star
+   328                                  
+   329 00000222 61                          popa                         ; Restore all registers
+   330 00000223 C3                          retn                         ; Return to main program
+   331                                  
+   332                                  ; === DATA ===   
+   333                                  
+   334                                  ;%include 'FONT.DAT'    ; File with font data
+   335                                  ;%include 'NUMBERS.DAT' ; Include 500 random numbers between -200 and 200
+   336                                  
+   337                                  ;Message: DB   13,10,"Code by Vulture.",13,10,"$"  ; Important message  :)
+   338 00000224 0D0A436F6465206279-     Message: DB   13,10,"Code by Vulture.",13,10
+   339 0000022D 2056756C747572652E-
+   340 00000236 0D0A               
+   341 00000238 526570726F6772616D-     NewMessage: DB "Reprogrammed by Erdogan Tan (via NASM), 01/10/2016." 
+   342 00000241 6D6564206279204572-
+   343 0000024A 646F67616E2054616E-
+   344 00000253 2028766961204E4153-
+   345 0000025C 4D292C2030312F3130-
+   346 00000265 2F323031362E       
+   347 0000026B 0D0A24                           DB 13, 10, "$"
+   348                                  
+   349 0000026E 696620752077616E6E-     Text:   DB 'if u wanna experience some cewl boardz in the netherlands '
+   350 00000277 612065787065726965-
+   351 00000280 6E636520736F6D6520-
+   352 00000289 6365776C20626F6172-
+   353 00000292 647A20696E20746865-
+   354 0000029B 206E65746865726C61-
+   355 000002A4 6E647320           
+   356 000002A8 63616C6C2066697265-             DB 'call firehouse 058-661590    detonator 05111-4307   or   '
+   357 000002B1 686F75736520303538-
+   358 000002BA 2D3636313539302020-
+   359 000002C3 20206465746F6E6174-
+   360 000002CC 6F722030353131312D-
+   361 000002D5 343330372020206F72-
+   362 000002DE 202020             
+   363 000002E1 6D61726B206F662063-             DB 'mark of cain 058-672111      cu around. . . . . .'
+   364 000002EA 61696E203035382D36-
+   365 000002F3 373231313120202020-
+   366 000002FC 202063752061726F75-
+   367 00000305 6E642E202E202E202E-
+   368 0000030E 202E202E           
+   369 00000312 202020202020202020-             DB '                            ',0           ; Text to scroll
+   370 0000031B 202020202020202020-
+   371 00000324 202020202020202020-
+   372 0000032D 2000               
+   373                                  
+   374 0000032F 616263646566676869-     Order:  DB 'abcdefghijklmnopqrstuvwxyz0123456789-. '  ; Order of characters
+   375 00000338 6A6B6C6D6E6F707172-
+   376 00000341 737475767778797A30-
+   377 0000034A 313233343536373839-
+   378 00000353 2D2E20             
+   379                                  
+   380                                  align 2
+   381                                  
+   382                                  Font:
+   383 00000356 000202020202000002-     db 0,2,2,2,2,2,0,0,2,2,2,2,2,2,0,0,0,2,2,2
+   384 0000035F 020202020200000002-
+   385 00000368 0202               
+   386 0000036A 020200000202020202-     db 2,2,0,0,2,2,2,2,2,2,0,0,2,2,2,2,2,2,2,0
+   387 00000373 020000020202020202-
+   388 0000037C 0200               
+   389 0000037E 020202020202030000-     db 2,2,2,2,2,2,3,0,0,2,2,2,2,2,0,0,2,2,0,0
+   390 00000387 020202020200000202-
+   391 00000390 0000               
+   392 00000392 000202000202020202-     db 0,2,2,0,2,2,2,2,2,3,3,0,0,0,0,0,0,2,3,0
+   393 0000039B 030300000000000002-
+   394 000003A4 0300               
+   395 000003A6 020200000002030002-     db 2,2,0,0,0,2,3,0,2,2,0,0,0,0,0,0,2,2,3,0
+   396 000003AF 020000000000000202-
+   397 000003B8 0300               
+   398 000003BA 020202000202020202-     db 2,2,2,0,2,2,2,2,2,2,0,0,0,2,2,2,2,2,0,0
+   399 000003C3 020000000202020202-
+   400 000003CC 0000               
+   401 000003CE 020202020202000000-     db 2,2,2,2,2,2,0,0,0,2,2,2,2,2,0,0,2,2,2,2
+   402 000003D7 020202020200000202-
+   403 000003E0 0202               
+   404 000003E2 020200000002020202-     db 2,2,0,0,0,2,2,2,2,2,2,0,2,2,2,2,2,3,3,0
+   405 000003EB 020200020202020203-
+   406 000003F4 0300               
+   407 000003F6 020200000002020002-     db 2,2,0,0,0,2,2,0,2,3,0,0,0,2,2,0,2,2,0,0
+   408 000003FF 030000000202000202-
+   409 00000408 0000               
+   410 0000040A 000202000202000000-     db 0,2,2,0,2,2,0,0,0,2,2,0,2,2,0,0,0,2,2,0
+   411 00000413 020200020200000002-
+   412 0000041C 0200               
+   413 0000041E 020202020202020000-     db 2,2,2,2,2,2,2,0,0,0,2,2,2,2,2,0,0,0,0,0
+   414 00000427 000202020202000000-
+   415 00000430 0000               
+   416 00000432 020200000002020202-     db 2,2,0,0,0,2,2,2,2,2,2,0,0,2,2,2,2,2,2,0
+   417 0000043B 020200000202020202-
+   418 00000444 0200               
+   419 00000446 000202000000020200-     db 0,2,2,0,0,0,2,2,0,2,2,2,2,2,2,2,0,0,2,2
+   420 0000044F 020202020202020000-
+   421 00000458 0202               
+   422 0000045A 020202000002020202-     db 2,2,2,0,0,2,2,2,2,2,2,0,0,0,2,2,2,2,2,0
+   423 00000463 020200000002020202-
+   424 0000046C 0200               
+   425 0000046E 000002020202020000-     db 0,0,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0
+   426 00000477 000000000000000000-
+   427 00000480 0000               
+   428 00000482 000000000000000000-     db 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+   429 0000048B 000000000000000000-
+   430 00000494 0000               
+   431 00000496 020200000002020002-     db 2,2,0,0,0,2,2,0,2,2,0,0,0,2,2,0,2,2,0,0
+   432 0000049F 020000000202000202-
+   433 000004A8 0000               
+   434 000004AA 000203000202000003-     db 0,2,3,0,2,2,0,0,3,2,3,0,2,2,0,0,0,0,0,0
+   435 000004B3 020300020200000000-
+   436 000004BC 0000               
+   437 000004BE 020200000000000002-     db 2,2,0,0,0,0,0,0,2,2,0,0,0,2,3,0,2,2,0,0
+   438 000004C7 020000000203000202-
+   439 000004D0 0000               
+   440 000004D2 000203000000020200-     db 0,2,3,0,0,0,2,2,0,0,0,0,0,0,0,0,0,2,3,0
+   441 000004DB 000000000000000002-
+   442 000004E4 0300               
+   443 000004E6 020200000203000002-     db 2,2,0,0,2,3,0,0,2,2,0,0,0,0,0,0,2,2,2,2
+   444 000004EF 020000000000000202-
+   445 000004F8 0202               
+   446 000004FA 030203000203000003-     db 3,2,3,0,2,3,0,0,3,2,3,0,2,2,0,0,0,2,3,0
+   447 00000503 020300020200000002-
+   448 0000050C 0300               
+   449 0000050E 020200000002020002-     db 2,2,0,0,0,2,2,0,2,2,0,0,0,2,2,0,2,2,0,0
+   450 00000517 020000000202000202-
+   451 00000520 0000               
+   452 00000522 000202000202000000-     db 0,2,2,0,2,2,0,0,0,0,0,0,0,0,2,2,0,0,0,0
+   453 0000052B 000000000002020000-
+   454 00000534 0000               
+   455 00000536 020300000002030002-     db 2,3,0,0,0,2,3,0,2,3,0,0,0,2,3,0,2,3,0,0
+   456 0000053F 030000000203000203-
+   457 00000548 0000               
+   458 0000054A 000203000302030003-     db 0,2,3,0,3,2,3,0,3,2,3,0,2,2,0,0,0,2,3,0
+   459 00000553 020300020200000002-
+   460 0000055C 0300               
+   461 0000055E 000000000002020000-     db 0,0,0,0,0,2,2,0,0,2,2,0,0,0,2,3,0,0,0,0
+   462 00000567 020200000002030000-
+   463 00000570 0000               
+   464 00000572 020200000000000000-     db 2,2,0,0,0,0,0,0,0,0,2,2,0,0,0,0,0,0,2,2
+   465 0000057B 000202000000000000-
+   466 00000584 0202               
+   467 00000586 000203000000020300-     db 0,2,3,0,0,0,2,3,0,2,2,0,0,0,0,0,0,2,2,0
+   468 0000058F 020200000000000002-
+   469 00000598 0200               
+   470 0000059A 000002030000000000-     db 0,0,2,3,0,0,0,0,0,3,2,3,0,2,2,0,0,0,2,3
+   471 000005A3 030203000202000000-
+   472 000005AC 0203               
+   473 000005AE 000202000000020300-     db 0,2,2,0,0,0,2,3,0,0,0,0,0,0,0,0,0,0,0,0
+   474 000005B7 000000000000000000-
+   475 000005C0 0000               
+   476 000005C2 000000000000000000-     db 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+   477 000005CB 000000000000000000-
+   478 000005D4 0000               
+   479 000005D6 020200000002020002-     db 2,2,0,0,0,2,2,0,2,2,0,0,0,2,2,0,2,3,0,0
+   480 000005DF 020000000202000203-
+   481 000005E8 0000               
+   482 000005EA 000000000203000000-     db 0,0,0,0,2,3,0,0,0,2,3,0,2,3,0,0,0,0,0,0
+   483 000005F3 020300020300000000-
+   484 000005FC 0000               
+   485 000005FE 020300000000000002-     db 2,3,0,0,0,0,0,0,2,3,0,0,0,0,0,0,2,3,0,0
+   486 00000607 030000000000000203-
+   487 00000610 0000               
+   488 00000612 000203000000020300-     db 0,2,3,0,0,0,2,3,0,0,0,0,0,0,0,0,0,2,3,0
+   489 0000061B 000000000000000002-
+   490 00000624 0300               
+   491 00000626 020300020300000002-     db 2,3,0,2,3,0,0,0,2,3,0,0,0,0,0,0,2,3,0,3
+   492 0000062F 030000000000000203-
+   493 00000638 0003               
+   494 0000063A 000203000203000000-     db 0,2,3,0,2,3,0,0,0,2,3,0,2,3,0,0,0,2,3,0
+   495 00000643 020300020300000002-
+   496 0000064C 0300               
+   497 0000064E 020200000002030002-     db 2,2,0,0,0,2,3,0,2,3,0,0,0,2,3,0,2,2,0,0
+   498 00000657 030000000203000202-
+   499 00000660 0000               
+   500 00000662 000203000203000000-     db 0,2,3,0,2,3,0,0,0,0,0,0,0,0,2,3,0,0,0,0
+   501 0000066B 000000000002030000-
+   502 00000674 0000               
+   503 00000676 020300000002030002-     db 2,3,0,0,0,2,3,0,2,2,0,0,0,2,3,0,2,3,0,0
+   504 0000067F 020000000203000203-
+   505 00000688 0000               
+   506 0000068A 000203000003020302-     db 0,2,3,0,0,3,2,3,2,3,0,0,2,2,3,0,2,2,3,0
+   507 00000693 030000020203000202-
+   508 0000069C 0300               
+   509 0000069E 000000000302030000-     db 0,0,0,0,3,2,3,0,0,2,3,0,0,2,2,3,0,0,0,2
+   510 000006A7 020300000202030000-
+   511 000006B0 0002               
+   512 000006B2 020300000000000000-     db 2,3,0,0,0,0,0,0,0,0,2,2,0,0,0,0,0,0,2,2
+   513 000006BB 000202000000000000-
+   514 000006C4 0202               
+   515 000006C6 000203000000020300-     db 0,2,3,0,0,0,2,3,0,2,2,0,0,0,0,0,0,2,3,0
+   516 000006CF 020200000000000002-
+   517 000006D8 0300               
+   518 000006DA 000000000000000000-     db 0,0,0,0,0,0,0,0,0,0,2,3,0,2,3,0,0,0,2,3
+   519 000006E3 000203000203000000-
+   520 000006EC 0203               
+   521 000006EE 000203000000020300-     db 0,2,3,0,0,0,2,3,0,0,0,0,0,0,0,0,0,0,0,0
+   522 000006F7 000000000000000000-
+   523 00000700 0000               
+   524 00000702 000000000000000000-     db 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+   525 0000070B 000000000000000000-
+   526 00000714 0000               
+   527 00000716 020202030302020002-     db 2,2,2,3,3,2,2,0,2,2,2,3,3,2,0,0,2,3,0,0
+   528 0000071F 020203030200000203-
+   529 00000728 0000               
+   530 0000072A 000000000203000000-     db 0,0,0,0,2,3,0,0,0,2,3,0,2,3,2,2,2,3,0,0
+   531 00000733 020300020302020203-
+   532 0000073C 0000               
+   533 0000073E 020302020203000002-     db 2,3,2,2,2,3,0,0,2,3,0,0,2,2,2,0,2,3,2,2
+   534 00000747 030000020202000203-
+   535 00000750 0202               
+   536 00000752 020203000000020300-     db 2,2,3,0,0,0,2,3,0,0,0,0,0,0,0,0,0,2,3,0
+   537 0000075B 000000000000000002-
+   538 00000764 0300               
+   539 00000766 020302020000000002-     db 2,3,2,2,0,0,0,0,2,3,0,0,0,0,0,0,2,3,0,0
+   540 0000076F 030000000000000203-
+   541 00000778 0000               
+   542 0000077A 000203000203000000-     db 0,2,3,0,2,3,0,0,0,2,3,0,2,3,0,0,0,2,3,0
+   543 00000783 020300020300000002-
+   544 0000078C 0300               
+   545 0000078E 020202030203000002-     db 2,2,2,3,2,3,0,0,2,3,0,0,0,2,3,0,2,2,2,3
+   546 00000797 030000000203000202-
+   547 000007A0 0203               
+   548 000007A2 020300000002020202-     db 2,3,0,0,0,2,2,2,2,2,0,0,0,0,2,3,0,0,0,0
+   549 000007AB 020000000002030000-
+   550 000007B4 0000               
+   551 000007B6 020300000002030003-     db 2,3,0,0,0,2,3,0,3,2,3,0,2,2,3,0,2,3,0,2
+   552 000007BF 020300020203000203-
+   553 000007C8 0002               
+   554 000007CA 000203000000030203-     db 0,2,3,0,0,0,3,2,3,0,0,0,0,2,2,3,2,3,0,0
+   555 000007D3 000000000202030203-
+   556 000007DC 0000               
+   557 000007DE 000202020203000000-     db 0,2,2,2,2,3,0,0,0,2,3,0,2,2,2,3,0,0,0,0
+   558 000007E7 020300020202030000-
+   559 000007F0 0000               
+   560 000007F2 020300000000020202-     db 2,3,0,0,0,0,2,2,2,3,2,0,0,0,0,2,2,3,2,0
+   561 000007FB 030200000000020203-
+   562 00000804 0200               
+   563 00000806 000202020202020300-     db 0,2,2,2,2,2,2,3,0,2,2,2,3,3,3,0,0,2,3,3
+   564 0000080F 020202030303000002-
+   565 00000818 0303               
+   566 0000081A 020202000000000000-     db 2,2,2,0,0,0,0,0,0,0,2,3,0,0,2,2,2,2,2,0
+   567 00000823 000203000002020202-
+   568 0000082C 0200               
+   569 0000082E 000002020202020300-     db 0,0,2,2,2,2,2,3,0,0,2,2,2,2,0,0,0,0,0,0
+   570 00000837 000202020200000000-
+   571 00000840 0000               
+   572 00000842 000000000000000000-     db 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+   573 0000084B 000000000000000000-
+   574 00000854 0000               
+   575 00000856 020203000002030002-     db 2,2,3,0,0,2,3,0,2,2,2,0,0,2,2,0,2,2,3,0
+   576 0000085F 020200000202000202-
+   577 00000868 0300               
+   578 0000086A 000000000202030000-     db 0,0,0,0,2,2,3,0,0,2,3,0,2,2,2,0,0,0,0,0
+   579 00000873 020300020202000000-
+   580 0000087C 0000               
+   581 0000087E 020203000000000002-     db 2,2,3,0,0,0,0,0,2,2,3,0,0,2,3,0,2,2,3,0
+   582 00000887 020300000203000202-
+   583 00000890 0300               
+   584 00000892 000203000000020203-     db 0,2,3,0,0,0,2,2,3,0,0,0,0,0,0,0,2,2,3,0
+   585 0000089B 000000000000000202-
+   586 000008A4 0300               
+   587 000008A6 020202020300000002-     db 2,2,2,2,3,0,0,0,2,2,3,0,0,0,0,0,2,2,3,0
+   588 000008AF 020300000000000202-
+   589 000008B8 0300               
+   590 000008BA 000203000202030000-     db 0,2,3,0,2,2,3,0,0,2,3,0,2,2,3,0,0,2,3,0
+   591 000008C3 020300020203000002-
+   592 000008CC 0300               
+   593 000008CE 020203000000000002-     db 2,2,3,0,0,0,0,0,2,2,3,0,0,2,3,0,2,2,3,0
+   594 000008D7 020300000203000202-
+   595 000008E0 0300               
+   596 000008E2 030203000000000003-     db 3,2,3,0,0,0,0,0,3,2,2,0,0,0,2,2,3,0,0,0
+   597 000008EB 020200000002020300-
+   598 000008F4 0000               
+   599 000008F6 020203000002030000-     db 2,2,3,0,0,2,3,0,0,2,2,0,2,2,0,0,2,2,0,2
+   600 000008FF 020200020200000202-
+   601 00000908 0002               
+   602 0000090A 000203000000020203-     db 0,2,3,0,0,0,2,2,3,0,0,0,0,0,2,2,3,0,0,0
+   603 00000913 000000000002020300-
+   604 0000091C 0000               
+   605 0000091E 020202030000000000-     db 2,2,2,3,0,0,0,0,0,2,2,2,2,3,2,3,0,0,0,0
+   606 00000927 020202020302030000-
+   607 00000930 0000               
+   608 00000932 020300000002020203-     db 2,3,0,0,0,2,2,2,3,0,0,0,0,0,0,0,0,0,2,2
+   609 0000093B 000000000000000000-
+   610 00000944 0202               
+   611 00000946 000000000000020300-     db 0,0,0,0,0,0,2,3,0,0,0,0,3,2,2,2,0,2,2,3
+   612 0000094F 000000030202020002-
+   613 00000958 0203               
+   614 0000095A 000002030000000000-     db 0,0,2,3,0,0,0,0,0,0,2,3,0,2,2,3,0,0,2,3
+   615 00000963 000203000202030000-
+   616 0000096C 0203               
+   617 0000096E 000000000000020300-     db 0,0,0,0,0,0,2,3,0,0,3,3,3,3,0,0,0,0,0,0
+   618 00000977 000303030300000000-
+   619 00000980 0000               
+   620 00000982 000000000000000000-     db 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+   621 0000098B 000000000000000000-
+   622 00000994 0000               
+   623 00000996 020203000002030002-     db 2,2,3,0,0,2,3,0,2,2,3,0,0,2,3,0,2,2,3,0
+   624 0000099F 020300000203000202-
+   625 000009A8 0300               
+   626 000009AA 000202000202030000-     db 0,2,2,0,2,2,3,0,0,2,3,0,2,2,3,0,0,0,0,0
+   627 000009B3 020300020203000000-
+   628 000009BC 0000               
+   629 000009BE 020203000000000002-     db 2,2,3,0,0,0,0,0,2,2,3,0,0,2,3,0,2,2,3,0
+   630 000009C7 020300000203000202-
+   631 000009D0 0300               
+   632 000009D2 000203000000020203-     db 0,2,3,0,0,0,2,2,3,0,0,0,2,2,0,0,2,2,3,0
+   633 000009DB 000000020200000202-
+   634 000009E4 0300               
+   635 000009E6 020203020203000002-     db 2,2,3,2,2,3,0,0,2,2,3,0,0,0,0,0,2,2,3,0
+   636 000009EF 020300000000000202-
+   637 000009F8 0300               
+   638 000009FA 000203000202030000-     db 0,2,3,0,2,2,3,0,0,2,3,0,2,2,3,0,0,2,3,0
+   639 00000A03 020300020203000002-
+   640 00000A0C 0300               
+   641 00000A0E 020203000000000002-     db 2,2,3,0,0,0,0,0,2,2,3,0,0,2,3,0,2,2,3,0
+   642 00000A17 020300000203000202-
+   643 00000A20 0300               
+   644 00000A22 000203000000000000-     db 0,2,3,0,0,0,0,0,0,2,3,0,0,0,2,2,3,0,0,0
+   645 00000A2B 020300000002020300-
+   646 00000A34 0000               
+   647 00000A36 020203000002030000-     db 2,2,3,0,0,2,3,0,0,3,2,3,2,3,0,0,2,2,0,2
+   648 00000A3F 030203020300000202-
+   649 00000A48 0002               
+   650 00000A4A 000203000002020302-     db 0,2,3,0,0,2,2,3,2,3,0,0,0,0,2,2,3,0,0,0
+   651 00000A53 030000000002020300-
+   652 00000A5C 0000               
+   653 00000A5E 020203000000000000-     db 2,2,3,0,0,0,0,0,0,2,2,3,3,0,2,3,0,0,0,0
+   654 00000A67 020203030002030000-
+   655 00000A70 0000               
+   656 00000A72 020300000002020300-     db 2,3,0,0,0,2,2,3,0,0,0,0,0,0,0,0,0,0,2,3
+   657 00000A7B 000000000000000000-
+   658 00000A84 0203               
+   659 00000A86 000000000000020300-     db 0,0,0,0,0,0,2,3,0,0,0,0,0,2,2,3,0,2,2,3
+   660 00000A8F 000000000202030002-
+   661 00000A98 0203               
+   662 00000A9A 000002030000000000-     db 0,0,2,3,0,0,0,0,0,0,2,3,0,2,2,3,0,0,2,3
+   663 00000AA3 000203000202030000-
+   664 00000AAC 0203               
+   665 00000AAE 000000000000020300-     db 0,0,0,0,0,0,2,3,0,0,0,0,0,0,0,0,0,0,0,0
+   666 00000AB7 000000000000000000-
+   667 00000AC0 0000               
+   668 00000AC2 000000000000000000-     db 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+   669 00000ACB 000000000000000000-
+   670 00000AD4 0000               
+   671 00000AD6 020203000002030002-     db 2,2,3,0,0,2,3,0,2,2,3,0,0,2,3,0,2,2,3,0
+   672 00000ADF 020300000203000202-
+   673 00000AE8 0300               
+   674 00000AEA 000203000202030000-     db 0,2,3,0,2,2,3,0,0,2,3,0,2,2,3,0,0,0,0,0
+   675 00000AF3 020300020203000000-
+   676 00000AFC 0000               
+   677 00000AFE 020203000000000002-     db 2,2,3,0,0,0,0,0,2,2,3,0,0,2,3,0,2,2,3,0
+   678 00000B07 020300000203000202-
+   679 00000B10 0300               
+   680 00000B12 000203000000020203-     db 0,2,3,0,0,0,2,2,3,0,0,0,2,3,0,0,2,2,3,0
+   681 00000B1B 000000020300000202-
+   682 00000B24 0300               
+   683 00000B26 020203000202000002-     db 2,2,3,0,2,2,0,0,2,2,3,0,0,0,0,0,2,2,3,0
+   684 00000B2F 020300000000000202-
+   685 00000B38 0300               
+   686 00000B3A 000203000202030000-     db 0,2,3,0,2,2,3,0,0,2,3,0,2,2,3,0,0,2,3,0
+   687 00000B43 020300020203000002-
+   688 00000B4C 0300               
+   689 00000B4E 020203000000000002-     db 2,2,3,0,0,0,0,0,2,2,3,0,0,2,0,0,2,2,3,0
+   690 00000B57 020300000200000202-
+   691 00000B60 0300               
+   692 00000B62 000203000000000000-     db 0,2,3,0,0,0,0,0,0,2,3,0,0,0,2,2,3,0,0,0
+   693 00000B6B 020300000002020300-
+   694 00000B74 0000               
+   695 00000B76 020203000002030000-     db 2,2,3,0,0,2,3,0,0,0,2,2,2,0,0,0,2,2,0,2
+   696 00000B7F 000202020000000202-
+   697 00000B88 0002               
+   698 00000B8A 000203000202030002-     db 0,2,3,0,2,2,3,0,2,2,3,0,0,0,2,2,3,0,0,0
+   699 00000B93 020300000002020300-
+   700 00000B9C 0000               
+   701 00000B9E 020203000000000000-     db 2,2,3,0,0,0,0,0,0,2,2,3,0,0,2,3,0,0,0,0
+   702 00000BA7 020203000002030000-
+   703 00000BB0 0000               
+   704 00000BB2 020300000002020300-     db 2,3,0,0,0,2,2,3,0,0,0,0,0,0,0,0,0,0,2,3
+   705 00000BBB 000000000000000000-
+   706 00000BC4 0203               
+   707 00000BC6 000000000000020300-     db 0,0,0,0,0,0,2,3,0,0,0,0,0,2,2,3,0,2,2,3
+   708 00000BCF 000000000202030002-
+   709 00000BD8 0203               
+   710 00000BDA 000002030000000000-     db 0,0,2,3,0,0,0,0,0,0,2,3,0,2,2,3,0,0,2,3
+   711 00000BE3 000203000202030000-
+   712 00000BEC 0203               
+   713 00000BEE 000000000000020300-     db 0,0,0,0,0,0,2,3,0,0,0,0,0,0,0,0,0,0,0,2
+   714 00000BF7 000000000000000000-
+   715 00000C00 0002               
+   716 00000C02 030000000000000000-     db 3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+   717 00000C0B 000000000000000000-
+   718 00000C14 0000               
+   719 00000C16 020203000002030002-     db 2,2,3,0,0,2,3,0,2,2,3,0,0,2,3,0,2,2,3,0
+   720 00000C1F 020300000203000202-
+   721 00000C28 0300               
+   722 00000C2A 000203000202030003-     db 0,2,3,0,2,2,3,0,3,2,3,0,2,2,3,0,0,0,0,0
+   723 00000C33 020300020203000000-
+   724 00000C3C 0000               
+   725 00000C3E 020203000000000002-     db 2,2,3,0,0,0,0,0,2,2,3,0,0,2,3,0,2,2,3,0
+   726 00000C47 020300000203000202-
+   727 00000C50 0300               
+   728 00000C52 000203000000020203-     db 0,2,3,0,0,0,2,2,3,0,0,0,2,3,0,0,2,2,3,0
+   729 00000C5B 000000020300000202-
+   730 00000C64 0300               
+   731 00000C66 020203000302030002-     db 2,2,3,0,3,2,3,0,2,2,3,0,0,0,0,0,2,2,3,0
+   732 00000C6F 020300000000000202-
+   733 00000C78 0300               
+   734 00000C7A 000203000202030000-     db 0,2,3,0,2,2,3,0,0,2,3,0,2,2,3,0,0,2,3,0
+   735 00000C83 020300020203000002-
+   736 00000C8C 0300               
+   737 00000C8E 020203000000000002-     db 2,2,3,0,0,0,0,0,2,2,3,0,2,2,2,0,2,2,3,0
+   738 00000C97 020300020202000202-
+   739 00000CA0 0300               
+   740 00000CA2 000203000000000003-     db 0,2,3,0,0,0,0,0,3,2,3,0,0,0,2,2,3,0,0,0
+   741 00000CAB 020300000002020300-
+   742 00000CB4 0000               
+   743 00000CB6 020203000002030000-     db 2,2,3,0,0,2,3,0,0,0,3,2,3,0,0,0,2,2,2,2
+   744 00000CBF 000302030000000202-
+   745 00000CC8 0202               
+   746 00000CCA 030203000202000000-     db 3,2,3,0,2,2,0,0,0,2,3,0,0,0,2,2,3,0,0,0
+   747 00000CD3 020300000002020300-
+   748 00000CDC 0000               
+   749 00000CDE 020203000000000000-     db 2,2,3,0,0,0,0,0,0,2,2,3,0,0,2,3,0,0,0,0
+   750 00000CE7 020203000002030000-
+   751 00000CF0 0000               
+   752 00000CF2 020200000002020300-     db 2,2,0,0,0,2,2,3,0,0,0,0,0,0,0,0,0,0,2,3
+   753 00000CFB 000000000000000000-
+   754 00000D04 0203               
+   755 00000D06 000000000000020300-     db 0,0,0,0,0,0,2,3,0,0,0,0,3,2,2,3,0,2,2,3
+   756 00000D0F 000000030202030002-
+   757 00000D18 0203               
+   758 00000D1A 000002030000000000-     db 0,0,2,3,0,0,0,0,0,0,2,3,0,2,2,3,0,0,2,3
+   759 00000D23 000203000202030000-
+   760 00000D2C 0203               
+   761 00000D2E 000000000003020300-     db 0,0,0,0,0,3,2,3,0,0,0,0,0,0,0,0,0,0,0,2
+   762 00000D37 000000000000000000-
+   763 00000D40 0002               
+   764 00000D42 030000000000000000-     db 3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+   765 00000D4B 000000000000000000-
+   766 00000D54 0000               
+   767 00000D56 030303000003030003-     db 3,3,3,0,0,3,3,0,3,3,3,3,3,3,0,0,0,3,3,3
+   768 00000D5F 030303030300000003-
+   769 00000D68 0303               
+   770 00000D6A 030300000303030303-     db 3,3,0,0,3,3,3,3,3,3,0,0,3,3,3,3,3,3,3,0
+   771 00000D73 030000030303030303-
+   772 00000D7C 0300               
+   773 00000D7E 030303000000000000-     db 3,3,3,0,0,0,0,0,0,3,3,3,3,3,0,0,3,3,3,0
+   774 00000D87 030303030300000303-
+   775 00000D90 0300               
+   776 00000D92 000203000202020303-     db 0,2,3,0,2,2,2,3,3,3,3,0,0,2,3,3,3,3,0,0
+   777 00000D9B 030300000203030303-
+   778 00000DA4 0000               
+   779 00000DA6 030303000002030003-     db 3,3,3,0,0,2,3,0,3,3,3,3,3,3,3,0,3,3,3,0
+   780 00000DAF 030303030303000303-
+   781 00000DB8 0300               
+   782 00000DBA 000303000303030000-     db 0,3,3,0,3,3,3,0,0,3,3,0,0,3,3,3,3,3,0,0
+   783 00000DC3 030300000303030303-
+   784 00000DCC 0000               
+   785 00000DCE 030303000000000000-     db 3,3,3,0,0,0,0,0,0,3,3,3,2,3,3,0,3,3,3,0
+   786 00000DD7 030303020303000303-
+   787 00000DE0 0300               
+   788 00000DE2 000203000303030303-     db 0,2,3,0,3,3,3,3,3,3,0,0,0,0,2,3,3,0,0,0
+   789 00000DEB 030000000002030300-
+   790 00000DF4 0000               
+   791 00000DF6 000303030303000000-     db 0,3,3,3,3,3,0,0,0,0,0,3,0,0,0,0,0,3,3,3
+   792 00000DFF 000003000000000003-
+   793 00000E08 0303               
+   794 00000E0A 030300000203000000-     db 3,3,0,0,2,3,0,0,0,2,3,0,0,0,2,3,3,0,0,0
+   795 00000E13 020300000002030300-
+   796 00000E1C 0000               
+   797 00000E1E 030303030303030000-     db 3,3,3,3,3,3,3,0,0,0,3,3,3,3,3,0,0,2,2,2
+   798 00000E27 000303030303000002-
+   799 00000E30 0202               
+   800 00000E32 020303030003030303-     db 2,3,3,3,0,3,3,3,3,3,3,3,0,3,3,3,3,3,3,0
+   801 00000E3B 030303000303030303-
+   802 00000E44 0300               
+   803 00000E46 000000000000020300-     db 0,0,0,0,0,0,2,3,0,3,3,3,3,3,3,0,0,0,3,3
+   804 00000E4F 030303030303000000-
+   805 00000E58 0303               
+   806 00000E5A 030303000000000000-     db 3,3,3,0,0,0,0,0,0,0,3,3,0,0,3,3,3,3,3,0
+   807 00000E63 000303000003030303-
+   808 00000E6C 0300               
+   809 00000E6E 000303030303030000-     db 0,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0
+   810 00000E77 000000000000000000-
+   811 00000E80 0000               
+   812 00000E82 000000000000000000-     db 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+   813 00000E8B 000000000000000000-
+   814 00000E94 0000               
+   815                                  
+   816 00000E96 0B00                    Numbers: DW 11
+   817 00000E98 AA008A000EFFD9FFE5-     dw 170,138,-242,-39,-283,-72,-129,-164,-14,-4
+   818 00000EA1 FEB8FF7FFF5CFFF2FF-
+   819 00000EAA FCFF               
+   820 00000EAC 650042FFA7FF040065-     dw 101,-190,-89,4,101,-218,-14,-201,-157,150
+   821 00000EB5 0026FFF2FF37FF63FF-
+   822 00000EBE 9600               
+   823 00000EC0 53FFB8FF18FF490039-     dw -173,-72,-232,73,-199,1,-278,72,-98,-185
+   824 00000EC9 FF0100EAFE48009EFF-
+   825 00000ED2 47FF               
+   826 00000ED4 8900CFFFC20003FF6E-     dw 137,-49,194,-253,110,113,-276,74,84,-16
+   827 00000EDD 007100ECFE4A005400-
+   828 00000EE6 F0FF               
+   829 00000EE8 F1FFF2FF240083FF5E-     dw -15,-14,36,-125,94,-291,131,-239,-4,-274
+   830 00000EF1 00DDFE830011FFFCFF-
+   831 00000EFA EEFE               
+   832 00000EFC F3FF260077002CFF18-     dw -13,38,119,-212,-232,-11,40,-49,-4,-214
+   833 00000F05 FFF5FF2800CFFFFCFF-
+   834 00000F0E 2AFF               
+   835 00000F10 5DFF3D003500F8FFBE-     dw -163,61,53,-8,-66,199,6,141,-129,-262
+   836 00000F19 FFC70006008D007FFF-
+   837 00000F22 FAFE               
+   838 00000F24 F8FF7C002D002AFF14-     dw -8,124,45,-214,20,197,116,-83,-296,84
+   839 00000F2D 00C5007400ADFFD8FE-
+   840 00000F36 5400               
+   841 00000F38 7BFFC400190014FFD6-     dw -133,196,25,-236,-42,178,-133,136,128,120
+   842 00000F41 FFB2007BFF88008000-
+   843 00000F4A 7800               
+   844 00000F4C DCFEAFFF140054FFC3-     dw -292,-81,20,-172,-61,-264,-66,155,-57,-36
+   845 00000F55 FFF8FEBEFF9B00C7FF-
+   846 00000F5E DCFF               
+   847 00000F60 C9FF35FFA9004800BD-     dw -55,-203,169,72,-67,161,66,-218,-294,-297
+   848 00000F69 FFA100420026FFDAFE-
+   849 00000F72 D7FE               
+   850 00000F74 8AFFFDFF180017FFB5-     dw -118,-3,24,-233,-75,111,-50,58,50,-120
+   851 00000F7D FF6F00CEFF3A003200-
+   852 00000F86 88FF               
+   853 00000F88 57002A00E7FEE6FE80-     dw 87,42,-281,-282,-128,147,144,-142,-254,-183
+   854 00000F91 FF9300900072FF02FF-
+   855 00000F9A 49FF               
+   856 00000F9C 7100EAFF75002C0012-     dw 113,-22,117,44,-238,-5,171,164,135,-135
+   857 00000FA5 FFFBFFAB00A4008700-
+   858 00000FAE 79FF               
+   859 00000FB0 EBFE3EFF2E0069FF9A-     dw -277,-194,46,-151,-102,32,-148,-161,82,-198
+   860 00000FB9 FF20006CFF5FFF5200-
+   861 00000FC2 3AFF               
+   862 00000FC4 81FFC4FFBF0029005D-     dw -127,-60,191,41,-163,154,-57,-286,-166,131
+   863 00000FCD FF9A00C7FFE2FE5AFF-
+   864 00000FD6 8300               
+   865 00000FD8 BDFFB4FF9FFF3A00C6-     dw -67,-76,-97,58,-58,185,-12,-88,42,140
+   866 00000FE1 FFB900F4FFA8FF2A00-
+   867 00000FEA 8C00               
+   868 00000FEC 8200A3FFA10082009C-     dw 130,-93,161,130,-100,90,-71,128,166,186
+   869 00000FF5 FF5A00B9FF8000A600-
+   870 00000FFE BA00               
+   871 00001000 ECFEC500DCFF8DFFEA-     dw -276,197,-36,-115,-22,-271,-186,-72,-81,-111
+   872 00001009 FFF1FE46FFB8FFAFFF-
+   873 00001012 91FF               
+   874 00001014 FEFFBCFF3C000BFF98-     dw -2,-68,60,-245,-104,52,-145,-162,132,194
+   875 0000101D FF34006FFF5EFF8400-
+   876 00001026 C200               
+   877 00001028 5300E8FE9FFF610091-     dw 83,-280,-97,97,145,-259,-34,-227,63,-272
+   878 00001031 00FDFEDEFF1DFF3F00-
+   879 0000103A F0FE               
+   880 0000103C B2FF77FF8000C9FF11-     dw -78,-137,128,-55,17,136,-261,10,-153,-35
+   881 00001045 008800FBFE0A0067FF-
+   882 0000104E DDFF               
+   883 00001050 7500C400C7FFFAFEDA-     dw 117,196,-57,-262,-294,129,-132,-212,175,38
+   884 00001059 FE81007CFF2CFFAF00-
+   885 00001062 2600               
+   886 00001064 34003D005C0054FF04-     dw 52,61,92,-172,-252,-152,-66,-130,88,51
+   887 0000106D FF68FFBEFF7EFF5800-
+   888 00001076 3300               
+   889 00001078 0CFF2B007EFF3D00BB-     dw -244,43,-130,61,-69,162,-199,-34,25,75
+   890 00001081 FFA20039FFDEFF1900-
+   891 0000108A 4B00               
+   892 0000108C 4F00AEFFF2FF50FF36-     dw 79,-82,-14,-176,-202,129,-47,-98,-206,68
+   893 00001095 FF8100D1FF9EFF32FF-
+   894 0000109E 4400               
+   895 000010A0 6A00F5FEAF0058007B-     dw 106,-267,175,88,123,172,-94,-199,-80,-87
+   896 000010A9 00AC00A2FF39FFB0FF-
+   897 000010B2 A9FF               
+   898 000010B4 B9FFB200E3FF53FFD4-     dw -71,178,-29,-173,-44,-54,151,-122,153,-1
+   899 000010BD FFCAFF970086FF9900-
+   900 000010C6 FFFF               
+   901 000010C8 91009EFF6400A6006E-     dw 145,-98,100,166,110,125,12,-215,-107,-29
+   902 000010D1 007D000C0029FF95FF-
+   903 000010DA E3FF               
+   904 000010DC 62FFAB00F3FE29FFFF-     dw -158,171,-269,-215,-1,199,-11,-247,63,-176
+   905 000010E5 FFC700F5FF09FF3F00-
+   906 000010EE 50FF               
+   907 000010F0 7F00B9FFE5FF0C00B2-     dw 127,-71,-27,12,178,-131,-178,160,189,38
+   908 000010F9 007DFF4EFFA000BD00-
+   909 00001102 2600               
+   910 00001104 EDFFDEFEA50012FFC6-     dw -19,-290,165,-238,-58,-185,-295,115,-147,-10
+   911 0000110D FF47FFD9FE73006DFF-
+   912 00001116 F6FF               
+   913 00001118 7F001BFF82FF6EFF12-     dw 127,-229,-126,-146,18,-31,90,171,-240,-140
+   914 00001121 00E1FF5A00AB0010FF-
+   915 0000112A 74FF               
+   916 0000112C 6AFF0A00E0FE8D0018-     dw -150,10,-288,141,24,11,-144,-1,-198,-177
+   917 00001135 000B0070FFFFFF3AFF-
+   918 0000113E 4FFF               
+   919 00001140 55FFFEFF12FFB8FFA5-     dw -171,-2,-238,-72,-91,-287,84,197,119,-25
+   920 00001149 FFE1FE5400C5007700-
+   921 00001152 E7FF               
+   922 00001154 A7FF7E0011FF21FFD0-     dw -89,126,-239,-223,-48,-150,-182,-24,88,132
+   923 0000115D FF6AFF4AFFE8FF5800-
+   924 00001166 8400               
+   925 00001168 14FF460064FFB400DD-     dw -236,70,-156,180,-35,-63,-293,-266,-10,86
+   926 00001171 FFC1FFDBFEF6FEF6FF-
+   927 0000117A 5600               
+   928 0000117C BAFF1F00FBFE20002C-     dw -70,31,-261,32,44,-169,-40,102,-49,-130
+   929 00001185 0057FFD8FF6600CFFF-
+   930 0000118E 7EFF               
+   931 00001190 59FF30005F00B400A6-     dw -167,48,95,180,-90,1,-172,-133,-135,-89
+   932 00001199 FF010054FF7BFF79FF-
+   933 000011A2 A7FF               
+   934 000011A4 D5FE3E00570006FF42-     dw -299,62,87,-250,66,-119,-190,-132,-34,-156
+   935 000011AD 0089FF42FF7CFFDEFF-
+   936 000011B6 64FF               
+   937 000011B8 4C002600BCFF70FFDF-     dw 76,38,-68,-144,-33,-175,-53,-51,157,65
+   938 000011C1 FF51FFCBFFCDFF9D00-
+   939 000011CA 4100               
+   940 000011CC A8FF7800DAFF63FF87-     dw -88,120,-38,-157,135,-262,198,-4,-48,90
+   941 000011D5 00FAFEC600FCFFD0FF-
+   942 000011DE 5A00               
+   943 000011E0 1EFF2FFFDBFE30FF49-     dw -226,-209,-293,-208,73,56,-15,-114,-199,149
+   944 000011E9 003800F1FF8EFF39FF-
+   945 000011F2 9500               
+   946 000011F4 4200650072003AFFF3-     dw 66,101,114,-198,-269,-153,-53,-22,159,164
+   947 000011FD FE67FFCBFFEAFF9F00-
+   948 00001206 A400               
+   949 00001208 62001D0026FFD7FF09-     dw 98,29,-218,-41,-247,34,82,-10,-245,-147
+   950 00001211 FF22005200F6FF0BFF-
+   951 0000121A 6DFF               
+   952 0000121C E1FFB8002D003100D4-     dw -31,184,45,49,-44,5,-177,-66,12,197
+   953 00001225 FF05004FFFBEFF0C00-
+   954 0000122E C500               
+   955 00001230 7F00A1005D0080FF73-     dw 127,161,93,-128,115,-137,-57,31,-6,5
+   956 00001239 0077FFC7FF1F00FAFF-
+   957 00001242 0500               
+   958 00001244 C4FFDFFE8900DBFE4D-     dw -60,-289,137,-293,-179,126,85,-44,-194,-275
+   959 0000124D FF7E005500D4FF3EFF-
+   960 00001256 EDFE               
+   961 00001258 E8FED8FEE9FE29FF3A-     dw -280,-296,-279,-215,58,30,-134,-265,196,117
+   962 00001261 001E007AFFF7FEC400-
+   963 0000126A 7500               
+   964 0000126C 060027006D00CAFFD0-     dw 6,39,109,-54,-48,122,97,-252,-117,-92
+   965 00001275 FF7A00610004FF8BFF-
+   966 0000127E A4FF               
+   967                                  
+   968                                  ScreenWidth   EQU 320   ; Obvious
+   969                                  ScreenHeight  EQU 200   ; Obvious
+   970                                  MaxStars      EQU 250   ; Maximum number of stars
+   971                                  MaxNumbers    EQU 500   ; Number of random numbers defined  
+   972                                  MaxZ          EQU 4096  ; StartZvalue for all stars
+   973                                  MinZ          EQU 0     ; If Z = 0 then star is dead
+   974                                  
+   975 00001280 FA00                    XIndex:       DW  250   ; Index to X-numbers
+   976 00001282 7D00                    YIndex:       DW  125   ; Index to Y-numbers
+   977 00001284 1400                    WarpSpeed:    DW  20    ; Speed of stars  
+   978 00001286 0000                    NumActive:    DW  0     ; Number of stars active
+   979                                  
+   980                                  ;Star_Struc      STRUC   ; Format of star (like a record in Pascal)
+   981                                  ;     X   DW   0         ; X-position of star
+   982                                  ;     Y   DW   0         ; Y-position of star
+   983                                  ;     Z   DW   0         ; Z-position of star
+   984                                  ;     Old DW   0         ; Where to erase old star
+   985                                  ;     Col DB   0         ; Color of star
+   986                                  ;Star_Struc      ENDS
+   987                                  
+   988                                  Palette:
+   989 00001288 000000                  	DB 0,0,0        ; Palette info for first 5 colors (font)
+   990 0000128B 000000                          DB 0,0,0
+   991 0000128E 340000                          DB 52,0,0
+   992 00001291 2A0000                          DB 42,0,0
+   993 00001294 200000                          DB 32,0,0
+   994 00001297 000000                          DB 0,0,0                    ; Base color black => R,G,B
+   995                                      	; 16 grey shades
+   996 0000129A 2D2D2D                          DB 3*15,3*15,3*15
+   997 0000129D 2A2A2A                          DB 3*14,3*14,3*14
+   998 000012A0 272727                          DB 3*13,3*13,3*13
+   999 000012A3 242424                          DB 3*12,3*12,3*12
+  1000 000012A6 212121                          DB 3*11,3*11,3*11
+  1001 000012A9 1E1E1E                          DB 3*10,3*10,3*10
+  1002 000012AC 1B1B1B                          DB 3*9,3*9,3*9
+  1003 000012AF 181818                          DB 3*8,3*8,3*8
+  1004 000012B2 151515                          DB 3*7,3*7,3*7
+  1005 000012B5 121212                          DB 3*6,3*6,3*6
+  1006 000012B8 0F0F0F                          DB 3*5,3*5,3*5
+  1007 000012BB 0C0C0C                          DB 3*4,3*4,3*4
+  1008 000012BE 090909                          DB 3*3,3*3,3*3
+  1009 000012C1 060606                          DB 3*2,3*2,3*2
+  1010 000012C4 030303                          DB 3*1,3*1,3*1
+  1011 000012C7 000000                          DB 3*0,3*0,3*0
+  1012                                  
+  1013                                  bss_start:
+  1014                                  
+  1015                                  ABSOLUTE bss_start
+  1016                                  
+  1017                                  PaletteArray:
+  1018 000012CA <res 00000300>               resb 768		      ; Array to hold the palette
+  1019                                  
+  1020                                  alignb 2
+  1021                                  
+  1022                                  Star_Struct:
+  1023                                       Stars_X   equ   0        ; X-position of star
+  1024                                       Stars_Y   equ   2        ; Y-position of star
+  1025                                       Stars_Z   equ   4        ; Z-position of star
+  1026                                       Stars_Old equ   6        ; Where to erase old star
+  1027                                       Stars_Col equ   8        ; Color of star
+  1028                                  
+  1029                                  StarStrucSize equ 9    ; Number of bytes per entry ( 4 wordz and a byte )
+  1030                                  
+  1031                                  Stars:
+  1032 000015CA <res 000008CA>               resb StarStrucSize * MaxStars  ; Array of star-records
+  1033                                  
+  1034                                  bss_end:
+  1035                                  
+  1036                                  ; Code by Vulture.
+  1037                                  ; Thanx to Draeden of VLA for example code.
+  1038                                  ; Don't be lame. Don't just rip the code.
+  1039                                  ; Give credit where it should be. I did.
+  1040                                  ; See ya in the next release.
+  1041                                  
+  1042                                  _end:                       	; End Of C<><>L Program !!!

@@ -1,0 +1,441 @@
+     1                                  ; ****************************************************************************
+     2                                  ; filecopy.s (TRDOS 386, TRDOS v2.0 - sample binary file, 'filecopy.prg')
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; FILECOPY.PRG ! 'sysopen', 'sysread', 'syscreate', 'syswrite' 
+     5                                  ;		 TEST program for TRDOS 386 !
+     6                                  ;
+     7                                  ; 31/10/2016
+     8                                  ;
+     9                                  ; [ Last Modification: 31/10/2016 ]
+    10                                  ;
+    11                                  ; ****************************************************************************
+    12                                  
+    13                                  ; 16/10/2016
+    14                                  ; 29/04/2016
+    15                                  ; TRDOS 386 system calls (temporary list!)
+    16                                  _ver 	equ 0
+    17                                  _exit 	equ 1
+    18                                  _fork 	equ 2
+    19                                  _read 	equ 3
+    20                                  _write	equ 4
+    21                                  _open	equ 5
+    22                                  _close 	equ 6
+    23                                  _wait 	equ 7
+    24                                  _creat 	equ 8
+    25                                  _link 	equ 9
+    26                                  _unlink	equ 10
+    27                                  _exec	equ 11
+    28                                  _chdir	equ 12
+    29                                  _time 	equ 13
+    30                                  _mkdir 	equ 14
+    31                                  _chmod	equ 15
+    32                                  _chown	equ 16
+    33                                  _break	equ 17
+    34                                  _stat	equ 18
+    35                                  _seek	equ 19
+    36                                  _tell 	equ 20
+    37                                  _mount	equ 21
+    38                                  _umount	equ 22
+    39                                  _setuid	equ 23
+    40                                  _getuid	equ 24
+    41                                  _stime	equ 25
+    42                                  _quit	equ 26	
+    43                                  _intr	equ 27
+    44                                  _fstat	equ 28
+    45                                  _emt 	equ 29
+    46                                  _mdate 	equ 30
+    47                                  _video 	equ 31
+    48                                  _audio	equ 32
+    49                                  _timer	equ 33
+    50                                  _sleep	equ 34
+    51                                  _msg    equ 35
+    52                                  _geterr	equ 36
+    53                                  _rsvd1	equ 37
+    54                                  _pri	equ 38
+    55                                  _rele	equ 39
+    56                                  _fff	equ 40
+    57                                  _fnf	equ 41
+    58                                  
+    59                                  %macro sys 1-4
+    60                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    61                                      ; 03/09/2015	
+    62                                      ; 13/04/2015
+    63                                      ; Retro UNIX 386 v1 system call.		
+    64                                      %if %0 >= 2   
+    65                                          mov ebx, %2
+    66                                          %if %0 >= 3    
+    67                                              mov ecx, %3
+    68                                              %if %0 = 4
+    69                                                 mov edx, %4   
+    70                                              %endif
+    71                                          %endif
+    72                                      %endif
+    73                                      mov eax, %1
+    74                                      ;int 30h
+    75                                      int 40h ; TRDOS 386 (TRDOS v2.0)		   
+    76                                  %endmacro
+    77                                  
+    78                                  ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
+    79                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    80                                  
+    81                                  [BITS 32] ; 80386 protected mode (32 bit instructions)
+    82                                  
+    83                                  [ORG 0]   ; virtual start address  = 0
+    84                                  
+    85                                  START_CODE:
+    86 00000000 89E6                    	mov	esi, esp
+    87 00000002 AD                      	lodsd
+    88 00000003 83F803                  	cmp	eax, 3 ; two arguments (program file name & binary file name)
+    89 00000006 0F82F3000000            	jb	prg_msg ; nothing to do
+    90                                  
+    91 0000000C AD                      	lodsd ; program file name address 
+    92 0000000D AD                      	lodsd ; binary file name address (source file to be read)
+    93                                  	; EAX = arg2 ; source file name address
+    94                                  
+    95                                  open_bin_file:
+    96                                  	sys	_open, eax, 0 ; open for reading
+    96                              <1> 
+    96                              <1> 
+    96                              <1> 
+    96                              <1> 
+    96                              <1>  %if %0 >= 2
+    96 0000000E 89C3                <1>  mov ebx, %2
+    96                              <1>  %if %0 >= 3
+    96 00000010 B900000000          <1>  mov ecx, %3
+    96                              <1>  %if %0 = 4
+    96                              <1>  mov edx, %4
+    96                              <1>  %endif
+    96                              <1>  %endif
+    96                              <1>  %endif
+    96 00000015 B805000000          <1>  mov eax, %1
+    96                              <1> 
+    96 0000001A CD40                <1>  int 40h
+    97 0000001C 0F82F7000000            	jc	open_error
+    98                                  
+    99 00000022 A3[80020000]            	mov	[fhandle1], eax ; file handle/index number
+   100                                  
+   101 00000027 AD                      	lodsd	
+   102                                  	; EAX = arg3 ; destination file name address
+   103                                  
+   104 00000028 A3[88020000]            	mov	[dfname_addr], eax
+   105                                  	
+   106                                  	sys	_open, eax, 1 ; open for writing
+   106                              <1> 
+   106                              <1> 
+   106                              <1> 
+   106                              <1> 
+   106                              <1>  %if %0 >= 2
+   106 0000002D 89C3                <1>  mov ebx, %2
+   106                              <1>  %if %0 >= 3
+   106 0000002F B901000000          <1>  mov ecx, %3
+   106                              <1>  %if %0 = 4
+   106                              <1>  mov edx, %4
+   106                              <1>  %endif
+   106                              <1>  %endif
+   106                              <1>  %endif
+   106 00000034 B805000000          <1>  mov eax, %1
+   106                              <1> 
+   106 00000039 CD40                <1>  int 40h
+   107 0000003B 7310                    	jnc	short _1	
+   108                                  
+   109 0000003D 83F802                  	cmp	eax, 2 ; file not found ?
+   110 00000040 0F85D3000000            	jne	open_error
+   111                                  
+   112 00000046 30C0                    	xor	al, al ; eax = 0
+   113 00000048 A3[84020000]            	mov	[fhandle2], eax ; file handle/index number
+   114                                  _1:
+   115 0000004D C605[7C020000]0E        	mov	byte [color], 0Eh ; Yellow
+   116 00000054 BE[5B020000]            	mov	esi, msg_reading
+   117 00000059 E809010000              	call	print_msg
+   118                                  
+   119                                  read_file:
+   120                                  	sys	_read, [fhandle1], BUFFER, 0FFFFFFFFh ; read all bytes 
+   120                              <1> 
+   120                              <1> 
+   120                              <1> 
+   120                              <1> 
+   120                              <1>  %if %0 >= 2
+   120 0000005E 8B1D[80020000]      <1>  mov ebx, %2
+   120                              <1>  %if %0 >= 3
+   120 00000064 B9[90020000]        <1>  mov ecx, %3
+   120                              <1>  %if %0 = 4
+   120 00000069 BAFFFFFFFF          <1>  mov edx, %4
+   120                              <1>  %endif
+   120                              <1>  %endif
+   120                              <1>  %endif
+   120 0000006E B803000000          <1>  mov eax, %1
+   120                              <1> 
+   120 00000073 CD40                <1>  int 40h
+   121 00000075 0F82B1000000             	jc	r_error		 ; disk read or memory allocation error
+   122                                  
+   123 0000007B A3[8C020000]            	mov	[fsize], eax ; file size (read bytes)
+   124                                  
+   125 00000080 E8D6000000              	call	print_msg_ok
+   126                                  
+   127                                  close_bin_file:
+   128                                  	sys	_close, [fhandle1] ; close file
+   128                              <1> 
+   128                              <1> 
+   128                              <1> 
+   128                              <1> 
+   128                              <1>  %if %0 >= 2
+   128 00000085 8B1D[80020000]      <1>  mov ebx, %2
+   128                              <1>  %if %0 >= 3
+   128                              <1>  mov ecx, %3
+   128                              <1>  %if %0 = 4
+   128                              <1>  mov edx, %4
+   128                              <1>  %endif
+   128                              <1>  %endif
+   128                              <1>  %endif
+   128 0000008B B806000000          <1>  mov eax, %1
+   128                              <1> 
+   128 00000090 CD40                <1>  int 40h
+   129                                  
+   130 00000092 833D[84020000]00        	cmp	dword [fhandle2], 0
+   131 00000099 7719                    	ja	short _2
+   132                                  
+   133                                  create_txt_file:
+   134                                  	sys	_creat, [dfname_addr], 0 ; create (normal) file
+   134                              <1> 
+   134                              <1> 
+   134                              <1> 
+   134                              <1> 
+   134                              <1>  %if %0 >= 2
+   134 0000009B 8B1D[88020000]      <1>  mov ebx, %2
+   134                              <1>  %if %0 >= 3
+   134 000000A1 B900000000          <1>  mov ecx, %3
+   134                              <1>  %if %0 = 4
+   134                              <1>  mov edx, %4
+   134                              <1>  %endif
+   134                              <1>  %endif
+   134                              <1>  %endif
+   134 000000A6 B808000000          <1>  mov eax, %1
+   134                              <1> 
+   134 000000AB CD40                <1>  int 40h
+   135 000000AD 7263                    	jc	short create_error
+   136                                  
+   137 000000AF A3[84020000]            	mov	[fhandle2], eax
+   138                                  _2:
+   139 000000B4 C605[7C020000]0B        	mov	byte [color], 0Bh ; Light Cyan
+   140 000000BB BE[69020000]            	mov	esi, msg_writing
+   141 000000C0 E8A2000000              	call	print_msg
+   142                                  
+   143                                  	sys	_write, [fhandle2], BUFFER, [fsize] ; write to destination
+   143                              <1> 
+   143                              <1> 
+   143                              <1> 
+   143                              <1> 
+   143                              <1>  %if %0 >= 2
+   143 000000C5 8B1D[84020000]      <1>  mov ebx, %2
+   143                              <1>  %if %0 >= 3
+   143 000000CB B9[90020000]        <1>  mov ecx, %3
+   143                              <1>  %if %0 = 4
+   143 000000D0 8B15[8C020000]      <1>  mov edx, %4
+   143                              <1>  %endif
+   143                              <1>  %endif
+   143                              <1>  %endif
+   143 000000D6 B804000000          <1>  mov eax, %1
+   143                              <1> 
+   143 000000DB CD40                <1>  int 40h
+   144 000000DD 725C                     	jc	short w_error     ; disk write (or free space) error
+   145                                  
+   146 000000DF E877000000              	call	print_msg_ok
+   147                                  
+   148                                  	sys	_close, [fhandle2] ; close file
+   148                              <1> 
+   148                              <1> 
+   148                              <1> 
+   148                              <1> 
+   148                              <1>  %if %0 >= 2
+   148 000000E4 8B1D[84020000]      <1>  mov ebx, %2
+   148                              <1>  %if %0 >= 3
+   148                              <1>  mov ecx, %3
+   148                              <1>  %if %0 = 4
+   148                              <1>  mov edx, %4
+   148                              <1>  %endif
+   148                              <1>  %endif
+   148                              <1>  %endif
+   148 000000EA B806000000          <1>  mov eax, %1
+   148                              <1> 
+   148 000000EF CD40                <1>  int 40h
+   149                                  
+   150 000000F1 C605[7C020000]07        	mov	byte [color], 07h ; Light Gray (Default Color)
+   151 000000F8 BE[4D020000]            	mov	esi, nextline
+   152 000000FD EB05                    	jmp	short print_nl
+   153                                  
+   154                                  prg_msg:
+   155 000000FF BE[A1010000]            	mov	esi, msg_program
+   156                                  print_nl:
+   157 00000104 E85E000000              	call	print_msg	
+   158                                  terminate:
+   159                                  	sys 	_exit			   ; INT 40h
+   159                              <1> 
+   159                              <1> 
+   159                              <1> 
+   159                              <1> 
+   159                              <1>  %if %0 >= 2
+   159                              <1>  mov ebx, %2
+   159                              <1>  %if %0 >= 3
+   159                              <1>  mov ecx, %3
+   159                              <1>  %if %0 = 4
+   159                              <1>  mov edx, %4
+   159                              <1>  %endif
+   159                              <1>  %endif
+   159                              <1>  %endif
+   159 00000109 B801000000          <1>  mov eax, %1
+   159                              <1> 
+   159 0000010E CD40                <1>  int 40h
+   160                                  here:
+   161 00000110 EBFE                    	jmp	short here
+   162                                  
+   163                                  create_error:
+   164 00000112 BE[3A020000]            	mov	esi, msg_create_error
+   165 00000117 EB05                    	jmp	short open_create_error
+   166                                  open_error:
+   167 00000119 BE[26020000]            	mov	esi, msg_open_error
+   168                                  open_create_error:
+   169 0000011E C605[7C020000]0C        	mov	byte [color], 0Ch ; Light Red
+   170 00000125 E83D000000              	call	print_msg		   ; INT 31h
+   171 0000012A EBDD                    	jmp	short terminate	
+   172                                  
+   173                                  r_error:
+   174                                  	sys	_close, [fhandle1] ; close file
+   174                              <1> 
+   174                              <1> 
+   174                              <1> 
+   174                              <1> 
+   174                              <1>  %if %0 >= 2
+   174 0000012C 8B1D[80020000]      <1>  mov ebx, %2
+   174                              <1>  %if %0 >= 3
+   174                              <1>  mov ecx, %3
+   174                              <1>  %if %0 = 4
+   174                              <1>  mov edx, %4
+   174                              <1>  %endif
+   174                              <1>  %endif
+   174                              <1>  %endif
+   174 00000132 B806000000          <1>  mov eax, %1
+   174                              <1> 
+   174 00000137 CD40                <1>  int 40h
+   175 00000139 EB0D                    	jmp	short rw_error
+   176                                  w_error:
+   177                                  	sys	_close, [fhandle2] ; close file
+   177                              <1> 
+   177                              <1> 
+   177                              <1> 
+   177                              <1> 
+   177                              <1>  %if %0 >= 2
+   177 0000013B 8B1D[84020000]      <1>  mov ebx, %2
+   177                              <1>  %if %0 >= 3
+   177                              <1>  mov ecx, %3
+   177                              <1>  %if %0 = 4
+   177                              <1>  mov edx, %4
+   177                              <1>  %endif
+   177                              <1>  %endif
+   177                              <1>  %endif
+   177 00000141 B806000000          <1>  mov eax, %1
+   177                              <1> 
+   177 00000146 CD40                <1>  int 40h
+   178                                  rw_error:
+   179 00000148 C605[7C020000]0C        	mov	byte [color], 0Ch ; Light Red
+   180 0000014F BE[50020000]            	mov	esi, msg_error
+   181 00000154 E80E000000              	call	print_msg		   ; INT 31h
+   182 00000159 EBAE                    	jmp	short terminate
+   183                                  
+   184                                  print_msg_ok:
+   185 0000015B C605[7C020000]0A        	mov	byte [color], 0Ah ; Light Green
+   186 00000162 BE[77020000]            	mov	esi, msg_ok
+   187                                  print_msg:
+   188 00000167 0FB61D[7C020000]        	movzx	ebx, byte [color] ; text color (bl)
+   189                                  		               ; video page 0 (bh)
+   190 0000016E B40E                    	mov	ah, 0Eh ; teletype output (write tty)
+   191 00000170 AC                      	lodsb
+   192                                  _p_nextchar:
+   193 00000171 CD31                    	int	31h
+   194 00000173 AC                      	lodsb
+   195 00000174 20C0                    	and	al, al
+   196 00000176 75F9                    	jnz	short _p_nextchar
+   197 00000178 C3                      	retn
+   198                                  
+   199                                  hex:
+   200 00000179 0FB6D8                  	movzx	ebx, al
+   201 0000017C C0EB04                  	shr	bl, 4
+   202 0000017F 8A9B[91010000]          	mov	bl, [ebx+hexchrs] 	 	
+   203 00000185 86D8                    	xchg	bl, al
+   204 00000187 80E30F                  	and	bl, 0Fh
+   205 0000018A 8AA3[91010000]          	mov	ah, [ebx+hexchrs] 
+   206 00000190 C3                      	retn
+   207                                  
+   208                                  hexchrs:
+   209 00000191 303132333435363738-     	db '0123456789ABCDEF'
+   209 0000019A 39414243444546     
+   210                                  
+   211                                  ;-----------------------------------------------------------------
+   212                                  ;  messages
+   213                                  ;-----------------------------------------------------------------
+   214                                  
+   215                                  msg_program:
+   216 000001A1 0D0A                    	db 0Dh, 0Ah
+   217 000001A3 46494C45434F50592E-     	db "FILECOPY.PRG /// TRDOS 386 syswrite test program"
+   217 000001AC 505247202F2F2F2054-
+   217 000001B5 52444F532033383620-
+   217 000001BE 737973777269746520-
+   217 000001C7 746573742070726F67-
+   217 000001D0 72616D             
+   218 000001D3 0D0A                    	db 0Dh, 0Ah
+   219 000001D5 6279204572646F6761-     	db "by Erdogan Tan, 31/10/2016", 0Dh, 0Ah
+   219 000001DE 6E2054616E2C203331-
+   219 000001E7 2F31302F323031360D-
+   219 000001F0 0A                 
+   220 000001F1 0D0A                    	db 0Dh, 0Ah
+   221 000001F3 55736167653A204649-     	db 'Usage: FILECOPY <Source File> <Destination File>'
+   221 000001FC 4C45434F5059203C53-
+   221 00000205 6F757263652046696C-
+   221 0000020E 653E203C4465737469-
+   221 00000217 6E6174696F6E204669-
+   221 00000220 6C653E             
+   222 00000223 0D0A00                  	db 0Dh, 0Ah, 0
+   223                                  
+   224                                  msg_open_error:
+   225 00000226 0D0A                    	db 0Dh, 0Ah
+   226 00000228 7379736F70656E2065-     	db 'sysopen error !'
+   226 00000231 72726F722021       
+   227 00000237 0D0A00                  	db 0Dh, 0Ah, 0
+   228                                  
+   229                                  msg_create_error:
+   230 0000023A 0D0A                    	db 0Dh, 0Ah
+   231 0000023C 737973637265617465-     	db 'syscreate error !'
+   231 00000245 206572726F722021   
+   232                                  nextline:
+   233 0000024D 0D0A00                  	db 0Dh, 0Ah, 0
+   234                                  
+   235                                  msg_error:
+   236 00000250 4552524F522021200D-     	db 'ERROR ! ', 0Dh, 0Ah, 0
+   236 00000259 0A00               
+   237                                  
+   238                                  msg_reading:
+   239 0000025B 0D0A                    	db 0Dh, 0Ah
+   240 0000025D 52656164696E672E2E-     	db 'Reading... ', 0
+   240 00000266 2E2000             
+   241                                  
+   242                                  msg_writing:
+   243 00000269 0D0A                    	db 0Dh, 0Ah
+   244 0000026B 57726974696E672E2E-     	db 'Writing... ', 0
+   244 00000274 2E2000             
+   245                                  
+   246                                  msg_ok:
+   247 00000277 4F4B2E2000              	db 'OK. ', 0
+   248                                  
+   249 0000027C 0F                      color:	db 0Fh ; White
+   250                                  
+   251                                  bss:
+   252                                  
+   253                                  ABSOLUTE bss
+   254                                  
+   255 0000027D <res 00000003>          alignb 4
+   256                                  
+   257 00000280 <res 00000004>          fhandle1:    resd 1
+   258 00000284 <res 00000004>          fhandle2:    resd 1
+   259 00000288 <res 00000004>          dfname_addr: resd 1
+   260 0000028C <res 00000004>          fsize:	     resd 1
+   261                                  
+   262                                  BUFFER:	

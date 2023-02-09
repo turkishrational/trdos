@@ -1,0 +1,255 @@
+     1                                  ; ****************************************************************************
+     2                                  ; flist.s (TRDOS 386, TRDOS v2.0 - sample binary file, 'flist.prg')
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; FLIST.PRG ! 'sysfff' and 'sysfnf' TEST program for TRDOS 386 !
+     5                                  ;
+     6                                  ; 17/10/2016
+     7                                  ;
+     8                                  ; [ Last Modification: 17/10/2016 ]
+     9                                  ;
+    10                                  ; ****************************************************************************
+    11                                  
+    12                                  ; 16/10/2016
+    13                                  ; 29/04/2016
+    14                                  ; TRDOS 386 system calls (temporary list!)
+    15                                  _ver 	equ 0
+    16                                  _exit 	equ 1
+    17                                  _fork 	equ 2
+    18                                  _read 	equ 3
+    19                                  _write	equ 4
+    20                                  _open	equ 5
+    21                                  _close 	equ 6
+    22                                  _wait 	equ 7
+    23                                  _creat 	equ 8
+    24                                  _link 	equ 9
+    25                                  _unlink	equ 10
+    26                                  _exec	equ 11
+    27                                  _chdir	equ 12
+    28                                  _time 	equ 13
+    29                                  _mkdir 	equ 14
+    30                                  _chmod	equ 15
+    31                                  _chown	equ 16
+    32                                  _break	equ 17
+    33                                  _stat	equ 18
+    34                                  _seek	equ 19
+    35                                  _tell 	equ 20
+    36                                  _mount	equ 21
+    37                                  _umount	equ 22
+    38                                  _setuid	equ 23
+    39                                  _getuid	equ 24
+    40                                  _stime	equ 25
+    41                                  _quit	equ 26	
+    42                                  _intr	equ 27
+    43                                  _fstat	equ 28
+    44                                  _emt 	equ 29
+    45                                  _mdate 	equ 30
+    46                                  _video 	equ 31
+    47                                  _audio	equ 32
+    48                                  _timer	equ 33
+    49                                  _sleep	equ 34
+    50                                  _msg    equ 35
+    51                                  _geterr	equ 36
+    52                                  _rsvd1	equ 37
+    53                                  _pri	equ 38
+    54                                  _rele	equ 39
+    55                                  _fff	equ 40
+    56                                  _fnf	equ 41
+    57                                  
+    58                                  %macro sys 1-4
+    59                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    60                                      ; 03/09/2015	
+    61                                      ; 13/04/2015
+    62                                      ; Retro UNIX 386 v1 system call.		
+    63                                      %if %0 >= 2   
+    64                                          mov ebx, %2
+    65                                          %if %0 >= 3    
+    66                                              mov ecx, %3
+    67                                              %if %0 = 4
+    68                                                 mov edx, %4   
+    69                                              %endif
+    70                                          %endif
+    71                                      %endif
+    72                                      mov eax, %1
+    73                                      ;int 30h
+    74                                      int 40h ; TRDOS 386 (TRDOS v2.0)		   
+    75                                  %endmacro
+    76                                  
+    77                                  ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
+    78                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    79                                  
+    80                                  [BITS 32] ; We need 32-bit intructions for protected mode
+    81                                  
+    82                                  [ORG 0] 
+    83                                  
+    84                                  START_CODE:
+    85 00000000 89E6                    	mov	esi, esp
+    86 00000002 AD                      	lodsd
+    87 00000003 83F802                  	cmp	eax, 2 ; two arguments (program file name & text file name)
+    88 00000006 725A                    	jb	terminate ; nothing top do
+    89 00000008 AD                      	lodsd ; program file name address 
+    90 00000009 AD                      	lodsd ; text file name address
+    91                                  	; EAX = arg2 ; file name address
+    92                                  
+    93                                  	; EBX = EAX = file name or path address
+    94                                  	; CL = file attributes (archive = 20h, read only = 01h)
+    95                                  	;	(21h = Archived & Read Only files are included)
+    96                                  	; CH = 0 = basic parameters (24 bytes)
+    97                                  	; EDX = DTA = buffer address (24 bytes for basic parameters)
+    98                                  	; EAX = _fff = 'Find First File' system call for TRDOS 386
+    99                                  
+   100 0000000A 50                      	push	eax
+   101                                  
+   102 0000000B BE[85000000]            	mov	esi, msg_program
+   103 00000010 E860000000              	call	print_msg
+   104                                  
+   105 00000015 30E4                    	xor	ah, ah
+   106 00000017 CD32                    	int	32h
+   107                                  
+   108 00000019 58                      	pop	eax
+   109                                  
+   110                                  	; Find First File
+   111                                  	sys	_fff, eax, 0021h, DTA
+   111                              <1> 
+   111                              <1> 
+   111                              <1> 
+   111                              <1> 
+   111                              <1>  %if %0 >= 2
+   111 0000001A 89C3                <1>  mov ebx, %2
+   111                              <1>  %if %0 >= 3
+   111 0000001C B921000000          <1>  mov ecx, %3
+   111                              <1>  %if %0 = 4
+   111 00000021 BA[DC000000]        <1>  mov edx, %4
+   111                              <1>  %endif
+   111                              <1>  %endif
+   111                              <1>  %endif
+   111 00000026 B828000000          <1>  mov eax, %1
+   111                              <1> 
+   111 0000002B CD40                <1>  int 40h
+   112                                  _0:
+   113 0000002D 7233                    	jc	terminate  ; terminate if there is 
+   114                                  			   ; file not found error or another error
+   115                                  
+   116                                  	; check file attributes
+   117 0000002F F605[DC000000]1E        	test	byte [DTA], 1Eh ; 10h = directory, 08h = volume label
+   118                                  				; 04h = system, 02h = hidden
+   119 00000036 7409                    	jz	short _2   ; atributes are proper 
+   120                                  		
+   121                                  _1:
+   122                                  	; Find Next File
+   123                                  	sys	_fnf	; if the first file is not proper file
+   123                              <1> 
+   123                              <1> 
+   123                              <1> 
+   123                              <1> 
+   123                              <1>  %if %0 >= 2
+   123                              <1>  mov ebx, %2
+   123                              <1>  %if %0 >= 3
+   123                              <1>  mov ecx, %3
+   123                              <1>  %if %0 = 4
+   123                              <1>  mov edx, %4
+   123                              <1>  %endif
+   123                              <1>  %endif
+   123                              <1>  %endif
+   123 00000038 B829000000          <1>  mov eax, %1
+   123                              <1> 
+   123 0000003D CD40                <1>  int 40h
+   124                                  			; check for next file
+   125 0000003F EBEC                    	jmp	short _0
+   126                                  _2:
+   127 00000041 BE[D9000000]            	mov	esi, nextline
+   128 00000046 E82A000000              	call	print_msg
+   129                                  
+   130 0000004B BE[E6000000]            	mov	esi, DTA+10 ; ASCIIZ, capitalized file name
+   131 00000050 E820000000              	call	print_msg
+   132                                  
+   133 00000055 30E4                    	xor	ah, ah
+   134                                  	;int	16h	; KEYBOARD - READ CHAR FROM BUFFER, WAIT IF EMPTY
+   135                                  			; Return: AH = scan code, AL = character
+   136 00000057 CD32                    	int	32h	; TRDOS 386 Keyboard interrupt 
+   137                                  		    	; Note: This is not a system call -INT 40h-,
+   138                                  		    	; this is a direct video service like as
+   139                                  		    	; INT 16h ROMBIOS service in real mode.
+   140                                  
+   141                                  	sys	_fnf
+   141                              <1> 
+   141                              <1> 
+   141                              <1> 
+   141                              <1> 
+   141                              <1>  %if %0 >= 2
+   141                              <1>  mov ebx, %2
+   141                              <1>  %if %0 >= 3
+   141                              <1>  mov ecx, %3
+   141                              <1>  %if %0 = 4
+   141                              <1>  mov edx, %4
+   141                              <1>  %endif
+   141                              <1>  %endif
+   141                              <1>  %endif
+   141 00000059 B829000000          <1>  mov eax, %1
+   141                              <1> 
+   141 0000005E CD40                <1>  int 40h
+   142                                  	
+   143 00000060 EBCB                    	jmp	_0 	; loop (we use same code for the next file)
+   144                                  
+   145                                  terminate:
+   146 00000062 BE[D9000000]            	mov	esi, nextline
+   147 00000067 E809000000              	call	print_msg
+   148                                  
+   149                                  	sys 	_exit			   ; INT 40h
+   149                              <1> 
+   149                              <1> 
+   149                              <1> 
+   149                              <1> 
+   149                              <1>  %if %0 >= 2
+   149                              <1>  mov ebx, %2
+   149                              <1>  %if %0 >= 3
+   149                              <1>  mov ecx, %3
+   149                              <1>  %if %0 = 4
+   149                              <1>  mov edx, %4
+   149                              <1>  %endif
+   149                              <1>  %endif
+   149                              <1>  %endif
+   149 0000006C B801000000          <1>  mov eax, %1
+   149                              <1> 
+   149 00000071 CD40                <1>  int 40h
+   150                                  here:
+   151 00000073 EBFE                    	jmp	short here
+   152                                  
+   153                                  print_msg:
+   154 00000075 BB0F000000              	mov	ebx, 0Fh       ; white characters (bl)
+   155                                  		               ; video page 0 (bh)
+   156 0000007A B40E                    	mov	ah, 0Eh ; teletype output (write tty)
+   157 0000007C AC                      	lodsb
+   158                                  _p_nextchar:
+   159 0000007D CD31                    	int	31h
+   160 0000007F AC                      	lodsb
+   161 00000080 20C0                    	and	al, al
+   162 00000082 75F9                    	jnz	short _p_nextchar
+   163 00000084 C3                      	retn
+   164                                  
+   165                                  ;-----------------------------------------------------------------
+   166                                  ;  messages
+   167                                  ;-----------------------------------------------------------------
+   168                                  
+   169                                  msg_program:
+   170 00000085 0D0A                    	db 0Dh, 0Ah
+   171 00000087 464C4953542E505247-     	db "FLIST.PRG /// TRDOS 386 sysfff, sysfnf test program"
+   171 00000090 202F2F2F205452444F-
+   171 00000099 532033383620737973-
+   171 000000A2 6666662C2073797366-
+   171 000000AB 6E6620746573742070-
+   171 000000B4 726F6772616D       
+   172 000000BA 0D0A                    	db 0Dh, 0Ah
+   173 000000BC 6279204572646F6761-     	db "by Erdogan Tan, 17/10/2016", 0Dh, 0Ah, 0
+   173 000000C5 6E2054616E2C203137-
+   173 000000CE 2F31302F323031360D-
+   173 000000D7 0A00               
+   174                                  nextline:
+   175 000000D9 0D0A00                  	db 0Dh, 0Ah, 0
+   176                                  
+   177                                  bss:
+   178                                  
+   179                                  ABSOLUTE bss
+   180                                  
+   181                                  alignb 4
+   182                                  
+   183 000000DC <res 00000018>          DTA:	 resb 24

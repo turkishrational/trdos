@@ -1,0 +1,424 @@
+     1                                  ; ****************************************************************************
+     2                                  ; bin2db.s (TRDOS 386, TRDOS v2.0 - sample binary file, 'bin2db.prg')
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; BIN2DB.PRG ! 'sysopen', 'sysread', 'syswrite' TEST program for TRDOS 386 !
+     5                                  ;
+     6                                  ; 25/10/2016
+     7                                  ;
+     8                                  ; [ Last Modification: 31/10/2016 ]
+     9                                  ;
+    10                                  ; ****************************************************************************
+    11                                  
+    12                                  ; 16/10/2016
+    13                                  ; 29/04/2016
+    14                                  ; TRDOS 386 system calls (temporary list!)
+    15                                  _ver 	equ 0
+    16                                  _exit 	equ 1
+    17                                  _fork 	equ 2
+    18                                  _read 	equ 3
+    19                                  _write	equ 4
+    20                                  _open	equ 5
+    21                                  _close 	equ 6
+    22                                  _wait 	equ 7
+    23                                  _creat 	equ 8
+    24                                  _link 	equ 9
+    25                                  _unlink	equ 10
+    26                                  _exec	equ 11
+    27                                  _chdir	equ 12
+    28                                  _time 	equ 13
+    29                                  _mkdir 	equ 14
+    30                                  _chmod	equ 15
+    31                                  _chown	equ 16
+    32                                  _break	equ 17
+    33                                  _stat	equ 18
+    34                                  _seek	equ 19
+    35                                  _tell 	equ 20
+    36                                  _mount	equ 21
+    37                                  _umount	equ 22
+    38                                  _setuid	equ 23
+    39                                  _getuid	equ 24
+    40                                  _stime	equ 25
+    41                                  _quit	equ 26	
+    42                                  _intr	equ 27
+    43                                  _fstat	equ 28
+    44                                  _emt 	equ 29
+    45                                  _mdate 	equ 30
+    46                                  _video 	equ 31
+    47                                  _audio	equ 32
+    48                                  _timer	equ 33
+    49                                  _sleep	equ 34
+    50                                  _msg    equ 35
+    51                                  _geterr	equ 36
+    52                                  _rsvd1	equ 37
+    53                                  _pri	equ 38
+    54                                  _rele	equ 39
+    55                                  _fff	equ 40
+    56                                  _fnf	equ 41
+    57                                  
+    58                                  %macro sys 1-4
+    59                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    60                                      ; 03/09/2015	
+    61                                      ; 13/04/2015
+    62                                      ; Retro UNIX 386 v1 system call.		
+    63                                      %if %0 >= 2   
+    64                                          mov ebx, %2
+    65                                          %if %0 >= 3    
+    66                                              mov ecx, %3
+    67                                              %if %0 = 4
+    68                                                 mov edx, %4   
+    69                                              %endif
+    70                                          %endif
+    71                                      %endif
+    72                                      mov eax, %1
+    73                                      ;int 30h
+    74                                      int 40h ; TRDOS 386 (TRDOS v2.0)		   
+    75                                  %endmacro
+    76                                  
+    77                                  ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
+    78                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    79                                  
+    80                                  [BITS 32] ; We need 32-bit intructions for protected mode
+    81                                  
+    82                                  [ORG 0] 
+    83                                  
+    84                                  START_CODE:
+    85 00000000 89E6                    	mov	esi, esp
+    86 00000002 AD                      	lodsd
+    87 00000003 83F802                  	cmp	eax, 2 ; two arguments (program file name & binary file name)
+    88 00000006 0F820A010000            	jb	prg_msg ; nothing to do
+    89                                  
+    90 0000000C AD                      	lodsd ; program file name address 
+    91 0000000D AD                      	lodsd ; binary file name address (file to be read)
+    92                                  	; EAX = arg2 ; file name address
+    93                                  
+    94                                  open_bin_file:
+    95                                  	sys	_open, eax, 0 ; open for reading
+    95                              <1> 
+    95                              <1> 
+    95                              <1> 
+    95                              <1> 
+    95                              <1>  %if %0 >= 2
+    95 0000000E 89C3                <1>  mov ebx, %2
+    95                              <1>  %if %0 >= 3
+    95 00000010 B900000000          <1>  mov ecx, %3
+    95                              <1>  %if %0 = 4
+    95                              <1>  mov edx, %4
+    95                              <1>  %endif
+    95                              <1>  %endif
+    95                              <1>  %endif
+    95 00000015 B805000000          <1>  mov eax, %1
+    95                              <1> 
+    95 0000001A CD40                <1>  int 40h
+    96 0000001C 0F820E010000            	jc	open_error
+    97                                  
+    98 00000022 A3[5C020000]            	mov	[fhandle], eax ; file handle/index number
+    99                                  
+   100 00000027 C605[59020000]0E        	mov	byte [color], 0Eh ; Yellow
+   101 0000002E BE[2D020000]            	mov	esi, msg_reading
+   102 00000033 E837010000              	call	print_msg
+   103                                  
+   104                                  read_file:
+   105                                  	sys	_read, [fhandle], BUFFER, 0FFFFFFFFh ; read all bytes 
+   105                              <1> 
+   105                              <1> 
+   105                              <1> 
+   105                              <1> 
+   105                              <1>  %if %0 >= 2
+   105 00000038 8B1D[5C020000]      <1>  mov ebx, %2
+   105                              <1>  %if %0 >= 3
+   105 0000003E B9[64020000]        <1>  mov ecx, %3
+   105                              <1>  %if %0 = 4
+   105 00000043 BAFFFFFFFF          <1>  mov edx, %4
+   105                              <1>  %endif
+   105                              <1>  %endif
+   105                              <1>  %endif
+   105 00000048 B803000000          <1>  mov eax, %1
+   105                              <1> 
+   105 0000004D CD40                <1>  int 40h
+   106 0000004F 0F82EE000000             	jc	rw_error	; disk read or memory allocation error
+   107                                  
+   108 00000055 A3[60020000]            	mov	[fsize], eax ; file size (read bytes)
+   109                                  
+   110 0000005A E804010000              	call	print_msg_ok
+   111                                  
+   112                                  close_bin_file:
+   113                                  	sys	_close, [fhandle] ; close file
+   113                              <1> 
+   113                              <1> 
+   113                              <1> 
+   113                              <1> 
+   113                              <1>  %if %0 >= 2
+   113 0000005F 8B1D[5C020000]      <1>  mov ebx, %2
+   113                              <1>  %if %0 >= 3
+   113                              <1>  mov ecx, %3
+   113                              <1>  %if %0 = 4
+   113                              <1>  mov edx, %4
+   113                              <1>  %endif
+   113                              <1>  %endif
+   113                              <1>  %endif
+   113 00000065 B806000000          <1>  mov eax, %1
+   113                              <1> 
+   113 0000006A CD40                <1>  int 40h
+   114                                  
+   115                                  convert_byte_to_db:
+   116 0000006C BE[64020000]            	mov	esi, BUFFER
+   117 00000071 89F2                    	mov	edx, esi
+   118 00000073 0315[60020000]          	add	edx, [fsize]
+   119 00000079 89D7                    	mov	edi, edx 
+   120                                  
+   121 0000007B 31C9                    	xor	ecx, ecx
+   122                                  c_0:
+   123 0000007D B110                    	mov	cl, 16
+   124                                  c_1:
+   125 0000007F 66B86462                	mov	ax, 'db'
+   126 00000083 66AB                    	stosw
+   127 00000085 B020                    	mov	al, ' '
+   128 00000087 AA                      	stosb
+   129                                  c_2: 
+   130 00000088 AC                      	lodsb
+   131 00000089 E8F3000000              	call	hex
+   132 0000008E 66AB                    	stosw
+   133 00000090 B068                    	mov	al, 'h'
+   134 00000092 AA                      	stosb
+   135                                  
+   136 00000093 FF0D[60020000]          	dec	dword [fsize]
+   137 00000099 7414                    	jz	short c_4
+   138                                  
+   139 0000009B FEC9                    	dec	cl
+   140 0000009D 7408                    	jz	short c_3
+   141                                  
+   142 0000009F 66B82C20                	mov	ax, ', '
+   143 000000A3 66AB                    	stosw
+   144 000000A5 EBE1                    	jmp	short c_2
+   145                                  c_3:
+   146 000000A7 66B80D0A                	mov 	ax, 0A0Dh
+   147 000000AB 66AB                    	stosw
+   148 000000AD EBCE                    	jmp	short c_0
+   149                                  c_4:
+   150 000000AF 66B80D0A                	mov 	ax, 0A0Dh
+   151 000000B3 66AB                    	stosw
+   152 000000B5 28C0                    	sub	al, al
+   153 000000B7 AA                      	stosb
+   154                                  
+   155                                  create_txt_file:
+   156                                  	sys	_creat, txt_file, 0 ; create (normal) file
+   156                              <1> 
+   156                              <1> 
+   156                              <1> 
+   156                              <1> 
+   156                              <1>  %if %0 >= 2
+   156 000000B8 BB[4E020000]        <1>  mov ebx, %2
+   156                              <1>  %if %0 >= 3
+   156 000000BD B900000000          <1>  mov ecx, %3
+   156                              <1>  %if %0 = 4
+   156                              <1>  mov edx, %4
+   156                              <1>  %endif
+   156                              <1>  %endif
+   156                              <1>  %endif
+   156 000000C2 B808000000          <1>  mov eax, %1
+   156                              <1> 
+   156 000000C7 CD40                <1>  int 40h
+   157 000000C9 725E                    	jc	short create_error
+   158                                  
+   159 000000CB A3[5C020000]            	mov	[fhandle], eax
+   160                                  
+   161 000000D0 C605[59020000]0B        	mov	byte [color], 0Bh ; Light Cyan
+   162 000000D7 BE[3B020000]            	mov	esi, msg_writing
+   163 000000DC E88E000000              	call	print_msg
+   164                                  
+   165 000000E1 29D7                    	sub	edi, edx ; file size 
+   166                                  	; edx = start address of the text
+   167                                  
+   168                                  	sys	_write, [fhandle], edx, edi ; write to 'BIN2DB.TXT' 
+   168                              <1> 
+   168                              <1> 
+   168                              <1> 
+   168                              <1> 
+   168                              <1>  %if %0 >= 2
+   168 000000E3 8B1D[5C020000]      <1>  mov ebx, %2
+   168                              <1>  %if %0 >= 3
+   168 000000E9 89D1                <1>  mov ecx, %3
+   168                              <1>  %if %0 = 4
+   168 000000EB 89FA                <1>  mov edx, %4
+   168                              <1>  %endif
+   168                              <1>  %endif
+   168                              <1>  %endif
+   168 000000ED B804000000          <1>  mov eax, %1
+   168                              <1> 
+   168 000000F2 CD40                <1>  int 40h
+   169 000000F4 724D                     	jc	short rw_error  ; disk write (or free space) error
+   170                                  
+   171 000000F6 E868000000              	call	print_msg_ok
+   172                                  
+   173                                  	sys	_close, [fhandle] ; close file
+   173                              <1> 
+   173                              <1> 
+   173                              <1> 
+   173                              <1> 
+   173                              <1>  %if %0 >= 2
+   173 000000FB 8B1D[5C020000]      <1>  mov ebx, %2
+   173                              <1>  %if %0 >= 3
+   173                              <1>  mov ecx, %3
+   173                              <1>  %if %0 = 4
+   173                              <1>  mov edx, %4
+   173                              <1>  %endif
+   173                              <1>  %endif
+   173                              <1>  %endif
+   173 00000101 B806000000          <1>  mov eax, %1
+   173                              <1> 
+   173 00000106 CD40                <1>  int 40h
+   174                                  
+   175 00000108 C605[59020000]07        	mov	byte [color], 07h ; Light Gray (Default Color)
+   176 0000010F BE[1F020000]            	mov	esi, nextline
+   177 00000114 EB05                    	jmp	short print_nl
+   178                                  
+   179                                  prg_msg:
+   180 00000116 BE[A9010000]            	mov	esi, msg_program
+   181                                  print_nl:
+   182 0000011B E84F000000              	call	print_msg	
+   183                                  terminate:
+   184                                  	sys 	_exit			   ; INT 40h
+   184                              <1> 
+   184                              <1> 
+   184                              <1> 
+   184                              <1> 
+   184                              <1>  %if %0 >= 2
+   184                              <1>  mov ebx, %2
+   184                              <1>  %if %0 >= 3
+   184                              <1>  mov ecx, %3
+   184                              <1>  %if %0 = 4
+   184                              <1>  mov edx, %4
+   184                              <1>  %endif
+   184                              <1>  %endif
+   184                              <1>  %endif
+   184 00000120 B801000000          <1>  mov eax, %1
+   184                              <1> 
+   184 00000125 CD40                <1>  int 40h
+   185                                  here:
+   186 00000127 EBFE                    	jmp	short here
+   187                                  
+   188                                  create_error:
+   189 00000129 BE[0C020000]            	mov	esi, msg_create_error
+   190 0000012E EB05                    	jmp	short open_create_error
+   191                                  open_error:
+   192 00000130 BE[F8010000]            	mov	esi, msg_open_error
+   193                                  open_create_error:
+   194 00000135 C605[59020000]0C        	mov	byte [color], 0Ch ; Light Red
+   195 0000013C E82E000000              	call	print_msg		   ; INT 31h
+   196 00000141 EBDD                    	jmp	short terminate	
+   197                                  
+   198                                  rw_error:
+   199                                  	sys	_close, [fhandle] ; close file
+   199                              <1> 
+   199                              <1> 
+   199                              <1> 
+   199                              <1> 
+   199                              <1>  %if %0 >= 2
+   199 00000143 8B1D[5C020000]      <1>  mov ebx, %2
+   199                              <1>  %if %0 >= 3
+   199                              <1>  mov ecx, %3
+   199                              <1>  %if %0 = 4
+   199                              <1>  mov edx, %4
+   199                              <1>  %endif
+   199                              <1>  %endif
+   199                              <1>  %endif
+   199 00000149 B806000000          <1>  mov eax, %1
+   199                              <1> 
+   199 0000014E CD40                <1>  int 40h
+   200 00000150 C605[59020000]0C        	mov	byte [color], 0Ch ; Light Red
+   201 00000157 BE[22020000]            	mov	esi, msg_error
+   202 0000015C E80E000000              	call	print_msg		   ; INT 31h
+   203 00000161 EBBD                    	jmp	short terminate
+   204                                  
+   205                                  print_msg_ok:
+   206 00000163 C605[59020000]0A        	mov	byte [color], 0Ah ; Light Green
+   207 0000016A BE[49020000]            	mov	esi, msg_ok
+   208                                  print_msg:
+   209 0000016F 0FB61D[59020000]        	movzx	ebx, byte [color] ; text color (bl)
+   210                                  		               ; video page 0 (bh)
+   211 00000176 B40E                    	mov	ah, 0Eh ; teletype output (write tty)
+   212 00000178 AC                      	lodsb
+   213                                  _p_nextchar:
+   214 00000179 CD31                    	int	31h
+   215 0000017B AC                      	lodsb
+   216 0000017C 20C0                    	and	al, al
+   217 0000017E 75F9                    	jnz	short _p_nextchar
+   218 00000180 C3                      	retn
+   219                                  
+   220                                  hex:
+   221 00000181 0FB6D8                  	movzx	ebx, al
+   222 00000184 C0EB04                  	shr	bl, 4
+   223 00000187 8A9B[99010000]          	mov	bl, [ebx+hexchrs] 	 	
+   224 0000018D 86D8                    	xchg	bl, al
+   225 0000018F 80E30F                  	and	bl, 0Fh
+   226 00000192 8AA3[99010000]          	mov	ah, [ebx+hexchrs] 
+   227 00000198 C3                      	retn
+   228                                  
+   229                                  hexchrs:
+   230 00000199 303132333435363738-     	db '0123456789ABCDEF'
+   230 000001A2 39414243444546     
+   231                                  
+   232                                  ;-----------------------------------------------------------------
+   233                                  ;  messages
+   234                                  ;-----------------------------------------------------------------
+   235                                  
+   236                                  msg_program:
+   237 000001A9 0D0A                    	db 0Dh, 0Ah
+   238 000001AB 42494E3244422E5052-     	db "BIN2DB.PRG /// TRDOS 386 syswrite test program"
+   238 000001B4 47202F2F2F20545244-
+   238 000001BD 4F5320333836207379-
+   238 000001C6 737772697465207465-
+   238 000001CF 73742070726F677261-
+   238 000001D8 6D                 
+   239 000001D9 0D0A                    	db 0Dh, 0Ah
+   240 000001DB 6279204572646F6761-     	db "by Erdogan Tan, 31/10/2016", 0Dh, 0Ah, 0
+   240 000001E4 6E2054616E2C203331-
+   240 000001ED 2F31302F323031360D-
+   240 000001F6 0A00               
+   241                                  
+   242                                  msg_open_error:
+   243 000001F8 0D0A                    	db 0Dh, 0Ah
+   244 000001FA 7379736F70656E2065-     	db 'sysopen error !'
+   244 00000203 72726F722021       
+   245 00000209 0D0A00                  	db 0Dh, 0Ah, 0
+   246                                  
+   247                                  msg_create_error:
+   248 0000020C 0D0A                    	db 0Dh, 0Ah
+   249 0000020E 737973637265617465-     	db 'syscreate error !'
+   249 00000217 206572726F722021   
+   250                                  nextline:
+   251 0000021F 0D0A00                  	db 0Dh, 0Ah, 0
+   252                                  
+   253                                  msg_error:
+   254 00000222 4552524F522021200D-     	db 'ERROR ! ', 0Dh, 0Ah, 0
+   254 0000022B 0A00               
+   255                                  
+   256                                  msg_reading:
+   257 0000022D 0D0A                    	db 0Dh, 0Ah
+   258 0000022F 52656164696E672E2E-     	db 'Reading... ', 0
+   258 00000238 2E2000             
+   259                                  
+   260                                  msg_writing:
+   261 0000023B 0D0A                    	db 0Dh, 0Ah
+   262 0000023D 57726974696E672E2E-     	db 'Writing... ', 0
+   262 00000246 2E2000             
+   263                                  
+   264                                  msg_ok:
+   265 00000249 4F4B2E2000              	db 'OK. ', 0
+   266                                  
+   267                                  txt_file:
+   268 0000024E 42494E3244422E5458-     	db 'BIN2DB.TXT', 0
+   268 00000257 5400               
+   269                                  
+   270 00000259 0F                      color:	db 0Fh ; White
+   271                                  
+   272                                  bss:
+   273                                  
+   274                                  ABSOLUTE bss
+   275                                  
+   276 0000025A <res 00000002>          alignb 4
+   277                                  
+   278 0000025C <res 00000004>          fhandle: resd 1
+   279 00000260 <res 00000004>          fsize:	 resd 1
+   280                                  
+   281                                  BUFFER:	

@@ -1,0 +1,660 @@
+     1                                  ; ****************************************************************************
+     2                                  ; line1.s - TRDOS 386 (TRDOS v2.0.3) Test Program - 'sysvideo' pixel w/r tests
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ;
+     5                                  ; 09/02/2021
+     6                                  ;
+     7                                  ; ****************************************************************************
+     8                                  ; nasm line1.s -l line1.txt -o LINE1.PRG -Z error.txt
+     9                                  
+    10                                  ; Draw lines by using 'sysvideo' bh=3
+    11                                  
+    12                                  ; 14/07/2020
+    13                                  ; 31/12/2017
+    14                                  ; TRDOS 386 (v2.0) system calls
+    15                                  _ver 	equ 0
+    16                                  _exit 	equ 1
+    17                                  _fork 	equ 2
+    18                                  _read 	equ 3
+    19                                  _write	equ 4
+    20                                  _open	equ 5
+    21                                  _close 	equ 6
+    22                                  _wait 	equ 7
+    23                                  _create	equ 8
+    24                                  _rename	equ 9
+    25                                  _delete	equ 10
+    26                                  _exec	equ 11
+    27                                  _chdir	equ 12
+    28                                  _time 	equ 13
+    29                                  _mkdir 	equ 14
+    30                                  _chmod	equ 15
+    31                                  _rmdir	equ 16
+    32                                  _break	equ 17
+    33                                  _drive	equ 18
+    34                                  _seek	equ 19
+    35                                  _tell 	equ 20
+    36                                  _memory	equ 21
+    37                                  _prompt	equ 22
+    38                                  _path	equ 23
+    39                                  _env	equ 24
+    40                                  _stime	equ 25
+    41                                  _quit	equ 26	
+    42                                  _intr	equ 27
+    43                                  _dir	equ 28
+    44                                  _emt 	equ 29
+    45                                  _ldrvt 	equ 30
+    46                                  _video 	equ 31
+    47                                  _audio	equ 32
+    48                                  _timer	equ 33
+    49                                  _sleep	equ 34
+    50                                  _msg    equ 35
+    51                                  _geterr	equ 36
+    52                                  _fpstat	equ 37
+    53                                  _pri	equ 38
+    54                                  _rele	equ 39
+    55                                  _fff	equ 40
+    56                                  _fnf	equ 41
+    57                                  _alloc	equ 42
+    58                                  _dalloc equ 43
+    59                                  _calbac equ 44
+    60                                  _dma	equ 45	
+    61                                  
+    62                                  %macro sys 1-4
+    63                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    64                                      ; 03/09/2015	
+    65                                      ; 13/04/2015
+    66                                      ; Retro UNIX 386 v1 system call.		
+    67                                      %if %0 >= 2   
+    68                                          mov ebx, %2
+    69                                          %if %0 >= 3    
+    70                                              mov ecx, %3
+    71                                              %if %0 = 4
+    72                                                 mov edx, %4   
+    73                                              %endif
+    74                                          %endif
+    75                                      %endif
+    76                                      mov eax, %1
+    77                                      ;int 30h
+    78                                      int 40h ; TRDOS 386 (TRDOS v2.0)		   
+    79                                  %endmacro
+    80                                  
+    81                                  ; Retro UNIX 386 v1 system call format:
+    82                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    83                                  
+    84                                  [BITS 32] ; We need 32-bit intructions for protected mode
+    85                                  
+    86                                  [ORG 0] 
+    87                                  
+    88                                  START_CODE:
+    89                                  	; clear bss
+    90 00000000 BF[CC050000]            	mov	edi, bss_start
+    91 00000005 B908000000              	mov	ecx, (bss_end - bss_start)/4
+    92                                  	;xor	eax, eax
+    93 0000000A F3AB                    	rep	stosd
+    94                                  
+    95                                  	; program message
+    96 0000000C BE[65040000]            	mov	esi, program_msg
+    97 00000011 E86C020000              	call	print_msg
+    98                                  
+    99 00000016 30E4                    	xor	ah, ah
+   100                                  	;int	16h	; KEYBOARD - READ CHAR FROM BUFFER, WAIT IF EMPTY
+   101                                  			; Return: AH = scan code, AL = character
+   102 00000018 CD32                    	int	32h	; TRDOS 386 Keyboard interrupt 
+   103                                  
+   104                                  	;; Set Video Mode to 13h
+   105                                  	;sys	_video, 0813h
+   106                                  	;cmp	eax, 14h 
+   107                                  	;je	short mode_13h_set_ok
+   108                                  
+   109                                  	; set VGA mode by using int 31h
+   110 0000001A 66B81300                	mov	ax, 13h	; mode 13h ; 
+   111 0000001E CD31                    	int	31h	; real mode: int 10h
+   112 00000020 EB0E                    	jmp	short mode_13h_set_ok
+   113                                  
+   114                                  terminate:
+   115 00000022 E837040000              	call	set_text_mode
+   116                                  	sys	_exit
+   116                              <1> 
+   116                              <1> 
+   116                              <1> 
+   116                              <1> 
+   116                              <1>  %if %0 >= 2
+   116                              <1>  mov ebx, %2
+   116                              <1>  %if %0 >= 3
+   116                              <1>  mov ecx, %3
+   116                              <1>  %if %0 = 4
+   116                              <1>  mov edx, %4
+   116                              <1>  %endif
+   116                              <1>  %endif
+   116                              <1>  %endif
+   116 00000027 B801000000          <1>  mov eax, %1
+   116                              <1> 
+   116 0000002C CD40                <1>  int 40h
+   117                                  halt:
+   118 0000002E EBFE                    	jmp	short halt
+   119                                  
+   120                                  mode_13h_set_ok:
+   121                                  	; create a box and the center of 640x480 screen 
+   122                                  reset:	
+   123 00000030 B380                    	mov	bl, 128  ; color
+   124 00000032 881D[CD050000]          	mov	[color], bl
+   125                                  
+   126 00000038 B140                    	mov	cl, 64
+   127 0000003A 880D[D8050000]          	mov	[length], cl
+   128                                  
+   129                                  	; BL = Line Color
+   130                                  	; CL = Line Size
+   131                                  
+   132                                  	; move square to center of screen
+   133                                  center:
+   134 00000040 E8CE030000              	call	movecenter
+   135                                  _0:
+   136 00000045 E89C020000              	call	drawline
+   137 0000004A 7206                    	jc	short waitforkey
+   138 0000004C FE05[CC050000]          	inc	byte [lphase] 
+   139                                  waitforkey:
+   140 00000052 B401                    	mov	ah, 1
+   141 00000054 CD32                    	int	32h
+   142 00000056 740C                    	jz	short getkey
+   143 00000058 66FF05[CE050000]        	inc	word [counter]
+   144 0000005F 90                      	nop
+   145 00000060 90                      	nop
+   146 00000061 90                      	nop
+   147 00000062 EBEE                    	jmp	short waitforkey
+   148                                  getkey:
+   149 00000064 30E4                    	xor	ah, ah
+   150 00000066 CD32                    	int	32h
+   151                                  
+   152 00000068 663D032E                	cmp	ax, 2E03h
+   153 0000006C 74B4                    	je	short terminate
+   154 0000006E 3C1B                    	cmp	al, 1Bh ; ESC key
+   155 00000070 74B0                    	je	short terminate	
+   156                                  
+   157 00000072 3C2B                    	cmp	al, '+'
+   158 00000074 7541                    	jne	short _1
+   159                                  
+   160 00000076 803D[CC050000]04        	cmp	byte [lphase], 4
+   161 0000007D 0F82F5010000            	jb	_14
+   162                                  
+   163 00000083 E82A020000              	call	clear_lines
+   164                                  	; increase length
+   165 00000088 FE05[D8050000]          	inc	byte [length]
+   166 0000008E 7506                    	jnz	short _incl
+   167 00000090 FE0D[D8050000]          	dec	byte [length]
+   168                                  _incl:
+   169                                  _decl:
+   170 00000096 E89F030000              	call	get_start_offset
+   171 0000009B 0305[D8050000]          	add	eax, [length]
+   172 000000A1 3D00FA0000              	cmp	eax, 64000
+   173 000000A6 769D                    	jna	short _0
+   174 000000A8 FE0D[D8050000]          	dec	byte [length]
+   175 000000AE 75E6                    	jnz	short _incl
+   176 000000B0 E897030000              	call	beep
+   177 000000B5 EB9B                    	jmp	short waitforkey
+   178                                  _1:
+   179 000000B7 3C2D                    	cmp	al, '-'
+   180 000000B9 7522                    	jne	short _2
+   181                                  
+   182 000000BB 803D[CC050000]04        	cmp	byte [lphase], 4
+   183 000000C2 0F82B0010000            	jb	_14
+   184                                  
+   185 000000C8 E8E5010000              	call	clear_lines
+   186                                  	; decrease length
+   187 000000CD FE0D[D8050000]          	dec	byte [length]
+   188 000000D3 75C1                    	jnz	short _decl
+   189 000000D5 FE05[D8050000]          	inc	byte [length]
+   190 000000DB EBB9                    	jmp	short _decl
+   191                                  _2:
+   192 000000DD 3C20                    	cmp	al, 20h  ; space
+   193 000000DF 7511                    	jne	short _3
+   194 000000E1 8005[CD050000]08        	add	byte [color], 8 	
+   195 000000E8 E8F9010000              	call	drawline
+   196 000000ED E960FFFFFF              	jmp	waitforkey
+   197                                  _3:
+   198 000000F2 80FC4B                  	cmp	ah, 4Bh
+   199 000000F5 7532                    	jne	short _4
+   200                                  
+   201                                  	; left arrow
+   202 000000F7 803D[CC050000]04        	cmp	byte [lphase], 4
+   203 000000FE 0F8274010000            	jb	_14
+   204 00000104 66833D[D4050000]00      	cmp	word [x_pos], 0
+   205 0000010C 770A                    	ja	short _3_
+   206 0000010E E839030000              	call	beep
+   207 00000113 E93AFFFFFF              	jmp	waitforkey
+   208                                  _3_:
+   209 00000118 E895010000              	call	clear_lines
+   210 0000011D 66FF0D[D4050000]        	dec	word [x_pos]
+   211 00000124 E91CFFFFFF              	jmp	_0
+   212                                  _4:
+   213 00000129 80FC4D                  	cmp	ah, 4Dh
+   214 0000012C 754A                    	jne	short _5
+   215                                  
+   216                                  	; right arrow
+   217 0000012E 803D[CC050000]04        	cmp	byte [lphase], 4
+   218 00000135 0F823D010000            	jb	_14
+   219 0000013B E872010000              	call	clear_lines
+   220 00000140 8B0D[D4050000]          	mov	ecx, [x_pos]
+   221 00000146 030D[D8050000]          	add	ecx, [length]
+   222 0000014C 81F940010000            	cmp	ecx, 320
+   223 00000152 7218                    	jb	short _4_
+   224 00000154 FE0D[D8050000]          	dec	byte [length]
+   225 0000015A 7510                    	jnz	short _4_
+   226 0000015C FE05[D8050000]          	inc	byte [length]
+   227 00000162 E8E5020000              	call	beep
+   228 00000167 E9E6FEFFFF              	jmp	waitforkey
+   229                                  _4_:
+   230 0000016C 66FF05[D4050000]        	inc	word [x_pos]
+   231 00000173 E9CDFEFFFF              	jmp	_0
+   232                                  _5:
+   233 00000178 80FC50                  	cmp	ah, 50h
+   234 0000017B 7548                    	jne	short _6
+   235                                  	; down arrow
+   236 0000017D 803D[CC050000]04        	cmp	byte [lphase], 4
+   237 00000184 0F82EE000000            	jb	_14
+   238 0000018A E823010000              	call	clear_lines
+   239 0000018F A1[D0050000]            	mov	eax, [y_pos]
+   240 00000194 0305[D8050000]          	add	eax, [length]
+   241 0000019A 3DC8000000              	cmp	eax, 200
+   242 0000019F 7218                    	jb	short _5_
+   243 000001A1 FE0D[D8050000]          	dec	byte [length]
+   244 000001A7 7510                    	jnz	short _5_
+   245 000001A9 FE05[D8050000]          	inc	byte [length]
+   246 000001AF E898020000              	call	beep
+   247 000001B4 E999FEFFFF              	jmp	waitforkey
+   248                                  _5_:
+   249 000001B9 66FF05[D0050000]        	inc	word [y_pos]
+   250 000001C0 E980FEFFFF              	jmp	_0
+   251                                  _6:
+   252 000001C5 80FC48                  	cmp	ah, 48h
+   253 000001C8 7532                    	jne	short _7
+   254                                  	; up arrow
+   255 000001CA 803D[CC050000]04        	cmp	byte [lphase], 4
+   256 000001D1 0F82A1000000            	jb	_14
+   257 000001D7 66833D[D0050000]00      	cmp	word [y_pos], 0
+   258 000001DF 770A                    	ja	short _6_
+   259 000001E1 E866020000              	call	beep
+   260 000001E6 E967FEFFFF              	jmp	waitforkey
+   261                                  _6_:
+   262 000001EB E8C2000000              	call	clear_lines
+   263 000001F0 66FF0D[D0050000]        	dec	word [y_pos]
+   264 000001F7 E949FEFFFF              	jmp	_0
+   265                                  _7:
+   266 000001FC 80FC47                  	cmp	ah, 47h ; Home key
+   267 000001FF 751B                    	jne	short _8
+   268 00000201 E8AC000000              	call	clear_lines
+   269 00000206 E808020000              	call	movecenter
+   270 0000020B E883000000              	call	drawline_x
+   271 00000210 E87E000000              	call	drawline_x
+   272 00000215 E879000000              	call	drawline_x
+   273 0000021A EB5C                    	jmp	short _14
+   274                                  _8:
+   275 0000021C 80FC4F                  	cmp	ah, 4Fh ; End key
+   276 0000021F 752B                    	jne	short _9
+   277 00000221 E88C000000              	call	clear_lines
+   278 00000226 B380                    	mov	bl, 128  ; color
+   279 00000228 881D[CD050000]          	mov	[color], bl
+   280 0000022E B140                    	mov	cl, 64
+   281 00000230 880D[D8050000]          	mov	[length], cl
+   282 00000236 E8D8010000              	call	movecenter
+   283 0000023B E853000000              	call	drawline_x
+   284 00000240 E84E000000              	call	drawline_x
+   285 00000245 E849000000              	call	drawline_x
+   286 0000024A EB2C                    	jmp	short _14
+   287                                  _9:	
+   288 0000024C 663D0D1C                	cmp	ax, 1C0Dh
+   289 00000250 7426                    	je	short _14
+   290                                  _10:	
+   291 00000252 80FC53                  	cmp	ah, 53h ; INSERT
+   292 00000255 7421                    	je	short _14
+   293                                  _11:
+   294 00000257 80FC52                  	cmp	ah, 52h  ; DEL
+   295 0000025A 741C                    	je	short _14
+   296                                  _12:
+   297 0000025C 80FC49                  	cmp	ah, 49h  ; Page UP
+   298 0000025F 7508                    	jne	short _13
+   299 00000261 FE0D[CD050000]          	dec	byte [color]
+   300 00000267 EB0F                    	jmp	short _14
+   301                                  _13:
+   302 00000269 80FC51                  	cmp	ah, 51h  ; Page Down
+   303 0000026C 0F85E0FDFFFF            	jne	waitforkey
+   304 00000272 FE05[CD050000]          	inc	byte [color]
+   305                                  _14:
+   306 00000278 E816000000              	call	drawline_x
+   307 0000027D E9D0FDFFFF              	jmp	waitforkey
+   308                                  
+   309                                  print_msg:
+   310 00000282 B40E                    	mov	ah, 0Eh
+   311 00000284 BB07000000              	mov	ebx, 7
+   312                                  	;mov	bl, 7 ; char attribute & color
+   313                                  p_next_chr:
+   314 00000289 AC                      	lodsb
+   315 0000028A 08C0                    	or	al, al
+   316 0000028C 7404                    	jz	short p_retn ; retn	
+   317 0000028E CD31                    	int	31h
+   318 00000290 EBF7                    	jmp	short p_next_chr
+   319                                  p_retn:
+   320 00000292 C3                      	retn
+   321                                  
+   322                                  drawline_x:
+   323 00000293 803D[CC050000]04        	cmp	byte [lphase], 4
+   324 0000029A 7316                    	jnb	short clear_lines
+   325 0000029C E845000000              	call	drawline
+   326 000002A1 7308                    	jnc	short drawline_x_ok
+   327 000002A3 C605[CC050000]04        	mov	byte [lphase], 4
+   328 000002AA C3                      	retn
+   329                                  drawline_x_ok:
+   330 000002AB FE05[CC050000]          	inc	byte [lphase]
+   331                                  drawline_r:
+   332 000002B1 C3                      	retn
+   333                                  clear_lines:
+   334                                  	; clear previous square by drawing black square
+   335 000002B2 30E4                    	xor	ah, ah
+   336 000002B4 A0[CC050000]            	mov	al, [lphase]
+   337 000002B9 8825[CC050000]          	mov	[lphase], ah ; 0
+   338 000002BF 8625[CD050000]          	xchg	[color], ah ; 0
+   339                                  csq_1:
+   340 000002C5 50                      	push	eax
+   341 000002C6 E81B000000              	call	drawline
+   342 000002CB 58                      	pop	eax
+   343 000002CC 20C0                    	and	al, al
+   344 000002CE 740A                    	jz	short csq_2
+   345 000002D0 FE05[CC050000]          	inc	byte [lphase]
+   346 000002D6 FEC8                    	dec	al
+   347 000002D8 EBEB                    	jmp	short csq_1
+   348                                  csq_2:
+   349 000002DA A2[CC050000]            	mov	[lphase], al ; 0
+   350 000002DF 8825[CD050000]          	mov	[color], ah ; restore color
+   351 000002E5 C3                      	retn
+   352                                  drawline:
+   353                                  	; INPUT:
+   354                                  	;	[x_pos]
+   355                                  	;	[y_pos]
+   356                                  	;	[length]
+   357                                  	;	[color]
+   358                                  	;
+   359                                  	; Modified registers: edi, eax, ecx, ebx, edx	
+   360                                  
+   361                                  	; draw one segment of a square
+   362                                  _dline0:
+   363 000002E6 803D[CC050000]00        	cmp	byte [lphase], 0
+   364 000002ED 774B                    	ja	short _dvline1
+   365                                  	; draw (x1,y1) to (x2,y1) horizontal line at first
+   366                                  _dline0_x:
+   367 000002EF 8B2D[D8050000]          	mov	ebp, [length]
+   368 000002F5 E840010000              	call	get_start_offset
+   369                                  	; eax = start pos
+   370                                  	; ebp = length
+   371 000002FA 89C7                    	mov	edi, eax
+   372 000002FC 01E8                    	add	eax, ebp
+   373 000002FE 3D00FA0000              	cmp	eax, 64000
+   374 00000303 760F                    	jna	short _dline0_y
+   375 00000305 FE0D[D8050000]          	dec	byte [length]
+   376 0000030B 75E2                    	jnz	short _dline0_x
+   377                                  _dvline_err:
+   378 0000030D E83A010000              	call	beep
+   379 00000312 F9                      	stc
+   380 00000313 C3                      	retn
+   381                                  _dline0_y:
+   382 00000314 893D[DC050000]          	mov	[p1pos], edi
+   383 0000031A 48                      	dec	eax
+   384 0000031B A3[E0050000]            	mov	[p2pos], eax
+   385                                  _dvline0_np:
+   386                                  	sys	_video, 0301h, [color], edi  
+   386                              <1> 
+   386                              <1> 
+   386                              <1> 
+   386                              <1> 
+   386                              <1>  %if %0 >= 2
+   386 00000320 BB01030000          <1>  mov ebx, %2
+   386                              <1>  %if %0 >= 3
+   386 00000325 8B0D[CD050000]      <1>  mov ecx, %3
+   386                              <1>  %if %0 = 4
+   386 0000032B 89FA                <1>  mov edx, %4
+   386                              <1>  %endif
+   386                              <1>  %endif
+   386                              <1>  %endif
+   386 0000032D B81F000000          <1>  mov eax, %1
+   386                              <1> 
+   386 00000332 CD40                <1>  int 40h
+   387 00000334 4D                      	dec	ebp
+   388 00000335 747A                    	jz	short _dvline_ok
+   389 00000337 47                      	inc	edi
+   390 00000338 EBE6                    	jmp	short _dvline0_np
+   391                                  _dvline1:
+   392 0000033A 803D[CC050000]01        	cmp	byte [lphase], 1
+   393 00000341 776F                    	ja	short _dvline2
+   394                                  	; draw (x2,y1) to (x2,y2) vertical line
+   395                                  _dline1_x:
+   396 00000343 8B2D[D8050000]          	mov	ebp, [length] 
+   397 00000349 B840010000              	mov	eax, 320
+   398 0000034E F7E5                    	mul	ebp
+   399 00000350 8B3D[E0050000]          	mov	edi, [p2pos]
+   400 00000356 01F8                    	add	eax, edi
+   401 00000358 3D00FA0000              	cmp	eax, 64000
+   402 0000035D 762E                    	jna	short _dline1_y
+   403                                  
+   404 0000035F 803D[D8050000]01        	cmp	byte [length], 1 
+   405 00000366 76A5                    	jna	short _dvline_err
+   406                                  	
+   407 00000368 28C0                    	sub	al, al
+   408 0000036A 8605[CD050000]          	xchg	[color], al ; 0
+   409 00000370 50                      	push	eax
+   410 00000371 E879FFFFFF              	call	_dline0_x
+   411 00000376 58                      	pop	eax
+   412 00000377 A2[CD050000]            	mov	[color], al
+   413 0000037C 7233                    	jc	short _dvline_ok
+   414 0000037E FE0D[D8050000]          	dec	byte [length]
+   415 00000384 E866FFFFFF              	call	_dline0_x
+   416 00000389 7226                    	jc	short _dvline_ok
+   417 0000038B EBB6                    	jmp	short _dline1_x
+   418                                  _dline1_y:
+   419 0000038D A3[E4050000]            	mov	[p3pos], eax
+   420                                  _dvline1_np:
+   421                                  	sys	_video, 0301h, [color], edi  
+   421                              <1> 
+   421                              <1> 
+   421                              <1> 
+   421                              <1> 
+   421                              <1>  %if %0 >= 2
+   421 00000392 BB01030000          <1>  mov ebx, %2
+   421                              <1>  %if %0 >= 3
+   421 00000397 8B0D[CD050000]      <1>  mov ecx, %3
+   421                              <1>  %if %0 = 4
+   421 0000039D 89FA                <1>  mov edx, %4
+   421                              <1>  %endif
+   421                              <1>  %endif
+   421                              <1>  %endif
+   421 0000039F B81F000000          <1>  mov eax, %1
+   421                              <1> 
+   421 000003A4 CD40                <1>  int 40h
+   422 000003A6 4D                      	dec	ebp
+   423 000003A7 7408                    	jz	short _dvline_ok
+   424 000003A9 81C740010000            	add	edi, 320
+   425 000003AF EBE1                    	jmp	short _dvline1_np
+   426                                  _dvline_ok:
+   427 000003B1 C3                      	retn	
+   428                                  _dvline2:
+   429 000003B2 803D[CC050000]02        	cmp	byte [lphase], 2
+   430 000003B9 772E                    	ja	short _dvline3
+   431                                  	; draw (x2,y2) to (x3,y2) horizontal line
+   432 000003BB 8B2D[D8050000]          	mov	ebp, [length]
+   433 000003C1 A1[E4050000]            	mov	eax, [p3pos]
+   434 000003C6 40                      	inc	eax
+   435 000003C7 89C7                    	mov	edi, eax
+   436 000003C9 29E8                    	sub	eax, ebp	 
+   437                                  	;jb	_dvline_err
+   438 000003CB A3[E8050000]            	mov	[p4pos], eax
+   439                                  _dvline2_np:
+   440 000003D0 4F                      	dec	edi
+   441                                  	sys	_video, 0301h, [color], edi  
+   441                              <1> 
+   441                              <1> 
+   441                              <1> 
+   441                              <1> 
+   441                              <1>  %if %0 >= 2
+   441 000003D1 BB01030000          <1>  mov ebx, %2
+   441                              <1>  %if %0 >= 3
+   441 000003D6 8B0D[CD050000]      <1>  mov ecx, %3
+   441                              <1>  %if %0 = 4
+   441 000003DC 89FA                <1>  mov edx, %4
+   441                              <1>  %endif
+   441                              <1>  %endif
+   441                              <1>  %endif
+   441 000003DE B81F000000          <1>  mov eax, %1
+   441                              <1> 
+   441 000003E3 CD40                <1>  int 40h
+   442 000003E5 4D                      	dec	ebp
+   443 000003E6 75E8                    	jnz	short _dvline2_np
+   444 000003E8 C3                      	retn
+   445                                  _dvline3:
+   446                                  	; draw (x3,y2) to (x1,y1) vertical line
+   447 000003E9 8B2D[D8050000]          	mov	ebp, [length] 
+   448 000003EF 8B3D[E8050000]          	mov	edi, [p4pos]
+   449                                  _dvline3_np:
+   450 000003F5 81EF40010000            	sub	edi, 320
+   451                                  	sys	_video, 0301h, [color], edi  
+   451                              <1> 
+   451                              <1> 
+   451                              <1> 
+   451                              <1> 
+   451                              <1>  %if %0 >= 2
+   451 000003FB BB01030000          <1>  mov ebx, %2
+   451                              <1>  %if %0 >= 3
+   451 00000400 8B0D[CD050000]      <1>  mov ecx, %3
+   451                              <1>  %if %0 = 4
+   451 00000406 89FA                <1>  mov edx, %4
+   451                              <1>  %endif
+   451                              <1>  %endif
+   451                              <1>  %endif
+   451 00000408 B81F000000          <1>  mov eax, %1
+   451                              <1> 
+   451 0000040D CD40                <1>  int 40h
+   452 0000040F 4D                      	dec	ebp
+   453 00000410 75E3                    	jnz	short _dvline3_np
+   454 00000412 C3                      	retn
+   455                                  
+   456                                  movecenter:
+   457                                  	; Modified registers: ecx	
+   458                                  
+   459 00000413 B940010000              	mov	ecx, 320
+   460 00000418 2B0D[D8050000]          	sub	ecx, [length]
+   461 0000041E D1E9                    	shr	ecx, 1
+   462 00000420 890D[D4050000]          	mov	[x_pos], ecx
+   463 00000426 B9C8000000              	mov	ecx, 200
+   464 0000042B 2B0D[D8050000]          	sub	ecx, [length]
+   465 00000431 D1E9                    	shr	ecx, 1
+   466 00000433 890D[D0050000]          	mov	[y_pos], ecx
+   467 00000439 C3                      	retn
+   468                                  
+   469                                  get_start_offset:
+   470 0000043A B840010000              	mov	eax, 320
+   471 0000043F F725[D0050000]          	mul	dword [y_pos]
+   472 00000445 0305[D4050000]          	add	eax, [x_pos]
+   473 0000044B C3                      	retn
+   474                                  beep:
+   475                                  	; call beep function (16/64 second, 886Hz)
+   476                                  	sys	_audio, 16, 1331
+   476                              <1> 
+   476                              <1> 
+   476                              <1> 
+   476                              <1> 
+   476                              <1>  %if %0 >= 2
+   476 0000044C BB10000000          <1>  mov ebx, %2
+   476                              <1>  %if %0 >= 3
+   476 00000451 B933050000          <1>  mov ecx, %3
+   476                              <1>  %if %0 = 4
+   476                              <1>  mov edx, %4
+   476                              <1>  %endif
+   476                              <1>  %endif
+   476                              <1>  %endif
+   476 00000456 B820000000          <1>  mov eax, %1
+   476                              <1> 
+   476 0000045B CD40                <1>  int 40h
+   477 0000045D C3                      	retn
+   478                                  
+   479                                  set_text_mode:
+   480 0000045E 30E4                    	xor    ah, ah
+   481 00000460 B003                    	mov    al, 3                        
+   482                                   	;int   10h	; al = 03h text mode, int 10 video
+   483 00000462 CD31                    	int    31h ; TRDOS 386 - Video interrupt
+   484 00000464 C3                      	retn
+   485                                  		
+   486                                  program_msg:
+   487 00000465 5452444F5320333836-     	db "TRDOS 386 v2.0.3 - ('sysvideo') Test Program - Draw Lines"
+   487 0000046E 2076322E302E33202D-
+   487 00000477 202827737973766964-
+   487 00000480 656F27292054657374-
+   487 00000489 2050726F6772616D20-
+   487 00000492 2D2044726177204C69-
+   487 0000049B 6E6573             
+   488 0000049E 0D0A                    	db 0Dh, 0Ah
+   489 000004A0 6279204572646F6761-     	db "by Erdogan Tan - 09/02/2021"
+   489 000004A9 6E2054616E202D2030-
+   489 000004B2 392F30322F32303231 
+   490                                  	;db 0Dh, 0Ah, 0
+   491 000004BB 0D0A0D0A                	db 0Dh, 0Ah, 0Dh, 0Ah
+   492                                  
+   493 000004BF 557365204172726F77-     	db "Use Arrow Keys, Home, End to move the LINE .."
+   493 000004C8 204B6579732C20486F-
+   493 000004D1 6D652C20456E642074-
+   493 000004DA 6F206D6F7665207468-
+   493 000004E3 65204C494E45202E2E 
+   494 000004EC 0D0A                    	db 0Dh, 0Ah
+   495 000004EE 557365202B2C2D206B-     	db "Use +,- keys to increase and decrease LENGTH .."		
+   495 000004F7 65797320746F20696E-
+   495 00000500 63726561736520616E-
+   495 00000509 642064656372656173-
+   495 00000512 65204C454E47544820-
+   495 0000051B 2E2E               
+   496 0000051D 0D0A                    	db 0Dh, 0Ah
+   497 0000051F 55736520454E544552-     	db "Use ENTER key to draw SQUARE .."
+   497 00000528 206B657920746F2064-
+   497 00000531 726177205351554152-
+   497 0000053A 45202E2E           
+   498 0000053E 0D0A                    	db 0Dh, 0Ah
+   499 00000540 53504143452C205067-     	db "SPACE, Pg Up, Pg Down keys to change LINE COLOR .."
+   499 00000549 2055702C2050672044-
+   499 00000552 6F776E206B65797320-
+   499 0000055B 746F206368616E6765-
+   499 00000564 204C494E4520434F4C-
+   499 0000056D 4F52202E2E         
+   500 00000572 0D0A                    	db 0Dh, 0Ah	
+   501 00000574 55736520496E736572-     	db "Use Insert, Delete keys to delete LINE or SQUARE .."
+   501 0000057D 742C2044656C657465-
+   501 00000586 206B65797320746F20-
+   501 0000058F 64656C657465204C49-
+   501 00000598 4E45206F7220535155-
+   501 000005A1 415245202E2E       
+   502 000005A7 0D0A                    	db 0Dh, 0Ah
+   503 000005A9 0D0A                    	db 0Dh, 0Ah
+   504 000005AB 507265737320616E79-     	db "Press any key to continue .."
+   504 000005B4 206B657920746F2063-
+   504 000005BD 6F6E74696E7565202E-
+   504 000005C6 2E                 
+   505                                  nextline:
+   506 000005C7 0D0A00                  	db 0Dh, 0Ah, 0	
+   507                                  
+   508                                  bss:
+   509                                  
+   510                                  ABSOLUTE bss
+   511                                  
+   512 000005CA <res 00000002>          alignb 4
+   513                                  
+   514                                  bss_start:
+   515                                  
+   516                                  
+   517 000005CC <res 00000001>          lphase:	resb 1
+   518 000005CD <res 00000001>          color:	resb 1
+   519                                  
+   520 000005CE <res 00000002>          counter: resw 1
+   521                                  
+   522 000005D0 <res 00000004>          y_pos:	resd 1
+   523 000005D4 <res 00000004>          x_pos:	resd 1
+   524 000005D8 <res 00000004>          length: resd 1
+   525                                  
+   526 000005DC <res 00000004>          p1pos: resd 1
+   527 000005E0 <res 00000004>          p2pos: resd 1
+   528 000005E4 <res 00000004>          p3pos: resd 1
+   529 000005E8 <res 00000004>          p4pos: resd 1
+   530                                  
+   531                                  bss_end:

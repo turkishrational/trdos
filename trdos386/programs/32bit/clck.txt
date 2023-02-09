@@ -1,0 +1,1138 @@
+     1                                  ; ****************************************************************************
+     2                                  ; clck.s (for TRDOS 386)
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; CLCK.PRG ! VGA DEMO program by Erdogan TAN
+     5                                  ;
+     6                                  ; 04/11/2017
+     7                                  ;
+     8                                  ; [ Last Modification: 04/11/2017 ] 
+     9                                  ;
+    10                                  ; Derived from 'clck.asm' by Benjamin David Lunt (08/12/1998)
+    11                                  ;
+    12                                  ; Assembler: NASM 2.11
+    13                                  ; ----------------------------------------------------------------------------
+    14                                  ;	   nasm  clck.s -l clck.txt -o CLCK.PRG	
+    15                                  ; ****************************************************************************
+    16                                  
+    17                                  ; ****************************************************************************
+    18                                  ; clck.asm (for MSDOS)
+    19                                  ; ----------------------------------------------------------------------------
+    20                                  ; CLCK.COM ! VGA (Mode 13h) CLOCK DEMO program ! NASM version by Erdogan TAN
+    21                                  ; (04/11/2017)
+    22                                  
+    23                                  ;------------------------------------------------------------------------------
+    24                                  ; TRDOS 386, TRDOS v2.0
+    25                                  ;------------------------------------------------------------------------------
+    26                                  
+    27                                  ; 01/03/2017
+    28                                  ; 16/10/2016
+    29                                  ; 29/04/2016
+    30                                  ; TRDOS 386 system calls (temporary list!)
+    31                                  _ver 	equ 0
+    32                                  _exit 	equ 1
+    33                                  _fork 	equ 2
+    34                                  _read 	equ 3
+    35                                  _write	equ 4
+    36                                  _open	equ 5
+    37                                  _close 	equ 6
+    38                                  _wait 	equ 7
+    39                                  _creat 	equ 8
+    40                                  _link 	equ 9
+    41                                  _unlink	equ 10
+    42                                  _exec	equ 11
+    43                                  _chdir	equ 12
+    44                                  _time 	equ 13
+    45                                  _mkdir 	equ 14
+    46                                  _chmod	equ 15
+    47                                  _chown	equ 16
+    48                                  _break	equ 17
+    49                                  _stat	equ 18
+    50                                  _seek	equ 19
+    51                                  _tell 	equ 20
+    52                                  _mount	equ 21
+    53                                  _umount	equ 22
+    54                                  _setuid	equ 23
+    55                                  _getuid	equ 24
+    56                                  _stime	equ 25
+    57                                  _quit	equ 26	
+    58                                  _intr	equ 27
+    59                                  _fstat	equ 28
+    60                                  _emt 	equ 29
+    61                                  _mdate 	equ 30
+    62                                  _video 	equ 31
+    63                                  _audio	equ 32
+    64                                  _timer	equ 33
+    65                                  _sleep	equ 34
+    66                                  _msg    equ 35
+    67                                  _geterr	equ 36
+    68                                  _fpsave	equ 37
+    69                                  _pri	equ 38
+    70                                  _rele	equ 39
+    71                                  _fff	equ 40
+    72                                  _fnf	equ 41
+    73                                  _alloc	equ 42
+    74                                  _dalloc equ 43
+    75                                  _calbac equ 44		
+    76                                  
+    77                                  %macro sys 1-4
+    78                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    79                                      ; 03/09/2015	
+    80                                      ; 13/04/2015
+    81                                      ; Retro UNIX 386 v1 system call.	
+    82                                      %if %0 >= 2   
+    83                                          mov ebx, %2
+    84                                          %if %0 >= 3    
+    85                                              mov ecx, %3
+    86                                              %if %0 = 4
+    87                                                 mov edx, %4   
+    88                                              %endif
+    89                                          %endif
+    90                                      %endif
+    91                                      mov eax, %1
+    92                                      ;int 30h
+    93                                      int 40h ; TRDOS 386 (TRDOS v2.0)	   
+    94                                  %endmacro
+    95                                  
+    96                                  ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
+    97                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    98                                  
+    99                                  ; ************************************************************************
+   100                                  ; *  This is a small example of VGA mode 13h screen programming.
+   101                                  ; *  It has the intent to show how to program in the specified mode,
+   102                                  ; *  therefore does not contain small or efficient code.
+   103                                  ; *  It is however quite fast, though probably could be a bit faster.
+   104                                  ; *
+   105                                  ; *  You may use this code as you would like.
+   106                                  ; *  As always, If this code crashes you machine in anyway I am
+   107                                  ; *  not held responsible.  Use at your own risk.
+   108                                  ; *   Benjamin David Lunt
+   109                                  ; *   Forever Young Software
+   110                                  ; *   Copyright 1984-2015
+   111                                  ; *   All rights reserved.
+   112                                  ; *    08 Dec 1998
+   113                                  ; *    NBASM
+   114                                  ; *
+   115                                  
+   116                                  DSpc      equ 42
+   117                                  
+   118                                  [Bits 32]  ; TRDOS 386 - 32 bit code
+   119                                  [Org 0]
+   120 00000000 66B81300                           mov  ax,0013h
+   121                                             ;int	10h
+   122 00000004 CD31                    	   int  31h ; TRDOS 386 VIDEO BIOS Interrupt
+   123                                  
+   124                                  	   ; DIRECT VGA MEMORY ACCESS
+   125                                  	   ; bl = 0, bh = 5
+   126                                  	   ; Direct access/map to VGA memory (0A0000h)
+   127                                  
+   128                                  	   sys	_video, 0500h
+   128                              <1> 
+   128                              <1> 
+   128                              <1> 
+   128                              <1> 
+   128                              <1>  %if %0 >= 2
+   128 00000006 BB00050000          <1>  mov ebx, %2
+   128                              <1>  %if %0 >= 3
+   128                              <1>  mov ecx, %3
+   128                              <1>  %if %0 = 4
+   128                              <1>  mov edx, %4
+   128                              <1>  %endif
+   128                              <1>  %endif
+   128                              <1>  %endif
+   128 0000000B B81F000000          <1>  mov eax, %1
+   128                              <1> 
+   128 00000010 CD40                <1>  int 40h
+   129 00000012 3D00000A00              	   cmp	eax, 0A0000h
+   130 00000017 7577                    	   jne	Done
+   131                                  	  	
+   132 00000019 BF00000A00              	   mov  edi,0A0000h
+   133 0000001E B9FF7F0000                         mov  ecx,32767
+   134 00000023 66A1[E3090000]                     mov  ax,[BackG]
+   135 00000029 F366AB                             rep  stosw
+   136                                  
+   137 0000002C BF24360A00                         mov  edi,0A0000h+13860       ; print full colons
+   138 00000031 E847010000                         call FColon                  ;
+   139 00000036 BF92360A00                         mov  edi,0A0000h+13970       ;  + 110
+   140 0000003B E83D010000                         call FColon                  ;
+   141 00000040 BFA4510A00                         mov  edi,0A0000h+20900       ;  + 7040
+   142 00000045 E833010000                         call FColon                  ;
+   143 0000004A BF12520A00                         mov  edi,0A0000h+21010       ;  + 110 + 7040
+   144 0000004F E829010000                         call FColon                  ;
+   145                                  
+   146                                  MyLoop:
+   147 00000054 E8E0000000              	   call GetTime                 ; get the current time
+   148                                  		
+   149 00000059 BFC7260A00                         mov  edi,0A0000h+9927        ; print hour
+   150 0000005E A0[E0090000]                       mov  al,[Hour]               ;
+   151 00000063 E838010000                         call DoHour                  ;
+   152 00000068 BF35270A00                         mov  edi,0A0000h+10037       ; print minutes
+   153 0000006D A0[E1090000]                       mov  al,[Min]                ;
+   154 00000072 E829010000                         call DoHour                  ;
+   155 00000077 BFA2270A00                         mov  edi,0A0000h+10146       ; print seconds
+   156 0000007C A0[E2090000]                       mov  al,[Sec]                ;
+   157 00000081 E81A010000                         call DoHour                  ;
+   158                                  
+   159 00000086 B401                               mov  ah,01h                  ; see if key pressed
+   160                                             ;int 16h
+   161 00000088 CD32                    	   int  32h ; TRDOS 386 keyboard interrupt
+   162 0000008A 74C8                               jz   short MyLoop            ; loop if no key pressed
+   163 0000008C 30E4                               xor  ah,ah                   ; key pressed so clear it
+   164                                             ;int 16h                     ;   from keyboard
+   165 0000008E CD32                    	   int  32h ; TRDOS 386 keyboard interrupt
+   166                                             
+   167 00000090 66B80300                Done:      mov  ax,0003h
+   168                                             ;int 10h
+   169 00000094 CD31                    	   int  31h  ; TRDOS 386 video bios interrupt	
+   170                                  
+   171                                             ;mov ax,4C00h
+   172                                             ;int 21h
+   173                                  
+   174                                  	   sys _exit	
+   174                              <1> 
+   174                              <1> 
+   174                              <1> 
+   174                              <1> 
+   174                              <1>  %if %0 >= 2
+   174                              <1>  mov ebx, %2
+   174                              <1>  %if %0 >= 3
+   174                              <1>  mov ecx, %3
+   174                              <1>  %if %0 = 4
+   174                              <1>  mov edx, %4
+   174                              <1>  %endif
+   174                              <1>  %endif
+   174                              <1>  %endif
+   174 00000096 B801000000          <1>  mov eax, %1
+   174                              <1> 
+   174 0000009B CD40                <1>  int 40h
+   175                                  ;here:
+   176                                  ;	   jmp	short here
+   177                                  
+   178                                  DoVLine:
+   179 0000009D 50                      	   push	eax
+   180 0000009E 51                      	   push ecx
+   181 0000009F 56                      	   push esi
+   182 000000A0 57                      	   push edi
+   183                                   	
+   184 000000A1 BE[E5090000]                       mov  esi,VLine
+   185 000000A6 B119                               mov  cl,25
+   186 000000A8 51                      VLoop1:    push ecx
+   187 000000A9 B10A                               mov  cl,10
+   188 000000AB AC                      VLoop2:    lodsb
+   189 000000AC 08C0                               or   al,al
+   190 000000AE 7402                               jz   short VNoDis
+   191 000000B0 AA                                 stosb
+   192 000000B1 4F                                 dec  edi
+   193 000000B2 47                      VNoDis:    inc  edi
+   194 000000B3 E2F6                               loop VLoop2
+   195 000000B5 6681C73601                         add  di,310
+   196 000000BA 59                                 pop  ecx
+   197 000000BB E2EB                               loop VLoop1
+   198                                  
+   199 000000BD 5F                      	   pop  edi
+   200 000000BE 5E                       	   pop  esi
+   201 000000BF 59                       	   pop  ecx
+   202 000000C0 58                      	   pop 	eax
+   203                                  	
+   204 000000C1 C3                                 retn
+   205                                  
+   206                                  DoRVLine:
+   207 000000C2 50                      	   push	eax
+   208 000000C3 51                      	   push ecx
+   209 000000C4 56                      	   push esi
+   210 000000C5 57                      	   push edi
+   211                                  
+   212 000000C6 BE[E5090000]            	   mov  esi,VLine
+   213 000000CB B119                               mov  cl,25
+   214 000000CD 51                      VLoop1r:   push ecx
+   215 000000CE B10A                               mov  cl,10
+   216 000000D0 AC                      VLoop2r:   lodsb
+   217 000000D1 08C0                               or   al,al
+   218 000000D3 7408                               jz   short VNoDisr
+   219 000000D5 66A1[E3090000]                     mov  ax,[BackG]
+   220 000000DB AA                                 stosb
+   221 000000DC 4F                                 dec  edi
+   222 000000DD 47                      VNoDisr:   inc  edi
+   223 000000DE E2F0                               loop VLoop2r
+   224 000000E0 6681C73601                         add  di,310
+   225 000000E5 59                                 pop  ecx
+   226 000000E6 E2E5                               loop VLoop1r
+   227                                  
+   228 000000E8 5F                      	   pop  edi
+   229 000000E9 5E                       	   pop  esi
+   230 000000EA 59                       	   pop  ecx
+   231 000000EB 58                      	   pop 	eax
+   232                                  
+   233 000000EC C3                                 retn
+   234                                  DoHLine:
+   235 000000ED 51                      	   push ecx
+   236 000000EE 56                      	   push esi
+   237 000000EF 57                      	   push edi
+   238                                  
+   239 000000F0 BE[DF0A0000]            	   mov  esi,HLine
+   240 000000F5 B107                               mov  cl,07
+   241 000000F7 51                      HLoop1:    push ecx
+   242 000000F8 B11E                               mov  cl,30
+   243 000000FA AC                      HLoop2:    lodsb
+   244 000000FB 08C0                               or   al,al
+   245 000000FD 7402                               jz   short HNoDis
+   246 000000FF AA                                 stosb
+   247 00000100 4F                                 dec  edi
+   248 00000101 47                      HNoDis:    inc  edi
+   249 00000102 E2F6                               loop HLoop2
+   250 00000104 6681C72201                         add  di,290
+   251 00000109 59                                 pop  ecx
+   252 0000010A E2EB                               loop HLoop1
+   253                                  
+   254 0000010C 5F                      	   pop  edi
+   255 0000010D 5E                       	   pop  esi
+   256 0000010E 59                       	   pop  ecx
+   257                                  
+   258 0000010F C3                                 retn
+   259                                  DoRHLine:
+   260 00000110 51                      	   push ecx
+   261 00000111 56                      	   push esi
+   262 00000112 57                      	   push edi
+   263                                  
+   264 00000113 BE[DF0A0000]                       mov  esi,HLine
+   265 00000118 B107                               mov  cl,07
+   266 0000011A 51                      HLoop1r:   push ecx
+   267 0000011B B11E                               mov  cl,30
+   268 0000011D AC                      HLoop2r:   lodsb
+   269 0000011E 08C0                               or   al,al
+   270 00000120 7408                               jz   short HNoDisr
+   271 00000122 66A1[E3090000]                     mov  ax,[BackG]
+   272 00000128 AA                                 stosb
+   273 00000129 4F                                 dec  edi
+   274 0000012A 47                      HNoDisr:   inc  edi
+   275 0000012B E2F0                               loop HLoop2r
+   276 0000012D 6681C72201                         add  di,290
+   277 00000132 59                                 pop  ecx
+   278 00000133 E2E5                               loop HLoop1r
+   279                                  
+   280 00000135 5F                      	   pop  edi
+   281 00000136 5E                       	   pop  esi
+   282 00000137 59                       	   pop  ecx
+   283                                  
+   284 00000138 C3                                 retn
+   285                                  
+   286                                  GetTime:
+   287 00000139 50                      	   push eax
+   288 0000013A 51                      	   push ecx
+   289 0000013B 52                      	   push edx
+   290                                  
+   291                                             ;mov ah,2Ch
+   292                                             ;int 21h
+   293                                  
+   294                                  	   ;mov [Hour],ch
+   295                                             ;mov [Min],cl
+   296                                             ;mov [Sec],dh
+   297                                  	
+   298 0000013C B402                    	   mov	ah,02h  
+   299 0000013E CD35                    	   int  35h  ; TRDOS 386 date & time ýnterrupt
+   300                                  
+   301 00000140 88E8                    	   mov	al,ch
+   302 00000142 C0E804                  	   shr	al,4
+   303 00000145 B40A                    	   mov	ah,10
+   304 00000147 F6E4                    	   mul  ah
+   305 00000149 80E50F                  	   and  ch,0Fh
+   306 0000014C 00E8                    	   add	al,ch	 	   	
+   307 0000014E A2[E0090000]            	   mov  [Hour],al
+   308                                  
+   309 00000153 88C8                    	   mov	al,cl
+   310 00000155 C0E804                  	   shr	al,4
+   311 00000158 B40A                    	   mov	ah,10
+   312 0000015A F6E4                    	   mul  ah 			   	
+   313 0000015C 80E10F                  	   and  cl,0Fh
+   314 0000015F 00C8                    	   add	al,cl	
+   315 00000161 A2[E1090000]                       mov  [Min],al
+   316                                  
+   317 00000166 88F0                    	   mov	al,dh
+   318 00000168 C0E804                  	   shr	al,4
+   319 0000016B B40A                    	   mov	ah,10
+   320 0000016D F6E4                    	   mul  ah 
+   321 0000016F 80E60F                  	   and  dh,0Fh
+   322 00000172 00F0                    	   add	al,dh	
+   323 00000174 A2[E2090000]                       mov  [Sec],al
+   324                                  
+   325 00000179 5A                      	   pop	edx
+   326 0000017A 59                      	   pop	ecx
+   327 0000017B 58                      	   pop	eax
+   328                                  
+   329 0000017C C3                                 retn
+   330                                  
+   331                                  FColon:
+   332 0000017D 50                      	   push eax
+   333 0000017E 56                      	   push esi
+   334 0000017F 57                      	   push edi
+   335                                  
+   336 00000180 BE[B10B0000]            	   mov  esi,FCln
+   337 00000185 B107                               mov  cl,07
+   338 00000187 51                      FLoop1:    push ecx
+   339 00000188 B107                               mov  cl,07
+   340 0000018A AC                      FLoop2:    lodsb
+   341 0000018B 08C0                               or   al,al
+   342 0000018D 7402                               jz   short FNoDis
+   343 0000018F AA                                 stosb
+   344 00000190 4F                                 dec  edi
+   345 00000191 47                      FNoDis:    inc  edi
+   346 00000192 E2F6                               loop FLoop2
+   347 00000194 6681C73901                         add  di,313
+   348 00000199 59                                 pop  ecx
+   349 0000019A E2EB                               loop FLoop1
+   350                                  
+   351 0000019C 5F                      	   pop	edi
+   352 0000019D 5E                      	   pop	esi
+   353 0000019E 58                      	   pop	eax
+   354                                  
+   355 0000019F C3                                 retn
+   356                                  
+   357                                  DoHour:
+   358 000001A0 50                      	   push eax
+   359 000001A1 57                      	   push	edi
+   360                                  
+   361 000001A2 08C0                               or   al,al
+   362 000001A4 7513                               jnz  short Not0
+   363 000001A6 E847050000                         call Do0
+   364 000001AB 6683C72A                           add  di,DSpc
+   365 000001AF E83E050000                         call Do0
+   366 000001B4 E936050000                         jmp  HDone
+   367 000001B9 3C01                    Not0:      cmp  al,01
+   368 000001BB 7513                               jne  short Not1
+   369 000001BD E830050000                         call Do0
+   370 000001C2 6683C72A                           add  di,DSpc
+   371 000001C6 E872050000                         call Do1
+   372 000001CB E91F050000                         jmp  HDone
+   373 000001D0 3C02                    Not1:      cmp  al,02
+   374 000001D2 7513                               jne  short Not2
+   375 000001D4 E819050000                         call Do0
+   376 000001D9 6683C72A                           add  di,DSpc
+   377 000001DD E8A6050000                         call Do2
+   378 000001E2 E908050000                         jmp  HDone
+   379 000001E7 3C03                    Not2:      cmp  al,03
+   380 000001E9 7513                               jne  short Not3
+   381 000001EB E802050000                         call Do0
+   382 000001F0 6683C72A                           add  di,DSpc
+   383 000001F4 E8DA050000                         call Do3
+   384 000001F9 E9F1040000                         jmp  HDone
+   385 000001FE 3C04                    Not3:      cmp  al,04
+   386 00000200 7513                               jne  short Not4
+   387 00000202 E8EB040000                         call Do0
+   388 00000207 6683C72A                           add  di,DSpc
+   389 0000020B E80E060000                         call Do4
+   390 00000210 E9DA040000                         jmp  HDone
+   391 00000215 3C05                    Not4:      cmp  al,05
+   392 00000217 7513                               jne  short Not5
+   393 00000219 E8D4040000                         call Do0
+   394 0000021E 6683C72A                           add  di,DSpc
+   395 00000222 E842060000                         call Do5
+   396 00000227 E9C3040000                         jmp  HDone
+   397 0000022C 3C06                    Not5:      cmp  al,06
+   398 0000022E 7513                               jne  short Not6
+   399 00000230 E8BD040000                         call Do0
+   400 00000235 6683C72A                           add  di,DSpc
+   401 00000239 E876060000                         call Do6
+   402 0000023E E9AC040000                         jmp  HDone
+   403 00000243 3C07                    Not6:      cmp  al,07
+   404 00000245 7513                               jne  short Not7
+   405 00000247 E8A6040000                         call Do0
+   406 0000024C 6683C72A                           add  di,DSpc
+   407 00000250 E8AA060000                         call Do7
+   408 00000255 E995040000                         jmp  HDone
+   409 0000025A 3C08                    Not7:      cmp  al,08
+   410 0000025C 7513                               jne  short Not8
+   411 0000025E E88F040000                         call Do0
+   412 00000263 6683C72A                           add  di,DSpc
+   413 00000267 E8DE060000                         call Do8
+   414 0000026C E97E040000                         jmp  HDone
+   415 00000271 3C09                    Not8:      cmp  al,09
+   416 00000273 7513                               jne  short Not9
+   417 00000275 E878040000                         call Do0
+   418 0000027A 6683C72A                           add  di,DSpc
+   419 0000027E E812070000                         call Do9
+   420 00000283 E967040000                         jmp  HDone
+   421 00000288 3C0A                    Not9:      cmp  al,10
+   422 0000028A 7513                               jne  short Not10
+   423 0000028C E8AC040000                         call Do1
+   424 00000291 6683C72A                           add  di,DSpc
+   425 00000295 E858040000                         call Do0
+   426 0000029A E950040000                         jmp  HDone
+   427 0000029F 3C0B                    Not10:     cmp  al,11
+   428 000002A1 7513                               jne  short Not11
+   429 000002A3 E895040000                         call Do1
+   430 000002A8 6683C72A                           add  di,DSpc
+   431 000002AC E88C040000                         call Do1
+   432 000002B1 E939040000                         jmp  HDone
+   433 000002B6 3C0C                    Not11:     cmp  al,12
+   434 000002B8 7513                               jne  short Not12
+   435 000002BA E87E040000                         call Do1
+   436 000002BF 6683C72A                           add  di,DSpc
+   437 000002C3 E8C0040000                         call Do2
+   438 000002C8 E922040000                         jmp  HDone
+   439 000002CD 3C0D                    Not12:     cmp  al,13
+   440 000002CF 7513                               jne  short Not13
+   441 000002D1 E867040000                         call Do1
+   442 000002D6 6683C72A                           add  di,DSpc
+   443 000002DA E8F4040000                         call Do3
+   444 000002DF E90B040000                         jmp  HDone
+   445 000002E4 3C0E                    Not13:     cmp  al,14
+   446 000002E6 7513                               jne  short Not14
+   447 000002E8 E850040000                         call Do1
+   448 000002ED 6683C72A                           add  di,DSpc
+   449 000002F1 E828050000                         call Do4
+   450 000002F6 E9F4030000                         jmp  HDone
+   451 000002FB 3C0F                    Not14:     cmp  al,15
+   452 000002FD 7513                               jne  short Not15
+   453 000002FF E839040000                         call Do1
+   454 00000304 6683C72A                           add  di,DSpc
+   455 00000308 E85C050000                         call Do5
+   456 0000030D E9DD030000                         jmp  HDone
+   457 00000312 3C10                    Not15:     cmp  al,16
+   458 00000314 7513                               jne  short Not16
+   459 00000316 E822040000                         call Do1
+   460 0000031B 6683C72A                           add  di,DSpc
+   461 0000031F E890050000                         call Do6
+   462 00000324 E9C6030000                         jmp  HDone
+   463 00000329 3C11                    Not16:     cmp  al,17
+   464 0000032B 7513                               jne  short Not17
+   465 0000032D E80B040000                         call Do1
+   466 00000332 6683C72A                           add  di,DSpc
+   467 00000336 E8C4050000                         call Do7
+   468 0000033B E9AF030000                         jmp  HDone
+   469 00000340 3C12                    Not17:     cmp  al,18
+   470 00000342 7513                               jne  short Not18
+   471 00000344 E8F4030000                         call Do1
+   472 00000349 6683C72A                           add  di,DSpc
+   473 0000034D E8F8050000                         call Do8
+   474 00000352 E998030000                         jmp  HDone
+   475 00000357 3C13                    Not18:     cmp  al,19
+   476 00000359 7513                               jne  short Not19
+   477 0000035B E8DD030000                         call Do1
+   478 00000360 6683C72A                           add  di,DSpc
+   479 00000364 E82C060000                         call Do9
+   480 00000369 E981030000                         jmp  HDone
+   481 0000036E 3C14                    Not19:     cmp  al,20
+   482 00000370 7513                               jne  short Not20
+   483 00000372 E811040000                         call Do2
+   484 00000377 6683C72A                           add  di,DSpc
+   485 0000037B E872030000                         call Do0
+   486 00000380 E96A030000                         jmp  HDone
+   487 00000385 3C15                    Not20:     cmp  al,21
+   488 00000387 7513                               jne  short Not21
+   489 00000389 E8FA030000                         call Do2
+   490 0000038E 6683C72A                           add  di,DSpc
+   491 00000392 E8A6030000                         call Do1
+   492 00000397 E953030000                         jmp  HDone
+   493 0000039C 3C16                    Not21:     cmp  al,22
+   494 0000039E 7513                               jne  short Not22
+   495 000003A0 E8E3030000                         call Do2
+   496 000003A5 6683C72A                           add  di,DSpc
+   497 000003A9 E8DA030000                         call Do2
+   498 000003AE E93C030000                         jmp  HDone
+   499 000003B3 3C17                    Not22:     cmp  al,23
+   500 000003B5 7513                               jne  short Not23
+   501 000003B7 E8CC030000                         call Do2
+   502 000003BC 6683C72A                           add  di,DSpc
+   503 000003C0 E80E040000                         call Do3
+   504 000003C5 E925030000                         jmp  HDone
+   505 000003CA 3C18                    Not23:     cmp  al,24
+   506 000003CC 7513                               jne  short Not24
+   507 000003CE E8B5030000                         call Do2
+   508 000003D3 6683C72A                           add  di,DSpc
+   509 000003D7 E842040000                         call Do4
+   510 000003DC E90E030000                         jmp  HDone
+   511 000003E1 3C19                    Not24:     cmp  al,25
+   512 000003E3 7513                               jne  short Not25
+   513 000003E5 E89E030000                         call Do2
+   514 000003EA 6683C72A                           add  di,DSpc
+   515 000003EE E876040000                         call Do5
+   516 000003F3 E9F7020000                         jmp  HDone
+   517 000003F8 3C1A                    Not25:     cmp  al,26
+   518 000003FA 7513                               jne  short Not26
+   519 000003FC E887030000                         call Do2
+   520 00000401 6683C72A                           add  di,DSpc
+   521 00000405 E8AA040000                         call Do6
+   522 0000040A E9E0020000                         jmp  HDone
+   523 0000040F 3C1B                    Not26:     cmp  al,27
+   524 00000411 7513                               jne  short Not27
+   525 00000413 E870030000                         call Do2
+   526 00000418 6683C72A                           add  di,DSpc
+   527 0000041C E8DE040000                         call Do7
+   528 00000421 E9C9020000                         jmp  HDone
+   529 00000426 3C1C                    Not27:     cmp  al,28
+   530 00000428 7513                               jne  short Not28
+   531 0000042A E859030000                         call Do2
+   532 0000042F 6683C72A                           add  di,DSpc
+   533 00000433 E812050000                         call Do8
+   534 00000438 E9B2020000                         jmp  HDone
+   535 0000043D 3C1D                    Not28:     cmp  al,29
+   536 0000043F 7513                               jne  short Not29
+   537 00000441 E842030000                         call Do2
+   538 00000446 6683C72A                           add  di,DSpc
+   539 0000044A E846050000                         call Do9
+   540 0000044F E99B020000                         jmp  HDone
+   541 00000454 3C1E                    Not29:     cmp  al,30
+   542 00000456 7513                               jne  short Not30
+   543 00000458 E876030000                         call Do3
+   544 0000045D 6683C72A                           add  di,DSpc
+   545 00000461 E88C020000                         call Do0
+   546 00000466 E984020000                         jmp  HDone
+   547 0000046B 3C1F                    Not30:     cmp  al,31
+   548 0000046D 7513                               jne  short Not31
+   549 0000046F E85F030000                         call Do3
+   550 00000474 6683C72A                           add  di,DSpc
+   551 00000478 E8C0020000                         call Do1
+   552 0000047D E96D020000                         jmp  HDone
+   553 00000482 3C20                    Not31:     cmp  al,32
+   554 00000484 7513                               jne  short Not32
+   555 00000486 E848030000                         call Do3
+   556 0000048B 6683C72A                           add  di,DSpc
+   557 0000048F E8F4020000                         call Do2
+   558 00000494 E956020000                         jmp  HDone
+   559 00000499 3C21                    Not32:     cmp  al,33
+   560 0000049B 7513                               jne  short Not33
+   561 0000049D E831030000                         call Do3
+   562 000004A2 6683C72A                           add  di,DSpc
+   563 000004A6 E828030000                         call Do3
+   564 000004AB E93F020000                         jmp  HDone
+   565 000004B0 3C22                    Not33:     cmp  al,34
+   566 000004B2 7513                               jne  short Not34
+   567 000004B4 E81A030000                         call Do3
+   568 000004B9 6683C72A                           add  di,DSpc
+   569 000004BD E85C030000                         call Do4
+   570 000004C2 E928020000                         jmp  HDone
+   571 000004C7 3C23                    Not34:     cmp  al,35
+   572 000004C9 7513                               jne  short Not35
+   573 000004CB E803030000                         call Do3
+   574 000004D0 6683C72A                           add  di,DSpc
+   575 000004D4 E890030000                         call Do5
+   576 000004D9 E911020000                         jmp  HDone
+   577 000004DE 3C24                    Not35:     cmp  al,36
+   578 000004E0 7513                               jne  short Not36
+   579 000004E2 E8EC020000                         call Do3
+   580 000004E7 6683C72A                           add  di,DSpc
+   581 000004EB E8C4030000                         call Do6
+   582 000004F0 E9FA010000                         jmp  HDone
+   583 000004F5 3C25                    Not36:     cmp  al,37
+   584 000004F7 7513                               jne  short Not37
+   585 000004F9 E8D5020000                         call Do3
+   586 000004FE 6683C72A                           add  di,DSpc
+   587 00000502 E8F8030000                         call Do7
+   588 00000507 E9E3010000                         jmp  HDone
+   589 0000050C 3C26                    Not37:     cmp  al,38
+   590 0000050E 7513                               jne  short Not38
+   591 00000510 E8BE020000                         call Do3
+   592 00000515 6683C72A                           add  di,DSpc
+   593 00000519 E82C040000                         call Do8
+   594 0000051E E9CC010000                         jmp  HDone
+   595 00000523 3C27                    Not38:     cmp  al,39
+   596 00000525 7513                               jne  short Not39
+   597 00000527 E8A7020000                         call Do3
+   598 0000052C 6683C72A                           add  di,DSpc
+   599 00000530 E860040000                         call Do9
+   600 00000535 E9B5010000                         jmp  HDone
+   601 0000053A 3C28                    Not39:     cmp  al,40
+   602 0000053C 7513                               jne  short Not40
+   603 0000053E E8DB020000                         call Do4
+   604 00000543 6683C72A                           add  di,DSpc
+   605 00000547 E8A6010000                         call Do0
+   606 0000054C E99E010000                         jmp  HDone
+   607 00000551 3C29                    Not40:     cmp  al,41
+   608 00000553 7513                               jne  short Not41
+   609 00000555 E8C4020000                         call Do4
+   610 0000055A 6683C72A                           add  di,DSpc
+   611 0000055E E8DA010000                         call Do1
+   612 00000563 E987010000                         jmp  HDone
+   613 00000568 3C2A                    Not41:     cmp  al,42
+   614 0000056A 7513                               jne  short Not42
+   615 0000056C E8AD020000                         call Do4
+   616 00000571 6683C72A                           add  di,DSpc
+   617 00000575 E80E020000                         call Do2
+   618 0000057A E970010000                         jmp  HDone
+   619 0000057F 3C2B                    Not42:     cmp  al,43
+   620 00000581 7513                               jne  short Not43
+   621 00000583 E896020000                         call Do4
+   622 00000588 6683C72A                           add  di,DSpc
+   623 0000058C E842020000                         call Do3
+   624 00000591 E959010000                         jmp  HDone
+   625 00000596 3C2C                    Not43:     cmp  al,44
+   626 00000598 7513                               jne  short Not44
+   627 0000059A E87F020000                         call Do4
+   628 0000059F 6683C72A                           add  di,DSpc
+   629 000005A3 E876020000                         call Do4
+   630 000005A8 E942010000                         jmp  HDone
+   631 000005AD 3C2D                    Not44:     cmp  al,45
+   632 000005AF 7513                               jne  short Not45
+   633 000005B1 E868020000                         call Do4
+   634 000005B6 6683C72A                           add  di,DSpc
+   635 000005BA E8AA020000                         call Do5
+   636 000005BF E92B010000                         jmp  HDone
+   637 000005C4 3C2E                    Not45:     cmp  al,46
+   638 000005C6 7513                               jne  short Not46
+   639 000005C8 E851020000                         call Do4
+   640 000005CD 6683C72A                           add  di,DSpc
+   641 000005D1 E8DE020000                         call Do6
+   642 000005D6 E914010000                         jmp  HDone
+   643 000005DB 3C2F                    Not46:     cmp  al,47
+   644 000005DD 7513                               jne  short Not47
+   645 000005DF E83A020000                         call Do4
+   646 000005E4 6683C72A                           add  di,DSpc
+   647 000005E8 E812030000                         call Do7
+   648 000005ED E9FD000000                         jmp  HDone
+   649 000005F2 3C30                    Not47:     cmp  al,48
+   650 000005F4 7513                               jne  short Not48
+   651 000005F6 E823020000                         call Do4
+   652 000005FB 6683C72A                           add  di,DSpc
+   653 000005FF E846030000                         call Do8
+   654 00000604 E9E6000000                         jmp  HDone
+   655 00000609 3C31                    Not48:     cmp  al,49
+   656 0000060B 7513                               jne  short Not49
+   657 0000060D E80C020000                         call Do4
+   658 00000612 6683C72A                           add  di,DSpc
+   659 00000616 E87A030000                         call Do9
+   660 0000061B E9CF000000                         jmp  HDone
+   661 00000620 3C32                    Not49:     cmp  al,50
+   662 00000622 7513                               jne  short Not50
+   663 00000624 E840020000                         call Do5
+   664 00000629 6683C72A                           add  di,DSpc
+   665 0000062D E8C0000000                         call Do0
+   666 00000632 E9B8000000                         jmp  HDone
+   667 00000637 3C33                    Not50:     cmp  al,51
+   668 00000639 7513                               jne  short Not51
+   669 0000063B E829020000                         call Do5
+   670 00000640 6683C72A                           add  di,DSpc
+   671 00000644 E8F4000000                         call Do1
+   672 00000649 E9A1000000                         jmp  HDone
+   673 0000064E 3C34                    Not51:     cmp  al,52
+   674 00000650 7513                               jne  short Not52
+   675 00000652 E812020000                         call Do5
+   676 00000657 6683C72A                           add  di,DSpc
+   677 0000065B E828010000                         call Do2
+   678 00000660 E98A000000                         jmp  HDone
+   679 00000665 3C35                    Not52:     cmp  al,53
+   680 00000667 7510                               jne  short Not53
+   681 00000669 E8FB010000                         call Do5
+   682 0000066E 6683C72A                           add  di,DSpc
+   683 00000672 E85C010000                         call Do3
+   684 00000677 EB76                               jmp  short HDone
+   685 00000679 3C36                    Not53:     cmp  al,54
+   686 0000067B 7510                               jne  short Not54
+   687 0000067D E8E7010000                         call Do5
+   688 00000682 6683C72A                           add  di,DSpc
+   689 00000686 E893010000                         call Do4
+   690 0000068B EB62                               jmp  short HDone
+   691 0000068D 3C37                    Not54:     cmp  al,55
+   692 0000068F 7510                               jne  short Not55
+   693 00000691 E8D3010000                         call Do5
+   694 00000696 6683C72A                           add  di,DSpc
+   695 0000069A E8CA010000                         call Do5
+   696 0000069F EB4E                               jmp  short HDone
+   697 000006A1 3C38                    Not55:     cmp  al,56
+   698 000006A3 7510                               jne  short Not56
+   699 000006A5 E8BF010000                         call Do5
+   700 000006AA 6683C72A                           add  di,DSpc
+   701 000006AE E801020000                         call Do6
+   702 000006B3 EB3A                               jmp  short HDone
+   703 000006B5 3C39                    Not56:     cmp  al,57
+   704 000006B7 7510                               jne  short Not57
+   705 000006B9 E8AB010000                         call Do5
+   706 000006BE 6683C72A                           add  di,DSpc
+   707 000006C2 E838020000                         call Do7
+   708 000006C7 EB26                               jmp  short HDone
+   709 000006C9 3C3A                    Not57:     cmp  al,58
+   710 000006CB 7510                               jne  short Not58
+   711 000006CD E897010000                         call Do5
+   712 000006D2 6683C72A                           add  di,DSpc
+   713 000006D6 E86F020000                         call Do8
+   714 000006DB EB12                               jmp  short HDone
+   715 000006DD 3C3B                    Not58:     cmp  al,59
+   716 000006DF 750E                               jne  short HDone
+   717 000006E1 E883010000                         call Do5
+   718 000006E6 6683C72A                           add  di,DSpc
+   719 000006EA E8A6020000                         call Do9
+   720                                  HDone:   
+   721 000006EF 5F                      	   pop	edi
+   722 000006F0 58                      	   pop	eax
+   723                                  
+   724 000006F1 C3                      	   retn
+   725                                  
+   726                                  Do0:
+   727 000006F2 50                      	   push eax
+   728 000006F3 57                      	   push	edi
+   729                                  
+   730 000006F4 E8A4F9FFFF                         call DoVLine                 ; 1
+   731 000006F9 57                                 push edi
+   732 000006FA 6681C7401F                         add  di,8000
+   733 000006FF E899F9FFFF                         call DoVLine                 ; 7
+   734 00000704 5F                                 pop  edi
+   735 00000705 47                                 inc  edi
+   736 00000706 47                                 inc  edi
+   737 00000707 57                                 push edi
+   738 00000708 6681EFBD03                         sub  di,957
+   739 0000070D E8DBF9FFFF                         call DoHLine                 ; 2
+   740 00000712 6681C7401F                         add  di,8000
+   741 00000717 E8F4F9FFFF                         call DoRHLine                ; 4
+   742 0000071C 6681C7401F                         add  di,8000
+   743 00000721 E8C7F9FFFF                         call DoHLine                 ; 6
+   744 00000726 5F                                 pop  edi
+   745 00000727 6683C71D                           add  di,29
+   746 0000072B E86DF9FFFF                         call DoVLine                 ; 3
+   747 00000730 6681C7401F                         add  di,8000
+   748 00000735 E863F9FFFF                         call DoVLine                 ; 5
+   749                                  
+   750 0000073A 5F                      	   pop	edi
+   751 0000073B 58                      	   pop	eax
+   752                                  
+   753 0000073C C3                                 retn
+   754                                  
+   755                                  Do1:
+   756 0000073D 50                      	   push eax
+   757 0000073E 57                      	   push	edi
+   758                                  
+   759 0000073F E87EF9FFFF                         call DoRVLine                ; 1
+   760 00000744 57                                 push edi
+   761 00000745 6681C7401F                         add  di,8000
+   762 0000074A E873F9FFFF                         call DoRVLine                ; 7
+   763 0000074F 5F                                 pop  edi
+   764 00000750 47                                 inc  edi
+   765 00000751 47                                 inc  edi
+   766 00000752 57                                 push edi
+   767 00000753 6681EFBD03                         sub  di,957
+   768 00000758 E8B3F9FFFF                         call DoRHLine                ; 2
+   769 0000075D 6681C7401F                         add  di,8000
+   770 00000762 E8A9F9FFFF                         call DoRHLine                ; 4
+   771 00000767 6681C7401F                         add  di,8000
+   772 0000076C E89FF9FFFF                         call DoRHLine                ; 6
+   773 00000771 5F                                 pop  edi
+   774 00000772 6683C71D                           add  di,29
+   775 00000776 E822F9FFFF                         call DoVLine                 ; 3
+   776 0000077B 6681C7401F                         add  di,8000
+   777 00000780 E818F9FFFF                         call DoVLine                 ; 5
+   778                                  
+   779 00000785 5F                      	   pop	edi
+   780 00000786 58                      	   pop	eax
+   781                                  
+   782 00000787 C3                                 retn
+   783                                  Do2:
+   784 00000788 50                      	   push eax
+   785 00000789 57                      	   push	edi
+   786                                  
+   787 0000078A E833F9FFFF                         call DoRVLine                ; 1
+   788 0000078F 57                                 push edi
+   789 00000790 6681C7401F                         add  di,8000
+   790 00000795 E803F9FFFF                         call DoVLine                 ; 7
+   791 0000079A 5F                                 pop  edi
+   792 0000079B 47                                 inc  edi
+   793 0000079C 47                                 inc  edi
+   794 0000079D 57                                 push edi
+   795 0000079E 6681EFBD03                         sub  di,957
+   796 000007A3 E845F9FFFF                         call DoHLine                 ; 2
+   797 000007A8 6681C7401F                         add  di,8000
+   798 000007AD E83BF9FFFF                         call DoHLine                 ; 4
+   799 000007B2 6681C7401F                         add  di,8000
+   800 000007B7 E831F9FFFF                         call DoHLine                 ; 6
+   801 000007BC 5F                                 pop  edi
+   802 000007BD 6683C71D                           add  di,29
+   803 000007C1 E8D7F8FFFF                         call DoVLine                 ; 3
+   804 000007C6 6681C7401F                         add  di,8000
+   805 000007CB E8F2F8FFFF                         call DoRVLine                ; 5
+   806                                  
+   807 000007D0 5F                      	   pop	edi
+   808 000007D1 58                      	   pop	eax
+   809                                  
+   810 000007D2 C3                                 retn
+   811                                  Do3:
+   812 000007D3 50                      	   push eax
+   813 000007D4 57                      	   push	edi
+   814                                  
+   815 000007D5 E8E8F8FFFF                         call DoRVLine                ; 1
+   816 000007DA 57                                 push edi
+   817 000007DB 6681C7401F                         add  di,8000
+   818 000007E0 E8DDF8FFFF                         call DoRVLine                ; 7
+   819 000007E5 5F                                 pop  edi
+   820 000007E6 47                                 inc  edi
+   821 000007E7 47                                 inc  edi
+   822 000007E8 57                                 push edi
+   823 000007E9 6681EFBD03                         sub  di,957
+   824 000007EE E8FAF8FFFF                         call DoHLine                 ; 2
+   825 000007F3 6681C7401F                         add  di,8000
+   826 000007F8 E8F0F8FFFF                         call DoHLine                 ; 4
+   827 000007FD 6681C7401F                         add  di,8000
+   828 00000802 E8E6F8FFFF                         call DoHLine                 ; 6
+   829 00000807 5F                                 pop  edi
+   830 00000808 6683C71D                           add  di,29
+   831 0000080C E88CF8FFFF                         call DoVLine                 ; 3
+   832 00000811 6681C7401F                         add  di,8000
+   833 00000816 E882F8FFFF                         call DoVLine                 ; 5
+   834                                  
+   835 0000081B 5F                      	   pop	edi
+   836 0000081C 58                      	   pop	eax
+   837                                  
+   838 0000081D C3                                 retn
+   839                                  Do4:
+   840 0000081E 50                      	   push eax
+   841 0000081F 57                      	   push	edi
+   842                                  
+   843 00000820 E878F8FFFF                         call DoVLine                 ; 1
+   844 00000825 57                                 push edi
+   845 00000826 6681C7401F                         add  di,8000
+   846 0000082B E892F8FFFF                         call DoRVLine                ; 7
+   847 00000830 5F                                 pop  edi
+   848 00000831 47                                 inc  edi
+   849 00000832 47                                 inc  edi
+   850 00000833 57                                 push edi
+   851 00000834 6681EFBD03                         sub  di,957
+   852 00000839 E8D2F8FFFF                         call DoRHLine                ; 2
+   853 0000083E 6681C7401F                         add  di,8000
+   854 00000843 E8A5F8FFFF                         call DoHLine                 ; 4
+   855 00000848 6681C7401F                         add  di,8000
+   856 0000084D E8BEF8FFFF                         call DoRHLine                ; 6
+   857 00000852 5F                                 pop  edi
+   858 00000853 6683C71D                           add  di,29
+   859 00000857 E841F8FFFF                         call DoVLine                 ; 3
+   860 0000085C 6681C7401F                         add  di,8000
+   861 00000861 E837F8FFFF                         call DoVLine                 ; 5
+   862                                  
+   863 00000866 5F                      	   pop	edi
+   864 00000867 58                      	   pop	eax
+   865                                  
+   866 00000868 C3                                 retn
+   867                                  Do5:
+   868 00000869 50                      	   push eax
+   869 0000086A 57                      	   push	edi
+   870                                  
+   871 0000086B E82DF8FFFF                         call DoVLine                 ; 1
+   872 00000870 57                                 push edi
+   873 00000871 6681C7401F                         add  di,8000
+   874 00000876 E847F8FFFF                         call DoRVLine                ; 7
+   875 0000087B 5F                                 pop  edi
+   876 0000087C 47                                 inc  edi
+   877 0000087D 47                                 inc  edi
+   878 0000087E 57                                 push edi
+   879 0000087F 6681EFBD03                         sub  di,957
+   880 00000884 E864F8FFFF                         call DoHLine                 ; 2
+   881 00000889 6681C7401F                         add  di,8000
+   882 0000088E E85AF8FFFF                         call DoHLine                 ; 4
+   883 00000893 6681C7401F                         add  di,8000
+   884 00000898 E850F8FFFF                         call DoHLine                 ; 6
+   885 0000089D 5F                                 pop  edi
+   886 0000089E 6683C71D                           add  di,29
+   887 000008A2 E81BF8FFFF                         call DoRVLine                ; 3
+   888 000008A7 6681C7401F                         add  di,8000
+   889 000008AC E8ECF7FFFF                         call DoVLine                 ; 5
+   890                                  
+   891 000008B1 5F                      	   pop	edi
+   892 000008B2 58                      	   pop	eax
+   893                                  
+   894 000008B3 C3                                 retn
+   895                                  Do6:
+   896 000008B4 50                      	   push eax
+   897 000008B5 57                      	   push	edi
+   898                                  
+   899 000008B6 E8E2F7FFFF                         call DoVLine                 ; 1
+   900 000008BB 57                                 push edi
+   901 000008BC 6681C7401F                         add  di,8000
+   902 000008C1 E8D7F7FFFF                         call DoVLine                 ; 7
+   903 000008C6 5F                                 pop  edi
+   904 000008C7 47                                 inc  edi
+   905 000008C8 47                                 inc  edi
+   906 000008C9 57                                 push edi
+   907 000008CA 6681EFBD03                         sub  di,957
+   908 000008CF E819F8FFFF                         call DoHLine                 ; 2
+   909 000008D4 6681C7401F                         add  di,8000
+   910 000008D9 E80FF8FFFF                         call DoHLine                 ; 4
+   911 000008DE 6681C7401F                         add  di,8000
+   912 000008E3 E805F8FFFF                         call DoHLine                 ; 6
+   913 000008E8 5F                                 pop  edi
+   914 000008E9 6683C71D                           add  di,29
+   915 000008ED E8D0F7FFFF                         call DoRVLine                ; 3
+   916 000008F2 6681C7401F                         add  di,8000
+   917 000008F7 E8A1F7FFFF                         call DoVLine                 ; 5
+   918                                  
+   919 000008FC 5F                      	   pop	edi
+   920 000008FD 58                      	   pop	eax
+   921                                  
+   922 000008FE C3                                 retn
+   923                                  Do7:
+   924 000008FF 50                      	   push eax
+   925 00000900 57                      	   push	edi
+   926                                  
+   927 00000901 E8BCF7FFFF                         call DoRVLine                ; 1
+   928 00000906 57                                 push edi
+   929 00000907 6681C7401F                         add  di,8000
+   930 0000090C E8B1F7FFFF                         call DoRVLine                ; 7
+   931 00000911 5F                                 pop  edi
+   932 00000912 47                                 inc  edi
+   933 00000913 47                                 inc  edi
+   934 00000914 57                                 push edi
+   935 00000915 6681EFBD03                         sub  di,957
+   936 0000091A E8CEF7FFFF                         call DoHLine                 ; 2
+   937 0000091F 6681C7401F                         add  di,8000
+   938 00000924 E8E7F7FFFF                         call DoRHLine                ; 4
+   939 00000929 6681C7401F                         add  di,8000
+   940 0000092E E8DDF7FFFF                         call DoRHLine                ; 6
+   941 00000933 5F                                 pop  edi
+   942 00000934 6683C71D                           add  di,29
+   943 00000938 E860F7FFFF                         call DoVLine                 ; 3
+   944 0000093D 6681C7401F                         add  di,8000
+   945 00000942 E856F7FFFF                         call DoVLine                 ; 5
+   946                                  
+   947 00000947 5F                      	   pop	edi
+   948 00000948 58                      	   pop	eax
+   949                                  
+   950 00000949 C3                                 retn
+   951                                  Do8:
+   952 0000094A 50                      	   push eax
+   953 0000094B 57                      	   push	edi
+   954                                  
+   955 0000094C E84CF7FFFF                         call DoVLine                 ; 1
+   956 00000951 57                                 push edi
+   957 00000952 6681C7401F                         add  di,8000
+   958 00000957 E841F7FFFF                         call DoVLine                 ; 7
+   959 0000095C 5F                                 pop  edi
+   960 0000095D 47                                 inc  edi
+   961 0000095E 47                                 inc  edi
+   962 0000095F 57                                 push edi
+   963 00000960 6681EFBD03                         sub  di,957
+   964 00000965 E883F7FFFF                         call DoHLine                 ; 2
+   965 0000096A 6681C7401F                         add  di,8000
+   966 0000096F E879F7FFFF                         call DoHLine                 ; 4
+   967 00000974 6681C7401F                         add  di,8000
+   968 00000979 E86FF7FFFF                         call DoHLine                 ; 6
+   969 0000097E 5F                                 pop  edi
+   970 0000097F 6683C71D                           add  di,29
+   971 00000983 E815F7FFFF                         call DoVLine                 ; 3
+   972 00000988 6681C7401F                         add  di,8000
+   973 0000098D E80BF7FFFF                         call DoVLine                 ; 5
+   974                                  
+   975 00000992 5F                      	   pop	edi
+   976 00000993 58                      	   pop	eax
+   977                                  
+   978 00000994 C3                                 retn
+   979                                  Do9:
+   980 00000995 50                      	   push eax
+   981 00000996 57                      	   push	edi
+   982                                  
+   983 00000997 E801F7FFFF                         call DoVLine                 ; 1
+   984 0000099C 57                                 push edi
+   985 0000099D 6681C7401F                         add  di,8000
+   986 000009A2 E81BF7FFFF                         call DoRVLine                ; 7
+   987 000009A7 5F                                 pop  edi
+   988 000009A8 47                                 inc  edi
+   989 000009A9 47                                 inc  edi
+   990 000009AA 57                                 push edi
+   991 000009AB 6681EFBD03                         sub  di,957
+   992 000009B0 E838F7FFFF                         call DoHLine                 ; 2
+   993 000009B5 6681C7401F                         add  di,8000
+   994 000009BA E82EF7FFFF                         call DoHLine                 ; 4
+   995 000009BF 6681C7401F                         add  di,8000
+   996 000009C4 E824F7FFFF                         call DoHLine                 ; 6
+   997 000009C9 5F                                 pop  edi
+   998 000009CA 6683C71D                           add  di,29
+   999 000009CE E8CAF6FFFF                         call DoVLine                 ; 3
+  1000 000009D3 6681C7401F                         add  di,8000
+  1001 000009D8 E8C0F6FFFF                         call DoVLine                 ; 5
+  1002                                  
+  1003 000009DD 5F                      	   pop	edi
+  1004 000009DE 58                      	   pop	eax
+  1005                                  
+  1006 000009DF C3                                 retn
+  1007                                  
+  1008 000009E0 00                      Hour:     db  00h
+  1009 000009E1 00                      Min:      db  00h
+  1010 000009E2 00                      Sec:      db  00h
+  1011 000009E3 0707                    BackG:    dw  0707h
+  1012 000009E5 000000000F00000000-     VLine:    db  00,00,00,00,15,00,00,00,00,00
+  1012 000009EE 00                 
+  1013 000009EF 0000000F0708000000-               db  00,00,00,15,07,08,00,00,00,00
+  1013 000009F8 00                 
+  1014 000009F9 00000F070707080000-               db  00,00,15,07,07,07,08,00,00,00
+  1014 00000A02 00                 
+  1015 00000A03 000F07070707070800-               db  00,15,07,07,07,07,07,08,00,00
+  1015 00000A0C 00                 
+  1016 00000A0D 0F0707070707070708-               db  15,07,07,07,07,07,07,07,08,00
+  1016 00000A16 00                 
+  1017 00000A17 0F0707070707070708-               db  15,07,07,07,07,07,07,07,08,00
+  1017 00000A20 00                 
+  1018 00000A21 0F0707070707070708-               db  15,07,07,07,07,07,07,07,08,00
+  1018 00000A2A 00                 
+  1019 00000A2B 0F0707070707070708-               db  15,07,07,07,07,07,07,07,08,00
+  1019 00000A34 00                 
+  1020 00000A35 0F0707070707070708-               db  15,07,07,07,07,07,07,07,08,00
+  1020 00000A3E 00                 
+  1021 00000A3F 0F0707070707070708-               db  15,07,07,07,07,07,07,07,08,00
+  1021 00000A48 00                 
+  1022 00000A49 0F0707070707070708-               db  15,07,07,07,07,07,07,07,08,00
+  1022 00000A52 00                 
+  1023 00000A53 0F0707070707070708-               db  15,07,07,07,07,07,07,07,08,00
+  1023 00000A5C 00                 
+  1024 00000A5D 0F0707070707070708-               db  15,07,07,07,07,07,07,07,08,00
+  1024 00000A66 00                 
+  1025 00000A67 0F0707070707070708-               db  15,07,07,07,07,07,07,07,08,00
+  1025 00000A70 00                 
+  1026 00000A71 0F0707070707070708-               db  15,07,07,07,07,07,07,07,08,00
+  1026 00000A7A 00                 
+  1027 00000A7B 0F0707070707070708-               db  15,07,07,07,07,07,07,07,08,00
+  1027 00000A84 00                 
+  1028 00000A85 0F0707070707070708-               db  15,07,07,07,07,07,07,07,08,00
+  1028 00000A8E 00                 
+  1029 00000A8F 0F0707070707070708-               db  15,07,07,07,07,07,07,07,08,00
+  1029 00000A98 00                 
+  1030 00000A99 0F0707070707070708-               db  15,07,07,07,07,07,07,07,08,00
+  1030 00000AA2 00                 
+  1031 00000AA3 0F0707070707070708-               db  15,07,07,07,07,07,07,07,08,00
+  1031 00000AAC 00                 
+  1032 00000AAD 0F0707070707070708-               db  15,07,07,07,07,07,07,07,08,00
+  1032 00000AB6 00                 
+  1033 00000AB7 000807070707070800-               db  00,08,07,07,07,07,07,08,00,00
+  1033 00000AC0 00                 
+  1034 00000AC1 000008070707080000-               db  00,00,08,07,07,07,08,00,00,00
+  1034 00000ACA 00                 
+  1035 00000ACB 000000080708000000-               db  00,00,00,08,07,08,00,00,00,00
+  1035 00000AD4 00                 
+  1036 00000AD5 000000000800000000-               db  00,00,00,00,08,00,00,00,00,00
+  1036 00000ADE 00                 
+  1037 00000ADF 0000000F0F0F0F0F0F-     HLine:    db  00,00,00,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,00,00,00
+  1037 00000AE8 0F0F0F0F0F0F0F0F0F-
+  1037 00000AF1 0F0F0F0F0F0F0F0F0F-
+  1037 00000AFA 000000             
+  1038 00000AFD 00000F070707070707-               db  00,00,15,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,08,00,00
+  1038 00000B06 070707070707070707-
+  1038 00000B0F 070707070707070707-
+  1038 00000B18 080000             
+  1039 00000B1B 000F07070707070707-               db  00,15,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,08,00
+  1039 00000B24 070707070707070707-
+  1039 00000B2D 070707070707070707-
+  1039 00000B36 070800             
+  1040 00000B39 0F0707070707070707-               db  15,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,08
+  1040 00000B42 070707070707070707-
+  1040 00000B4B 070707070707070707-
+  1040 00000B54 070708             
+  1041 00000B57 000807070707070707-               db  00,08,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,08,00
+  1041 00000B60 070707070707070707-
+  1041 00000B69 070707070707070707-
+  1041 00000B72 070800             
+  1042 00000B75 000008070707070707-               db  00,00,08,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,07,08,00,00
+  1042 00000B7E 070707070707070707-
+  1042 00000B87 070707070707070707-
+  1042 00000B90 080000             
+  1043 00000B93 000000080808080808-               db  00,00,00,08,08,08,08,08,08,08,08,08,08,08,08,08,08,08,08,08,08,08,08,08,08,08,08,00,00,00
+  1043 00000B9C 080808080808080808-
+  1043 00000BA5 080808080808080808-
+  1043 00000BAE 000000             
+  1044 00000BB1 0000000F000000          FCln:     db  00,00,00,15,00,00,00
+  1045 00000BB8 00000F07080000                    db  00,00,15,07,08,00,00
+  1046 00000BBF 000F0707070800                    db  00,15,07,07,07,08,00
+  1047 00000BC6 0F070707070708                    db  15,07,07,07,07,07,08
+  1048 00000BCD 000F0707070800                    db  00,15,07,07,07,08,00
+  1049 00000BD4 00000F07080000                    db  00,00,15,07,08,00,00
+  1050 00000BDB 00000008000000                    db  00,00,00,08,00,00,00
+  1051                                  
+  1052                                  ;         2
+  1053                                  ;       -----
+  1054                                  ;      |     |
+  1055                                  ;    1 |     | 3
+  1056                                  ;       -----  4
+  1057                                  ;      |     |
+  1058                                  ;    7 |     | 5
+  1059                                  ;       -----
+  1060                                  ;         6

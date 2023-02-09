@@ -1,0 +1,1244 @@
+     1                                  ; ****************************************************************************
+     2                                  ; blocks2.s - TRDOS 386 (TRDOS v2.0.3) Test Program - 'sysvideo' pixel tests
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ;
+     5                                  ; 22/02/2021
+     6                                  ;
+     7                                  ; ****************************************************************************
+     8                                  ; nasm blocks2.s -l blocks2.txt -o BLOCKS2.PRG -Z error.txt
+     9                                  ; (modified from 'blocks1.s', 21/02/2021)
+    10                                  
+    11                                  ; 'sysvideo' bh = 2, block copy and modification test (VESA VBE mode 101h)
+    12                                  
+    13                                  ; 14/07/2020
+    14                                  ; 31/12/2017
+    15                                  ; TRDOS 386 (v2.0) system calls
+    16                                  _ver 	equ 0
+    17                                  _exit 	equ 1
+    18                                  _fork 	equ 2
+    19                                  _read 	equ 3
+    20                                  _write	equ 4
+    21                                  _open	equ 5
+    22                                  _close 	equ 6
+    23                                  _wait 	equ 7
+    24                                  _create	equ 8
+    25                                  _rename	equ 9
+    26                                  _delete	equ 10
+    27                                  _exec	equ 11
+    28                                  _chdir	equ 12
+    29                                  _time 	equ 13
+    30                                  _mkdir 	equ 14
+    31                                  _chmod	equ 15
+    32                                  _rmdir	equ 16
+    33                                  _break	equ 17
+    34                                  _drive	equ 18
+    35                                  _seek	equ 19
+    36                                  _tell 	equ 20
+    37                                  _memory	equ 21
+    38                                  _prompt	equ 22
+    39                                  _path	equ 23
+    40                                  _env	equ 24
+    41                                  _stime	equ 25
+    42                                  _quit	equ 26	
+    43                                  _intr	equ 27
+    44                                  _dir	equ 28
+    45                                  _emt 	equ 29
+    46                                  _ldrvt 	equ 30
+    47                                  _video 	equ 31
+    48                                  _audio	equ 32
+    49                                  _timer	equ 33
+    50                                  _sleep	equ 34
+    51                                  _msg    equ 35
+    52                                  _geterr	equ 36
+    53                                  _fpstat	equ 37
+    54                                  _pri	equ 38
+    55                                  _rele	equ 39
+    56                                  _fff	equ 40
+    57                                  _fnf	equ 41
+    58                                  _alloc	equ 42
+    59                                  _dalloc equ 43
+    60                                  _calbac equ 44
+    61                                  _dma	equ 45	
+    62                                  
+    63                                  %macro sys 1-4
+    64                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    65                                      ; 03/09/2015	
+    66                                      ; 13/04/2015
+    67                                      ; Retro UNIX 386 v1 system call.		
+    68                                      %if %0 >= 2   
+    69                                          mov ebx, %2
+    70                                          %if %0 >= 3    
+    71                                              mov ecx, %3
+    72                                              %if %0 = 4
+    73                                                 mov edx, %4   
+    74                                              %endif
+    75                                          %endif
+    76                                      %endif
+    77                                      mov eax, %1
+    78                                      ;int 30h
+    79                                      int 40h ; TRDOS 386 (TRDOS v2.0)		   
+    80                                  %endmacro
+    81                                  
+    82                                  ; Retro UNIX 386 v1 system call format:
+    83                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    84                                  
+    85                                  [BITS 32] ; We need 32-bit intructions for protected mode
+    86                                  
+    87                                  [ORG 0] 
+    88                                  
+    89                                  START_CODE:
+    90                                  	; clear bss
+    91 00000000 BF[A0050000]            	mov	edi, bss_start
+    92 00000005 B9012C0100              	mov	ecx, (bss_end - bss_start)/4
+    93                                  	;xor	eax, eax
+    94 0000000A F3AB                    	rep	stosd
+    95                                  
+    96                                  	; program message
+    97 0000000C BE[DC040000]            	mov	esi, program_msg
+    98 00000011 E892040000              	call	print_msg
+    99                                  
+   100 00000016 30E4                    	xor	ah, ah
+   101                                  	;int	16h	; KEYBOARD - READ CHAR FROM BUFFER, WAIT IF EMPTY
+   102                                  			; Return: AH = scan code, AL = character
+   103 00000018 CD32                    	int	32h	; TRDOS 386 Keyboard interrupt 
+   104                                  
+   105                                  	; Set Video Mode to 101h ; 640x480, 256 colors
+   106                                  	sys	_video, 08FFh, 101h
+   106                              <1> 
+   106                              <1> 
+   106                              <1> 
+   106                              <1> 
+   106                              <1>  %if %0 >= 2
+   106 0000001A BBFF080000          <1>  mov ebx, %2
+   106                              <1>  %if %0 >= 3
+   106 0000001F B901010000          <1>  mov ecx, %3
+   106                              <1>  %if %0 = 4
+   106                              <1>  mov edx, %4
+   106                              <1>  %endif
+   106                              <1>  %endif
+   106                              <1>  %endif
+   106 00000024 B81F000000          <1>  mov eax, %1
+   106                              <1> 
+   106 00000029 CD40                <1>  int 40h
+   107 0000002B 09C0                    	or	eax, eax
+   108                                  	;jz	short terminate
+   109                                  	;mov	[LFB_ADDR], edx ; pointer to LFB info table/structure
+   110 0000002D 7505                    	jnz	short set_vesa_mode_101h_ok
+   111 0000002F E93C040000              	jmp	terminate
+   112                                  
+   113                                  set_vesa_mode_101h_ok:
+   114                                  	; Set initial block colors
+   115 00000034 B9C0120000              	mov	ecx, (120*160)/4
+   116 00000039 B80F0F0F0F              	mov	eax, 0F0F0F0Fh ; white 
+   117 0000003E BF[A4050000]            	mov	edi, whiteblock
+   118 00000043 F3AB                    	rep	stosd
+   119 00000045 66B9C012                	mov	cx, 120*40
+   120 00000049 B820202020              	mov	eax, 20202020h ; blue
+   121 0000004E BF[A4500000]            	mov	edi, blueblock
+   122 00000053 F3AB                    	rep	stosd
+   123 00000055 66B9C012                	mov	cx, 120*40
+   124 00000059 B828282828              	mov	eax, 28282828h ; red
+   125 0000005E BF[A49B0000]            	mov	edi, redblock
+   126 00000063 F3AB                    	rep	stosd
+   127 00000065 66B9C012                	mov	cx, 120*40
+   128 00000069 B830303030              	mov	eax, 30303030h ; green 
+   129 0000006E BF[A4E60000]            	mov	edi, greenblock
+   130 00000073 F3AB                    	rep	stosd
+   131 00000075 66B9C012                	mov	cx, 120*40
+   132 00000079 B82C2C2C2C              	mov	eax, 2C2C2C2Ch ; yellow
+   133 0000007E BF[A4310100]            	mov	edi, yellowblock
+   134 00000083 F3AB                    	rep	stosd
+   135                                  
+   136                                  	; copy white block to screen
+   137                                  	; at row 70, column 120
+   138                                  	; (block size: 120(w)*160(h) 
+   139                                  
+   140 00000085 B978004600              	mov	ecx, (70*65536)+120
+   141 0000008A BA7800A000              	mov	edx, (160*65536)+120 
+   142 0000008F BE[A4050000]            	mov	esi, whiteblock
+   143 00000094 BB10020000              	mov	ebx, 0210h ; non masked window copy
+   144                                  	sys	_video
+   144                              <1> 
+   144                              <1> 
+   144                              <1> 
+   144                              <1> 
+   144                              <1>  %if %0 >= 2
+   144                              <1>  mov ebx, %2
+   144                              <1>  %if %0 >= 3
+   144                              <1>  mov ecx, %3
+   144                              <1>  %if %0 = 4
+   144                              <1>  mov edx, %4
+   144                              <1>  %endif
+   144                              <1>  %endif
+   144                              <1>  %endif
+   144 00000099 B81F000000          <1>  mov eax, %1
+   144                              <1> 
+   144 0000009E CD40                <1>  int 40h
+   145                                  
+   146 000000A0 E8D9030000              	call	waitforkey
+   147                                  
+   148                                  	; copy blue block to screen
+   149                                  	; at row 160, column 260
+   150                                  	; (block size: 120(w)*160(h) 
+   151                                  
+   152 000000A5 B90401A000              	mov	ecx, (160*65536)+260
+   153 000000AA BA7800A000              	mov	edx, (160*65536)+120 
+   154 000000AF BE[A4500000]            	mov	esi, blueblock
+   155 000000B4 BB10020000              	mov	ebx, 0210h ; non masked window copy
+   156                                  	sys	_video
+   156                              <1> 
+   156                              <1> 
+   156                              <1> 
+   156                              <1> 
+   156                              <1>  %if %0 >= 2
+   156                              <1>  mov ebx, %2
+   156                              <1>  %if %0 >= 3
+   156                              <1>  mov ecx, %3
+   156                              <1>  %if %0 = 4
+   156                              <1>  mov edx, %4
+   156                              <1>  %endif
+   156                              <1>  %endif
+   156                              <1>  %endif
+   156 000000B9 B81F000000          <1>  mov eax, %1
+   156                              <1> 
+   156 000000BE CD40                <1>  int 40h
+   157                                  
+   158 000000C0 E8B9030000              	call	waitforkey
+   159                                  
+   160                                  	; copy red block to screen
+   161                                  	; at row 250, column 120
+   162                                  	; (block size: 120(w)*160(h) 
+   163                                  
+   164 000000C5 B97800FA00              	mov	ecx, (250*65536)+120
+   165 000000CA BA7800A000              	mov	edx, (160*65536)+120 
+   166 000000CF BE[A49B0000]            	mov	esi, redblock
+   167 000000D4 BB10020000              	mov	ebx, 0210h ; non masked window copy
+   168                                  	sys	_video
+   168                              <1> 
+   168                              <1> 
+   168                              <1> 
+   168                              <1> 
+   168                              <1>  %if %0 >= 2
+   168                              <1>  mov ebx, %2
+   168                              <1>  %if %0 >= 3
+   168                              <1>  mov ecx, %3
+   168                              <1>  %if %0 = 4
+   168                              <1>  mov edx, %4
+   168                              <1>  %endif
+   168                              <1>  %endif
+   168                              <1>  %endif
+   168 000000D9 B81F000000          <1>  mov eax, %1
+   168                              <1> 
+   168 000000DE CD40                <1>  int 40h
+   169                                  
+   170 000000E0 E899030000              	call	waitforkey
+   171                                  
+   172                                  	; copy green block to screen
+   173                                  	; at row 70, column 400
+   174                                  	; (block size: 120(w)*160(h) 
+   175                                  
+   176 000000E5 B990014600              	mov	ecx, (70*65536)+400
+   177 000000EA BA7800A000              	mov	edx, (160*65536)+120 
+   178 000000EF BE[A4E60000]            	mov	esi, greenblock
+   179 000000F4 BB10020000              	mov	ebx, 0210h ; non masked window copy
+   180                                  	sys	_video
+   180                              <1> 
+   180                              <1> 
+   180                              <1> 
+   180                              <1> 
+   180                              <1>  %if %0 >= 2
+   180                              <1>  mov ebx, %2
+   180                              <1>  %if %0 >= 3
+   180                              <1>  mov ecx, %3
+   180                              <1>  %if %0 = 4
+   180                              <1>  mov edx, %4
+   180                              <1>  %endif
+   180                              <1>  %endif
+   180                              <1>  %endif
+   180 000000F9 B81F000000          <1>  mov eax, %1
+   180                              <1> 
+   180 000000FE CD40                <1>  int 40h
+   181                                  
+   182 00000100 E879030000              	call	waitforkey
+   183                                  
+   184                                  	; copy yellow block to screen
+   185                                  	; at row 250, column 400
+   186                                  	; (block size: 120(w)*160(h) 
+   187                                  
+   188 00000105 B99001FA00              	mov	ecx, (250*65536)+400
+   189 0000010A BA7800A000              	mov	edx, (160*65536)+120 
+   190 0000010F BE[A4310100]            	mov	esi, yellowblock
+   191 00000114 BB10020000              	mov	ebx, 0210h ; non masked window copy
+   192                                  	sys	_video
+   192                              <1> 
+   192                              <1> 
+   192                              <1> 
+   192                              <1> 
+   192                              <1>  %if %0 >= 2
+   192                              <1>  mov ebx, %2
+   192                              <1>  %if %0 >= 3
+   192                              <1>  mov ecx, %3
+   192                              <1>  %if %0 = 4
+   192                              <1>  mov edx, %4
+   192                              <1>  %endif
+   192                              <1>  %endif
+   192                              <1>  %endif
+   192 00000119 B81F000000          <1>  mov eax, %1
+   192                              <1> 
+   192 0000011E CD40                <1>  int 40h
+   193                                  
+   194 00000120 E859030000              	call	waitforkey
+   195                                  
+   196                                  	; continue by using
+   197                                  	; window color modification sub functions
+   198                                  
+   199                                  	; apply NOT to pixel colors of
+   200                                  	; the window/block on row 70, column 120 with 
+   201                                  	; block size 120(w)*160(h). 
+   202 00000125 B978004600              	mov	ecx, (70*65536)+120
+   203 0000012A BA7800A000              	mov	edx, (160*65536)+120 
+   204 0000012F BB17020000              	mov	ebx, 0217h ; non masked window NOT op
+   205                                  	sys	_video
+   205                              <1> 
+   205                              <1> 
+   205                              <1> 
+   205                              <1> 
+   205                              <1>  %if %0 >= 2
+   205                              <1>  mov ebx, %2
+   205                              <1>  %if %0 >= 3
+   205                              <1>  mov ecx, %3
+   205                              <1>  %if %0 = 4
+   205                              <1>  mov edx, %4
+   205                              <1>  %endif
+   205                              <1>  %endif
+   205                              <1>  %endif
+   205 00000134 B81F000000          <1>  mov eax, %1
+   205                              <1> 
+   205 00000139 CD40                <1>  int 40h
+   206                                  
+   207 0000013B E83E030000              	call	waitforkey
+   208                                  
+   209                                  	; NOT to window's pixel colors again
+   210 00000140 B978004600              	mov	ecx, (70*65536)+120
+   211                                  	;mov	edx, (160*65536)+120 
+   212                                  	;mov	ebx, 0217h ; non masked window NOT op
+   213                                  	sys	_video
+   213                              <1> 
+   213                              <1> 
+   213                              <1> 
+   213                              <1> 
+   213                              <1>  %if %0 >= 2
+   213                              <1>  mov ebx, %2
+   213                              <1>  %if %0 >= 3
+   213                              <1>  mov ecx, %3
+   213                              <1>  %if %0 = 4
+   213                              <1>  mov edx, %4
+   213                              <1>  %endif
+   213                              <1>  %endif
+   213                              <1>  %endif
+   213 00000145 B81F000000          <1>  mov eax, %1
+   213                              <1> 
+   213 0000014A CD40                <1>  int 40h
+   214                                  
+   215 0000014C E82D030000              	call	waitforkey
+   216                                  
+   217                                  	; apply NOT to pixel colors of
+   218                                  	; the window/block on row 160, column 260
+   219 00000151 B90401A000              	mov	ecx, (160*65536)+260
+   220                                  	;mov	edx, (160*65536)+120 
+   221                                  	;mov	ebx, 0217h ; non masked window NOT op
+   222                                  	sys	_video
+   222                              <1> 
+   222                              <1> 
+   222                              <1> 
+   222                              <1> 
+   222                              <1>  %if %0 >= 2
+   222                              <1>  mov ebx, %2
+   222                              <1>  %if %0 >= 3
+   222                              <1>  mov ecx, %3
+   222                              <1>  %if %0 = 4
+   222                              <1>  mov edx, %4
+   222                              <1>  %endif
+   222                              <1>  %endif
+   222                              <1>  %endif
+   222 00000156 B81F000000          <1>  mov eax, %1
+   222                              <1> 
+   222 0000015B CD40                <1>  int 40h
+   223                                  
+   224 0000015D E81C030000              	call	waitforkey
+   225                                  
+   226                                  	; NOT to window's pixel colors again
+   227 00000162 B90401A000              	mov	ecx, (160*65536)+260
+   228                                  	;mov	edx, (160*65536)+120 
+   229                                  	;mov	ebx, 0217h ; non masked window NOT op
+   230                                  	sys	_video
+   230                              <1> 
+   230                              <1> 
+   230                              <1> 
+   230                              <1> 
+   230                              <1>  %if %0 >= 2
+   230                              <1>  mov ebx, %2
+   230                              <1>  %if %0 >= 3
+   230                              <1>  mov ecx, %3
+   230                              <1>  %if %0 = 4
+   230                              <1>  mov edx, %4
+   230                              <1>  %endif
+   230                              <1>  %endif
+   230                              <1>  %endif
+   230 00000167 B81F000000          <1>  mov eax, %1
+   230                              <1> 
+   230 0000016C CD40                <1>  int 40h
+   231                                  
+   232 0000016E E80B030000              	call	waitforkey
+   233                                  
+   234                                  	; apply NOT to pixel colors of
+   235                                  	; the window/block on row 250, column 120 
+   236 00000173 B97800FA00              	mov	ecx, (250*65536)+120
+   237                                  	;mov	edx, (160*65536)+120 
+   238                                  	;mov	ebx, 0210h ; non masked window copy
+   239                                  	sys	_video
+   239                              <1> 
+   239                              <1> 
+   239                              <1> 
+   239                              <1> 
+   239                              <1>  %if %0 >= 2
+   239                              <1>  mov ebx, %2
+   239                              <1>  %if %0 >= 3
+   239                              <1>  mov ecx, %3
+   239                              <1>  %if %0 = 4
+   239                              <1>  mov edx, %4
+   239                              <1>  %endif
+   239                              <1>  %endif
+   239                              <1>  %endif
+   239 00000178 B81F000000          <1>  mov eax, %1
+   239                              <1> 
+   239 0000017D CD40                <1>  int 40h
+   240                                  
+   241 0000017F E8FA020000              	call	waitforkey
+   242                                  
+   243                                  	; NOT to window's pixel colors again
+   244 00000184 B97800FA00              	mov	ecx, (250*65536)+120
+   245                                  	;mov	edx, (160*65536)+120 
+   246                                  	;mov	ebx, 0217h ; non masked window NOT op
+   247                                  	sys	_video
+   247                              <1> 
+   247                              <1> 
+   247                              <1> 
+   247                              <1> 
+   247                              <1>  %if %0 >= 2
+   247                              <1>  mov ebx, %2
+   247                              <1>  %if %0 >= 3
+   247                              <1>  mov ecx, %3
+   247                              <1>  %if %0 = 4
+   247                              <1>  mov edx, %4
+   247                              <1>  %endif
+   247                              <1>  %endif
+   247                              <1>  %endif
+   247 00000189 B81F000000          <1>  mov eax, %1
+   247                              <1> 
+   247 0000018E CD40                <1>  int 40h
+   248                                  
+   249 00000190 E8E9020000              	call	waitforkey
+   250                                  
+   251                                  	; apply NOT to pixel colors of
+   252                                  	; the window/block on row 70, column 400
+   253 00000195 B990014600              	mov	ecx, (70*65536)+400
+   254                                  	;mov	edx, (160*65536)+120
+   255                                  	;mov	ebx, 0217h ; non masked window NOT op
+   256                                  	sys	_video
+   256                              <1> 
+   256                              <1> 
+   256                              <1> 
+   256                              <1> 
+   256                              <1>  %if %0 >= 2
+   256                              <1>  mov ebx, %2
+   256                              <1>  %if %0 >= 3
+   256                              <1>  mov ecx, %3
+   256                              <1>  %if %0 = 4
+   256                              <1>  mov edx, %4
+   256                              <1>  %endif
+   256                              <1>  %endif
+   256                              <1>  %endif
+   256 0000019A B81F000000          <1>  mov eax, %1
+   256                              <1> 
+   256 0000019F CD40                <1>  int 40h
+   257                                  
+   258 000001A1 E8D8020000              	call	waitforkey
+   259                                  
+   260                                  	; NOT to window's pixel colors again
+   261 000001A6 B990014600              	mov	ecx, (70*65536)+400
+   262                                  	;mov	edx, (160*65536)+120 
+   263                                  	;mov	ebx, 0217h ; non masked window NOT op
+   264                                  	sys	_video
+   264                              <1> 
+   264                              <1> 
+   264                              <1> 
+   264                              <1> 
+   264                              <1>  %if %0 >= 2
+   264                              <1>  mov ebx, %2
+   264                              <1>  %if %0 >= 3
+   264                              <1>  mov ecx, %3
+   264                              <1>  %if %0 = 4
+   264                              <1>  mov edx, %4
+   264                              <1>  %endif
+   264                              <1>  %endif
+   264                              <1>  %endif
+   264 000001AB B81F000000          <1>  mov eax, %1
+   264                              <1> 
+   264 000001B0 CD40                <1>  int 40h
+   265                                  
+   266 000001B2 E8C7020000              	call	waitforkey
+   267                                  
+   268                                  	; apply NOT to pixel colors of
+   269                                  	; the window/block on row 250, column 400
+   270 000001B7 B99001FA00              	mov	ecx, (250*65536)+400
+   271                                  	;mov	edx, (160*65536)+120
+   272                                  	;mov	ebx, 0217h ; non masked window NOT op
+   273                                  	sys	_video
+   273                              <1> 
+   273                              <1> 
+   273                              <1> 
+   273                              <1> 
+   273                              <1>  %if %0 >= 2
+   273                              <1>  mov ebx, %2
+   273                              <1>  %if %0 >= 3
+   273                              <1>  mov ecx, %3
+   273                              <1>  %if %0 = 4
+   273                              <1>  mov edx, %4
+   273                              <1>  %endif
+   273                              <1>  %endif
+   273                              <1>  %endif
+   273 000001BC B81F000000          <1>  mov eax, %1
+   273                              <1> 
+   273 000001C1 CD40                <1>  int 40h
+   274                                  
+   275 000001C3 E8B6020000              	call	waitforkey
+   276                                  
+   277                                  	; NOT to window's pixel colors again
+   278 000001C8 B99001FA00              	mov	ecx, (250*65536)+400
+   279                                  	;mov	edx, (160*65536)+120 
+   280                                  	;mov	ebx, 0217h ; non masked window NOT op
+   281                                  	sys	_video
+   281                              <1> 
+   281                              <1> 
+   281                              <1> 
+   281                              <1> 
+   281                              <1>  %if %0 >= 2
+   281                              <1>  mov ebx, %2
+   281                              <1>  %if %0 >= 3
+   281                              <1>  mov ecx, %3
+   281                              <1>  %if %0 = 4
+   281                              <1>  mov edx, %4
+   281                              <1>  %endif
+   281                              <1>  %endif
+   281                              <1>  %endif
+   281 000001CD B81F000000          <1>  mov eax, %1
+   281                              <1> 
+   281 000001D2 CD40                <1>  int 40h
+   282                                  
+   283 000001D4 E8A5020000              	call	waitforkey
+   284                                  
+   285                                  	; apply NEGate to pixel colors of
+   286                                  	; the window/block on row 70, column 120 with 
+   287                                  	; block size 120(w)*160(h). 
+   288 000001D9 B978004600              	mov	ecx, (70*65536)+120
+   289                                  	;mov	edx, (160*65536)+120 
+   290                                  	;mov	ebx, 0210h ; non masked window copy
+   291                                  	sys	_video
+   291                              <1> 
+   291                              <1> 
+   291                              <1> 
+   291                              <1> 
+   291                              <1>  %if %0 >= 2
+   291                              <1>  mov ebx, %2
+   291                              <1>  %if %0 >= 3
+   291                              <1>  mov ecx, %3
+   291                              <1>  %if %0 = 4
+   291                              <1>  mov edx, %4
+   291                              <1>  %endif
+   291                              <1>  %endif
+   291                              <1>  %endif
+   291 000001DE B81F000000          <1>  mov eax, %1
+   291                              <1> 
+   291 000001E3 CD40                <1>  int 40h
+   292                                  
+   293 000001E5 E894020000              	call	waitforkey
+   294                                  
+   295                                  	; NEGate window's pixel colors again
+   296 000001EA B978004600              	mov	ecx, (70*65536)+120
+   297                                  	;mov	edx, (160*65536)+120 
+   298                                  	;mov	ebx, 0217h ; non masked window NOT op
+   299                                  	sys	_video
+   299                              <1> 
+   299                              <1> 
+   299                              <1> 
+   299                              <1> 
+   299                              <1>  %if %0 >= 2
+   299                              <1>  mov ebx, %2
+   299                              <1>  %if %0 >= 3
+   299                              <1>  mov ecx, %3
+   299                              <1>  %if %0 = 4
+   299                              <1>  mov edx, %4
+   299                              <1>  %endif
+   299                              <1>  %endif
+   299                              <1>  %endif
+   299 000001EF B81F000000          <1>  mov eax, %1
+   299                              <1> 
+   299 000001F4 CD40                <1>  int 40h
+   300                                  
+   301 000001F6 E883020000              	call	waitforkey
+   302                                  
+   303                                  	; apply NEGate to pixel colors of
+   304                                  	; the window/block on row 160, column 260
+   305 000001FB B90401A000              	mov	ecx, (160*65536)+260
+   306                                  	;mov	edx, (160*65536)+120 
+   307                                  	;mov	ebx, 0217h ; non masked window NOT op
+   308                                  	sys	_video
+   308                              <1> 
+   308                              <1> 
+   308                              <1> 
+   308                              <1> 
+   308                              <1>  %if %0 >= 2
+   308                              <1>  mov ebx, %2
+   308                              <1>  %if %0 >= 3
+   308                              <1>  mov ecx, %3
+   308                              <1>  %if %0 = 4
+   308                              <1>  mov edx, %4
+   308                              <1>  %endif
+   308                              <1>  %endif
+   308                              <1>  %endif
+   308 00000200 B81F000000          <1>  mov eax, %1
+   308                              <1> 
+   308 00000205 CD40                <1>  int 40h
+   309                                  
+   310 00000207 E872020000              	call	waitforkey
+   311                                  
+   312                                  	; NEGate window's pixel colors again
+   313 0000020C B90401A000              	mov	ecx, (160*65536)+260
+   314                                  	;mov	edx, (160*65536)+120 
+   315                                  	;mov	ebx, 0217h ; non masked window NOT op
+   316                                  	sys	_video
+   316                              <1> 
+   316                              <1> 
+   316                              <1> 
+   316                              <1> 
+   316                              <1>  %if %0 >= 2
+   316                              <1>  mov ebx, %2
+   316                              <1>  %if %0 >= 3
+   316                              <1>  mov ecx, %3
+   316                              <1>  %if %0 = 4
+   316                              <1>  mov edx, %4
+   316                              <1>  %endif
+   316                              <1>  %endif
+   316                              <1>  %endif
+   316 00000211 B81F000000          <1>  mov eax, %1
+   316                              <1> 
+   316 00000216 CD40                <1>  int 40h
+   317                                  
+   318 00000218 E861020000              	call	waitforkey
+   319                                  
+   320                                  	; apply NEGate to pixel colors of
+   321                                  	; the window/block on row 250, column 120 
+   322 0000021D B97800FA00              	mov	ecx, (250*65536)+120
+   323                                  	;mov	edx, (160*65536)+120 
+   324                                  	;mov	ebx, 0218h ; non masked window NEG op
+   325                                  	sys	_video
+   325                              <1> 
+   325                              <1> 
+   325                              <1> 
+   325                              <1> 
+   325                              <1>  %if %0 >= 2
+   325                              <1>  mov ebx, %2
+   325                              <1>  %if %0 >= 3
+   325                              <1>  mov ecx, %3
+   325                              <1>  %if %0 = 4
+   325                              <1>  mov edx, %4
+   325                              <1>  %endif
+   325                              <1>  %endif
+   325                              <1>  %endif
+   325 00000222 B81F000000          <1>  mov eax, %1
+   325                              <1> 
+   325 00000227 CD40                <1>  int 40h
+   326                                  
+   327 00000229 E850020000              	call	waitforkey
+   328                                  
+   329                                  	; NEGate window's pixel colors again
+   330 0000022E B97800FA00              	mov	ecx, (250*65536)+120
+   331                                  	;mov	edx, (160*65536)+120 
+   332                                  	;mov	ebx, 0218h ; non masked window NEG op
+   333                                  	sys	_video
+   333                              <1> 
+   333                              <1> 
+   333                              <1> 
+   333                              <1> 
+   333                              <1>  %if %0 >= 2
+   333                              <1>  mov ebx, %2
+   333                              <1>  %if %0 >= 3
+   333                              <1>  mov ecx, %3
+   333                              <1>  %if %0 = 4
+   333                              <1>  mov edx, %4
+   333                              <1>  %endif
+   333                              <1>  %endif
+   333                              <1>  %endif
+   333 00000233 B81F000000          <1>  mov eax, %1
+   333                              <1> 
+   333 00000238 CD40                <1>  int 40h
+   334                                  
+   335 0000023A E83F020000              	call	waitforkey
+   336                                  
+   337                                  	; apply NEGate to pixel colors of
+   338                                  	; the window/block on row 70, column 400
+   339 0000023F B990014600              	mov	ecx, (70*65536)+400
+   340                                  	;mov	edx, (160*65536)+120
+   341                                  	;mov	ebx, 0218h ; non masked window NEG op
+   342                                  	sys	_video
+   342                              <1> 
+   342                              <1> 
+   342                              <1> 
+   342                              <1> 
+   342                              <1>  %if %0 >= 2
+   342                              <1>  mov ebx, %2
+   342                              <1>  %if %0 >= 3
+   342                              <1>  mov ecx, %3
+   342                              <1>  %if %0 = 4
+   342                              <1>  mov edx, %4
+   342                              <1>  %endif
+   342                              <1>  %endif
+   342                              <1>  %endif
+   342 00000244 B81F000000          <1>  mov eax, %1
+   342                              <1> 
+   342 00000249 CD40                <1>  int 40h
+   343                                  
+   344 0000024B E82E020000              	call	waitforkey
+   345                                  
+   346                                  	; NEGate window's pixel colors again
+   347 00000250 B990014600              	mov	ecx, (70*65536)+400
+   348                                  	;mov	edx, (160*65536)+120 
+   349                                  	;mov	ebx, 0218h ; non masked window NEG op
+   350                                  	sys	_video
+   350                              <1> 
+   350                              <1> 
+   350                              <1> 
+   350                              <1> 
+   350                              <1>  %if %0 >= 2
+   350                              <1>  mov ebx, %2
+   350                              <1>  %if %0 >= 3
+   350                              <1>  mov ecx, %3
+   350                              <1>  %if %0 = 4
+   350                              <1>  mov edx, %4
+   350                              <1>  %endif
+   350                              <1>  %endif
+   350                              <1>  %endif
+   350 00000255 B81F000000          <1>  mov eax, %1
+   350                              <1> 
+   350 0000025A CD40                <1>  int 40h
+   351                                  
+   352 0000025C E81D020000              	call	waitforkey
+   353                                  
+   354                                  	; apply NEGate to pixel colors of
+   355                                  	; the window/block on row 250, column 400
+   356 00000261 B99001FA00              	mov	ecx, (250*65536)+400
+   357                                  	;mov	edx, (160*65536)+120
+   358                                  	;mov	ebx, 0218h ; non masked window NEG op
+   359                                  	sys	_video
+   359                              <1> 
+   359                              <1> 
+   359                              <1> 
+   359                              <1> 
+   359                              <1>  %if %0 >= 2
+   359                              <1>  mov ebx, %2
+   359                              <1>  %if %0 >= 3
+   359                              <1>  mov ecx, %3
+   359                              <1>  %if %0 = 4
+   359                              <1>  mov edx, %4
+   359                              <1>  %endif
+   359                              <1>  %endif
+   359                              <1>  %endif
+   359 00000266 B81F000000          <1>  mov eax, %1
+   359                              <1> 
+   359 0000026B CD40                <1>  int 40h
+   360                                  
+   361 0000026D E80C020000              	call	waitforkey
+   362                                  
+   363                                  	; NEGate window's pixel colors again
+   364 00000272 B99001FA00              	mov	ecx, (250*65536)+400
+   365                                  	;mov	edx, (160*65536)+120 
+   366                                  	;mov	ebx, 0218h ; non masked window NEG op
+   367                                  	sys	_video
+   367                              <1> 
+   367                              <1> 
+   367                              <1> 
+   367                              <1> 
+   367                              <1>  %if %0 >= 2
+   367                              <1>  mov ebx, %2
+   367                              <1>  %if %0 >= 3
+   367                              <1>  mov ecx, %3
+   367                              <1>  %if %0 = 4
+   367                              <1>  mov edx, %4
+   367                              <1>  %endif
+   367                              <1>  %endif
+   367                              <1>  %endif
+   367 00000277 B81F000000          <1>  mov eax, %1
+   367                              <1> 
+   367 0000027C CD40                <1>  int 40h
+   368                                  
+   369 0000027E E8FB010000              	call	waitforkey
+   370                                  
+   371 00000283 BE04000000              	mov	esi, 4
+   372                                  _0:
+   373 00000288 BF08000000              	mov	edi, 8
+   374                                  _0_n:
+   375                                  	; INCrease pixel colors of
+   376                                  	; the window/block on row 160, column 260
+   377 0000028D B90401A000              	mov	ecx, (160*65536)+260
+   378                                  	;mov	edx, (160*65536)+120 
+   379 00000292 BB19020000              	mov	ebx, 0219h ; non masked window INC op
+   380                                  	sys	_video
+   380                              <1> 
+   380                              <1> 
+   380                              <1> 
+   380                              <1> 
+   380                              <1>  %if %0 >= 2
+   380                              <1>  mov ebx, %2
+   380                              <1>  %if %0 >= 3
+   380                              <1>  mov ecx, %3
+   380                              <1>  %if %0 = 4
+   380                              <1>  mov edx, %4
+   380                              <1>  %endif
+   380                              <1>  %endif
+   380                              <1>  %endif
+   380 00000297 B81F000000          <1>  mov eax, %1
+   380                              <1> 
+   380 0000029C CD40                <1>  int 40h
+   381                                  
+   382 0000029E B96079FE00              	mov	ecx, 16677216
+   383                                  _0_x:
+   384 000002A3 90                      	nop
+   385 000002A4 90                      	nop
+   386 000002A5 90                      	nop
+   387 000002A6 49                      	dec	ecx
+   388 000002A7 75FA                    	jnz	short _0_x
+   389                                  
+   390 000002A9 4F                      	dec	edi
+   391 000002AA 75E1                    	jnz	short _0_n
+   392                                  
+   393 000002AC E8CD010000              	call	waitforkey
+   394                                  
+   395 000002B1 4E                      	dec	esi
+   396 000002B2 75D4                    	jnz	short _0
+   397                                  
+   398 000002B4 BE04000000              	mov	esi, 4
+   399                                  _1:
+   400 000002B9 BF08000000              	mov	edi, 8
+   401                                  _1_n:
+   402                                  	; DECrease pixel colors of
+   403                                  	; the window/block on row 160, column 260
+   404 000002BE B90401A000              	mov	ecx, (160*65536)+260
+   405                                  	;mov	edx, (160*65536)+120 
+   406 000002C3 BB1A020000              	mov	ebx, 021Ah ; non masked window DEC op
+   407                                  	sys	_video
+   407                              <1> 
+   407                              <1> 
+   407                              <1> 
+   407                              <1> 
+   407                              <1>  %if %0 >= 2
+   407                              <1>  mov ebx, %2
+   407                              <1>  %if %0 >= 3
+   407                              <1>  mov ecx, %3
+   407                              <1>  %if %0 = 4
+   407                              <1>  mov edx, %4
+   407                              <1>  %endif
+   407                              <1>  %endif
+   407                              <1>  %endif
+   407 000002C8 B81F000000          <1>  mov eax, %1
+   407                              <1> 
+   407 000002CD CD40                <1>  int 40h
+   408                                  
+   409 000002CF B900000001              	mov	ecx, 16777216
+   410                                  _1_x:
+   411 000002D4 90                      	nop
+   412 000002D5 90                      	nop
+   413 000002D6 90                      	nop
+   414 000002D7 49                      	dec	ecx
+   415 000002D8 75FA                    	jnz	short _1_x
+   416                                  
+   417 000002DA 4F                      	dec	edi
+   418 000002DB 75E1                    	jnz	short _1_n
+   419                                  
+   420 000002DD E89C010000              	call	waitforkey
+   421                                  
+   422 000002E2 4E                      	dec	esi
+   423 000002E3 75D4                    	jnz	short _1
+   424                                  
+   425                                  	; CHANGE color (full screen)
+   426 000002E5 31C9                    	xor	ecx, ecx ; 0 ; black
+   427 000002E7 BB01020000              	mov	ebx, 0201h ; Full screen, new color
+   428 000002EC B900000100              	mov	ecx, 65536
+   429                                  blackloop:
+   430 000002F1 09C9                    	or	ecx, ecx
+   431 000002F3 90                      	nop
+   432 000002F4 90                      	nop
+   433 000002F5 90                      	nop
+   434 000002F6 E2F9                     	loop	blackloop
+   435                                  
+   436 000002F8 B90F0F0F0F              	mov	ecx, 0F0F0F0Fh ; white
+   437 000002FD BB01020000              	mov	ebx, 0201h ; Full screen, new color
+   438                                  	sys	_video
+   438                              <1> 
+   438                              <1> 
+   438                              <1> 
+   438                              <1> 
+   438                              <1>  %if %0 >= 2
+   438                              <1>  mov ebx, %2
+   438                              <1>  %if %0 >= 3
+   438                              <1>  mov ecx, %3
+   438                              <1>  %if %0 = 4
+   438                              <1>  mov edx, %4
+   438                              <1>  %endif
+   438                              <1>  %endif
+   438                              <1>  %endif
+   438 00000302 B81F000000          <1>  mov eax, %1
+   438                              <1> 
+   438 00000307 CD40                <1>  int 40h
+   439 00000309 E870010000              	call	waitforkey
+   440 0000030E B920202020              	mov	ecx, 20202020h ; blue
+   441 00000313 BB01020000              	mov	ebx, 0201h ; Full screen, new color
+   442                                  	sys	_video
+   442                              <1> 
+   442                              <1> 
+   442                              <1> 
+   442                              <1> 
+   442                              <1>  %if %0 >= 2
+   442                              <1>  mov ebx, %2
+   442                              <1>  %if %0 >= 3
+   442                              <1>  mov ecx, %3
+   442                              <1>  %if %0 = 4
+   442                              <1>  mov edx, %4
+   442                              <1>  %endif
+   442                              <1>  %endif
+   442                              <1>  %endif
+   442 00000318 B81F000000          <1>  mov eax, %1
+   442                              <1> 
+   442 0000031D CD40                <1>  int 40h
+   443 0000031F E85A010000              	call	waitforkey
+   444 00000324 B928282828              	mov	ecx, 28282828h ; red
+   445 00000329 BB01020000              	mov	ebx, 0201h ; Full screen, new color
+   446                                  	sys	_video
+   446                              <1> 
+   446                              <1> 
+   446                              <1> 
+   446                              <1> 
+   446                              <1>  %if %0 >= 2
+   446                              <1>  mov ebx, %2
+   446                              <1>  %if %0 >= 3
+   446                              <1>  mov ecx, %3
+   446                              <1>  %if %0 = 4
+   446                              <1>  mov edx, %4
+   446                              <1>  %endif
+   446                              <1>  %endif
+   446                              <1>  %endif
+   446 0000032E B81F000000          <1>  mov eax, %1
+   446                              <1> 
+   446 00000333 CD40                <1>  int 40h
+   447 00000335 E844010000              	call	waitforkey
+   448 0000033A B930303030              	mov	ecx, 30303030h ; green 
+   449 0000033F BB01020000              	mov	ebx, 0201h ; Full screen, new color
+   450                                  	sys	_video
+   450                              <1> 
+   450                              <1> 
+   450                              <1> 
+   450                              <1> 
+   450                              <1>  %if %0 >= 2
+   450                              <1>  mov ebx, %2
+   450                              <1>  %if %0 >= 3
+   450                              <1>  mov ecx, %3
+   450                              <1>  %if %0 = 4
+   450                              <1>  mov edx, %4
+   450                              <1>  %endif
+   450                              <1>  %endif
+   450                              <1>  %endif
+   450 00000344 B81F000000          <1>  mov eax, %1
+   450                              <1> 
+   450 00000349 CD40                <1>  int 40h
+   451 0000034B E82E010000              	call	waitforkey
+   452 00000350 B92C2C2C2C              	mov	ecx, 2C2C2C2Ch ; yellow
+   453 00000355 BB01020000              	mov	ebx, 0201h ; Full screen, new color
+   454                                  	sys	_video
+   454                              <1> 
+   454                              <1> 
+   454                              <1> 
+   454                              <1> 
+   454                              <1>  %if %0 >= 2
+   454                              <1>  mov ebx, %2
+   454                              <1>  %if %0 >= 3
+   454                              <1>  mov ecx, %3
+   454                              <1>  %if %0 = 4
+   454                              <1>  mov edx, %4
+   454                              <1>  %endif
+   454                              <1>  %endif
+   454                              <1>  %endif
+   454 0000035A B81F000000          <1>  mov eax, %1
+   454                              <1> 
+   454 0000035F CD40                <1>  int 40h
+   455                                  
+   456 00000361 E818010000              	call	waitforkey
+   457                                  
+   458                                  	; Full screen copy
+   459 00000366 BE[A4050000]            	mov	esi, fullscreen_buffer
+   460 0000036B 89F7                    	mov	edi, esi
+   461 0000036D 31C0                    	xor	eax, eax ; black
+   462 0000036F B940060000              	mov	ecx, (640*10)/4
+   463 00000374 F3AB                    	rep	stosd
+   464 00000376 B80F0F0F0F              	mov	eax, 0F0F0F0Fh ; white
+   465 0000037B B920030000              	mov	ecx, (640*5)/4	
+   466 00000380 F3AB                    	rep	stosd
+   467 00000382 31C0                    	xor	eax, eax ; black
+   468 00000384 B920030000              	mov	ecx, (640*5)/4	
+   469 00000389 F3AB                    	rep	stosd
+   470 0000038B B820202020              	mov	eax, 20202020h ; blue
+   471 00000390 B9C0440000              	mov	ecx, (640*110)/4
+   472 00000395 F3AB                    	rep	stosd
+   473 00000397 B828282828              	mov	eax, 28282828h ; red
+   474 0000039C B9C0440000              	mov	ecx, (640*110)/4
+   475 000003A1 F3AB                    	rep	stosd
+   476 000003A3 B830303030              	mov	eax, 30303030h ; green 
+   477 000003A8 B9C0440000              	mov	ecx, (640*110)/4
+   478 000003AD F3AB                    	rep	stosd
+   479 000003AF B82C2C2C2C              	mov	eax, 2C2C2C2Ch ; yellow
+   480 000003B4 B9C0440000              	mov	ecx, (640*110)/4
+   481 000003B9 F3AB                    	rep	stosd
+   482 000003BB 31C0                    	xor	eax, eax ; black
+   483 000003BD B920030000              	mov	ecx, (640*5)/4	
+   484 000003C2 F3AB                    	rep	stosd
+   485 000003C4 B80F0F0F0F              	mov	eax, 0F0F0F0Fh ; white
+   486 000003C9 B920030000              	mov	ecx, (640*5)/4	
+   487 000003CE F3AB                    	rep	stosd
+   488 000003D0 31C0                    	xor	eax, eax ; black
+   489 000003D2 B940060000              	mov	ecx, (640*10)/4	
+   490 000003D7 F3AB                    	rep	stosd
+   491                                  
+   492 000003D9 BB00020000              	mov	ebx, 0200h ; Full screen copy
+   493                                  	sys	_video
+   493                              <1> 
+   493                              <1> 
+   493                              <1> 
+   493                              <1> 
+   493                              <1>  %if %0 >= 2
+   493                              <1>  mov ebx, %2
+   493                              <1>  %if %0 >= 3
+   493                              <1>  mov ecx, %3
+   493                              <1>  %if %0 = 4
+   493                              <1>  mov edx, %4
+   493                              <1>  %endif
+   493                              <1>  %endif
+   493                              <1>  %endif
+   493 000003DE B81F000000          <1>  mov eax, %1
+   493                              <1> 
+   493 000003E3 CD40                <1>  int 40h
+   494                                  
+   495 000003E5 E894000000              	call	waitforkey
+   496                                  
+   497 000003EA C605[A0050000]0F        	mov	byte [tcolor], 0Fh
+   498                                  
+   499 000003F1 BE2B002B00              	mov	esi, 43*65536+43
+   500 000003F6 BD[77050000]            	mov	ebp, txt_blue
+   501 000003FB E8B9000000               	call	print_text
+   502                                  	
+   503 00000400 E879000000              	call	waitforkey
+   504                                  
+   505 00000405 BE2B009900              	mov	esi, 153*65536+43
+   506 0000040A BD[7C050000]            	mov	ebp, txt_red
+   507 0000040F E8A5000000               	call	print_text
+   508                                  	
+   509 00000414 E865000000              	call	waitforkey
+   510                                  
+   511 00000419 BE2B000701              	mov	esi, 263*65536+43
+   512 0000041E BD[80050000]            	mov	ebp, txt_green
+   513 00000423 E891000000               	call	print_text
+   514                                  	
+   515 00000428 E851000000              	call	waitforkey
+   516                                  
+   517 0000042D BE2B007501              	mov	esi, 373*65536+43
+   518 00000432 BD[86050000]            	mov	ebp, txt_yellow
+   519 00000437 E87D000000               	call	print_text
+   520                                  	
+   521 0000043C E83D000000              	call	waitforkey
+   522                                  
+   523 00000441 C605[A0050000]00        	mov	byte [tcolor], 0
+   524                                  
+   525 00000448 BE2B000701              	mov	esi, 263*65536+43
+   526 0000044D BD[80050000]            	mov	ebp, txt_green
+   527 00000452 E862000000               	call	print_text
+   528                                  	
+   529 00000457 E822000000              	call	waitforkey
+   530                                  
+   531 0000045C BE2B007501              	mov	esi, 373*65536+43
+   532 00000461 BD[86050000]            	mov	ebp, txt_yellow
+   533 00000466 E84E000000               	call	print_text
+   534                                  	
+   535 0000046B E80E000000              	call	waitforkey
+   536                                  
+   537                                  terminate:
+   538 00000470 E82C000000              	call	set_text_mode
+   539                                  	sys	_exit
+   539                              <1> 
+   539                              <1> 
+   539                              <1> 
+   539                              <1> 
+   539                              <1>  %if %0 >= 2
+   539                              <1>  mov ebx, %2
+   539                              <1>  %if %0 >= 3
+   539                              <1>  mov ecx, %3
+   539                              <1>  %if %0 = 4
+   539                              <1>  mov edx, %4
+   539                              <1>  %endif
+   539                              <1>  %endif
+   539                              <1>  %endif
+   539 00000475 B801000000          <1>  mov eax, %1
+   539                              <1> 
+   539 0000047A CD40                <1>  int 40h
+   540                                  halt:
+   541 0000047C EBFE                    	jmp	short halt
+   542                                  
+   543                                  waitforkey:
+   544 0000047E B401                    	mov	ah, 1
+   545 00000480 CD32                    	int	32h
+   546 00000482 740B                    	jz	short getkey
+   547 00000484 FF05[9C050000]          	inc	dword [counter]
+   548 0000048A 90                      	nop
+   549 0000048B 90                      	nop
+   550 0000048C 90                      	nop
+   551 0000048D EBEF                    	jmp	short waitforkey
+   552                                  getkey:
+   553 0000048F 30E4                    	xor	ah, ah
+   554 00000491 CD32                    	int	32h
+   555                                  
+   556 00000493 663D032E                	cmp	ax, 2E03h
+   557 00000497 7405                    	je	short _terminate
+   558 00000499 3C1B                    	cmp	al, 1Bh ; ESC key
+   559 0000049B 7401                    	je	short _terminate
+   560 0000049D C3                      	retn
+   561                                  _terminate:
+   562 0000049E 58                      	pop	eax ; return address
+   563 0000049F EBCF                    	jmp	short terminate
+   564                                  	
+   565                                  set_text_mode:
+   566 000004A1 30E4                    	xor    ah, ah
+   567 000004A3 B003                    	mov    al, 3                        
+   568                                   	;int   10h ; al = 03h text mode, int 10 video
+   569 000004A5 CD31                    	int    31h ; TRDOS 386 - Video interrupt
+   570 000004A7 C3                      	retn
+   571                                  
+   572                                  print_msg:
+   573 000004A8 B40E                    	mov	ah, 0Eh
+   574 000004AA BB07000000              	mov	ebx, 7
+   575                                  	;mov	bl, 7 ; char attribute & color
+   576                                  p_next_chr:
+   577 000004AF AC                      	lodsb
+   578 000004B0 08C0                    	or	al, al
+   579 000004B2 7404                    	jz	short p_retn ; retn	
+   580 000004B4 CD31                    	int	31h
+   581 000004B6 EBF7                    	jmp	short p_next_chr
+   582                                  p_retn:
+   583 000004B8 C3                      	retn
+   584                                  
+   585                                  print_text:
+   586                                  	; ebp = text address
+   587                                  	; esi = row/column position (si = column)
+   588                                  p_d_x:
+   589                                  	;mov	dh, 0 ; 8x16 system font
+   590 000004B9 B606                    	mov	dh, 6 ; 32*64 scaled font (base: 8*16 system font) 
+   591                                  p_d_x_n:
+   592 000004BB 8A5500                  	mov	dl, [ebp]
+   593 000004BE 20D2                    	and	dl, dl
+   594 000004C0 7419                    	jz	short p_d_x_ok
+   595                                  	sys	_video, 020Fh, [tcolor] 
+   595                              <1> 
+   595                              <1> 
+   595                              <1> 
+   595                              <1> 
+   595                              <1>  %if %0 >= 2
+   595 000004C2 BB0F020000          <1>  mov ebx, %2
+   595                              <1>  %if %0 >= 3
+   595 000004C7 8B0D[A0050000]      <1>  mov ecx, %3
+   595                              <1>  %if %0 = 4
+   595                              <1>  mov edx, %4
+   595                              <1>  %endif
+   595                              <1>  %endif
+   595                              <1>  %endif
+   595 000004CD B81F000000          <1>  mov eax, %1
+   595                              <1> 
+   595 000004D2 CD40                <1>  int 40h
+   596 000004D4 45                      	inc	ebp
+   597 000004D5 6683C624                	add	si, 36 ; next char pos
+   598 000004D9 EBE0                    	jmp	short p_d_x_n
+   599                                  p_d_x_ok:
+   600 000004DB C3                      	retn
+   601                                  
+   602                                  program_msg:
+   603 000004DC 5452444F5320333836-     	db "TRDOS 386 v2.0.3 - ('sysvideo') Test Program - Block Operations"
+   603 000004E5 2076322E302E33202D-
+   603 000004EE 202827737973766964-
+   603 000004F7 656F27292054657374-
+   603 00000500 2050726F6772616D20-
+   603 00000509 2D20426C6F636B204F-
+   603 00000512 7065726174696F6E73 
+   604 0000051B 0D0A                    	db 0Dh, 0Ah
+   605 0000051D 6279204572646F6761-     	db "by Erdogan Tan - 22/02/2021"
+   605 00000526 6E2054616E202D2032-
+   605 0000052F 322F30322F32303231 
+   606                                  	;db 0Dh, 0Ah, 0
+   607 00000538 0D0A0D0A                	db 0Dh, 0Ah, 0Dh, 0Ah
+   608 0000053C 507265737320616E79-     	db "Press any key to continue .."
+   608 00000545 206B657920746F2063-
+   608 0000054E 6F6E74696E7565202E-
+   608 00000557 2E                 
+   609 00000558 0D0A                    	db 0Dh, 0Ah	
+   610 0000055A 285072657373204553-     	db "(Press ESC to exit) .."
+   610 00000563 4320746F2065786974-
+   610 0000056C 29202E2E           
+   611 00000570 0D0A                    	db 0Dh, 0Ah
+   612 00000572 0D0A                    	db 0Dh, 0Ah
+   613                                  
+   614                                  nextline:
+   615 00000574 0D0A00                  	db 0Dh, 0Ah, 0
+   616                                  
+   617                                  txt_blue:
+   618 00000577 424C554500              	db "BLUE", 0
+   619                                  txt_red:
+   620 0000057C 52454400                	db "RED", 0
+   621                                  txt_green:
+   622 00000580 475245454E00            	db "GREEN", 0
+   623                                  txt_yellow:
+   624 00000586 59454C4C4F5700          	db "YELLOW", 0
+   625                                  txt_white:
+   626 0000058D 574849544500            	db "WHITE", 0
+   627                                  txt_black:
+   628 00000593 424C41434B00            	db "BLACK", 0	
+   629                                  
+   630                                  bss:
+   631                                  
+   632                                  ABSOLUTE bss
+   633                                  
+   634 00000599 <res 00000003>          alignb 4
+   635                                  
+   636                                  counter:
+   637 0000059C <res 00000004>          	resd 1	
+   638                                  
+   639                                  bss_start:
+   640 000005A0 <res 00000004>          tcolor: resd 1
+   641                                  
+   642                                  fullscreen_buffer:
+   643                                  whiteblock:
+   644 000005A4 <res 00004B00>          	resb 120*160	
+   645                                  blueblock:
+   646 000050A4 <res 00004B00>          	resb 120*160
+   647                                  redblock:
+   648 00009BA4 <res 00004B00>          	resb 120*160
+   649                                  greenblock:
+   650 0000E6A4 <res 00004B00>          	resb 120*160
+   651                                  yellowblock:
+   652 000131A4 <res 00004B00>          	resb 120*160
+   653                                  
+   654 00017CA4 <res 00033900>          	resb 307200-96000	
+   655                                  bss_end:

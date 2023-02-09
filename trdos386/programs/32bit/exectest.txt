@@ -1,0 +1,551 @@
+     1                                  ; ****************************************************************************
+     2                                  ; exectest.s - TRDOS 386 (TRDOS v2.0) Kernel - 'sysexec' test
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ;
+     5                                  ; 12/11/2017
+     6                                  ;
+     7                                  ; [ Last Modification: 19/11/2017 ]
+     8                                  ;
+     9                                  ; ****************************************************************************
+    10                                  ; EXECTEST.PRG : 'sysexec' test with 'sysfork' - 19/11/2017
+    11                                  ; EXECTST2.PRG : direct sysexec test (without 'sysfork') - 19/11/2017
+    12                                  
+    13                                  ; 20/08/2017
+    14                                  ; 01/03/2017
+    15                                  ; 16/10/2016
+    16                                  ; 29/04/2016
+    17                                  ; TRDOS 386 system calls (temporary list!)
+    18                                  _ver 	equ 0
+    19                                  _exit 	equ 1
+    20                                  _fork 	equ 2
+    21                                  _read 	equ 3
+    22                                  _write	equ 4
+    23                                  _open	equ 5
+    24                                  _close 	equ 6
+    25                                  _wait 	equ 7
+    26                                  _creat 	equ 8
+    27                                  _link 	equ 9
+    28                                  _unlink	equ 10
+    29                                  _exec	equ 11
+    30                                  _chdir	equ 12
+    31                                  _time 	equ 13
+    32                                  _mkdir 	equ 14
+    33                                  _chmod	equ 15
+    34                                  _chown	equ 16
+    35                                  _break	equ 17
+    36                                  _stat	equ 18
+    37                                  _seek	equ 19
+    38                                  _tell 	equ 20
+    39                                  _mount	equ 21
+    40                                  _umount	equ 22
+    41                                  _setuid	equ 23
+    42                                  _getuid	equ 24
+    43                                  _stime	equ 25
+    44                                  _quit	equ 26	
+    45                                  _intr	equ 27
+    46                                  _fstat	equ 28
+    47                                  _emt 	equ 29
+    48                                  _mdate 	equ 30
+    49                                  _video 	equ 31
+    50                                  _audio	equ 32
+    51                                  _timer	equ 33
+    52                                  _sleep	equ 34
+    53                                  _msg    equ 35
+    54                                  _geterr	equ 36
+    55                                  _fpsave	equ 37
+    56                                  _pri	equ 38
+    57                                  _rele	equ 39
+    58                                  _fff	equ 40
+    59                                  _fnf	equ 41
+    60                                  _alloc	equ 42
+    61                                  _dalloc equ 43
+    62                                  _calbac equ 44
+    63                                  _dma	equ 45	
+    64                                  
+    65                                  %macro sys 1-4
+    66                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    67                                      ; 03/09/2015	
+    68                                      ; 13/04/2015
+    69                                      ; Retro UNIX 386 v1 system call.	
+    70                                      %if %0 >= 2   
+    71                                          mov ebx, %2
+    72                                          %if %0 >= 3    
+    73                                              mov ecx, %3
+    74                                              %if %0 = 4
+    75                                                 mov edx, %4   
+    76                                              %endif
+    77                                          %endif
+    78                                      %endif
+    79                                      mov eax, %1
+    80                                      ;int 30h
+    81                                      int 40h ; TRDOS 386 (TRDOS v2.0)	   
+    82                                  %endmacro
+    83                                  
+    84                                  ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
+    85                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    86                                  
+    87                                  ;========================================================================
+    88                                  ; EXEC TEST - CODE
+    89                                  ;========================================================================
+    90                                  
+    91                                  [BITS 32] ; 32-bit intructions
+    92                                  
+    93                                  [ORG 0] 
+    94                                  
+    95                                  START_CODE:
+    96                                  	; clear bss
+    97                                  	;mov	edi, bss_start ;
+    98 00000000 66BF[CC02]              	mov	di, bss_start
+    99 00000004 B928000000              	mov	ecx, (bss_end - bss_start)/4
+   100                                  	;xor	eax, eax
+   101 00000009 F3AB                    	rep	stosd
+   102                                  GetFileName:
+   103 0000000B 89E6                    	mov	esi, esp
+   104 0000000D AD                      	lodsd
+   105 0000000E 83F802                  	cmp	eax, 2 ; two arguments 
+   106                                  		; (program file name & mod file name)
+   107 00000011 0F8266010000            	jb	pmsg_usage ; nothing to do
+   108 00000017 7707                    	ja	short a_0
+   109 00000019 C605[D1010000]00        	mov	byte [maxargslength], 0
+   110                                  a_0:
+   111                                  	; 18/11/2017
+   112 00000020 48                      	dec	eax
+   113 00000021 A2[CC020000]            	mov	[argc], al
+   114                                  	;
+   115 00000026 AD                      	lodsd ; name of this program
+   116 00000027 AD                      	lodsd ; program file name address (to be launched)
+   117 00000028 89F5                    	mov	ebp, esi ; 18/11/2017
+   118 0000002A 89C6                    	mov	esi, eax
+   119 0000002C BF[CF020000]            	mov	edi, prgfilename
+   120                                  ScanName:       
+   121 00000031 AC                      	lodsb
+   122 00000032 3C20                    	cmp	al, 20h
+   123 00000034 74FB                    	je	short ScanName	; scan start of name.
+   124 00000036 0F8241010000            	jb	pmsg_usage
+   125 0000003C AA                      	stosb
+   126                                  a_1:
+   127 0000003D FE0D[D0010000]          	dec	byte [maxfnlength]
+   128 00000043 7408                    	jz	short a_2
+   129 00000045 AC                      	lodsb
+   130 00000046 3C20                    	cmp	al, 20h
+   131 00000048 7603                    	jna	short a_2	
+   132 0000004A AA                      	stosb
+   133 0000004B EBF0                    	jmp	short a_1
+   134                                  a_2:
+   135                                  	;mov	ebx, edi 
+   136                                  	;sub	ebx, prg_file_name ; file name length
+   137                                  	;mov	[maxfnlength], bl
+   138                                  
+   139 0000004D BF[1F030000]            	mov	edi, arguments 
+   140                                  	
+   141                                  	; 18/11/2017
+   142 00000052 FE0D[CC020000]          	dec	byte [argc]
+   143 00000058 742F                    	jz	short a_4
+   144                                  	;cmp	byte [maxargslength], 0
+   145                                  	;jna	short a_4
+   146 0000005A 8B7500                  	mov	esi, [ebp]
+   147 0000005D 83C504                  	add	ebp, 4
+   148                                  a_3:
+   149 00000060 AC                      	lodsb
+   150 00000061 3C20                    	cmp	al, 20h
+   151                                  	;jna	short a_4
+   152 00000063 7609                    	jna	short a_6 ; 18/11/2017
+   153 00000065 AA                      	stosb
+   154 00000066 FE0D[D1010000]          	dec	byte [maxargslength]
+   155 0000006C 75F2                    	jnz	short a_3
+   156                                  a_6:
+   157                                  	; 18/11/2017
+   158 0000006E FE0D[CC020000]          	dec	byte [argc]
+   159 00000074 7413                    	jz	short a_4
+   160 00000076 FE0D[D1010000]          	dec	byte [maxargslength]
+   161 0000007C 740B                    	jz	short a_4
+   162 0000007E B020                    	mov	al, 20h
+   163 00000080 AA                      	stosb	
+   164 00000081 8B7500                  	mov	esi, [ebp]
+   165                                  	;and	esi, esi
+   166                                  	;jz	short a_4
+   167 00000084 83C504                  	add	ebp, 4
+   168 00000087 EBD7                    	jmp	short a_3
+   169                                  a_4:	
+   170                                  	; 18/11/2017
+   171 00000089 30C0                    	xor	al, al
+   172 0000008B AA                      	stosb
+   173                                  
+   174                                  	;mov	ecx, edi
+   175                                  	;sub	ecx, arguments ; arguments length
+   176                                  	;mov	[maxargslength], cl
+   177                                  
+   178                                  	sys	_msg, msg_program1, 255, 0Bh
+   178                              <1> 
+   178                              <1> 
+   178                              <1> 
+   178                              <1> 
+   178                              <1>  %if %0 >= 2
+   178 0000008C BB[06020000]        <1>  mov ebx, %2
+   178                              <1>  %if %0 >= 3
+   178 00000091 B9FF000000          <1>  mov ecx, %3
+   178                              <1>  %if %0 = 4
+   178 00000096 BA0B000000          <1>  mov edx, %4
+   178                              <1>  %endif
+   178                              <1>  %endif
+   178                              <1>  %endif
+   178 0000009B B823000000          <1>  mov eax, %1
+   178                              <1> 
+   178 000000A0 CD40                <1>  int 40h
+   179                                  
+   180 000000A2 BB[D0000000]            	mov	ebx, child_exec
+   181                                  	sys	_fork
+   181                              <1> 
+   181                              <1> 
+   181                              <1> 
+   181                              <1> 
+   181                              <1>  %if %0 >= 2
+   181                              <1>  mov ebx, %2
+   181                              <1>  %if %0 >= 3
+   181                              <1>  mov ecx, %3
+   181                              <1>  %if %0 = 4
+   181                              <1>  mov edx, %4
+   181                              <1>  %endif
+   181                              <1>  %endif
+   181                              <1>  %endif
+   181 000000A7 B802000000          <1>  mov eax, %1
+   181                              <1> 
+   181 000000AC CD40                <1>  int 40h
+   182                                  
+   183                                  	sys	_wait
+   183                              <1> 
+   183                              <1> 
+   183                              <1> 
+   183                              <1> 
+   183                              <1>  %if %0 >= 2
+   183                              <1>  mov ebx, %2
+   183                              <1>  %if %0 >= 3
+   183                              <1>  mov ecx, %3
+   183                              <1>  %if %0 = 4
+   183                              <1>  mov edx, %4
+   183                              <1>  %endif
+   183                              <1>  %endif
+   183                              <1>  %endif
+   183 000000AE B807000000          <1>  mov eax, %1
+   183                              <1> 
+   183 000000B3 CD40                <1>  int 40h
+   184                                  
+   185                                  parent_return:
+   186                                  	sys	_msg, msg_program5, 255, 0Bh	
+   186                              <1> 
+   186                              <1> 
+   186                              <1> 
+   186                              <1> 
+   186                              <1>  %if %0 >= 2
+   186 000000B5 BB[A0020000]        <1>  mov ebx, %2
+   186                              <1>  %if %0 >= 3
+   186 000000BA B9FF000000          <1>  mov ecx, %3
+   186                              <1>  %if %0 = 4
+   186 000000BF BA0B000000          <1>  mov edx, %4
+   186                              <1>  %endif
+   186                              <1>  %endif
+   186                              <1>  %endif
+   186 000000C4 B823000000          <1>  mov eax, %1
+   186                              <1> 
+   186 000000C9 CD40                <1>  int 40h
+   187 000000CB E9A6000000              	jmp	terminate
+   188                                  
+   189                                  child_exec:
+   190                                  	sys	_msg, msg_program2, 255, 0Ah
+   190                              <1> 
+   190                              <1> 
+   190                              <1> 
+   190                              <1> 
+   190                              <1>  %if %0 >= 2
+   190 000000D0 BB[56020000]        <1>  mov ebx, %2
+   190                              <1>  %if %0 >= 3
+   190 000000D5 B9FF000000          <1>  mov ecx, %3
+   190                              <1>  %if %0 = 4
+   190 000000DA BA0A000000          <1>  mov edx, %4
+   190                              <1>  %endif
+   190                              <1>  %endif
+   190                              <1>  %endif
+   190 000000DF B823000000          <1>  mov eax, %1
+   190                              <1> 
+   190 000000E4 CD40                <1>  int 40h
+   191                                  	sys	_msg, prgfilename, 255, 0Ch
+   191                              <1> 
+   191                              <1> 
+   191                              <1> 
+   191                              <1> 
+   191                              <1>  %if %0 >= 2
+   191 000000E6 BB[CF020000]        <1>  mov ebx, %2
+   191                              <1>  %if %0 >= 3
+   191 000000EB B9FF000000          <1>  mov ecx, %3
+   191                              <1>  %if %0 = 4
+   191 000000F0 BA0C000000          <1>  mov edx, %4
+   191                              <1>  %endif
+   191                              <1>  %endif
+   191                              <1>  %endif
+   191 000000F5 B823000000          <1>  mov eax, %1
+   191                              <1> 
+   191 000000FA CD40                <1>  int 40h
+   192                                  
+   193 000000FC 803D[D1010000]00        	cmp	byte [maxargslength], 0
+   194 00000103 762C                    	jna	short a_5
+   195                                  
+   196                                  	sys	_msg, msg_program3, 255, 0Ah
+   196                              <1> 
+   196                              <1> 
+   196                              <1> 
+   196                              <1> 
+   196                              <1>  %if %0 >= 2
+   196 00000105 BB[67020000]        <1>  mov ebx, %2
+   196                              <1>  %if %0 >= 3
+   196 0000010A B9FF000000          <1>  mov ecx, %3
+   196                              <1>  %if %0 = 4
+   196 0000010F BA0A000000          <1>  mov edx, %4
+   196                              <1>  %endif
+   196                              <1>  %endif
+   196                              <1>  %endif
+   196 00000114 B823000000          <1>  mov eax, %1
+   196                              <1> 
+   196 00000119 CD40                <1>  int 40h
+   197                                  	sys	_msg, arguments, 255, 0Ch
+   197                              <1> 
+   197                              <1> 
+   197                              <1> 
+   197                              <1> 
+   197                              <1>  %if %0 >= 2
+   197 0000011B BB[1F030000]        <1>  mov ebx, %2
+   197                              <1>  %if %0 >= 3
+   197 00000120 B9FF000000          <1>  mov ecx, %3
+   197                              <1>  %if %0 = 4
+   197 00000125 BA0C000000          <1>  mov edx, %4
+   197                              <1>  %endif
+   197                              <1>  %endif
+   197                              <1>  %endif
+   197 0000012A B823000000          <1>  mov eax, %1
+   197                              <1> 
+   197 0000012F CD40                <1>  int 40h
+   198                                  a_5:	
+   199                                  	sys	_msg, msg_program4, 255, 0Fh
+   199                              <1> 
+   199                              <1> 
+   199                              <1> 
+   199                              <1> 
+   199                              <1>  %if %0 >= 2
+   199 00000131 BB[78020000]        <1>  mov ebx, %2
+   199                              <1>  %if %0 >= 3
+   199 00000136 B9FF000000          <1>  mov ecx, %3
+   199                              <1>  %if %0 = 4
+   199 0000013B BA0F000000          <1>  mov edx, %4
+   199                              <1>  %endif
+   199                              <1>  %endif
+   199                              <1>  %endif
+   199 00000140 B823000000          <1>  mov eax, %1
+   199                              <1> 
+   199 00000145 CD40                <1>  int 40h
+   200                                  	
+   201 00000147 30E4                    	xor	ah, ah
+   202 00000149 CD32                    	int	32h
+   203                                  
+   204 0000014B 3C1B                    	cmp	al, 1Bh ; ESC key
+   205 0000014D 745C                    	je	short child_cancel
+   206                                  
+   207                                  	sys	_exec, prgfilename, prgp 
+   207                              <1> 
+   207                              <1> 
+   207                              <1> 
+   207                              <1> 
+   207                              <1>  %if %0 >= 2
+   207 0000014F BB[CF020000]        <1>  mov ebx, %2
+   207                              <1>  %if %0 >= 3
+   207 00000154 B9[C4010000]        <1>  mov ecx, %3
+   207                              <1>  %if %0 = 4
+   207                              <1>  mov edx, %4
+   207                              <1>  %endif
+   207                              <1>  %endif
+   207                              <1>  %endif
+   207 00000159 B80B000000          <1>  mov eax, %1
+   207                              <1> 
+   207 0000015E CD40                <1>  int 40h
+   208                                  
+   209                                  	sys	_msg, error_msg, 255, 0Eh
+   209                              <1> 
+   209                              <1> 
+   209                              <1> 
+   209                              <1> 
+   209                              <1>  %if %0 >= 2
+   209 00000160 BB[B4020000]        <1>  mov ebx, %2
+   209                              <1>  %if %0 >= 3
+   209 00000165 B9FF000000          <1>  mov ecx, %3
+   209                              <1>  %if %0 = 4
+   209 0000016A BA0E000000          <1>  mov edx, %4
+   209                              <1>  %endif
+   209                              <1>  %endif
+   209                              <1>  %endif
+   209 0000016F B823000000          <1>  mov eax, %1
+   209                              <1> 
+   209 00000174 CD40                <1>  int 40h
+   210                                  
+   211                                  terminate:
+   212                                  	sys	_exit
+   212                              <1> 
+   212                              <1> 
+   212                              <1> 
+   212                              <1> 
+   212                              <1>  %if %0 >= 2
+   212                              <1>  mov ebx, %2
+   212                              <1>  %if %0 >= 3
+   212                              <1>  mov ecx, %3
+   212                              <1>  %if %0 = 4
+   212                              <1>  mov edx, %4
+   212                              <1>  %endif
+   212                              <1>  %endif
+   212                              <1>  %endif
+   212 00000176 B801000000          <1>  mov eax, %1
+   212                              <1> 
+   212 0000017B CD40                <1>  int 40h
+   213                                  
+   214                                  pmsg_usage:      
+   215                                  	sys	_msg, msg_program1, 255, 0Ah
+   215                              <1> 
+   215                              <1> 
+   215                              <1> 
+   215                              <1> 
+   215                              <1>  %if %0 >= 2
+   215 0000017D BB[06020000]        <1>  mov ebx, %2
+   215                              <1>  %if %0 >= 3
+   215 00000182 B9FF000000          <1>  mov ecx, %3
+   215                              <1>  %if %0 = 4
+   215 00000187 BA0A000000          <1>  mov edx, %4
+   215                              <1>  %endif
+   215                              <1>  %endif
+   215                              <1>  %endif
+   215 0000018C B823000000          <1>  mov eax, %1
+   215                              <1> 
+   215 00000191 CD40                <1>  int 40h
+   216                                  	sys	_msg, msg_usage, 255, 0Fh
+   216                              <1> 
+   216                              <1> 
+   216                              <1> 
+   216                              <1> 
+   216                              <1>  %if %0 >= 2
+   216 00000193 BB[D2010000]        <1>  mov ebx, %2
+   216                              <1>  %if %0 >= 3
+   216 00000198 B9FF000000          <1>  mov ecx, %3
+   216                              <1>  %if %0 = 4
+   216 0000019D BA0F000000          <1>  mov edx, %4
+   216                              <1>  %endif
+   216                              <1>  %endif
+   216                              <1>  %endif
+   216 000001A2 B823000000          <1>  mov eax, %1
+   216                              <1> 
+   216 000001A7 CD40                <1>  int 40h
+   217                                  	
+   218 000001A9 EBCB                    	jmp	short terminate
+   219                                  
+   220                                  child_cancel:
+   221                                  	sys	_msg, msg_program6, 255, 0Eh
+   221                              <1> 
+   221                              <1> 
+   221                              <1> 
+   221                              <1> 
+   221                              <1>  %if %0 >= 2
+   221 000001AB BB[A8020000]        <1>  mov ebx, %2
+   221                              <1>  %if %0 >= 3
+   221 000001B0 B9FF000000          <1>  mov ecx, %3
+   221                              <1>  %if %0 = 4
+   221 000001B5 BA0E000000          <1>  mov edx, %4
+   221                              <1>  %endif
+   221                              <1>  %endif
+   221                              <1>  %endif
+   221 000001BA B823000000          <1>  mov eax, %1
+   221                              <1> 
+   221 000001BF CD40                <1>  int 40h
+   222 000001C1 EBB3                    	jmp	short terminate
+   223                                  
+   224 000001C3 90                      align 4
+   225 000001C4 [CF020000]              prgp:	dd prgfilename
+   226 000001C8 [1F030000]              	dd arguments
+   227 000001CC 00000000                	dd 0
+   228                                  
+   229 000001D0 4F                      maxfnlength:	db 79
+   230 000001D1 4F                      maxargslength:	db 79				
+   231                                  
+   232                                  ;-----------------------------------------------------------------
+   233                                  ;  messages
+   234                                  ;-----------------------------------------------------------------
+   235                                  
+   236                                  msg_usage:
+   237 000001D2 0D0A                    	db 0Dh, 0Ah
+   238 000001D4 55736167653A206578-     	db 'Usage: exectest <program file name> <arguments>'
+   238 000001DD 656374657374203C70-
+   238 000001E6 726F6772616D206669-
+   238 000001EF 6C65206E616D653E20-
+   238 000001F8 3C617267756D656E74-
+   238 00000201 733E               
+   239 00000203 0D0A00                  	db 0Dh, 0Ah, 0
+   240                                  
+   241                                  msg_program1:
+   242 00000206 45584543544553542E-     	db "EXECTEST.PRG /// TRDOS 386 'sysexec' test program"
+   242 0000020F 505247202F2F2F2054-
+   242 00000218 52444F532033383620-
+   242 00000221 277379736578656327-
+   242 0000022A 20746573742070726F-
+   242 00000233 6772616D           
+   243 00000237 0D0A                    	db 0Dh, 0Ah
+   244 00000239 6279204572646F6761-     	db "by Erdogan Tan, 19/11/2017", 0Dh, 0Ah, 0
+   244 00000242 6E2054616E2C203139-
+   244 0000024B 2F31312F323031370D-
+   244 00000254 0A00               
+   245                                  msg_program2:
+   246 00000256 0D0A                    	db 0Dh, 0Ah
+   247 00000258 50524F4752414D204E-     	db "PROGRAM NAME: ", 0
+   247 00000261 414D453A2000       
+   248                                  msg_program3:
+   249 00000267 0D0A                    	db 0Dh, 0Ah
+   250 00000269 417267756D656E7428-     	db "Argument(s) : ", 0		
+   250 00000272 7329203A2000       
+   251                                  msg_program4:
+   252 00000278 0D0A                    	db 0Dh, 0Ah
+   253 0000027A 507265737320616E79-     	db "Press any key to run the program..."
+   253 00000283 206B657920746F2072-
+   253 0000028C 756E20746865207072-
+   253 00000295 6F6772616D2E2E2E   
+   254 0000029D 0D0A00                  	db 0Dh, 0Ah, 0
+   255                                  msg_program5:
+   256 000002A0 0D0A                    	db 0Dh, 0Ah
+   257 000002A2 4F4B2E                  	db "OK."
+   258 000002A5 0D0A00                  	db 0Dh, 0Ah, 0
+   259                                  
+   260                                  msg_program6:
+   261 000002A8 0D0A                    	db 0Dh, 0Ah
+   262 000002AA 43414E43454C2E          	db "CANCEL."
+   263 000002B1 0D0A00                  	db 0Dh, 0Ah, 0
+   264                                  
+   265                                  error_msg:
+   266 000002B4 0D0A07                  	db 0Dh, 0Ah, 07h
+   267 000002B7 277379736578656327-     	db "'sysexec' error ! "
+   267 000002C0 206572726F72202120 
+   268 000002C9 0D0A                    	db 0Dh, 0Ah
+   269 000002CB 00                      	db 0
+   270                                  
+   271                                  bss_start:
+   272                                  
+   273                                  alignb 4  ; 19/11/2017
+   274                                  
+   275                                  ABSOLUTE bss_start
+   276                                  
+   277                                  ;========================================================================
+   278                                  ; UNINITIALIZED DATA
+   279                                  ;========================================================================
+   280                                  
+   281                                  argc:	resb 0 ; 18/11/2017
+   282                                  
+   283 000002CC <res 00000003>          	resb 3 ; 19/11/2017
+   284                                  
+   285                                  ;alignb 4
+   286                                  
+   287 000002CF <res 00000050>          prgfilename:  resb 80
+   288 0000031F <res 00000050>          arguments:    resb 80
+   289                                  
+   290                                  ;alignb4
+   291                                  
+   292                                  bss_end:	
