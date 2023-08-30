@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.5) - DISK READ&WRITE : trdosk7.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.6) - DISK READ&WRITE : trdosk7.s
 ; ----------------------------------------------------------------------------
-; Last Update: 25/07/2022  (Previous: 25/02/2016 - Kernel v2.0.4)
+; Last Update: 29/08/2023  (Previous: 25/07/2022 - Kernel v2.0.5)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -48,6 +48,7 @@ disk_read:
         ja      short lba_read
 
 chs_read:
+	; 29/08/2023 (TRDOS 386 Kernel v2.0.6)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 25/02/2016
 	; 24/02/2016
@@ -92,9 +93,13 @@ chs_read_retry:
 	;mov	cx, dx			; Sector (zero based)
 	;inc	cx			; To make it 1 based
 	;push	cx
-	mov	ecx, edx
-	inc	ecx
-	push	ecx
+	; 29/08/2023
+	;mov	ecx, edx
+	;inc	ecx
+	;push	ecx
+	inc	edx
+	push	edx ; dl = sector number (on track)
+	;
 	mov	cx, [esi+LD_BPB+Heads]
 	;sub	dx, dx
 	; 25/07/2022
@@ -104,7 +109,7 @@ chs_read_retry:
 	mov	dh, dl
 	;pop	cx			; AX=Cyl, DH=Head, CX=Sector
 	; 25/07/2022
-	pop	ecx 
+	pop	ecx ; sector number (on track)
 	mov	dl, [esi+LD_PhyDrvNo]
 
 	mov	ch, al			; NOTE: max. 1023 cylinders !                   

@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.4 - memory.s
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.6 - memory.s
 ; ----------------------------------------------------------------------------
-; Last Update: 17/04/2021
+; Last Update: 29/08/2023  (Previous: 17/04/2021)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -759,6 +759,7 @@ dapd_2:
 	retn
 
 deallocate_page_table:
+	; 29/08/2023 - TRDOS 386 v2.0.6
 	; 17/04/2021 - TRDOS 386 v2.0.4
 	;	 (temporary modifications)
 	; 12/07/2016
@@ -804,7 +805,9 @@ dapt_0:
 	; ECX = page directory entry index (0-1023)
 	push	ebx
 	push	ecx
-	shl	cx, 2 ; *4 
+	;shl	cx, 2 ; *4
+	; 29/08/2023
+	shl	ecx, 2
 	add	ebx, ecx ; PDE offset (for the parent)
 	mov	ecx, [ebx]
 	test	cl, PDE_A_PRESENT ; present (valid) or not ?
@@ -812,7 +815,9 @@ dapt_0:
 	and	cx, PDE_A_CLEAR ; 0F000h ; Clear attribute bits
 	; EDI = page table entry index (0-1023)
 	mov	edx, edi 
-	shl	dx, 2 ; *4 
+	;shl	dx, 2 ; *4
+	; 29/08/2023
+	shl	edx, 2
 	add	edx, ecx ; PTE offset (for the parent)
 	mov	ebx, [edx]
 	test	bl, PTE_A_PRESENT ; present or not ?
@@ -1492,6 +1497,7 @@ pfh_pv_err:
 	jmp	short pfh_err_retn
 
 copy_page:
+	; 29/08/2023 (TRDOS 386 v2.0.6)
 	; 22/09/2015
 	; 21/09/2015
 	; 19/09/2015
@@ -1533,7 +1539,9 @@ copy_page:
 	and	ax, PTE_A_CLEAR ; 0F000h ; clear attribute bits 	
 	mov	ebx, ecx   ; (restore higher 20 bits of page fault address)
 	and	ebx, 3FFh  ; mask PDE# bits, the result is PTE# (0 to 1023)
-	shl	bx, 2	   ; shift 2 bits left to get PTE offset
+	;shl	bx, 2	   ; shift 2 bits left to get PTE offset
+	; 29/08/2023
+	shl	ebx, 2
 	add	ebx, eax   ; EBX points to the relevant page table entry 
 	; 07/09/2015
         test    word [ebx], PTE_DUPLICATED ; (Does current process share this
@@ -1549,7 +1557,9 @@ cpp_0:
 	and	ax, PTE_A_CLEAR ; 0F000h ; clear attribute bits
 	mov	esi, ecx   ; (restore higher 20 bits of page fault address)	
 	and	esi, 3FFh  ; mask PDE# bits, the result is PTE# (0 to 1023)
-	shl	si, 2	   ; shift 2 bits left to get PTE offset
+	;shl	si, 2	   ; shift 2 bits left to get PTE offset
+	; 29/08/2023
+	shl	esi, 2
 	add	esi, eax   ; EDX points to the relevant page table entry  	
 	mov	ecx, [esi] ; PTE value of the parent process
 	; 21/09/2015

@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.5) - Directory Functions : trdosk4.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.6) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 11/08/2022  (Previous: 02/03/2021)
+; Last Update: 29/08/2023  (Previous: 11/08/2022)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -104,6 +104,7 @@ pass_write_path:
 	retn
 
 get_current_directory:
+	; 29/08/2023 (TRDOS 386 Kernel v2.0.6)
 	; 11/08/2022
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 15/10/2016
@@ -113,7 +114,7 @@ get_current_directory:
 	;
 	; INPUT-> ESI = Current Directory Buffer
 	;         DL = TRDOS Logical Dos Drive Number + 1
-	;              (0= Default/Current Drive)
+	;              (0 = Default/Current Drive)
 	;           
 	;   Note: Required dir buffer length may be <= 92 bytes
 	;         for TRDOS (7*12 name chars + 7 slash + 0)
@@ -127,32 +128,21 @@ get_current_directory:
 	;   cf = 1 -> error code in AL 
               
 loc_get_current_drive_0:
-	cmp	dl, 0
+	; 29/08/2023
+	sub	eax, eax ; 0
+	;cmp	dl, 0
+	cmp	dl, al
 	ja	short loc_get_current_drive_1
 	mov	dl, [Current_Drv]
-	jmp	short loc_get_current_drive_2
-loc_get_current_drive_1:
-	dec 	dl
-	cmp	dl, [Last_DOS_DiskNo]
-	jna	short loc_get_current_drive_2
-	;mov	eax, 0Fh ; Invalid drive (Drive not ready!)
-	;cmc 	; stc
-	; 28/07/2022
-	sub	eax, eax
-	mov	al, 0Fh
-	stc
-	retn
-
-loc_get_current_drive_not_ready_retn:
-	pop	esi
-	;mov	eax, 15
-	mov	ax, 15 ; Drive not ready
-	retn  
+	; 29/08/2023
+	;jmp	short loc_get_current_drive_2
  
 loc_get_current_drive_2:
-	xor	eax, eax
+	; 29/08/2023
+	;xor	eax, eax
+	; eax = 0
 	mov	ah, dl
-	push	esi
+	push	esi ; (*)
 	mov	esi, Logical_DOSDisks
 	add	esi, eax
 	mov	al, [esi+LD_Name] 
@@ -168,13 +158,33 @@ loc_get_current_drive_2:
 
 	;xor	ah, ah ; mov ah, 0
 	
-	; 11/08/2022- BugFix (*)
+	; 11/08/2022 - BugFix (*)
 	pop	esi ; (*) Current Directory Buffer address
 	
 	mov	[esi], ah
 	; 28/07/2022
 	;xor	ecx, ecx
 	jmp	short loc_get_current_drive_4
+
+	; 29/08/2023
+loc_get_current_drive_1:
+	dec 	dl
+	cmp	dl, [Last_DOS_DiskNo]
+	jna	short loc_get_current_drive_2
+	;mov	eax, 0Fh ; Invalid drive (Drive not ready!)
+	;cmc 	; stc
+	; 28/07/2022
+	;sub	eax, eax ; 29/08/2023
+	; eax = 0
+	mov	al, 0Fh
+	stc
+	retn
+
+loc_get_current_drive_not_ready_retn:
+	pop	esi
+	;mov	eax, 15
+	mov	ax, 15 ; Drive not ready
+	retn 
 
 loc_get_current_drive_3:
         mov     edi, PATH_Array

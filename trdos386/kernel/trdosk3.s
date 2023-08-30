@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.5) - MAIN PROGRAM : trdosk3.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.6) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 07/08/2022  (Previous: 31/12/2017)
+; Last Update: 30/08/2023  (Previous: 07/08/2022)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -6738,6 +6738,7 @@ loc_mcfg_load_fs_file:
 	retn
 
 load_and_execute_file:
+	; 30/08/2023 - TRDOS 386 Kernel v2.0.6
 	; 25/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 04/01/2017
 	; 06/05/2016 - 07/05/2016 - 11/05/2016
@@ -6910,14 +6911,17 @@ loc_run_check_auto_path_again:
 	;jnb	loc_cmd_failed
 	; 25/07/2022
 	jnb	short loc_run_cap_failed
-	; xor	al, al 
+	;xor	al, al 
 	mov	esi, Cmd_Path ; 'PATH'
 	mov	edi, TextBuffer
 	call	get_environment_string
 	jnc	short loc_run_chk_filename_ext_again
 	mov	word [Run_Auto_Path], 0FFFFh ; invalid
 loc_run_cap_failed: ; 25/07/2022	
-	jmp	loc_cmd_failed
+	;jmp	loc_cmd_failed
+	; 30/08/2023
+	mov	al, 1 ; (force jump to loc_cmd_failed at the end)
+	jmp	loc_run_cmd_failed ; (restore cdir if it is needed)
 
 loc_run_chk_filename_ext_again:
 	mov	ecx, eax ; string length (with zero tail)
@@ -7038,7 +7042,11 @@ loc_run_chg_prompt_dir_str_again:
 loc_load_executable_cdir_chk_again:
 	mov	eax, [Current_Dir_FCluster]
 	cmp	eax, [Run_CDirFC]
-	jne	loc_run_find_executable_file_next
+	;jne	loc_run_find_executable_file_next
+	; 30/08/2023
+	je	short jmp_loc_run_check_auto_path_again
+	jmp	loc_run_find_executable_file_next		
+jmp_loc_run_check_auto_path_again:
 	xor	al, al ; 0
 	jmp	loc_run_check_auto_path_again
 

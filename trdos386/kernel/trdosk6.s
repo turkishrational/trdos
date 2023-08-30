@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.5) - MAIN PROGRAM : trdosk6.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.6) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 11/08/2022  (Previous: 17/04/2021)
+; Last Update: 29/08/2023  (Previous: 11/08/2022)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -13198,7 +13198,7 @@ cnpm_2:
 	mov	[esi+p.pid-2], ax ; put new process name 
 				  ; in child process' name slot
 	;;;
-	mov 	eax,  [ii]
+	mov 	eax, [ii]
 	; 23/07/2022
 	; Retro UNIX 386 v1, 'sysexec' (u2.s)
 	;call	iopen
@@ -13308,6 +13308,7 @@ dskr_5:		; 23/07/2022
 	retn
 
 mget_r:
+	; 29/08/2023
 	; 30/07/2022
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 24/10/2016
@@ -13385,8 +13386,9 @@ mget_r_2:
 	; NOTE: readi bytes per sector value is always 512 !
 	; 23/07/2022
 	;xor	ch, ch
-	;shl	ecx, 9 
-	shl	cx, 9 ; * 512
+	; 29/08/2023
+	shl	ecx, 9 
+	;shl	cx, 9 ; * 512
 	;dec	cx ; bytes per cluster - 1
 	; 23/07/2022
 	dec	ecx
@@ -14615,6 +14617,7 @@ sysfff_6:
 	jmp	sysret
 
 sysfnf: ; <Find Next File>
+	; 29/08/2023 (TRDOS 386 Kernel v2.0.6)
 	; 08/08/2022
 	; 30/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 16/10/2016 TRDOS 386 (TRDOS v2.0) feature only !
@@ -14721,7 +14724,10 @@ sysfnf_10:
 	;jne	short sysfnf_12
 	;jmp	short sysfnf_11	
 	; 08/08/2022
-	je	short sysfnf_6 ; esi = FindFile_Drv
+	;je	short sysfnf_6 ; esi = FindFile_Drv
+	; 29/08/2023 (BugFix)
+	je	short sysfff_6 ; esi = FindFile_Drv
+	
 	jmp	sysfnf_12
 
 stsfnf_2:
@@ -17186,7 +17192,7 @@ sysenv:
 	; ecx = 512
 	call	transfer_to_user_buffer
 	;jc	error
-	; 23/07/202
+	; 23/07/2022
 	jc	short sysenv_error
 	mov	[u.r0], ecx 
 	jmp	sysret

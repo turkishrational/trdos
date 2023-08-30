@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.5) - DRV INIT : trdosk2.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.6) - DRV INIT : trdosk2.s
 ; ----------------------------------------------------------------------------
-; Last Update: 30/07/2022 (Previous: 30/08/2020)
+; Last Update: 29/08/2023 (Previous: 30/07/2022)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -1032,6 +1032,7 @@ load_masterboot_ok:
 	retn
 
 get_free_FAT_sectors:
+	; 29/08/2023
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 21/12/2017
 	; 29/02/2016
@@ -1084,8 +1085,9 @@ loc_gfc_check_fsinfo_signs:
 	mov	eax, [ebx+488]
 	; 29/02/2016
 	mov	[esi+LD_BPB+BPB_Reserved], eax ; Free cluster count
-	mov	edx,  [ebx+492] 
-	mov	[esi+LD_BPB+BPB_Reserved+4], eax ; First Free Cluster
+	mov	edx, [ebx+492] 
+	; 29/08/2023 (BugFix)
+	mov	[esi+LD_BPB+BPB_Reserved+4], edx ; First Free Cluster
 	; 21/12/2017
 	mov	ebx, eax ; (initial value = 0FFFFFFFFh)
 	inc	ebx ; 0FFFFFFFFh -> 0  
@@ -1548,6 +1550,7 @@ get_FAT_volume_name:
 	jnc     short loc_get_volume_name
 
 loc_gfvn_dir_load_err:
+loc_get_volume_name_retn: ; 29/08/2023
 	retn
 
 get_FAT32_root_cluster:
@@ -1574,8 +1577,9 @@ check_root_volume_name:
 	add     esi, 32
 	jmp     short check_root_volume_name
 
-loc_get_volume_name_retn:
-	retn
+	; 29/08/2023
+;loc_get_volume_name_retn:
+	;retn
     
 pass_check_root_volume_name:
 	cmp	byte [DirBuff_FATType], 3

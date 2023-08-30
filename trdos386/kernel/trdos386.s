@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.5
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.6
 ; ----------------------------------------------------------------------------
-; Last Update: 11/08/2022 (Previous: 18/04/2021)
+; Last Update: 30/08/2023 (Previous: 11/08/2022)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -174,6 +174,26 @@ Video_Pg_Backup	 equ 98000h ; Mode 3h, video page backup (32K, 8 pages)
 ; 15/12/2020
 LFB_ADDR	equ LFB_Info+LFBINFO.LFB_addr
 LFB_SIZE	equ LFB_Info+LFBINFO.LFB_size
+
+; 29/08/2023 - TRDOS 386 v2.0.6
+	; 30/11/2020
+	; 29/11/2020 - TRDOS 386 v2.0.3
+
+struc PMInfo  ;  VESA VBE3 PMInfoBlock ('PMID' block)
+
+ .Signature:	resb 4  ; db 'PMID' ; PM Info Block Signature
+ .EntryPoint:	resw 1	; Offset of PM entry point within BIOS
+ .PMInitialize: resw 1	; Offset of PM initialization entry point
+ .BIOSDataSel:	resw 1 	; Selector to BIOS data area emulation block
+ .A0000Sel:	resw 1	; Selector to access A0000h physical mem
+ .B0000Sel:	resw 1  ; Selector to access B0000h physical mem
+ .B8000Sel:	resw 1	; Selector to access B8000h physical mem
+ .CodeSegSel:	resw 1	; Selector to access code segment as data
+ .InProtectMode: resb 1 ; Set to 1 when in protected mode
+ .Checksum:	resb 1	; Checksum byte for structure
+ .size:
+
+endstruc
  
 [BITS 16]       ; We need 16-bit intructions for Real mode
 
@@ -437,17 +457,17 @@ L19:
         lgdt    [cs:gdtd]
 
         mov     eax, cr0
-	;or 	al, 1	; 24/07/2022
-	inc	ax
+	;or 	al, 1	; 24/07/2023
+	inc     ax
 	mov     cr0, eax
 
 	; Jump to 32 bit code
 	
-	db	66h 		; Prefix for 32-bit
-	db	0EAh		; Opcode for far jump
-	dd	StartPM		; Offset to start, 32-bit
+	db 66h 			; Prefix for 32-bit
+	db 0EAh 		; Opcode for far jump
+	dd StartPM 		; Offset to start, 32-bit
 				; (1000h:StartPM = StartPM + 10000h)
-	dw	KCODE		; This is the selector for CODE32_DESCRIPTOR,
+	dw KCODE		; This is the selector for CODE32_DESCRIPTOR,
 				; assuming that StartPM resides in code32
 
 ; 20/02/2017
@@ -457,13 +477,13 @@ L19:
 
 StartPM:
 	; Kernel Base Address = 0 ; 30/12/2013
-	mov	ax, KDATA 	; Save data segment identifier
-        mov	ds, ax		; Move a valid data segment into DS register
-       	mov	es, ax		; Move data segment into ES register
-       	mov	fs, ax		; Move data segment into FS register
-      	mov	gs, ax		; Move data segment into GS register
-        mov	ss, ax		; Move data segment into SS register
-        mov	esp, 90000h	; Move the stack pointer to 090000h
+	mov ax, KDATA           ; Save data segment identifier
+        mov ds, ax              ; Move a valid data segment into DS register
+       	mov es, ax              ; Move data segment into ES register
+       	mov fs, ax              ; Move data segment into FS register
+      	mov gs, ax              ; Move data segment into GS register
+        mov ss, ax              ; Move data segment into SS register
+        mov esp, 90000h         ; Move the stack pointer to 090000h
 
 clear_bss: ; Clear uninitialized data area
 	; 11/03/2015
@@ -502,7 +522,6 @@ memory_init:
 				   ; between 16 MB and 4 GB.	
 	or	dx, dx
 	jz	short mi_0
-	;
 	mov	ax, dx
 	shl	eax, 4		   ; 64 KB -> 4 KB (page count)
 	add	[free_pages], eax
@@ -640,7 +659,7 @@ mi_10:
 	mov	eax, esi	 ; allocation bit offset		 
 	mov	ebx, eax
 	shr	ebx, 3		 ; convert to alloc. byte offset
-	and	bl, 0FCh	 ; clear bit 0 and bit 1
+	and	bl,  0FCh	 ; clear bit 0 and bit 1
 				 ;   to align on dword boundary
 	and	eax, 31		 ; set allocation bit position 
 				 ;  (bit 0 to bit 31)
@@ -688,9 +707,13 @@ mi_13:
 	stosd
 	add	eax, 4096	
 	loop	mi_13	
-	and	dx, 1023	; (***)
+	;and	dx, 1023	; (***)
+	; 30/08/2023
+	and	edx, 1023
 	jz	short mi_14
-	mov	cx, 1024	
+	;mov	cx, 1024	
+	; 30/08/2023
+	mov	ch, 4 ; 4*256 = 1024
 	;sub	cx, dx		; from dx (<= 1023) to 1024
 	; 24/07/2022
 	sub	ecx, edx
@@ -723,9 +746,9 @@ mi_14:
 	mov	cr0, eax
         ;jmp    KCODE:StartPMP
 
-	db	0EAh		; Opcode for far jump
-        dd	StartPMP	; 32 bit offset
-	dw	KCODE		; kernel code segment descriptor
+	db 0EAh 		; Opcode for far jump
+        dd StartPMP		; 32 bit offset
+	dw KCODE		; kernel code segment descriptor
 
 StartPMP:
 	; 06/11//2014
@@ -1033,25 +1056,6 @@ display_vbios_product_name: ; 14/11/2020
 	; 02/12/2020
 	;pop	edi ; * pmid_addr
 
-	; 30/11/2020
-	; 29/11/2020 - TRDOS 386 v2.0.3
-
-struc PMInfo  ;  VESA VBE3 PMInfoBlock ('PMID' block)
-
- .Signature:	resb 4  ; db 'PMID' ; PM Info Block Signature
- .EntryPoint:	resw 1	; Offset of PM entry point within BIOS
- .PMInitialize: resw 1	; Offset of PM initialization entry point
- .BIOSDataSel:	resw 1 	; Selector to BIOS data area emulation block
- .A0000Sel:	resw 1	; Selector to access A0000h physical mem
- .B0000Sel:	resw 1  ; Selector to access B0000h physical mem
- .B8000Sel:	resw 1	; Selector to access B8000h physical mem
- .CodeSegSel:	resw 1	; Selector to access code segment as data
- .InProtectMode: resb 1 ; Set to 1 when in protected mode
- .Checksum:	resb 1	; Checksum byte for structure
- .size:
-
-endstruc
-
 	; 24/07/2022
 	; 29/11/2020
 vbe3pminit:
@@ -1244,8 +1248,8 @@ _VBE3PMI_fcall:
 
 	;mov	ax, si ; restore function
 	; 24/07/2022
-	mov	eax, esi 
-	
+	mov	eax, esi
+
 	; 02/12/2020
 	xor	esi, esi ; (not necessary, it is not used)
 	
@@ -1380,9 +1384,9 @@ display_mem_info:
 	; 06/11/2014
 	call	memory_info
 	; 14/08/2015
-	;call	getch ; 28/02/2015
+	;call getch ; 28/02/2015
 drv_init:
-	sti	; Enable Interrupts
+	sti	; Enable Interrupts 
 	; 06/02/2015
 	mov	edx, [hd0_type] ; hd0, hd1, hd2, hd3
 	mov	bx, [fd0_type] ; fd0, fd1
@@ -1454,7 +1458,7 @@ check_boch_plex86_vbe:
 	
 	; this is not necessary ! (20/11/2020)
 	cmp	byte [vbe2bios], 0C4h 
-	jb	short display_mem_info	; (QEMU) 
+	jb	display_mem_info	; (QEMU) 
 
 	; Display kernel version message if 0E9h hack port
 	; is enabled (bochs emulator feature)
@@ -1481,13 +1485,12 @@ di1:
 	;mov 	ax, cs
 	;stosw
 	;; 16/02/2015
-        ;;mov	dword [DISKETTE_INT], fdc_int ; IRQ 6 handler
+        ;;mov     dword [DISKETTE_INT], fdc_int ; IRQ 6 handler
 	;
-
 	CALL	DSKETTE_SETUP	; Initialize Floppy Disks
-
+	;
 	or	edx, edx
-	jz	short di3
+        jz      short di3
 di2:
 	call   	DISK_SETUP	; Initialize Fixed Disks
         ;jc	setup_error
@@ -1552,7 +1555,7 @@ di4:
 	; 27/02/2017
 	inc	byte [fpready]
 	; 80387 (FPU) is ready
-	fninit	; Initialize Floating-Point Unit
+	fninit ; Initialize Floating-Point Unit
 sysinit:
 	; 30/06/2015
 	call	sys_init
@@ -1638,15 +1641,15 @@ pkr:
 	retn
 
 ; 14/11/2020 (TRDOS 386 v2.0.3)
-vbe3:	db 0	; VESA VBE version (must be 03h)
-		; for using video bios calls in protected mode
+vbe3:	db 0  ; VESA VBE version (must be 03h)
+	      ; for using video bios calls in protected mode
 vbe2bios:
 	db 0B0h ; 
 ;pmid_addr: 		
-	;dw 0   ; > 0 if 'PMID' sign is found 
-	;       ;  ('pmid' offset addr in VGA bios seg, 0C000h)
+	;dw 0  ; > 0 if 'PMID' sign is found 
+	;     ;	('pmid' offset addr in VGA bios seg, 0C000h)
 	;; 02/12/2020
-	;dw 0   ; 32 bit address in pmid_addr
+	;dw 0	; 32 bit address in pmid_addr
 		
 ; 28/02/2017
 ; 22/01/2017
@@ -1713,23 +1716,23 @@ timer_int:	; IRQ 0
 	mov	cr3, ecx
 T3:
 	;sti				; INTERRUPTS BACK ON
-	inc	word [TIMER_LOW]	; INCREMENT TIME
-	jnz	short T4		; GO TO TEST_DAY
-	inc	word [TIMER_HIGH]	; INCREMENT HIGH WORD OF TIME
+	INC	word [TIMER_LOW]	; INCREMENT TIME
+	JNZ	short T4		; GO TO TEST_DAY
+	INC	word [TIMER_HIGH]	; INCREMENT HIGH WORD OF TIME
 T4:					; TEST_DAY
-	cmp	word [TIMER_HIGH], 018h	; TEST FOR COUNT EQUALING 24 HOURS
-	jnz	short T5		; GO TO DISKETTE_CTL
-	cmp	word [TIMER_LOW], 0B0h
-	jnz	short T5		; GO TO DISKETTE_CTL
+	CMP	word [TIMER_HIGH],018H	; TEST FOR COUNT EQUALING 24 HOURS
+	JNZ	short T5		; GO TO DISKETTE_CTL
+	CMP	word [TIMER_LOW],0B0H
+	JNZ	short T5		; GO TO DISKETTE_CTL
 
 ;-----	TIMER HAS GONE 24 HOURS
-	;;sub	ax, ax
-	;mov	[TIMER_HIGH], ax
-	;mov	[TIMER_LOW], ax
+	;;SUB	AX,AX
+	;MOV	[TIMER_HIGH],AX
+	;MOV	[TIMER_LOW],AX
 	sub	eax, eax
 	mov	[TIMER_LH], eax
 	;	
-	mov	byte [TIMER_OFL], 1
+	MOV	byte [TIMER_OFL],1
 
 ;-----	TEST FOR DISKETTE TIME OUT
 
@@ -1738,39 +1741,39 @@ T5:
 	jmp	short T6		; will be replaced with nop, nop
 					; (9090h) if a floppy disk
 					; is detected.
-	;mov	al, [CS:MOTOR_COUNT]
+	;mov	al,[CS:MOTOR_COUNT]
 	mov	al, [MOTOR_COUNT]
 	dec	al
 	;mov	[CS:MOTOR_COUNT], al	; DECREMENT DISKETTE MOTOR CONTROL
 	mov	[MOTOR_COUNT], al
 	;mov	[ORG_MOTOR_COUNT], al
-	jnz	short T6		; RETURN IF COUNT NOT OUT
-	mov 	al, 0F0h
-	;and	[CS:MOTOR_STATUS],al 	; TURN OFF MOTOR RUNNING BITS
+	JNZ	short T6		; RETURN IF COUNT NOT OUT
+	mov 	al,0F0h
+	;AND	[CS:MOTOR_STATUS],al 	; TURN OFF MOTOR RUNNING BITS
 	and	[MOTOR_STATUS], al
 	;and	[ORG_MOTOR_STATUS], al
-	mov	al, 0Ch			; bit 3 = enable IRQ & DMA, 
+	MOV	AL,0CH			; bit 3 = enable IRQ & DMA, 
 					; bit 2 = enable controller
 					;	1 = normal operation
 					;	0 = reset	
 					; bit 0, 1 = drive select
 					; bit 4-7 = motor running bits 
-	mov	dx, 03F2h		; FDC CTL PORT
-	out	dx, al			; TURN OFF THE MOTOR
+	MOV	DX,03F2H		; FDC CTL PORT
+	OUT	DX,AL			; TURN OFF THE MOTOR
 T6:	
 	;inc	word [CS:wait_count]	; 22/12/2014 (byte -> word)
 					; TIMER TICK INTERRUPT
 	;;inc	word [wait_count] ;;27/02/2015
-	;int	1Ch			; TRANSFER CONTROL TO A USER ROUTINE
+	;INT	1CH			; TRANSFER CONTROL TO A USER ROUTINE
 	;cli
 	call 	u_timer			; TRANSFER CONTROL TO A USER ROUTINE
 	; 23/05/2016
 	call	clock			; Multi Tasking control procedure
 T7:
 	; 14/10/2015
-	mov	al, EOI			; GET END OF INTERRUPT MASK
-	cli				; DISABLE INTERRUPTS TILL STACK CLEARED
-	out	INTA00, al		; END OF INTERRUPT TO 8259 - 1	
+	MOV	AL,EOI			; GET END OF INTERRUPT MASK
+	CLI				; DISABLE INTERRUPTS TILL STACK CLEARED
+	OUT	INTA00,AL		; END OF INTERRUPT TO 8259 - 1	
 	;
 rtc_int_2:
 	; 26/12/2016
@@ -2046,14 +2049,14 @@ rtc_int_return: ; 19/05/2016
 	nop
 	in	al, 71h ; just throw away contents
 	; 22/02/2015
-	mov	al, EOI		; END OF INTERRUPT
-	;cli			; DISABLE INTERRUPTS TILL STACK CLEARED
-	out	INTB00, al	; FOR CONTROLLER #2
+	MOV	AL,EOI		; END OF INTERRUPT
+	;CLI			; DISABLE INTERRUPTS TILL STACK CLEARED
+	OUT	INTB00,AL	; FOR CONTROLLER #2
 
 	; 23/05/2016
-	mov	al, EOI		; GET END OF INTERRUPT MASK
-	cli			; DISABLE INTERRUPTS TILL STACK CLEARED
-	out	INTA00, al	; END OF INTERRUPT TO 8259 - 1	
+	MOV	AL,EOI		; GET END OF INTERRUPT MASK
+	CLI			; DISABLE INTERRUPTS TILL STACK CLEARED
+	OUT	INTA00,AL	; END OF INTERRUPT TO 8259 - 1	
 	;
 	; 23/05/2016
 	and	ah, ah
@@ -2061,7 +2064,7 @@ rtc_int_return: ; 19/05/2016
 	; 24/07/2022
 	jnz	short rtc_int_4
 	jmp	rtc_int_2
-rtc_int_4:	
+rtc_int_4:
 	; ah = 1 (half second)
 	pop	eax ; *
 	pop	ds  ; **
@@ -2176,7 +2179,7 @@ ii1:
 	stosw
 	; 23/02/2015
 	cmp	bl, 7 ; check for IRQ 8 to IRQ 15 
-	jna	short ii2
+	jna	ii2
 	; 22/01/2017
 	mov	al, 20h  ; END OF INTERRUPT COMMAND TO
 	out	0A0h, al ; the 2nd 8259
@@ -2440,8 +2443,8 @@ b2d3:
 	;
 	; 20/01/2017 (!cpu exception!)
 	;
-        add	dword [scr_row], 0A0h
-        mov	edi, [scr_row]
+        add    dword [scr_row], 0A0h
+        mov    edi, [scr_row]
 	;	
 	mov	byte [sysflg], 0  ; system mode
         sti
@@ -2695,7 +2698,7 @@ bcd_to_ascii:
 
 ; 15/12/2020
 real_mem_16m_64k: 
-	dw 0		; Real size of system memory (if > 16MB)
+	dw	0	; Real size of system memory (if > 16MB)
 			; as number of 64K blocks - 256
 			; (This is for saving real system memory
 			; because if system memory is larger than
@@ -2706,7 +2709,7 @@ real_mem_16m_64k:
 			; Upper memory space from LFB base address
 			; to 4GB will not be included by M.A.T.
 def_LFB_addr:	
-	dw 0		; HW of default LFB addr (for mode 118h)	
+	dw	0 	; HW of default LFB addr (for mode 118h)	
 	
 
 %include 'keyboard.s' ; 07/03/2015
@@ -3087,43 +3090,43 @@ Align 2
 
 ; 04/11/2014 (Retro UNIX 386 v1)
 mem_1m_1k:   dw 0  ; Number of contiguous KB between
-		   ; 1 and 16 MB, max. 3C00h = 15 MB.
+                     ; 1 and 16 MB, max. 3C00h = 15 MB.
 mem_16m_64k: dw 0  ; Number of contiguous 64 KB blocks
 		   ; between 16 MB and 4 GB.
 
 ; 12/11/2014 (Retro UNIX 386 v1)
-boot_drv:    db 0  ; boot drive number (physical)
+boot_drv:    db 0 ; boot drive number (physical)
 ; 24/11/2014
 drv:	     db 0 
-last_drv:    db 0  ; last hdd
+last_drv:    db 0 ; last hdd
 hdc:         db 0  ; number of hard disk drives
-		   ; (present/detected)
+		     ; (present/detected)
 
 ; 24/11/2014 (Retro UNIX 386 v1)
 ; Physical drive type & flags
 fd0_type:    db 0  ; floppy drive type
 fd1_type:    db 0  ; 4 = 1.44 Mb, 80 track, 3.5" (18 spt)
-		   ; 6 = 2.88 Mb, 80 track, 3.5" (36 spt)
-		   ; 3 = 720 Kb, 80 track, 3.5" (9 spt)
-		   ; 2 = 1.2 Mb, 80 track, 5.25" (15 spt)
-		   ; 1 = 360 Kb, 40 track, 5.25" (9 spt)		
+		     ; 6 = 2.88 Mb, 80 track, 3.5" (36 spt)
+		     ; 3 = 720 Kb, 80 track, 3.5" (9 spt)
+		     ; 2 = 1.2 Mb, 80 track, 5.25" (15 spt)
+		     ; 1 = 360 Kb, 40 track, 5.25" (9 spt)		
 hd0_type:    db 0  ; EDD status for hd0 (bit 7 = present flag)
 hd1_type:    db 0  ; EDD status for hd1 (bit 7 = present flag)
 hd2_type:    db 0  ; EDD status for hd2 (bit 7 = present flag)
 hd3_type:    db 0  ; EDD status for hd3 (bit 7 = present flag)
-		   ; bit 0 = Fixed disk access subset supported
-		   ; bit 1 = Drive locking and ejecting
-		   ; bit 2 = Enhanced disk drive support
-		   ; bit 3 = Reserved (64 bit EDD support)
-		   ; (If bit 0 is '1' Retro UNIX 386 v1
-		   ; will interpret it as 'LBA ready'!)
+		     ; bit 0 - Fixed disk access subset supported
+		     ; bit 1 - Drive locking and ejecting
+		     ; bit 2 - Enhanced disk drive support
+		     ; bit 3 = Reserved (64 bit EDD support)
+		     ; (If bit 0 is '1' Retro UNIX 386 v1
+		     ; will interpret it as 'LBA ready'!)
 
 ; 08/08/2022
 ; (drv.cylinders, drv.spt, drv.spt will not be used now on)
 ; ('diskio.inc')
 ; ((spt and heads and cylinder counts will be taken from DPT))
 
-; 11/03/2015 - 10/07/2015
+;; 11/03/2015 - 10/07/2015
 ;drv.cylinders: dw 0,0,0,0,0,0,0
 ;drv.heads:     dw 0,0,0,0,0,0,0
 ;drv.spt:       dw 0,0,0,0,0,0,0
@@ -3206,9 +3209,9 @@ ilist:
 IRQ_list: ; 28/02/2017 ('syscalbac')
 	; Interrupt list
 	dd	timer_int	; INT 20h
-		;dd irq0	
+		;dd	irq0	
 	dd	kb_int		; 24/01/2016
-		;dd irq1
+		;dd	irq1
 	dd	irq2
 		; COM2 int
 	dd	irq3
@@ -3217,14 +3220,14 @@ IRQ_list: ; 28/02/2017 ('syscalbac')
 	dd	irq5
 ;DISKETTE_INT: ;06/02/2015
 	dd	fdc_int		; 16/02/2015, IRQ 6 handler	
-		;dd irq6
+		;dd	irq6
 ; Default IRQ 7 handler against spurious IRQs (from master PIC)
 ; 25/02/2015 (source: http://wiki.osdev.org/8259_PIC)
 	dd	default_irq7	; 25/02/2015
-		;dd irq7
+		;dd	irq7
 ; Real Time Clock Interrupt
 	dd	rtc_int		; 23/02/2015, IRQ 8 handler
-		;dd irq8	; INT 28h
+		;dd	irq8	; INT 28h
 	dd	irq9
 	dd	irq10
 	dd	irq11
@@ -3232,10 +3235,10 @@ IRQ_list: ; 28/02/2017 ('syscalbac')
 	dd	irq13
 ;HDISK_INT1:  ;06/02/2015 	
 	dd	hdc1_int 	; 21/02/2015, IRQ 14 handler		
-		;dd irq14
+		;dd	irq14
 ;HDISK_INT2:  ;06/02/2015
 	dd	hdc2_int 	; 21/02/2015, IRQ 15 handler		
-		;dd irq15	; INT 2Fh
+		;dd	irq15	; INT 2Fh
 		; 14/08/2015
 	;dd	sysent		; INT 30h (system calls)
 
@@ -3410,58 +3413,52 @@ EIPstr: ; 29/08/2014
 ; Memory Information message
 ; 14/08/2015
 msg_memory_info:
-	db 07h
-	db 0Dh, 0Ah
-	;db "MEMORY ALLOCATION INFO", 0Dh, 0Ah, 0Dh, 0Ah
-	db "Total memory : "
+	db	07h
+	db	0Dh, 0Ah
+	;db 	"MEMORY ALLOCATION INFO", 0Dh, 0Ah, 0Dh, 0Ah
+	db	"Total memory : "
 mem_total_b_str: ; 10 digits
-	db "0000000000 bytes", 0Dh, 0Ah
-	db "               ", 20h, 20h, 20h
+	db	"0000000000 bytes", 0Dh, 0Ah
+	db	"               ", 20h, 20h, 20h
 mem_total_p_str: ; 7 digits
-	db "0000000 pages", 0Dh, 0Ah
-	db 0Dh, 0Ah
-	db "Free memory  : "
+	db	"0000000 pages", 0Dh, 0Ah
+	db 	0Dh, 0Ah
+	db	"Free memory  : "
 free_mem_b_str:  ; 10 digits
-	db "?????????? bytes", 0Dh, 0Ah
-	db "               ", 20h, 20h, 20h
+	db	"?????????? bytes", 0Dh, 0Ah
+	db	"               ", 20h, 20h, 20h
 free_mem_p_str:  ; 7 digits
-	db "??????? pages", 0Dh, 0Ah
-	db 0Dh, 0Ah, 0
+	db	"??????? pages", 0Dh, 0Ah
+	db	0Dh, 0Ah, 0
 
 dsk_ready_msg:
-	db 0Dh, 0Ah
+	db 	0Dh, 0Ah
 dsktype:
-	db 'fd'
+	db	'fd'
 dskx:
-	db '0'
-	db 20h
-	db 'is READY ...'
-	db 0
-
-situp_error_msg:
-	db 0Dh, 0Ah
-	db 'Disk Setup TEST Error !' 
-	db 0Dh, 0Ah,0
-
+	db	'0'
+	db	20h
+	db 	'is READY ...'
+	db 	0
 
 setup_error_msg:
-	db 0Dh, 0Ah
-	db 'Disk Setup Error !' 
-	db 0Dh, 0Ah,0
+	db	0Dh, 0Ah
+	db	'Disk Setup Error !' 
+	db	0Dh, 0Ah,0
 
 next2line: ; 08/02/2016
-	db 0Dh, 0Ah
+	db	0Dh, 0Ah
 nextline:
-	db 0Dh, 0Ah, 0
+	db 	0Dh, 0Ah, 0
 
 ; temporary
 ; 19/12/2020
 msg_lfb_addr:
-	;db 0Dh, 0Ah
-	db "Linear frame buffer at "
+	;db	0Dh, 0Ah
+	db	"Linear frame buffer at "
 lfb_addr_str: ; 8 (hex) digits
-	db "00000000h", 0Dh, 0Ah
-	db 0Dh, 0Ah, 0
+	db	"00000000h", 0Dh, 0Ah
+	db	0Dh, 0Ah, 0
 
 ; KERNEL - SYSINIT Messages
 ; 24/08/2015
@@ -3492,8 +3489,10 @@ panic_msg:
 ;       db 0Dh, 0Ah, 0
 
 starting_msg:
-	;db "Turkish Rational DOS v2.0 [18/04/2021] ...", 0
-	db "Turkish Rational DOS v2.0 [11/08/2022] ...", 0
+	;;db "Turkish Rational DOS v2.0 [18/04/2021] ...", 0
+	;db "Turkish Rational DOS v2.0 [11/08/2022] ...", 0
+	db "Turkish Rational DOS v2.0 [30/08/2023] ...", 0
+
 NextLine:
 	db 0Dh, 0Ah, 0
 
@@ -3549,8 +3548,10 @@ DMonth:
 
 ; 15/11/2020
 db	0
-kernel_version_msg: ; 07/08/2022
-db	"TRDOS (386) Kernel v2.0.5 by Erdogan Tan"
+kernel_version_msg: ; 17/04/2021
+;;db	"TRDOS (386) Kernel v2.0.4 by Erdogan Tan"
+;db	"TRDOS (386) Kernel v2.0.5 by Erdogan Tan" ; 11/08/2022
+db	"TRDOS (386) Kernel v2.0.6 by Erdogan Tan" ; 29/08/2023
 db	0
 
 ; 20/02/2017
@@ -3639,7 +3640,7 @@ first_page:  resd 1 ; offset value in M.A.T. which
 mat_size:    resd 1 ; Memory Allocation Table size in pages
 
 ; 20/11/2020
-;vbe2bios:   resw 1 ; VBE2 video bios ID (bochs/qemu)
+;vbe2bios:    resw 1 ; VBE2 video bios ID (bochs/qemu)
 ;		    ; (0B0C4h or 0B0C5h for bochs/plex86 vgabios)				
 
 ; 02/09/2014 (Retro UNIX 386 v1)
@@ -3702,7 +3703,7 @@ RTC_WAIT_FLAG: resb 1
 USER_FLAG:     resb 1
 ; 19/05/2016
 ;RTC_second:
-RTC_2Hz:       resb 1	; from 2Hz interrupt to 1Hz timer event function	
+RTC_2Hz:       resb 1 ;  from 2Hz interrupt to 1Hz timer event function	
 
 %include 'diskbss.s'	; UNINITIALIZED DISK (BIOS) DATA
 
@@ -3712,7 +3713,6 @@ RTC_2Hz:       resb 1	; from 2Hz interrupt to 1Hz timer event function
 
 ; 10/01/2016
 %include 'trdoskx.s'	; UNINITIALIZED KERNEL (Logical Drive & FS) DATA
-
 ; 24/01/2016
 %include 'ubss.s'	; UNINITIALIZED KERNEL (USER) DATA
 
@@ -3720,16 +3720,14 @@ alignb 4
 
 ; 23/05/2016 (TRDOS 386)
 ; 14/10/2015 (Retro UNIX 386 v1, 'unix386.s')
-cr3reg:	resd 1	; cr3 register content at the beginning of the timer
-		; (or RTC) interrupt handler.
+cr3reg:	 resd 1  ; cr3 register content at the beginning of the timer
+		 ; (or RTC) interrupt handler.
 
 ; 10/12/2016 (callback)
 ; 10/06/2016
 ; 19/05/2016
 ; 18/05/2016 - TRDOS 386 feature only !
-timer_set:
-	resd 16*4   ; 256 bytes memory space for 16 timer events
-	
+timer_set: resd 16*4   ; 256 bytes memory space for 16 timer events
 	; Timer Event Structure: (max. 16 timer events, 16*16 bytes)
 	;       Owner:	        resb 1 ; 0 = free
 	;		  	       ;>0 = process number (u.uno)
@@ -3742,6 +3740,7 @@ timer_set:
 	;	Current Count: 	resd 1 ; count of ticks (current)
 	;	Response Addr:  resd 1 ; response byte (pointer) address
 	;			       ; (or callback -user service- address)	
+
 
 ; 17/04/2021
 ; (memory page swap parameters are disabled as temporary)
@@ -3761,7 +3760,7 @@ alignb 4
 ; 28/08/2014
 error_code:	resd 1
 ; 29/08/2014
-FaultOffset:	resd 1
+FaultOffset: 	resd 1
 ; 21/09/2015
 PF_Count:	resd 1	; total page fault count
 		       	; (for debugging - page fault analyze)
@@ -3780,7 +3779,7 @@ writei_buffer:
 ; 24/10/2016
 	resb	8 
 rw_buffer:
-	resb 	2048 	; general purposed, r/w sector buffer
+	resb 	2048  ; general purposed, r/w sector buffer
 
 %if 1
 ; 17/01/2021
@@ -3795,20 +3794,22 @@ vbe3bios_addr:	resd 1	; new (writable mem) address of VBE3 bios
 pmid_addr:	resd 1	; PMInfoBlock ('PMID') linear address
 ; 14/01/2021
 ; 06/12/2020		; VESA VBE 3 video state
-;vbe3stbufsize:	resw 1	; video regs/dac/bios state buffer size
+;vbe3stbufsize: resw 1	; video regs/dac/bios state buffer size
 ;			; block size in bytes
 ; 16/01/2021
-vbe3stbsflags:	resw 1	; video regs/dac/bios state buffer size
+vbe3stbsflags: resw 1	; video regs/dac/bios state buffer size
 ;			; pointer flags for buffer state options
 %endif
 
 %if 1
 ; 10/12/2020
-LFB_Info:	resb 16	; Linear Frame Buffer info block
-;
+LFB_Info:
+		resb 16	; Linear Frame Buffer info block
+
 ;24/11/2020 - TRDOS 386 v2.0.3
 ; BOCHS/PLEX86 VESA VBE3 MODE INFO extension to TRDOS 386 v2 kernel	
-MODE_INFO_LIST:	resb 68	; mode + 66 byte VESA vbe3 mode info (4F01h) 
+MODE_INFO_LIST:
+		resb 68	; mode + 66 byte VESA vbe3 mode info (4F01h) 
 %endif
 
 ; 05/01/2021
@@ -3839,7 +3840,7 @@ maskcolor:	resd 1	; VGA/SVGA pixel mask color ('sysvideo')
 ; 27/02/2021
 pixcount:	resd 1	; pixel count ('sysvideo' window ops) 
 ; 02/02/2021
-buffer8:	resd 2	; 8 bytes small buffer for 'sysvideo'
+buffer8:	resd 2	; 8 bytes small buffer for 'sysvideo'  
 
 bss_end:
 
