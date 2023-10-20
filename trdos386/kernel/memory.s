@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.6 - memory.s
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.7 - memory.s
 ; ----------------------------------------------------------------------------
-; Last Update: 29/08/2023  (Previous: 17/04/2021)
+; Last Update: 20/10/2023  (Previous: 29/08/2023)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -854,7 +854,13 @@ dapt_3:
 	;and	ax, PTE_A_CLEAR ; 0F000h ; clear lower 12 (attribute) bits
 	call	deallocate_page ; set the mem allocation bit of this page
 dapt_4:
-	mov	dword [esi-4], 0 ; clear/reset PTE (child, dupl. as parent)
+	; 20/10/2023
+	; PTE clearing here was/is not necessary
+	; because this page table is being deallocated
+	; and it's PTEs will be ineffective.
+
+	;mov	dword [esi-4], 0 ; clear/reset PTE (child, dupl. as parent)
+
 dapt_1:	; 17/04/2021 (temporary)
 dapt_5:
 	inc	edi ; page table entry index
@@ -2984,6 +2990,17 @@ amb_14:
 	stc
         jmp     amb_25
 
+allocate_lfb_memory_block:
+	; 20/10/2023 - TRDOS 386 v2.0.7
+	; (short way to set the LFB page bits on the M.A.T.)
+	; called from 'allocate_lfb_pages_for_kernel' 
+	mov	[mem_pg_pos], eax    ; LFB start/base address   	
+	mov	[mem_aperture], ecx  ; number of LFB pages
+				     ; (!which overlapping main memory!)	
+	push	edx ; *
+	push	ebx ; **
+	jmp	short amb_16
+
 amb_15: ; OK !
 	mov	eax, [mem_pg_pos]    ; Beginning address as page number
 	mov	ecx, [mem_aperture]  ; Free contiguous page count (>=1)
@@ -3012,7 +3029,17 @@ amb_18:
 	btr	[ebx], eax	 ; The destination bit indexed by the source value
 				 ; is copied into the Carry Flag and then cleared
 				 ; in the destination.
+	; 20/10/2023
+	; (for LFB page allocation.. 
+	;  -here, to prevent using LFB pages for another allocation later-
+	;  /// the destination bit must be 0 -already- ..
+	;  so, following 'jnc' is not necessary but i am not removing it
+	;  for understanding why free page count is decreased here.) 
+	;   
+	;jnc	short amb_28 ; requested page is already allocated 
+
 	dec     dword [free_pages] ; 1 page has been allocated (X = X-1) 
+;amb_28:	; 20/10/2023
 	dec	ecx
 	jz	short amb_19
 	inc	al
@@ -3187,6 +3214,7 @@ damb_7:
 	retn
 
 direct_memory_access:
+	; 20/10/2023
 	; 17/04/2021 (temporary modifications)
 	; 22/07/2017
 	; 12/05/2017
@@ -3250,7 +3278,8 @@ dmem_acc_0:
 		; EAX = Page table entry value (page address)
 		;	CF = 1 -> PDE not present or invalid ? 	
 	jnc	short dmem_acc_1
-	;
+	; 20/10/2023
+	; Allocate a page as a new page table
 	call	allocate_page
 	;jc	dmem_acc_7  ; 'insufficient memory' error
 	; 17/04/2021
@@ -3275,6 +3304,15 @@ dmem_acc_1:
 	;jnz	short dmem_acc_2   ; 17/04/2021 (*)
 	; 17/04/2021 (temporary)
 	jz	short short dmem_acc_6  ; ! temporary ! (*)	
+	; 20/10/2023
+	; If the page table entry is zero or invalid -not present-
+	; it will be directy allocated for the physical memory section
+	; without using the M.A.T. (Specially for LFB access -generally-
+	; is at the beyod of the physical main memory end.)
+	; (M.A.T bits are not used for direct memory access. To cancel
+	; direct memory access also is out of the M.A.T scope because
+	; direct accessed physical pages are marked as SHARED on their
+	; PTE. Shared pages are not dealloaced.)
 
 ; 17/04/2021
 ; (following code is disabled as temporary)
@@ -3559,7 +3597,7 @@ allocate_user_pages:
 	; (caller: 'sysalloc' system call)
 	;
 	; Note: This procedure does not alloc a page's itself
-	;	(page bit) on Memory Allocation Table.
+	;	(page bits) on Memory Allocation Table.
 	;	(allocate_memory_block is needed before this proc)
 	;
 	; INPUT ->
@@ -3774,33 +3812,63 @@ a_u_pd_5:
 	retn
 
 allocate_lfb_pages_for_kernel:
+	; 20/10/2023 - TRDOS 386 v2.0.7
+	; (only the overlapped main memory pages will be allocated)
+	; ((if LFB base/start address is greater than -or equal to-
+	;      main memory size, this procedure is not called/used)) 
 	; 15/12/2020
 	; 14/12/2020 - TRDOS 386 v2.0.3
 	; Set kernel page tables for linear frame buffer 
-	; (this procedure will be called by kernel only)
 	;
 	; Input:
-	;	[LFB_ADDR] = linear frame buffer base address
- 	;	[LFB_SIZE] = linear frame buffer size in bytes
+	;	;[LFB_ADDR] = linear frame buffer base address
+	;	;[LFB_SIZE] = linear frame buffer size in bytes
+	;	; 20/10/2023
+	;	eax = Linear frame buffer base address as page num
+	;	      (eax < memory size)
+	;	esi = linear frame buffer base address
+	;	ecx = memory size in pages = [memory_size]
 	; Output:
 	;	none
 	;	cf = 1 -> error
 	;
 	; Modified registers: eax, ecx, edx, edi
 
-	mov	edi, [LFB_ADDR]
-	mov	edx, [LFB_SIZE]
+	; 20/10/2023
+	;mov	edi, [LFB_ADDR]
+	;mov	edx, [LFB_SIZE]
 
-	shr	edi, 22	; convert address to page number
+	;;;
+	; 20/10/2023
+	mov	edi, eax ; LFB base/start page number
+	;mov	ecx, [memory_size]
+	sub	ecx, eax	
+
+	; ecx = number of pages to be set as (already) allocated 
+	;;;
+
+	; 20/10/2023
+	shr	edi, 10 ; convert page number to PDE entry number
+			; (1024 pages per page table -the shift
+			; result is a page table index number
+			; or page directory entry number <= 1023)
+	;shr	edi, 22	; convert address to page number
 			; and then convert it to PDE entry offset
 			; (1 PDE is for 4MB, 22 bit shift)
 
-	shl	di, 2	; * 4 for offset 
+	shl	di, 2	; * 4 to obtain the PDE offset
 
-	;add	edx, 4095
-	shr	edx, 12	; convert LFB size to LFB page count
+	; 20/10/2023
+	;;add	edx, 4095
+	;shr	edx, 12	; convert LFB size to LFB page count
 	
-	mov	ecx, edx ; * ; LFB page count
+	;mov	ecx, edx ; * ; LFB page count
+	; 20/10/2023
+	mov	edx, ecx ; *
+			; 20/10/2023
+			; edx = page count (to be set as allocated)
+			; 	from the LFB start page
+			; (it may be <= linear frame buffer size) 
 
 	add	ecx, 1023 ; page count + 1023
 	shr	ecx, 10 ; convert to page directory entry count	
@@ -3808,11 +3876,21 @@ allocate_lfb_pages_for_kernel:
 	push	ecx ; **
 	shl	ecx, 12 ; convert to byte count
 
-	xor	eax, eax ; first available pages
+	; 20/10/2023
+	; (absolute allocation is needed instead of the first fit)
+	;xor	eax, eax ; first available pages
 	
+	; 20/10/2023
+	;mov	esi, [LFB_ADDR]
+	mov	eax, esi ; linear frame buffer's base/start address	
+
 	; allocate contiguous memory block for these kernel pages
 	
-	call	allocate_memory_block
+	;call	allocate_memory_block
+	; 20/10/2023 
+	; (short way to set LFB page bits on the 'M.A.T.)
+	call	allocate_lfb_memory_block ; in 'allocate_memory_block'	
+
 	; eax = start address of (contiguous) memory block
 	pop	ecx ; ** ; PDE count
 	jnc	short a_lfb_k_1

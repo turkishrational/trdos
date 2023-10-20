@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.6
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.7
 ; ----------------------------------------------------------------------------
-; Last Update: 30/08/2023 (Previous: 11/08/2022)
+; Last Update: 20/10/2023 (Previous: 30/08/2023)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -259,6 +259,22 @@ _int13h_48h_buffer: ; 07/07/2016
 	db	'(Minimum 2MB memory is needed.)'
  	db	0Dh, 0Ah, 0
 V0:
+	; 18/10/2023 - TRDOS 386 v2.0.7
+	; set video mode to 03h again 
+	; (to reset video bios data in ROMBIOS DATA AREA)
+	mov	ax, 3
+	int	10h
+	; copy IVT and ROMBIOS DATA AREA to VBE3 BIOS data area
+	mov	di, VBE3BIOSDATABLOCK>>4
+	mov	es, di
+	xor	si, si
+	xor	di, di
+	mov	ds, si ; 0
+	mov	cx, 300h ; 600h / 2
+	rep	movsw
+	push	cs
+	pop	ds
+	
 	; 15/12/2020
 	mov	si, [mem_16m_64k]
 	mov	[real_mem_16m_64k], si
@@ -269,10 +285,12 @@ V0:
 	mov	ax, 4F03h  ; Return current VBE mode
 	int	10h
 	cmp	ax, 004Fh  ; successful (vbe) function call
-	jne	short L0   ; not a VESA VBE compatible bios	
+	;jne	short L0   ; not a VESA VBE compatible bios	
+	; 18/10/2023
+	jne	short V1   ; restore es
 
 	;mov	ah, 3
-	;;jmp	short v1	
+	;;jmp	short V1	
 	
 	; 15/11/2020
 	mov	bx, VBE3INFOSEG  ; 97E0h for current version 
@@ -990,9 +1008,18 @@ jmp_display_mem_info:	; 24/07/2022
 	jmp	display_mem_info
 
 verify_pmib_chksum:
-	; 15/11/2020
+	; 18/10/2023
+	; (ATI RV370 video bios contains ZERO at Checksum offset.)
 	xor	eax, eax
-	;mov	ecx, eax 
+	cmp	byte [esi+19], al ; 0 ; Checksum byte
+	jna	short skip_verify_pmib_chksum ; may be ATI video bios
+	;cmp	dword [esi+16], 0C000h
+	;	; CodeSegSel = 0C000h, InProtectMode = 0, Checksum = 0
+	;je	short skip_verify_pmib_chksum ; may be ATI video bios
+	; 18/10/2023
+	; 15/11/2020
+	;xor	eax, eax
+	;;mov	ecx, eax 
 	;mov	cl, 20
 	mov	cx, 20 ; 30/11/2020
 	push	esi
@@ -1004,12 +1031,17 @@ pmib_sum_bytes:
 	or	ah, ah
 	jnz	short not_valid_pmib ; AH must be 0
 
+	; 18/10/2023
+	xor	al, al  ; eax = 0
+
 	; 28/02/2021
 	; Set default (initial) truecolor bpp value to 32
 	; (for VBE3 video bios.. because vbe3 video bioses
 	;  use 32bpp -for truecolor modes- instead of 24bpp)
 	; (This setting may be changed via 'sysvideo' bx=0908h)
-	
+
+skip_verify_pmib_chksum: ; 18/10/2023
+		
 	mov	byte [truecolor], 32 ; (RGB: 00RRGGBBh)
 
 display_vbios_product_name: ; 14/11/2020
@@ -1027,7 +1059,8 @@ display_vbios_product_name: ; 14/11/2020
 	;		; OemVendorNamePtr (seg16:off16)
 	mov	esi, [VBE3INFOBLOCK+6] ; 097E00h + 06h
 			; OemStringPtr (seg16:off16)
-	xor	al, al  ; eax = 0
+	; 18/10/2023
+	;xor	al, al  ; eax = 0
 	xchg	ax, si	; ax = offset, si = 0
 	shr	esi, 12 ; (to convert segment to base addr)
 	add	si, ax  ; esi has an address < 1 MB limit
@@ -1151,6 +1184,11 @@ vbe3pminit0:
 	; clear mem from VBE3 BIOS data area emu block
 	; to end of vbe3 buffers
 
+	; 18/10/2023 - TRDOS v2.0.7
+	; (VBE3BIOSDATABLOCK contains a copy of the 1st
+	; 1536 bytes of the memory, IVT, ROMBIOS DATA etc.)
+	; ((it must not be cleared here))
+%if 0	
 	; 01/12/2020
 	mov	edi, VBE3BIOSDATABLOCK ; 97000h
 	;mov	cx, (VBE3INFOBLOCK-VBE3BIOSDATABLOCK)/4
@@ -1161,6 +1199,17 @@ vbe3pminit0:
 	;xor	eax, eax
 	xor	al, al
 	rep	stosd
+%endif
+	; 18/10/2023 - TRDOS v2.0.7
+	; (VBE3BIOSDATABLOCK contains a copy of the 1st
+	; 1536 bytes of the memory, IVT, ROMBIOS DATA etc.)
+	; ((it must not be cleared here))
+	mov	edi, VBE3SAVERESTOREBLOCK ; 97600h
+	mov	cx, (VBE3MODEINFOBLOCK-VBE3SAVERESTOREBLOCK)/4
+		 ; ecx = 1536/4 = 384 double words
+	;xor	eax, eax
+	xor	al, al
+	rep	stosd	
 
 	; Filling PMInfoBlock selector fields
 	mov	edi, [pmid_addr]
@@ -1180,7 +1229,7 @@ pmid_chksum:
 	add	ah, al
 	loop	pmid_chksum
 	neg	ah ; 1 -> 255, 255 -> 1
-	mov	byte [esi], ah  ; checksum
+	mov	[esi], ah  ; checksum
 
 	; far call PM initialization
 	; (VBE3 video bios will return via 'retf')
@@ -1371,6 +1420,16 @@ vbe3h_chcl_next:
 	stosw
 	jmp	short vbe3h_chcl_next
 
+di5:
+	; 18/10/2023 - TRDOS 386 v2.0.7
+	; ATI RV370 Video BIOS (VESA VBE2)
+	; has PMI. (as described in VESA VBE3 specification)
+	;
+	inc	byte [vbe3]  ; [vbe3] = 2 -> 3
+			; will be decreased to 2 again if 'PMID'
+			; signature will not be found. 	
+	jmp	vbe3_pmid_chk ; check for ATI Video BIOS
+
 di0:
 	; 30/11/2020
 	; Memory allocation error !
@@ -1414,6 +1473,8 @@ psem:
 	jmp	short psem
 
 check_boch_plex86_vbe:
+	; 20/10/2023
+	; 18/10/2023
 	; 20/11/2020
 	; check Bochs/Plex86 VGABios VBE extension
 	; (check if TRDOS 386 v2 is running on emulators)
@@ -1424,6 +1485,14 @@ check_boch_plex86_vbe:
 	; bochs/plex86 VGAbios VBE source code
 	;  by Jeroen Janssen (2002)
 	;  and Volker Ruppert (2003-2020)
+
+	; 20/10/2023
+	; (ATI RV370 video bios has PMI support but
+	; it is a VESA VBE2 bios. So, even if [vbe3] is set
+	; to 3 for PMI functionality, it is better to display
+	; VESA VBE number as it is declared by the video bios.)
+
+	mov	byte [vbe_vnumber], "2" ; 20/10/2023
 
 	sub	eax, eax ; 0
 	mov	dx, 1CEh ; VBE_DISPI_IOPORT_INDEX
@@ -1436,7 +1505,10 @@ check_boch_plex86_vbe:
 	in	ax, dx
 	cmp	ah, 0B0h
 	;jne	short not_boch_qemu_vbe
-	jne	short display_mem_info
+	; 18/10/2023
+	;jne	short display_mem_info
+	jne	short di5  ; ATI VESA VBE2 bios or another
+
 	cmp	al, 0C5h ; it must be 0B0C4h or 0B0C5h ..
 	;ja	short not_boch_qemu_vbe
 	ja	short display_mem_info
@@ -1449,7 +1521,9 @@ check_boch_plex86_vbe:
 	; for enabling VBE2 functions in TRDOS 386 v2 kernel
 	mov	[vbe2bios], al ; 0C4h or 0C5h (for BOCHS) 
 			       ; (0C0h-0C5h for QEMU)
-	mov	byte [vbe_vnumber], "2"
+	; 20/10/2023
+	;mov	byte [vbe_vnumber], "2"
+
 	; 26/11/2020
 	; "BOCHS/QEMU/VIRTUALBOX VBE2 Video BIOS ..".
 	mov	esi, vbe2_bochs_vbios ; BOCH/QEMU vbios msg
@@ -1546,6 +1620,18 @@ di3:
 				  ; 1024*768, 24bpp
 	call	set_lfbinfo_table
 
+	;;;
+	; 20/10/2023 - TRDOS 386 v2.0.7
+	mov	esi, [LFB_ADDR]
+	mov	eax, esi
+	;add	eax, 4095 ; LFB start addr is always in page boundary
+	shr	eax, 12	; convert byte address to page address 
+	mov	ecx, [memory_size]
+	cmp	eax, ecx
+	jnb	short di4 ; LFB addr >= main memory size	
+	
+	; (set the overlapped pages as allocated for kernel)
+	;;;
 	call	allocate_lfb_pages_for_kernel
 di4:
 	; 08/09/2016
@@ -3489,9 +3575,10 @@ panic_msg:
 ;       db 0Dh, 0Ah, 0
 
 starting_msg:
-	;;db "Turkish Rational DOS v2.0 [18/04/2021] ...", 0
-	;db "Turkish Rational DOS v2.0 [11/08/2022] ...", 0
-	db "Turkish Rational DOS v2.0 [30/08/2023] ...", 0
+	;;;db "Turkish Rational DOS v2.0 [18/04/2021] ...", 0
+	;;db "Turkish Rational DOS v2.0 [11/08/2022] ...", 0
+	;db "Turkish Rational DOS v2.0 [30/08/2023] ...", 0
+	db "Turkish Rational DOS v2.0 [20/10/2023] ...", 0
 
 NextLine:
 	db 0Dh, 0Ah, 0
@@ -3549,9 +3636,10 @@ DMonth:
 ; 15/11/2020
 db	0
 kernel_version_msg: ; 17/04/2021
-;;db	"TRDOS (386) Kernel v2.0.4 by Erdogan Tan"
-;db	"TRDOS (386) Kernel v2.0.5 by Erdogan Tan" ; 11/08/2022
-db	"TRDOS (386) Kernel v2.0.6 by Erdogan Tan" ; 29/08/2023
+;;;db	"TRDOS (386) Kernel v2.0.4 by Erdogan Tan"
+;;db	"TRDOS (386) Kernel v2.0.5 by Erdogan Tan" ; 11/08/2022
+;db	"TRDOS (386) Kernel v2.0.6 by Erdogan Tan" ; 29/08/2023
+db	"TRDOS (386) Kernel v2.0.7 by Erdogan Tan" ; 20/10/2023
 db	0
 
 ; 20/02/2017

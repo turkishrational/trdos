@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.3 - vidata.s
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.7 - vidata.s
 ; ----------------------------------------------------------------------------
-; Last Update: 24/11/2020
+; Last Update: 17/10/2023 (Previous: 24/11/2020)
 ; ----------------------------------------------------------------------------
 ; Beginning: 16/01/2016
 ; ----------------------------------------------------------------------------
@@ -187,8 +187,9 @@ vga_p_cm_pos equ $ - vga_mode_03h
 	db	0FFh	; crtc_regs (25)
 	db	00h, 01h, 02h, 03h, 04h, 05h, 14h, 07h
  	db	38h, 39h, 3Ah, 3Bh, 3Ch, 3Dh, 3Eh, 3Fh
- 	;db	0Ch, 00h, 0Fh, 08h  ; actl regs (20)
-	db	0Ch, 00h, 0Fh, 00h  ; 19/11/2020
+ 	; 17/10/2023
+	db	0Ch, 00h, 0Fh, 08h  ; actl regs (20)
+	;db	0Ch, 00h, 0Fh, 00h  ; 19/11/2020
 	db	00h, 00h, 00h, 00h, 00h, 10h, 0Eh, 0Fh, 0FFh ; grdc regs (9)
 	; 09/11/2020
 	;db	00h, 00h, 00h, 00h, 00h, 10h, 0Eh, 00h, 0FFh ; grdc regs (9)
@@ -253,6 +254,7 @@ vga_mode_13h:  ; mode 13h, 300*200, 256 colors, linear
 	db	5Fh, 4Fh, 50h, 82h, 54h, 80h, 0BFh, 1Fh 
 	db 	00h, 041h, 00h, 00h, 00h, 00h, 00h, 00h
 	db	9Ch, 8Eh, 8Fh, 28h, 40h, 96h, 0B9h, 0A3h
+	;db	9Ch, 0Eh, 8Fh, 28h, 40h, 96h, 0B9h, 0A3h ; 17/10/2023
 	db	0FFh	; crtc regs (25)
 	db	00h, 01h, 02h, 03h, 04h, 05h, 06h, 07h
  	db	08h, 09h, 0Ah, 0Bh, 0Ch, 0Dh, 0Eh, 0Fh
