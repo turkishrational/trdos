@@ -1,9 +1,9 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.2 - epformat.s
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.7 - epformat.s
 ; ----------------------------------------------------------------------------
 ; Extended DOS Partition (FAT File System) Format Utility for TRDOS 386 v2 OS.
 ; ----------------------------------------------------------------------------
-; Last Update: 25/09/2020
+; Last Update: 28/10/2023
 ; ----------------------------------------------------------------------------
 ; Beginning: 22/09/2020
 ; ----------------------------------------------------------------------------
@@ -1976,6 +1976,8 @@ FAT12_f_10:
 	; (According to MS FAT32 FS specification.)
 	;mov	cx, 1  ; 1 sector per cluster
 	mov	cl, 1  ; CH = 0
+	; 28/10/2023 ; (BugFix)
+	push	ax
 FAT12_f_0:
 	cmp	ax, 4085 ; Max. cluster count for FAT12
 	jb	short FAT12_f_1
@@ -1983,13 +1985,15 @@ FAT12_f_0:
 	shr	ax, 1 ; /2
 	jmp	short FAT12_f_0
 FAT12_f_1:
+	; 28/10/2023
+	pop	ax
 	mov	[bp+0Dh], cl	 ; [BPB_SecPerClus]
 	;mov	byte [bp+10h], 2 ; [BPB_NumFATs] 
 	;mov	word [bp+0Eh], 1 ; [BPB_RsvdSecCnt] 
 	;mov	word [bp+11h], 512 ; [BPB_RootEntCnt]
 	
 	; Calculating FAT size in sectors
-	; AX = partition (volume) size in sectors
+	; AX = partition (volume, data) size in sectors
 	; CX = sectors per clusters
 	xor	dx, dx
 	div	cx
@@ -2400,7 +2404,7 @@ TrDOS_Welcome:
 	db '(for logical dos drives in extended dos partitions)	'
 	db 0Dh, 0Ah
 	db 0Dh, 0Ah
-	db '(c) Erdogan TAN - 2020'
+	db '(c) Erdogan TAN 2020-2023'
 	db 0Dh,0Ah
 	db 0Dh,0Ah
 	db 'Usage: epformat <drive> '

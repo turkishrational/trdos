@@ -4,11 +4,11 @@
 ; ----------------------------------------------------------------------------
 ; Only for 1.44MB (3.5") Floppy Disks
 ; ****************************************************************************
-; Last Update: 12/02/2018
+; Last Update: 30/10/2023  (Previous: 12/02/2018)
 ; ----------------------------------------------------------------------------
 ; Beginning: 23/11/2017
 ; ----------------------------------------------------------------------------
-; Assembler: NASM version 2.11
+; Assembler: NASM version 2.15
 ; ----------------------------------------------------------------------------
 ; Turkish Rational DOS
 ; Operating System Project v2.0 by ERDOGAN TAN (Beginning: 04/01/2016)
@@ -95,13 +95,19 @@ T_04:
 	mov	[bsDriveNumber], al
 	mov	ah, 08h
 	int	13h			; return disk parameters
-	jc	T_19
+	;jc	T_19
+	jc	short T_04_err
 
 	push	cs
 	pop	es			; restore es
 
 	cmp	bl, 04			; Drive Type
-  	jb	T_19
+  	;jb	T_19
+	jnb	short T_04_ok
+	; 28/10/2023
+T_04_err:
+	jmp	T_19
+T_04_ok:
 
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ; Format question
@@ -159,7 +165,8 @@ T_09:
 	mov	bx, FDFORMAT_FATBUFFER_S9
 T_10:
 	call	write_fd_sector
-	jc	T_19
+	;jc	T_19
+	jc	short T_12_err
 	inc	AX
  	cmp	AX, 32
 	jna	short T_10
@@ -193,7 +200,8 @@ T_11:
 	call	write_fd_sector
 	jnc	short T_12
 	and	ah, 16h  ; Errors: 2h, 4h, 10h
-	jz	T_19 ; Drive not ready msg
+	;jz	T_19 ; Drive not ready msg
+	jz	short T_12_err
 
 	; DX = LBA sector value
 	push	dx
@@ -217,18 +225,25 @@ T_12:
 	mov	ax, 1  ; FAT Beginning Address
 	mov	bx, FDFORMAT_FATBUFFER
 	call	write_fd_sector
-	jc	T_19
+	;jc	T_19
+	jnc	short T_12_ok
+	; 28/10/2023
+T_12_err:
+	jmp	T_19
+T_12_ok:
 	mov	bx, FDFORMAT_FATBUFFER_S9
 T_13:
 	inc	ax
 	call	write_fd_sector
- 	jc	T_19
+ 	;jc	T_19
+	jc	short T_12_err
 	cmp	ax, 9
 	jb	short T_13
 	mov	bx, FDFORMAT_FATBUFFER
 	inc	ax
 	call	write_fd_sector
-	jc	T_19
+	;jc	T_19
+	jc	short T_12_err
 	mov	bx, FDFORMAT_FATBUFFER_S9
 T_14:
 	inc	ax 
@@ -547,7 +562,7 @@ TrDOS_Welcome:
 	db	0Dh, 0Ah
 	db	'TR-DOS 1.44 MB FAT12 Floppy Disk Format Utility'
 	db	0Dh, 0Ah
-	db	"v2.0.120218  (c) Erdogan TAN 2005-2018"
+	db	"v3.0.231030  (c) Erdogan TAN 2005-2023"
 	db	0Dh,0Ah
 	db	0Dh,0Ah
 	db	'Usage: fdformat [drive] '
@@ -605,9 +620,6 @@ Disk_NotReadyOrError:
 	db	'Disk error or drive not ready. Try again? (Y/N) '
 	db	0
 
-Error_Code:
-	db	0
-
 FDFORMAT_SECBUFFER:
 	times	512 db 0F6h
 FDFORMAT_FATBUFFER:
@@ -617,10 +629,14 @@ FDFORMAT_FATBUFFER:
 FDFORMAT_FATBUFFER_S9:
 	times	512 db 0
  
-	db	'(c) Erdogan TAN 1998-2018'
+	db	'(c) Erdogan TAN 1998-2023' ; 28/10/2023
 
 RetryCount:
 	db	0
 
 TRDOS_FAT12_fd_bs:
-	incbin 'TRFDBS.BIN' ; 12/02/2018
+	incbin 'TRFDBS.BIN' ; 30/10/2023
+
+	; 28/10/2023
+Error_Code:
+	db	0

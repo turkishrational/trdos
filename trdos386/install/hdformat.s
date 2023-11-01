@@ -1,9 +1,9 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.2 - hdformat.s
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.7 - hdformat.s
 ; ----------------------------------------------------------------------------
 ; Primary DOS Partition (FAT File System) Format Utility for TRDOS 386 v2 OS.
 ; ----------------------------------------------------------------------------
-; Last Update: 25/09/2020
+; Last Update: 28/10/2023
 ; ----------------------------------------------------------------------------
 ; Beginning: 11/09/2020
 ; ----------------------------------------------------------------------------
@@ -1714,7 +1714,9 @@ format_FAT12_fs:
 	;sub	ax, 33  ; 1 reserved sector, 32 root dir sectors
 			; .. now AX has number of data sectors
 			;	 		+ 2* (FAT sectors)
-	sub	ax, cx	
+	sub	ax, cx
+	; 28/10/2023 ; (BugFix)
+	push	ax	
 FAT12_f_10:
 	; Sectors per cluster calculation
 	; (According to MS FAT32 FS specification.)
@@ -1727,13 +1729,15 @@ FAT12_f_0:
 	shr	ax, 1 ; /2
 	jmp	short FAT12_f_0
 FAT12_f_1:
+	; 28/10/2023
+	pop	ax
 	mov	[bp+0Dh], cl	 ; [BPB_SecPerClus]
 	;mov	byte [bp+10h], 2 ; [BPB_NumFATs] 
 	;mov	word [bp+0Eh], 1 ; [BPB_RsvdSecCnt] 
 	;mov	word [bp+11h], 512 ; [BPB_RootEntCnt]
 	
 	; Calculating FAT size in sectors
-	; AX = partition (volume) size in sectors
+	; AX = partition (volume, data) size in sectors
 	; CX = sectors per clusters
 	xor	dx, dx
 	div	cx
@@ -2141,7 +2145,7 @@ TrDOS_Welcome:
 	db 0Dh, 0Ah
 	db 'TR-DOS 386 v2 Hard Disk Partition Formatting Utility '
 	db 0Dh, 0Ah
-	db '(c) Erdogan TAN - 2020'
+	db '(c) Erdogan TAN 2020-2023'
 	db 0Dh,0Ah
 	db 0Dh,0Ah
 	db 'Usage: hdformat <drive> '
