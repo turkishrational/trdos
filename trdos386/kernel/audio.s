@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.5 - audio.s
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.7 - audio.s
 ; ----------------------------------------------------------------------------
-; Last Update: 06/08/2022  (Previous: 01/09/2020 - Kernel v2.0.4)
+; Last Update: 01/11/2023  (Previous: 06/08/2022 - Kernel v2.0.5)
 ; ----------------------------------------------------------------------------
 ; Beginning: 03/04/2017
 ; ----------------------------------------------------------------------------
@@ -201,6 +201,10 @@ EOL	EQU BIT31
 ; 28/05/2017
 INTEL_VID	equ	8086h	; Intel's PCI vendor ID
 ICH_DID		equ	2415h	; ICH (82801AA) device ID
+; 01/11/2023
+NFORCE_VID	equ	10DEh	; Nvidia NFORCE PCI vendor ID
+NFORCE_DID	equ	0059h	; Nvidia NFORCE (CK804) device ID
+
 NAMBAR_REG      equ	10h	; native audio mixer Base Address Register
 NABMBAR_REG     equ	14h	; native audio bus mastering Base Addr Reg
 
@@ -262,6 +266,12 @@ DetectICH:
 	mov     eax, (ICH_DID << 16) + INTEL_VID
         call    pciFindDevice
         jnc     short d_ac97_1
+
+	; 01/11/2023
+	mov     eax, (NFORCE_DID << 16) + NFORCE_VID
+        call    pciFindDevice
+        jnc     short d_ac97_1
+
 d_ac97_0:
 ; couldn't find the audio device!
 	retn
@@ -311,9 +321,14 @@ d_ac97_1:
 	;mov	al, NAMBAR_REG	; Native Audio Mixer BAR (10h)
 	call	pciRegRead32
 
-	cmp	word [audio_vendor], 8086h ; AC'97 ?
-	jne	short d_vt8233_1
+	cmp	word [audio_vendor], INTEL_VID ; 8086h ; AC'97 ?
+	;jne	short d_vt8233_1
+	; 01/11/2023
+	je	short d_ac97_3
+	cmp	word [audio_vendor], NFORCE_VID ; 10DEh  ; AC'97
+	jne	short d_vt8233_1	
 
+d_ac97_3:
 	;and	dx, 0FFFEh ; Audio Codec IO_ADDR_MASK
 	; 06/08/2022
 	and	dl, 0FEh
