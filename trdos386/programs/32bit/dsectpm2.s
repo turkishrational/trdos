@@ -6,9 +6,9 @@
 ;
 ; 27/05/2016
 ;
-; Derived from 'dsestrm2.s' source code for Retro UNIX 386 v1 'boot'
+; Derived from 'dsectrm2.s' source code for Retro UNIX 386 v1 'boot'
 ;
-; [ Last Modification: 02/07/2016 ]
+; [ Last Modification: 26/08/2020 ]
 ;
 ; ****************************************************************************
 ; dsectrm2.s (21/02/2015, Retro UNIX 386 v1, standalone program, real mode)
@@ -31,6 +31,8 @@ HOMEKey  equ 47E0h
 ENDKey	 equ 4FE0h
 PgUpKey	 equ 49E0h
 PgDnKey  equ 51E0h 
+
+; 02/07/2016
 
 [BITS 32]
 	
@@ -1019,34 +1021,54 @@ hc_sc:
 	retn
 
 set_disk_parms:
-        movzx   ebx, byte [drv]
+	; 26/08/2020
+	mov	dl, [drv]
+	cmp	dl, 80h
+	jb	short set_disk_parms_fd ; floppy
+	and	al, 1  ; LBA ready ?
+	jz	short set_disk_parms_chs
+set_disk_parms_lba:
+	; Translated FDPT
+	mov	ax, [ebx+9]  ; physical cylinders
+	mov	dh, [ebx+11] ; physical heads
+	mov	cl, [ebx+4]  ; physical sectors per track 
+	jmp	short sdp0
+set_disk_parms_fd:
+	;mov	al, ch ; last cylinder (bits 0-7)
+	;mov	ah, cl ; 
+	;shr	ah, 6  ; last cylinder (bits 8-9)
+	inc	ax  ; convert max. cyl number to cyl count
+	mov	al, ch
+	inc	al
+	sub	ah, ah
+	inc	dh  ; convert last head to heads
+	;and	cl, 63 ; sectors per track
+	jmp	short sdp0  
+set_disk_parms_chs:
+	; Standard FDPT
+	mov	ax, [ebx]  ; physical cylinders
+	mov	dh, [ebx+2] ; physical heads
+	mov	cl, [ebx+14] ; physical sectors per track 
+sdp0:
+	movzx   ebx, dl
 	cmp	bl, 80h
-	jb	short sdp0
+	jb	short sdp1
 	sub	bl, 7Eh
-sdp0:	
-	;add	ebx, drv_status
-        ;mov     byte [ebx], 80h ; 'Present' flag
-	;
-	mov	al, ch ; last cylinder (bits 0-7)
-	mov	ah, cl ; 
-	shr	ah, 6  ; last cylinder (bits 8-9)
-	;sub	ebx, drv_status
+sdp1:	
 	shl	bl, 1
 	add	ebx, drv_cylinders
-	inc	ax  ; convert max. cyl number to cyl count		
 	mov	[ebx], ax
 	push	ax ; ** cylinders
 	sub	ebx, drv_cylinders
 	add	ebx, drv_heads
-	mov	al, dh ; last head number
+	mov	al, dh ; heads
 	xor	ah, ah
-	inc	ax     ; heads 	
 	mov	[ebx], ax
-        sub     ebx, drv_heads
-        add     ebx, drv_spt
+	sub     ebx, drv_heads
+	add     ebx, drv_spt
 	and	cx, 3Fh  ; sectors (bits 0-6)
-	mov	[ebx], cx
-        sub     ebx, drv_spt
+	mov	[ebx], cx ; sectors per track
+	sub     ebx, drv_spt
 	shl	bx, 1
 	add	ebx, drv_size ; disk size (in sectors)
 	; LBA size = cylinders * heads * secpertrack
@@ -1054,14 +1076,59 @@ sdp0:
 	mov	dx, ax ; heads*spt					
 	pop	ax ; ** cylinders
 	cmp	byte [drv], 80h
-	jb	short sdp1
+	jb	short sdp2
 	dec	ax ; 1 cylinder reserved (!?)
-sdp1:
+sdp2:
 	mul	dx ; cylinders * (heads*spt)		
 	mov	[ebx], ax
 	mov	[ebx+2], dx
 	;
-	retn
+	retn	
+
+;set_disk_parms
+;	movzx   ebx, byte [drv]
+;	cmp	bl, 80h
+;	jb	short sdp0
+;	sub	bl, 7Eh
+;sdp0:	
+;	;add	ebx, drv_status
+;	;mov     byte [ebx], 80h ; 'Present' flag
+;	;
+;	mov	al, ch ; last cylinder (bits 0-7)
+;	mov	ah, cl ; 
+;	shr	ah, 6  ; last cylinder (bits 8-9)
+;	;sub	ebx, drv_status
+;	shl	bl, 1
+;	add	ebx, drv_cylinders
+;	inc	ax  ; convert max. cyl number to cyl count		
+;	mov	[ebx], ax
+;	push	ax ; ** cylinders
+;	sub	ebx, drv_cylinders
+;	add	ebx, drv_heads
+;	mov	al, dh ; last head number
+;	xor	ah, ah
+;	inc	ax     ; heads 	
+;	mov	[ebx], ax
+;	sub     ebx, drv_heads
+;	add     ebx, drv_spt
+;	and	cx, 3Fh  ; sectors (bits 0-6)
+;	mov	[ebx], cx
+;	sub     ebx, drv_spt
+;	shl	bx, 1
+;	add	ebx, drv_size ; disk size (in sectors)
+;	; LBA size = cylinders * heads * secpertrack
+;	mul	cx 
+;	mov	dx, ax ; heads*spt					
+;	pop	ax ; ** cylinders
+;	cmp	byte [drv], 80h
+;	jb	short sdp1
+;	dec	ax ; 1 cylinder reserved (!?)
+;sdp1:
+;	mul	dx ; cylinders * (heads*spt)		
+;	mov	[ebx], ax
+;	mov	[ebx+2], dx
+;	;
+;	retn
 
 read_disk_sector:
 	; EAX = sector number (LBA)
@@ -1807,9 +1874,10 @@ align 2
 
 prg_msg:
 	db 0Dh, 0Ah, 07h
-	db 'Disk Read Utility - TRDOS 386 v1 Disk I/O and timer test.'
+	db 'Disk Read Utility - TRDOS 386 v2 Disk I/O and timer test.'
 	db 0Dh, 0Ah	
-	db 'by Erdogan Tan  [02/07/2016]'
+	;db 'by Erdogan Tan  [07/07/2016]'
+	db 'by Erdogan Tan  [26/08/2020]'   ; LBA disk (>8GB) bugfix
 	db 0Dh, 0Ah, 0Dh, 0Ah
         db '(Press any key to continue...)'
 	db 0Dh, 0Ah, 0

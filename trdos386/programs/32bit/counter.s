@@ -6,7 +6,7 @@
 ;
 ; 19/12/2016
 ;
-; [ Last Modification: 02/01/2017 ]
+; [ Last Modification: 15/01/2017 ]
 ;
 ; ****************************************************************************
 
@@ -17,11 +17,11 @@
 	call	getch
 
 	cmp	al, 1Bh  ; ESC key
-	je	terminate ; short olacak !	
+	je	short terminate	
 
 	mov	word [color], 22h
 
-	; start (Real Time Clock) timer function
+	; start timer function
 	;;mov	bl, 0
         ;;mov	bh, 84h	 ; Current Timer setup, Callback method 	
         mov	bx, 8400h
@@ -94,14 +94,6 @@ hang:
 ;	db	0
 
 t_callback:
-	pushfd
-
-	; save registers
-	push	edi
-	push	edx
-	push	eax
-	push	ecx
-	
 	inc	byte [timer_event_status]
 
 	sub	edx, edx
@@ -127,18 +119,13 @@ _tcb2:
 _tcb3:
 	inc	word [tcount]
 
-	; restore registers
-	pop	ecx
-	pop	eax
-	pop	edx
-	pop	edi
-
-	popfd
-
-	retn
-
-	;iret	; restore EIP, CS, E-FLAGS	
-		; return to normal running code
+	mov	eax, 39 ; 'sysrele'
+	int	40h
+;here:
+;	nop
+;	nop
+;	nop
+;	jmp	short here
 
 getch:
 	; Getchar by using keyboard interrupt
@@ -163,7 +150,7 @@ pmsg_ok:
 
 prg_msg:
 	db 0Dh, 0Ah, 07h
-	db 'TRDOS 386 timer callback test program by Erdogan Tan [02/01/2017]'
+	db 'TRDOS 386 timer callback test program by Erdogan Tan [15/01/2017]'
 	db 0Dh, 0Ah, 0Dh, 0Ah
         db '(Press any key to continue...)'
 	db 0Dh, 0Ah
