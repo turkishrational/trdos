@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.7 - memory.s
 ; ----------------------------------------------------------------------------
-; Last Update: 20/10/2023  (Previous: 29/08/2023)
+; Last Update: 02/12/2023  (Previous: 29/08/2023)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -381,10 +381,10 @@ al_p_scan:
 			   ; Sets ZF to 1 if no bits are found set.
 	jnz	short al_p_found ; ZF = 0 -> a free page has been found
 			 ;
-			 ; NOTE:  a Memory Allocation Table bit 
-			 ;	  with value of 1 means 
-			 ;	  the corresponding page is free 
-			 ;	  (Retro UNIX 386 v1 feature only!)
+			 ; NOTE: a Memory Allocation Table bit 
+			 ;	 with value of 1 means 
+			 ;	 the corresponding page is free 
+			 ;	 (Retro UNIX 386 v1 feature only!)
 	add	ebx, 4
 			 ; We return back for searching next page block
 			 ; NOTE: [free_pages] is not ZERO; so, 
@@ -1185,6 +1185,7 @@ dpt_err:
 	retn
 
 page_fault_handler:	; CPU EXCEPTION 0Eh (14) : Page Fault !
+	; 29/11/2023 - TRDOS 386 v2.0.7
 	; 17/04/2021 - TRDOS 386 v2.0.4
 	;	 (temporary modifications)
 	; 21/09/2015
@@ -1363,11 +1364,11 @@ page_fault_handler:	; CPU EXCEPTION 0Eh (14) : Page Fault !
 	;	
 	test	dl, 2	; page fault was caused by a page write
 			; sign
-        jz      pfh_p_err
+        jz      short pfh_p_err
 	; 31/08/2015
 	test	dl, 4	; page fault was caused while CPL = 3 (user mode)
 			; sign.  (U+W+P = 4+2+1 = 7)
-        jz	pfh_pv_err
+        jz	short pfh_pv_err
 	;
 	; make a new page and copy the parent's page content
 	; as the child's new page content
@@ -1375,10 +1376,27 @@ page_fault_handler:	; CPU EXCEPTION 0Eh (14) : Page Fault !
 	mov	ebx, cr2 ; CR2 contains the linear address 
 			 ; which has caused to page fault
 	call 	copy_page
-        jc      pfh_im_err ; insufficient memory
+        jc	short pfh_im_err ; insufficient memory
 	;
         jmp     pfh_cpp_ok
-	;
+
+	; 29/11/2023
+pfh_im_err:
+	mov	eax, ERR_MAJOR_PF + ERR_MINOR_IM ; Error code in AX
+			; Major (Primary) Error: Page Fault
+			; Minor (Secondary) Error: Insufficient Memory !
+	jmp	short pfh_err_retn
+
+	; 29/11/2023
+pfh_p_err: ; 09/03/2015
+pfh_pv_err:
+	; Page fault was caused by a protection-violation
+	mov	eax, ERR_MAJOR_PF + ERR_MINOR_PV ; Error code in AX
+			; Major (Primary) Error: Page Fault
+			; Minor (Secondary) Error: Protection violation !
+	stc
+	jmp	short pfh_err_retn
+
 pfh_alloc_np:
 	call	allocate_page	; (allocate a new page)
         jc      pfh_im_err	; 'insufficient memory' error
@@ -1487,21 +1505,6 @@ pfh_err_retn:
 	pop	ebx
 	retn 
 	
-pfh_im_err:
-	mov	eax, ERR_MAJOR_PF + ERR_MINOR_IM ; Error code in AX
-			; Major (Primary) Error: Page Fault
-			; Minor (Secondary) Error: Insufficient Memory !
-	jmp	short pfh_err_retn
-
-pfh_p_err: ; 09/03/2015
-pfh_pv_err:
-	; Page fault was caused by a protection-violation
-	mov	eax, ERR_MAJOR_PF + ERR_MINOR_PV ; Error code in AX
-			; Major (Primary) Error: Page Fault
-			; Minor (Secondary) Error: Protection violation !
-	stc
-	jmp	short pfh_err_retn
-
 copy_page:
 	; 29/08/2023 (TRDOS 386 v2.0.6)
 	; 22/09/2015
@@ -2991,12 +2994,13 @@ amb_14:
         jmp     amb_25
 
 allocate_lfb_memory_block:
+	; 28/11/2023
 	; 20/10/2023 - TRDOS 386 v2.0.7
 	; (short way to set the LFB page bits on the M.A.T.)
 	; called from 'allocate_lfb_pages_for_kernel' 
-	mov	[mem_pg_pos], eax    ; LFB start/base address   	
+	mov	[mem_pg_pos], eax    ; LFB start/base address as page number
 	mov	[mem_aperture], ecx  ; number of LFB pages
-				     ; (!which overlapping main memory!)	
+				     ; (!which overlapping main memory!)
 	push	edx ; *
 	push	ebx ; **
 	jmp	short amb_16
@@ -3010,7 +3014,7 @@ amb_16:
 	; 25/04/2017
 	shr	edx, 3		 ; 8 pages in one allocation byte
 	and	dl, 0FCh	 ; clear lower 2 bits
-				 ; (for dword/32bit positioning)	
+				 ; (for dword/32bit positioning)
 
 	mov	ebx, MEM_ALLOC_TBL
 	add	ebx, edx
@@ -3046,8 +3050,10 @@ amb_18:
 	jmp	short amb_18
 amb_19:	
 	pop	ecx ; ***
-	and	ecx, ecx ; 0 ?
-	jz	short amb_22	
+	;and	ecx, ecx ; 0 ?
+	;jz	short amb_22	
+	; 28/11/2023
+	jecxz	amb_22
 	; 01/04/2016
 	mov	al, 32
 amb_20:
@@ -3126,6 +3132,12 @@ amb_27:
 	mov	[mem_pg_count], eax
 
 	retn
+
+deallocate_memory_block_x:
+	; 26/11/2023 - TRDOS 386 v2.0.7
+	; deallocate pages after rounding up
+	; ((audio buffer size etc. may not be rounded up to page boundary)) 
+	add	ecx, PAGE_SIZE - 1   ; 4095
 
 deallocate_memory_block:
 	; 03/04/2016
@@ -3811,6 +3823,179 @@ a_u_pd_5:
 	;pop	edi ; *
 	retn
 
+	; 28/11/2023
+;a_lfb_k__err:
+	;retn
+
+allocate_lfb_pages_for_kernel:
+	; 02/12/2023
+	; 29/11/2023
+	; 28/11/2023
+	; 20/10/2023 - TRDOS 386 v2.0.7
+	; (only the overlapped main memory pages will be allocated)
+	; 28/11/2023
+	; (but all LFB pages will be added to the kernel's page tables)
+	; (NOTE: LFB size -which will be used- is the size of the max.
+	;  recognized screen resolution. For example: 1024*768*4 bytes)
+	; 15/12/2020
+	; 14/12/2020 - TRDOS 386 v2.0.3
+	; Set kernel page tables for linear frame buffer 
+	;
+	; Input:
+	;	;[LFB_ADDR] = linear frame buffer base address
+	;	;[LFB_SIZE] = linear frame buffer size in bytes
+	;	; 29/11/2023
+	;	;ebx = Linear frame buffer base address as page num
+	;	; 20/10/2023
+	;	esi = linear frame buffer base address
+	;	ecx = memory size in pages = [memory_size]
+	;	; 28/11/2023
+	;	edx = linear frame buffer size in pages
+	; Output:
+	;	none
+	;	cf = 1 -> error
+	;
+	; Modified registers: eax, ebx, ecx, edx, esi, edi, ebp
+
+
+; 02/12/2023 ; (!**!)
+; ('memory size' -for M.A.T.- is always <= LFB stat/base address) 
+%if 0
+
+	; 29/11/2023
+	; allocate LFB blocks which < memory size at first
+	
+	;mov	eax, edx
+	;shl	eax, 12
+	;add	eax, esi
+	;jc	short a_lfb_k__err ; > 4GB limit
+	;
+	;;mov	eax, 1048576 ; page count of (full) 4GB memory
+	;;sub	eax, edx
+	;;cmp	eax, esi
+	;jb	short a_lfb_k__err ; > 4GB limit
+
+	mov	ebx, esi ; LFB base/start address
+	shr	ebx, 12	 ; convert byte address to page address
+	; ebx = LFB start/base page number 
+
+	sub	ecx, ebx
+	jna	short a_lfb_k_2 ; skip M.A.T. bit allocation 
+	cmp	ecx, edx
+	jna	short a_lfb_k_0
+	mov	ecx, edx
+a_lfb_k_0:
+	sub	edx, ecx
+	jna	short a_lfb_k_1
+
+	; edx = remain count of LFB pages which are out of the M.A.T. 
+	; ebx = LFB start/base page number
+	; ecx = page allocation count in the M.A.T.
+
+	;mov	eax, 4096
+	;mul	ecx
+	mov	eax, ecx
+	shl	eax, 12 ; * 4096
+
+	add	esi, eax
+	; esi = LFB address just after the main memory if there is	
+a_lfb_k_1:
+	mov	eax, ebx ; LFB start/base page number
+	call	allocate_lfb_memory_block
+
+	; here if there is, remain (the 2nd) part of the LFB 
+	; will be allocated by using new kernel page table(s)
+	; (but M.A.T. bits will not be cleared because 
+	;  the 2nd LFB part is out of the M.A.T.)	
+	
+	and	edx, edx
+	jz	short a_lfb_k_6  ; all LFB pages have been allocated
+
+%endif
+
+a_lfb_k_2:
+	; 29/11/2023
+	shr	esi, 12	; convert LFB address to page number
+	; edx = count of pages to be added (in kernel page tables)
+	; 28/11/2023
+	mov	ebp, edx
+	add	edx, 1023 ; round up
+	shr	edx, 10	  ; / 1024
+	; edx = count of kernel page tables to be added
+	; (edx = 1 or edx = 2)
+	; ((1024*768*4 = 3145728 bytes, 768 PTEs, 1 page table))
+	; ((1920*1080*4 = 8294400 bytes, 2025 PTEs, 2 page tables)) 
+	call	allocate_page
+	;jc	short a_lfb_k__err
+	; (mem alloc error is not expected at this startup stage)
+	; eax = physical address of the new page table
+	mov	edi, esi  ; LFB start/base page number
+	shr	edi, 10
+	; edi = PDE entry number of the Linear Frame Buffer addr
+	; (edi = 832 for 0D0000000h, edi = 896 for 0E0000000h)
+	shl	edi, 2
+	; edi = PDE offset
+	add	edi, [k_page_dir] ; Kernel's Page Dir Address
+	push	eax ; +
+	or	ax, PDE_A_PRESENT + PDE_A_WRITE + PDE_EXTERNAL
+				; supervisor + read&write + present
+				; + external memory block (LFB)
+	stosd
+
+	dec	edx
+	jz	short a_lfb_k_3	; only 1 new page table
+
+	; the 2nd page table
+	call	allocate_page
+	;jc	short a_lfb_k__err
+	; (mem alloc error is not expected at this startup stage)
+	; eax = physical address of the new page table
+	mov	ebx, eax
+	or	ax, PDE_A_PRESENT + PDE_A_WRITE + PDE_EXTERNAL
+				; supervisor + read&write + present
+				; + external memory block (LFB)
+	stosd
+
+a_lfb_k_3:
+	; set new PTEs
+	;
+	; ebp = count of pages (PTEs) to be allocated
+	pop	edi ; +	 ; 1st page table address	
+	; 29/11/2023
+	mov	ecx, 1024	; number of PTEs in a page table
+	mov	eax, esi	; LFB base/start page number
+			 	; (may be the 2nd part of the LFB)
+	shl	eax, 12
+	or	ax, PTE_A_PRESENT + PTE_A_WRITE + PTE_EXTERNAL
+				; supervisor + read&write + present
+				; + external memory block (LFB)
+a_lfb_k_4:
+	stosd			; save as PTE
+	dec	ebp
+	jz	short a_lfb_k_5
+	add	eax, 4096	; the next page address
+	loop	a_lfb_k_4
+	
+	;and	ebx, ebx
+	;jz	short a_lfb_k_6
+	mov	edi, ebx	; the 2nd page table address
+	;xor	ebx, ebx
+	;mov	ecx, 1024
+	mov	ch, 4 ; cx = 4*256 = 1024
+	jmp	short a_lfb_k_4 ; only 1 more loop (no the 3rd pt)
+				; (ebp <= 1024 here)
+a_lfb_k_5:
+	dec	ecx
+	jz	short a_lfb_k_6
+	xor	eax, eax	; clear page table entry (empty)
+	rep	stosd
+a_lfb_k_6:
+	; 29/11/2023
+	retn
+
+; 28/11/2023
+%if 0 
+
 allocate_lfb_pages_for_kernel:
 	; 20/10/2023 - TRDOS 386 v2.0.7
 	; (only the overlapped main memory pages will be allocated)
@@ -3940,6 +4125,8 @@ a_lfb_k_4:
 	xor	eax, eax ; clear page table entry (empty)
 	rep	stosd
 	retn
+
+%endif
 
 ;deallocate_lfb_pages_for_kernel:
 	; 15/12/2020

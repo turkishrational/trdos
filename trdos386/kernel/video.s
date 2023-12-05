@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.5 - video.s
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.7 - video.s
 ; ----------------------------------------------------------------------------
-; Last Update: 07/08/2022 (Previous: 17/04/2021 - Kernel v2.0.4)
+; Last Update: 29/11/2023 (Previous: 07/08/2022 - Kernel v2.0.5)
 ; ----------------------------------------------------------------------------
 ; Beginning: 16/01/2016
 ; ----------------------------------------------------------------------------
@@ -210,6 +210,19 @@ M1:	dd	SET_MODE	; TABLE OF ROUTINES WITHIN VIDEO I/O
 	dd	WRITE_STRING	; 23/06/2016 (TRDOS 386)
 M1L	EQU	$ - M1
 
+; 29/11/2023 - TRDOS 386 v2.0.7
+;	[VESA VBE3-PMI functions]
+;	(fixing page table problems for LFB/PMI for >2.5GB main memory)
+;	((Addresses of kernel page tables and PMI videobios address
+;	  must be < 4MB or cr3 register must contain kernel's page dir
+;	  during video interrupt. Save-change-restore cr3 register
+;	  content here is a bugfix method to prevent page faults 
+;	  for -real- computers with >2.5GB main memory.))
+;	 {INT 31h was not changing cr3 while it contains user's
+;	  page directory addr and accessing beyond of the 1st 4MB was
+;	  causing to page faults.. because, after the 1st 4MB, user's
+;	  page tables contain non-linear/virtual memory pages.}
+;
 ; 02/08/2022 - TRDOS 386 v2.0.5
 ; 06/12/2020
 ; 05/12/2020
@@ -394,6 +407,14 @@ VBE_func:
 	; (every function must restore and set
 	; registers except esp, esi, es, ds)
 
+	; 29/11/2023 - TRDOS 386 v2.0.7
+	mov	esi, cr3
+	push	esi ; *****
+	;cmp	esi, [k_page_dir]
+	;je	short VBE_func_x
+	mov	esi, [k_page_dir]
+	mov	cr3, esi
+;VBE_func_x:
 	cmp	byte [vbe3], 2
 	ja	short VESA_VBE3_PMI_CALL ; VBE3 video bios ('PMID')
 	;je	short VBE_func_0  ; Bochs/Qemu/VirtualBox emulator
@@ -429,6 +450,12 @@ VBE_func_1:
 
 VBE_bios_return:
 	cli
+	; 29/11/2023 - TRDOS 386 v2.0.7
+	pop	esi ; *****
+	;cmp	esi, [k_page_dir]
+	;je	short VBE_bios_return_x
+	mov	cr3, esi
+;VBE_bios_return_x:	
 	pop	esi ; ****
 	pop	ebp ; *** ; 27/11/2020
 	pop	es  ; **
@@ -478,7 +505,7 @@ VESA_VBE3_PMI_CALL: ; VESA VBE video bios (firmware) functions
 	;sti
 
 	push	edi ; *****
-		
+
 	call	dword [esi+P1] ; call VBE 3 function
 
 	pop	edi ; *****
@@ -866,6 +893,7 @@ vbe3_sm_3:
 	jmp	short vbe3_sm_4
 	
 vesa_vbe3_pmi:
+	; 29/11/2023 - TRDOS 386 v2.0.7
 	; 12/12/2020
 	; 08/12/2020
 	; 07/12/2020
@@ -878,7 +906,19 @@ vesa_vbe3_pmi:
 
 	; 04/12/2020
 	; Only 'set mode' will be redirected to vbe3 video bios
-	; (by setting mode 3 multiscreen paraters before and after) 
+	; (by setting mode 3 multiscreen parameters before and after) 
+
+	; 29/11/2023 - TRDOS 386 v2.0.7
+	push	eax
+	mov	eax, cr3
+	xchg	eax, [esp] ; **!**
+	push	eax
+	;cmp	esi, [k_page_dir]
+	;je	short vesa_vbe3_pmi_x
+	mov	eax, [k_page_dir]
+	mov	cr3, eax
+;vesa_vbe3_pmi_x:
+	pop	eax
 
 	; 06/12/2020
 	and	ah, ah	; 0 = set mode function
@@ -1077,6 +1117,14 @@ vbe3_pmi_8:
 	;(TRDOS 386 v2.0.3, INT 31h, ah=0 return)
 	xor	eax, eax  ; eax = 0 -> succesful
 vesa_vbe3_pmi_retn:
+	; 29/11/2023 - TRDOS 386 v2.0.7
+	xchg	eax, [esp] ; **!**
+	;cmp	eax, [k_page_dir]
+	;je	short vesa_vbe3_pmi_retn_x
+	mov	cr3, eax
+;vesa_vbe3_pmi_retn_x:
+	pop	eax
+	;
 	pop	es  ; **
 	pop	ds  ; *
 	iretd

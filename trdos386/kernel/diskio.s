@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.5 - diskio.s
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.7 - diskio.s
 ; ----------------------------------------------------------------------------
-; Last Update: 11/08/2022 (Previous: 18/04/2021 - Kernel v2.0.4)
+; Last Update: 02/12/2023 (Previous: 11/08/2022 - Kernel v2.0.5)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -835,12 +835,21 @@ DSK_WRITE:
 ; ON EXIT:	@DSKETTE_STATUS, CY REFLECT STATUS OF OPERATION
 ;-------------------------------------------------------------------------------
 RD_WR_VF:
+	; 02/12/2023
 	; 11/08/2022
 	; 09/08/2022
 	; 07/08/2022
 	; 06/08/2022
 	; 11/04/2021 (32 bit push/pop, AX -> EAX)
+	
 	push	eax			; SAVE DMA, NEC PARAMETERS
+	
+	; 02/12/2023
+	; (diskette change check for 'dir', 28 seconds)
+	mov	al, [TIMER_LOW+1]
+	shr	al, 1
+	mov	[P_TIMER], al
+
 	call	XLAT_NEW		; TRANSLATE STATE TO PRESENT ARCH.
 	call	SETUP_STATE		; INITIALIZE START AND END RATE
 	pop	eax			; RESTORE READ/WRITE/VERIFY
@@ -4793,6 +4802,8 @@ D1:					; FUNCTION TRANSFER TABLE
 	dd	DISK_WRITE		; 1Ch ; LBA write
 D1L     EQU    $ - D1
 
+	; 02/12/2023
+	; 01/12/2023 - TRDOS 386 v2.0.7 
 	; 07/08/2022
 	; 17/07/2022 - TRDOS 386 v2.0.5
 DISK_IO_CONT:
@@ -4889,10 +4900,9 @@ su2:
 	ja 	short invldfnc
 	;;pop	edx ; * ; 14/02/2015
 	;mov	ax, cx ; Lower word of LBA address (bits 0-15)
-	mov	eax, ecx ; LBA address (21/02/2015)
-	; 13/07/2022
-	mov	cl, dl ; 14/02/2015
-	jmp	short lbarw2
+
+	; 01/12/2023 (48 bit LBA rw) 
+	jmp	lba_read_write
 
 lbarw1:
 	; convert CHS to LBA
@@ -5084,6 +5094,122 @@ BAD_COMMAND:
 	mov	al, 0
 	retn
 
+; -----------------------------------------------------
+; 48 bit LBA read/write
+; -----------------------------------------------------
+
+su10:	; 01/12/2023 ; 28 bit LBA r/w
+	mov	eax, ecx ; LBA address (21/02/2015)
+	; 13/07/2022
+	mov	cl, dl ; 14/02/2015
+	jmp	short lbarw2
+
+lba_read_write:
+	; 02/12/2023
+	; 01/12/2023 - TRDOS 386 v2.0.7 (48 bit LBA rw)
+	cmp	ecx, 0FFFFFFFh
+	jnb	short su6
+	;movzx	eax, byte [esp] ; ***
+	xor	eax, eax
+	mov	al, [esp] ; *** ; sector count
+	add	eax, ecx
+	jnc	short su5
+	mov	byte [DISK_STATUS1], ERR_INV_PARAMETER
+	jmp	short su7
+su5:	
+	cmp	eax, 0FFFFFFFh ; 28 bit limit
+	jna	short su10
+su6:
+	; 48 bit LBA r/w
+	mov	al, [hf_m_s]	; (+!+) ; 02/12/2023
+	shl	al, 4
+	; 02/12/2023
+	;add	al, 0E0h
+	add	al, 40h
+	;;add	al, 0Eh
+	;add	al, 04h
+	;shl	al, 4
+	mov	dx, [HF_PORT]
+	add	dl, 6	; hd base port + 6
+	out	dx, al
+	; 02/12/2023
+	mov	[CMD_BLOCK+6], al
+	inc	edx	; hd base port + 7
+	in	al, dx
+	NEWIODELAY
+	;test	al, 128		; READY ?
+	and	al, 128
+	jz	short su8
+	in	al, dx
+	;test	al, 128
+	and	al, 128
+	jz	short su8
+	mov	byte [DISK_STATUS1], TIME_OUT
+su7:
+	pop	eax ; ***
+	mov	al, 0
+	retn
+su8:
+	;mov	dx, [HF_PORT]
+	;inc	edx
+	;inc	edx	; hd base port + 2
+	sub	dl, 5	; hd base port + 2
+	;xor	al, al
+	out	dx, al	; sector count hb (bits 8 to 15) = 0
+	inc	edx	; hd base port + 3
+	mov	eax, ecx ; LBA disk sector address
+	rol	eax, 8 
+	out	dx, al	; LBA byte 4 (bits 24 to 31)
+	inc	edx	; hd base port + 4
+	xor	al, al
+	out	dx, al	; LBA byte 5 (bits 32 to 39) = 0
+	inc	edx	; hd base port + 5
+	;sub	al, al
+	out	dx, al	; LBA byte 6 (bits 40 to 47) = 0
+
+	mov	al, [esp] ; ***
+	; 02/12/2023
+	mov	[CMD_BLOCK+1], al
+
+	sub	dl, 3	; hd base port + 2
+	out	dx, al	; sector count lb (bits 0 to 7) = 0
+	inc	edx	; hd base port + 3
+	mov	eax, ecx ; LBA disk sector address
+	out	dx, al	; LBA byte 1 (bits 0 to 7)
+	inc	edx	; hd base port + 4
+	shr	eax, 8
+	out	dx, al	; LBA byte 2 (bits 8 to 15) = 0
+	inc	edx	; hd base port + 5
+	shr	eax, 8
+	out	dx, al	; LBA byte 3 (bits 16 to 23) = 0
+
+ 	inc     edx	; hd base port + 6
+
+	; 02/12/2023 (not necessary) (+!+)
+	;mov	al, [hf_m_s]
+	;shl	al, 4
+	;add	al, 40h
+	;out	dx, al
+
+	pop	eax	; ***
+
+	inc	edx	; dx = hd base port + 7 
+			;      command/status port
+	;xchg	esi, ebx
+	;mov	edi, ebx
+	mov	edi, esi ; sector buffer 
+	cmp	ah, 1Ch
+	jne	short su_9
+	mov	al, 34h ; WRITE SECTOR(S) EXT
+	out	dx, al
+	jmp	CMD_WX
+su_9:
+	mov	al, 24h ; READ SECTOR(S) EXT
+	out	dx, al
+	jmp	CMD_RX
+
+; -----------------------------------------------------
+
 ; 09/08/2022
 ; 07/08/2022
 ; 17/07/2022
@@ -5255,6 +5381,7 @@ COMMANDI:
 	mov	edi, ebx ; 21/02/2015
 	call	COMMAND 		; OUTPUT COMMAND
 	jnz	short CMD_ABORT
+CMD_RX:	; 01/12/2023 (48 bit LBA read)
 CMD_I1:
 	call	_WAIT			; WAIT FOR DATA REQUEST INTERRUPT
 	jnz	short TM_OUT		; TIME OUT
@@ -5341,6 +5468,7 @@ CMD_OF:
 	mov	esi, ebx ; 21/02/2015
 	call	COMMAND 		; OUTPUT COMMAND
 	jnz	short CMD_ABORT
+CMD_WX:	; 01/12/2023 (48 bit LBA write)
 	call	WAIT_DRQ		; WAIT FOR DATA REQUEST
 	jc	short TM_OUT		; TOO LONG
 CMD_O1: 
@@ -5353,7 +5481,13 @@ CMD_O1:
 	; ecx = 256
 	cli
 	cld
-	rep	outsw
+	;rep	outsw
+	; 01/12/2023 - TRDOS 386 v2.0.7
+CMD_01_L:	
+	outsw
+	jmp	$+2
+	loop	CMD_01_L
+
 	sti
 
 	test	byte [CMD_BLOCK+6], ECC_MODE ; CHECK FOR NORMAL OUTPUT
@@ -5410,7 +5544,9 @@ FMT_TRK:				; FORMAT TRACK (AH = 005H)
 	pop	ebx
 	;pop	bx
 	;pop	es
-	jmp	short CMD_OF		; GO EXECUTE THE COMMAND
+	;jmp	short CMD_OF		; GO EXECUTE THE COMMAND
+	; 01/12/2023
+	jmp	CMD_OF
 
 ;----------------------------------------
 ;	DISK VERIFY	     (AH = 04H) :

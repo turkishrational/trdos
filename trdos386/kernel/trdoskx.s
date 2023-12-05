@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.5) - UNINITIALIZED DATA : trdoskx.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.7) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 29/06/2022 (Previous: 17/04/2021 - Kernel v2.0.4)
+; Last Update: 04/12/2023 (Previous: 29/06/2022 - Kernel v2.0.5)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -104,7 +104,9 @@ LastCluster: resd 1
 ;ClusterBuffer_Valid: resb 1
 
 ; 29/07/2022
-resb 1
+;resb 1
+; 02/12/2023
+P_TIMER: resb 1 ; diskette change check (2 seconds)
 
 Dir_BuffDescriptor:
 DirBuff_DRV: resb 1
@@ -700,10 +702,13 @@ IRQnum:		resb 1		; IRQ number for IRQ handler (trdosk8.s)
 alignb 4
 audio_pci:	resb 1
 audio_device:	resb 1
-audio_mode:	resb 1
+;audio_mode:	resb 1
 audio_intr:	resb 1
 audio_busy:	resb 1  ; Busy flag for audio irq ; 21/04/2017
-audio_reserved: resb 1
+;audio_reserved: resb 1
+; 20/11/2023
+NAMBAR:		resw 1	; Native Audio Mixer Base Address
+NABMBAR:	; 02/10/2023 (NABMBAR = audio_io_base)
 audio_io_base:	resw 1 	; Base I/O address of audio device
 audio_dev_id:	resd 1	; BUS/DEV/FN ; 00000000BBBBBBBBDDDDDFFF00000000
 audio_vendor:	resd 1
@@ -726,10 +731,14 @@ audio_cb_addr:	resd 1  ; callback service address or s.r.b. address
 audio_bps:	resb 1  ; selected mode: 8 bit, 16 bit
 audio_stmo:	resb 1	; selected mode: mono /stereo
 audio_freq: 	resw 1	; sampling rate
+; 20/11/2023
+VRA:		resb 1
+audio_mode:	resb 1
 
 ; 21/04/2017
 audio_play_cmd: resb 1  ; Play/Stop command (1 = play, 0 = stop)
-audio_civ: ; 28/05/2017 ; Current Buffer Index (AC'97)
+; 21/11/2023
+;audio_civ: ; 28/05/2017 ; Current Buffer Index (AC'97)
 audio_flag_eol:	resb 1  ; End of Link status (vt8233, EOL/FLAG)
 
 audio_master_volume:
@@ -737,10 +746,12 @@ audio_master_volume_l: resb 1 ; sound volume (lineout) left channel
 audio_master_volume_r: resb 1 ; sound volume (lineout) right channel
 
 alignb 4
+
+; 20/11/2023
 ; 28/05/2017
 ; AC'97 Audio Controller Base Adress Registers
-NAMBAR:		resw 1	; Native Audio Mixer Base Address
-NABMBAR:	resw 1	; Native Audio Bus Mastering Base Address
+;NAMBAR:	resw 1	; Native Audio Mixer Base Address
+;NABMBAR:	resw 1	; Native Audio Bus Mastering Base Address
 	
 ;alignb 4
 ; 21/04/2017
@@ -757,9 +768,14 @@ dma_mode:	resb 1  ; dma mode for sysdma
 dma_addr:	resd 1	; dma buffer physical addr for sysdma
 dma_size:	resd 1  ; dma buffer size (in bytes) for sysdma
 dma_start:	resd 1  ; dma start address for sysdma
-dma_count:	resd 1  ; dma count (in bytes) for sysdma 
+dma_count:	resd 1  ; dma count (in bytes) for sysdma
+
+; 04/12/2023
+%if 0 
 
 alignb 65536
 ; 09/08/2017
 ; 12/05/2017
 sb16_dma_buffer: resb 65536 ; DMA buffer for sb16 audio playing.
+
+%endif

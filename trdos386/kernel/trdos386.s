@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.7
 ; ----------------------------------------------------------------------------
-; Last Update: 01/11/2023 (Previous: 30/08/2023)
+; Last Update: 04/12/2023 (Previous: 30/08/2023)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -46,15 +46,15 @@ CMOS_SEC_ALARM	EQU	01H		; SECONDS ALARM (BCD)
 CMOS_MINUTES	EQU	02H		; MINUTES (BCD)
 CMOS_MIN_ALARM	EQU	03H		; MINUTES ALARM (BCD) 	
 CMOS_HOURS	EQU	04H		; HOURS (BCD
-CMOS_HR_ALARM	EQU	005H		; HOURS ALARM   (BCD)
+CMOS_HR_ALARM	EQU	05H		; HOURS ALARM   (BCD)
 CMOS_DAY_WEEK	EQU	06H		; DAY OF THE WEEK  (BCD)
 CMOS_DAY_MONTH	EQU	07H		; DAY OF THE MONTH (BCD) 
 CMOS_MONTH	EQU	08H		; MONTH (BCD)
 CMOS_YEAR	EQU	09H		; YEAR (TWO DIGITS) (BCD)
 CMOS_CENTURY	EQU	32H		; DATE CENTURY BYTE (BCD)
 CMOS_REG_A	EQU	0AH		; STATUS REGISTER A
-CMOS_REG_B	EQU	00BH		; STATUS REGISTER B  ALARM
-CMOS_REG_C	EQU	00CH		; STATUS REGISTER C  FLAGS
+CMOS_REG_B	EQU	0BH		; STATUS REGISTER B  ALARM
+CMOS_REG_C	EQU	0CH		; STATUS REGISTER C  FLAGS
 CMOS_REG_D	EQU	0DH		; STATUS REGISTER D  BATTERY
 CMOS_SHUT_DOWN	EQU	0FH		; SHUTDOWN STATUS COMMAND BYTE
 ;----------------------------------------
@@ -175,6 +175,13 @@ Video_Pg_Backup	 equ 98000h ; Mode 3h, video page backup (32K, 8 pages)
 LFB_ADDR	equ LFB_Info+LFBINFO.LFB_addr
 LFB_SIZE	equ LFB_Info+LFBINFO.LFB_size
 
+; 04/12/2023 - TRDOS 386 v2.0.7
+SYSTEMSTACK_ADDR  equ 97000h	; max. 3072 bytes (96400h-97000h)
+VBE3BIOSCODE_ADDR equ 60000h	; Protected Mode Video Bios (64KB)
+;AC97DMABUFFR_ADDR equ 40000h	; AC97 & VIA VT8233 DMA Buffer (128KB)
+SB16DMABUFFR_ADDR equ 50000h	; Sound Blaster 16 DMA Buffer (64KB)
+sb16_dma_buffer equ SB16DMABUFFR_ADDR
+
 ; 29/08/2023 - TRDOS 386 v2.0.6
 	; 30/11/2020
 	; 29/11/2020 - TRDOS 386 v2.0.3
@@ -225,6 +232,9 @@ endstruc
 chk_ms:
 	mov	[mem_1m_1k], cx
 	mov	[mem_16m_64k], dx
+	; 24/11/2023
+	mov	[real_mem_16m_64k], dx
+
 	; 05/11/2014
 	;and	dx, dx
 	;jz	short L2
@@ -275,9 +285,11 @@ V0:
 	push	cs
 	pop	ds
 	
+	; 24/11/2023
 	; 15/12/2020
-	mov	si, [mem_16m_64k]
-	mov	[real_mem_16m_64k], si
+	;mov	si, [mem_16m_64k]
+	;mov	[real_mem_16m_64k], si
+	
 	; 15/11/2020
 	; 14/11/2020 (TRDOS 386 v2.0.3)
 	; check VESA (VBE) VIDEO BIOS version
@@ -288,6 +300,10 @@ V0:
 	;jne	short L0   ; not a VESA VBE compatible bios	
 	; 18/10/2023
 	jne	short V1   ; restore es
+
+	; 27/11/2023
+	; 24/11/2023 - temporary
+	;jmp	short V1
 
 	;mov	ah, 3
 	;;jmp	short V1	
@@ -365,7 +381,8 @@ V0:
 	; check memory and decrease it to 3.5 GB if it is 4GB
 	; (reserve upper memory for LFB)
 	mov	di, [mem_16m_64k]
-	mov	[real_mem_16m_64k], di
+	; 24/11/2023
+	;mov	[real_mem_16m_64k], di
 
 	cmp	di, si
 	jna	short V1
@@ -432,8 +449,11 @@ L0:
 	; 04/07/2016 - TRDOS 386 (64K - 128K kernel)
       	xor	si, si
 	xor	di, di
-	mov	cx, 16384
-	rep	movsd
+	;mov	cx, 16384
+	;rep	movsd
+	; 02/12/2023
+	mov	cx, 32768
+	rep	movsw
 	;
 	push	es ; 0
 	push	L17
@@ -443,11 +463,15 @@ L17:
 	mov	es, cx  ; 1000h 
 	add	cx, cx
 	mov	ds, cx  ; 2000h
-	sub	si, si
-	sub	di, di
-	mov	cx, 16384
-	rep	movsd
-	
+	;sub	si, si
+	;sub	di, di
+	;mov	cx, 16384
+	;rep	movsd
+	; 02/12/2023
+	; si = di = 0
+	mov	cx, 32768
+	rep	movsw	
+
 	; Turn off the floppy drive motor
         mov     dx, 3F2h
         out     dx, al ; 0 ; 31/12/2013
@@ -501,7 +525,10 @@ StartPM:
        	mov fs, ax              ; Move data segment into FS register
       	mov gs, ax              ; Move data segment into GS register
         mov ss, ax              ; Move data segment into SS register
-        mov esp, 90000h         ; Move the stack pointer to 090000h
+	;mov esp, 90000h        ; Move the stack pointer to 090000h
+	; 04/12/2023 - TRDOS 386 v2.0.7
+	;mov esp, 97000h	; 3072 bytes system stack (96400h-97000h)
+	mov esp, SYSTEMSTACK_ADDR ; 97000h (max. 3072 bytes)
 
 clear_bss: ; Clear uninitialized data area
 	; 11/03/2015
@@ -513,6 +540,10 @@ clear_bss: ; Clear uninitialized data area
 
 memory_init:
 	; Initialize memory allocation table and page tables
+	; 04/12/2023
+	; 29/11/2023
+	; 27/11/2023
+	; 23/11/2023 (TRDOS 386 v2.0.7)
 	; 24/07/2022 (TRDOS 386 v2.0.5)
 	; 18/04/2021 (TRDOS 386 v2.0.4)
 	; 16/11/2014
@@ -540,6 +571,22 @@ memory_init:
 				   ; between 16 MB and 4 GB.	
 	or	dx, dx
 	jz	short mi_0
+
+; 04/12/2023
+%if 1
+	; 02/12/2023 - temporary (2816MB limit)
+	;cmp	dx, 44800 ; 0AF00h	
+	cmp	dx, 40704	; (2560MB limit)
+	jna	short mi_x
+	;mov	dx, 44800
+	mov	dx, 40704
+mi_x:
+%endif
+	; 23/11/2023 - temporary
+	;and	dx, 3FFFh
+
+	mov	[mem_16m_64k], dx
+
 	mov	ax, dx
 	shl	eax, 4		   ; 64 KB -> 4 KB (page count)
 	add	[free_pages], eax
@@ -549,8 +596,9 @@ mi_0:
 	;mov	ax, cx
 	; 24/07/2022
 	mov	eax, ecx
-	add	ax, 256		   ; add 256 pages for the first 1 MB		 
-mi_1:
+	add	ax, 256		   ; add 256 pages for the first 1 MB
+	;add	eax, 256
+mi_1:			 
 	mov	[memory_size], eax ; Total available memory in pages
 				   ; 1 alloc. tbl. bit = 1 memory page
 				   ; 32 allocation bits = 32 mem. pages   
@@ -569,7 +617,7 @@ mi_1:
 				   ; just after the last M.A.T. page
 	;
 	sub	eax, 4		   ; convert M.A.T. size to offset value
-	mov	[last_page], eax   ; last page ofset in the M.A.T.
+	mov	[last_page], eax   ; last page offset in the M.A.T.
 	;			   ; (allocation status search must be 
 				   ; stopped after here)	
 	xor	eax, eax
@@ -577,8 +625,11 @@ mi_1:
 	;push	cx
 	; 18/04/2021
 	push	ecx
+	; ecx = 3840 ; 27/11/2023
+	; (Note: ecx < 3840 if the total memory is less than 16 MB)
 	shr	ecx, 5		   ; convert 1 - 16 MB page count to 
 				   ; count of 32 allocation bits
+	; ecx = 120 ; 27/11/2023
 	rep	stosd
 	;pop	cx
 	; 18/04/2021
@@ -597,7 +648,7 @@ mi_3:
 	sub	al, al	   	   ; 0
 	add	edi, 4		   ; 15/11/2014
 mi_4:
-	or	dx, dx		  ; check 16M to 4G memory space	
+	or	dx, dx		  ; check 16 MB to 4 GB memory space	
 	jz	short mi_6	  ; max. 16 MB memory, no more...
 	;	
 	mov	ecx, MEM_ALLOC_TBL + 512 ; End of first 16 MB memory
@@ -667,28 +718,28 @@ mi_9:
 	;
 	push	ecx		 ; (**) PDE count (<= 1024)
 	;
-	inc	ecx		 ; +1 for kernel page directory	
+	inc	ecx		 ; +1 for kernel page directory
 	;
 	sub	[free_pages], ecx ; 07/11/2014
 	;
 	mov	esi, [k_page_dir] ; Kernel's Page Directory address
 	shr	esi, 12		 ; convert to page number
 mi_10:
-	mov	eax, esi	 ; allocation bit offset		 
+	mov	eax, esi	 ; allocation bit offset
 	mov	ebx, eax
 	shr	ebx, 3		 ; convert to alloc. byte offset
-	and	bl,  0FCh	 ; clear bit 0 and bit 1
+	and	bl, 0FCh	 ; clear bit 0 and bit 1
 				 ;   to align on dword boundary
 	and	eax, 31		 ; set allocation bit position 
 				 ;  (bit 0 to bit 31)
 	;
-	add	ebx, edx	 ; offset in M.A.T. + M.A.T. address 
+	add	ebx, edx	 ; offset in M.A.T. + M.A.T. address
 	;
 	btr 	[ebx], eax	 ; reset relevant bit (0 to 31)
 	;
 	inc	esi		 ; next page table
-	loop	mi_10		 ; allocate next kernel page table 
-				 ; (ecx = page table count + 1)		
+	loop	mi_10		 ; allocate next kernel page table
+				 ; (ecx = page table count + 1)
 	;
 	pop	ecx		 ; (**) PDE count (= pg. tbl. count)
 	;
@@ -706,7 +757,9 @@ mi_11:
 	stosd
 	loop	mi_11
 	sub	eax, eax	; Empty PDE
-	mov	cx, 1024	; Entry count (PGSZ/4)
+	;mov	cx, 1024	; Entry count (PGSZ/4)
+	; 29/11/2023
+	mov	ch, 4 ; cx = 4*256 = 1024
 	sub	ecx, edx
 	jz	short mi_12
 	rep	stosd 		; clear remain (empty) PDEs
@@ -743,10 +796,10 @@ mi_14:
 	;
 	mov	eax, edi	; end of the last page table page
 			        ; (beginging of user space pages)
+
 	shr	eax, 15		; convert to M.A.T. byte offset
 	and	al, 0FCh	; clear bit 0 and bit 1 for
 				; aligning on dword boundary	
-	 
 	mov	[first_page], eax
 	mov	[next_page], eax ; The first free page pointer
 				 ; for user programs
@@ -854,7 +907,7 @@ StartPMP:
 	; 26/03/2015
 	mov	ecx, 48		; 48 hardware interrupts (INT 0 to INT 2Fh)
 	; 02/04/2015
-	mov	ebx,  80000h
+	mov	ebx, 80000h
 rp_sidt1:
 	lodsd
 	mov	edx, eax
@@ -921,6 +974,26 @@ sidt_OK:
 	ltr	ax  ; Load task register
 	;
 esp0_set0:
+
+; 29/11/2023 - Erdogan Tan
+; ------------------------
+; If we read following -disabled- stack page setting code...
+; When the memory size >= 3GB, one of page tables conflicts with the stack page
+; at 4MB-4096 address. So, to leave stack pointer at 90000h is better/default.
+; (Problem may not appears for <= 2.5GB main memory but following code is also
+; defective because kernel stack page would be seen as unallocated in the M.A.T.
+; without by adding a memory allocation code.)
+;
+; 1st 4MB layout: 1MB kernel -base- reserved + max. 128 KB M.A.T. (at 100000h)
+;                 + Kernel's page directory (4KB) -just after the M.A.T.-
+;		  + Kernel's page tables (main memory size / 1024)
+; Note:
+; 1 or 2 additional kernel page table(s) may be needed for Linear Frame Buffer
+; .. but, it/they will not have to be contiguous with other kernel page tables.
+; ------------------------ 	 
+
+; 27/11/2023 - TRDOS 386 v2.0.7
+%if 0
 	; 30/07/2015
 	mov 	ecx, [memory_size] ; memory size in pages
 	shl 	ecx, 12 ; convert page count to byte count
@@ -935,9 +1008,12 @@ esp0_set0:
 	mov	ecx, CORE
 esp0_set1:
 	mov	esp, ecx ; top of kernel stack (**tss.esp0**)
+%endif
+
 esp0_set_ok:
 	; 30/07/2015 (**tss.esp0**) 
-	mov	[tss.esp0], esp
+	mov	[tss.esp0], esp	; 90000h ; 29/11/2023
+				; <-- 97000h ; 04/12/2023 (max. 3072 bytes)
         mov     word [tss.ss0], KDATA
 	; 14/08/2015
 	; 10/11/2014 (Retro UNIX 386 v1 - Erdogan Tan)
@@ -1089,6 +1165,8 @@ display_vbios_product_name: ; 14/11/2020
 	; 02/12/2020
 	;pop	edi ; * pmid_addr
 
+; 04/12/2023 - TRDOS 386 v2.0.7
+%if 0
 	; 24/07/2022
 	; 29/11/2020
 vbe3pminit:
@@ -1112,6 +1190,19 @@ vbe3pminit0:
 	; (80286 type segment descriptors in GDT)
 
 	mov	[vbe3bios_addr], eax
+%endif
+
+	; 04/12/2023 - TRDOS 386 v2.0.7	; (+!*!+)
+	; fixed PM-VBIOS address (no need to add a memory block)
+	; in the reserved -and already allocated- area under 1MB
+	; (purpose: to prevent page faults if memory size > 2.5GB)
+	; ((User's page dir contains only the 1st 4MB of system mem
+	; as PDE. So, this causes to page faults during an interrupt
+	; in user mode, because if memory size > 2.5GB, kernel
+	; page tables overs/passes 4MB limit and PM-VBIOS
+	; is located after kernel page tables.))
+vbe3pminit:
+	mov	eax, VBE3BIOSCODE_ADDR ; 60000h	; (+!*!+)
 
 	; set [pmid_addr] to the new location
 	mov	esi, 0C0000h
@@ -1130,6 +1221,8 @@ vbe3pminit0:
 	; 30/11/2020
 	; set vbe3 segment selectors
 
+; 04/12/2023 - TRDOS 386 v2.0.7	; (+!*!+)
+%if 0
 	; VBE3CS (VESA VBE3 video bios code segment)
 	mov	edi, _vbe3_CS+2 ; base address bits 0..15
 	stosw	; edi = _vbe3_CS+4
@@ -1141,7 +1234,7 @@ vbe3pminit0:
 	mov	[edi], al 
 	rol	eax, 16
 	mov	[edi-2], ax ; base address, bits 0..15
-
+%endif
 	; VBE3BDS (BIOSDataSel in PMInfoBlock)
 	mov	edi, _vbe3_BDS+2 ; base addr bits 0..15
 	mov	eax, VBE3BIOSDATABLOCK ; 1536 bytes
@@ -1438,12 +1531,15 @@ di0:
 display_mem_info:
 	; 19/12/2020
 	; temporary
+	; 24/11/2023
+	cmp	byte [vbe3], 2
+	jb	short dmi
 	call	default_lfb_info
-	;
+dmi:
 	; 06/11/2014
 	call	memory_info
 	; 14/08/2015
-	;call getch ; 28/02/2015
+	;call	getch ; 28/02/2015
 drv_init:
 	sti	; Enable Interrupts 
 	; 06/02/2015
@@ -1532,7 +1628,9 @@ check_boch_plex86_vbe:
 	
 	; this is not necessary ! (20/11/2020)
 	cmp	byte [vbe2bios], 0C4h 
-	jb	display_mem_info	; (QEMU) 
+	;jb	display_mem_info	; (QEMU)
+	; 02/12/2023
+	jb	short not_boch_qemu_vbe
 
 	; Display kernel version message if 0E9h hack port
 	; is enabled (bochs emulator feature)
@@ -1621,17 +1719,29 @@ di3:
 	call	set_lfbinfo_table
 
 	;;;
+	; 28/11/2023
 	; 20/10/2023 - TRDOS 386 v2.0.7
-	mov	esi, [LFB_ADDR]
-	mov	eax, esi
-	;add	eax, 4095 ; LFB start addr is always in page boundary
-	shr	eax, 12	; convert byte address to page address 
+	mov	esi, [LFB_ADDR] ; LFB base address (in bytes)
+	;mov	edx, [LFB_SIZE] ; 28/11/2023
+	;add	edx, 4095
+	;;;
+	;mov	edx, ((1024*768*4)+4095)>>12 ; 28/11/2023
+	mov	edx, ((1920*1080*4)+4095)>>12 ; 28/11/2023
+	; edx = LFB size in pages
+
+	; 29/11/2023
+	;mov	ebx, esi
+	;;add	ebx, 4095 ; LFB start addr is always in page boundary
+	;shr	ebx, 12	; convert byte address to page address
 	mov	ecx, [memory_size]
-	cmp	eax, ecx
-	jnb	short di4 ; LFB addr >= main memory size	
+	;cmp	ebx, ecx
+	;jnb	short di4 ; LFB addr >= main memory size	
 	
 	; (set the overlapped pages as allocated for kernel)
 	;;;
+	; 28/11/2023
+	; (and set all of LFB pages in the kernel's page tables)
+
 	call	allocate_lfb_pages_for_kernel
 di4:
 	; 08/09/2016
@@ -1706,7 +1816,7 @@ nxtl:
 	
 ;_c8:
 ;	; 25/08/2014
-;	cli				; Disable interrupts
+;	cli			; Disable interrupts
 ;	mov	al, [scounter + 1]
 ;	and	al, al
 ;	jnz	hang
@@ -2529,8 +2639,8 @@ b2d3:
 	;
 	; 20/01/2017 (!cpu exception!)
 	;
-        add    dword [scr_row], 0A0h
-        mov    edi, [scr_row]
+        add	dword [scr_row], 0A0h
+        mov	edi, [scr_row]
 	;	
 	mov	byte [sysflg], 0  ; system mode
         sti
@@ -2543,7 +2653,11 @@ b2d3:
 	mov	al, 3
 	call	_set_mode
 	;
-	mov	eax, 1
+	;mov	eax, 1
+	; 30/11/2023
+	xor	eax, eax
+	inc	eax
+	; eax = 1	
 	jmp	sysexit ; terminate process !!!
 	
 	; 22/01/2017
@@ -2897,6 +3011,9 @@ pkmsg_ok:
 ;
 default_lfb_info:	
 	mov	ax, [def_LFB_addr] ; high word
+	; 24/11/2023 - temporary
+	or	ax, ax
+	jz	short pkmsg_ok
 	call	wordtohex
 	mov	dword [lfb_addr_str], eax
 	mov	esi, msg_lfb_addr
@@ -3078,13 +3195,16 @@ gdt_tss1:
 gdt_tss2:
 	db 0  ; TSS base address, bits 24-31 
 
+	; 04/12/2023 - TRDOS v2.0.7
 	; 30/11/2020
 	; 29/11/2020 - TRDOS v2.0.3
 	; VESA VBE3 VIDE BIOS 32 BIT PMI SEGMENTS (16 bit segments)
 			; 30h ; VBE3CS
 _vbe3_CS:  ; vesa vbe3 bios uses this as code seg (same addr with _vbe3_DS)
 	; limit = 65536, base addr = 0, P/DPL/1/Type/C/R/A = 9Ah, 16 bit
-	dw 0FFFFh, 0, 9A00h, 0 ; Note: base addr will be initialized
+	;dw 0FFFFh, 0, 9A00h, 0 ; Note: base addr will be initialized
+	; 04/12/2023 - TRDOS 386 v2.0.7	; (+!*!+)
+	dw 0FFFFh, 0, 9A06h, 0	; VBE3BIOSCODE_ADDR = 60000h
 			; 38h ; VBE3BDS
 _vbe3_BDS: ; vesa vbe3 bios uses this as equivalent of rombios data segment
 	; limit = 1536, base addr = 0, P/DPL/1/Type/E/W/A = 92h, 16 bit
@@ -3104,7 +3224,9 @@ _B8000Sel: ; CGA video memory address
 			; 58h ; VBE3DS 
 _vbe3_DS: ; vesa vbe3 bios uses this as data seg (CodeSegSel in PMInfoBlock)
 	; limit = 65536, base addr = 0, P/DPL/1/Type/E/W/A = 92h, 16 bit
-	dw 0FFFFh, 0, 9200h, 0 ; Note: base addr will be initialized
+	;dw 0FFFFh, 0, 9200h, 0 ; Note: base addr will be initialized
+	; 04/12/2023 - TRDOS 386 v2.0.7	; (+!*!+)
+	dw 0FFFFh, 0, 9206h, 0	; VBE3BIOSCODE_ADDR = 60000h
 			; 60h ; VBE3SS   
 _vbe3_SS: ; kernel's stack segment but 16 bit version (same stack addr)
 	; limit = 1024, base addr = 0, P/DPL/1/Type/E/W/A = 92h, 16 bit
@@ -3122,12 +3244,12 @@ gdt_end:
 	;; 9Eh = 1001 1110b (GDT byte 5) P=1/DPL=00/1/TYPE=1110, 
 					;; Type= 1 (code)/C=1/R=1/A=0
 		; P= Present, DPL=0=ring 0,  1= user (0= system)
-		; 1= Code C= Conforming, R= Readable, A = Accessed
+		; 1= Code C= Conforming, R= Readable, A= Accessed
 
 	;; 9Ah = 1001 1010b (GDT byte 5) P=1/DPL=00/1/TYPE=1010, 
 					;; Type= 1 (code)/C=0/R=1/A=0
 		; P= Present, DPL=0=ring 0,  1= user (0= system)
-		; 1= Code C= non-Conforming, R= Readable, A = Accessed
+		; 1= Code C= non-Conforming, R= Readable, A= Accessed
 
 	;; 92h = 1001 0010b (GDT byte 5) P=1/DPL=00/1/TYPE=1010, 
 					;; Type= 0 (data)/E=0/W=1/A=0
@@ -3138,12 +3260,12 @@ gdt_end:
 	;; FEh = 1111 1110b (GDT byte 5) P=1/DPL=11/1/TYPE=1110, 
 					;; Type= 1 (code)/C=1/R=1/A=0
 		; P= Present, DPL=3=ring 3,  1= user (0= system)
-		; 1= Code C= Conforming, R= Readable, A = Accessed
+		; 1= Code C= Conforming, R= Readable, A= Accessed
 	
 	;; FAh = 1111 1010b (GDT byte 5) P=1/DPL=11/1/TYPE=1010, 
 					;; Type= 1 (code)/C=0/R=1/A=0
 		; P= Present, DPL=3=ring 3,  1= user (0= system)
-		; 1= Code C= non-Conforming, R= Readable, A = Accessed
+		; 1= Code C= non-Conforming, R= Readable, A= Accessed
 
 	;; F2h = 1111 0010b (GDT byte 5) P=1/DPL=11/1/TYPE=0010, 
 					;; Type= 0 (data)/E=0/W=1/A=0
@@ -3578,7 +3700,7 @@ starting_msg:
 	;;;db "Turkish Rational DOS v2.0 [18/04/2021] ...", 0
 	;;db "Turkish Rational DOS v2.0 [11/08/2022] ...", 0
 	;db "Turkish Rational DOS v2.0 [30/08/2023] ...", 0
-	db "Turkish Rational DOS v2.0 [20/10/2023] ...", 0
+	db "Turkish Rational DOS v2.0 [04/12/2023] ...", 0
 
 NextLine:
 	db 0Dh, 0Ah, 0

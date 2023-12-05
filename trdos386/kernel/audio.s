@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.7 - audio.s
 ; ----------------------------------------------------------------------------
-; Last Update: 01/11/2023  (Previous: 06/08/2022 - Kernel v2.0.5)
+; Last Update: 02/12/2023  (Previous: 06/08/2022 - Kernel v2.0.5)
 ; ----------------------------------------------------------------------------
 ; Beginning: 03/04/2017
 ; ----------------------------------------------------------------------------
@@ -200,10 +200,39 @@ EOL	EQU BIT31
 ; INTEL ICH EQUATES
 ; 28/05/2017
 INTEL_VID	equ	8086h	; Intel's PCI vendor ID
+; 20/11/2023
+; (playwav2.com, ac97.inc, Erdogan Tan, 11/11/2023)
+; 03/11/2023 - Erdogan Tan (Ref: MenuetOS AC97 WAV Player source code, 2004)
+SIS_VID		equ	1039h
+NVIDIA_VID	equ	10DEh	 ; Ref: MPXPLAY/SBEMU/KOLIBRIOS AC97 source c.
+AMD_VID		equ	1022h
+;
 ICH_DID		equ	2415h	; ICH (82801AA) device ID
-; 01/11/2023
-NFORCE_VID	equ	10DEh	; Nvidia NFORCE PCI vendor ID
-NFORCE_DID	equ	0059h	; Nvidia NFORCE (CK804) device ID
+; 20/11/2023
+; (playwav2.com, ac97.inc, Erdogan Tan, 11/11/2023)
+; 17/02/2017 (Erdogan Tan, ref: ALSA Device IDs, ALSA project)
+ICH0_DID        equ     2425h	; ICH0
+ICH2_DID        equ     2445h 	; ICH2
+ICH3_DID	equ     2485h	; ICH3
+ICH4_DID        equ     24C5h	; ICH4
+ICH5_DID	equ     24D5h	; ICH5 
+ICH6_DID	equ     266Eh	; ICH6
+ESB6300_DID	equ     25A6h	; 6300ESB
+ESB631X_DID	equ     2698h	; 631XESB
+ICH7_DID	equ	27DEh	; ICH7
+; 03/11/2023 - Erdogan Tan (Ref: MenuetOS AC97 WAV Player source code, 2004)
+MX82440_DID	equ	7195h
+SI7012_DID	equ	7012h
+NFORCE_DID	equ	01B1h
+NFORCE2_DID	equ	006Ah
+AMD8111_DID	equ	746Dh
+AMD768_DID	equ	7445h
+; 03/11/2023 - Erdogan Tan - Ref: MPXPLAY/SBEMU/KOLIBRIOS AC97 source code
+CK804_DID	equ	0059h	; NFORCE4
+MCP04_DID	equ	003Ah
+CK8_DID		equ	008Ah
+NFORCE3_DID	equ	00DAh
+CK8S_DID	equ	00EAh
 
 NAMBAR_REG      equ	10h	; native audio mixer Base Address Register
 NABMBAR_REG     equ	14h	; native audio bus mastering Base Addr Reg
@@ -252,6 +281,11 @@ CODEC_REG_ST          equ 26h
 ; 22/06/2017
 PO_PICB_REG	equ 18h	; PCM Out Position In Current Buffer Register
 
+; 19/11/2023
+AC97_EA_VRA	equ BIT0
+; 24/11/2023
+BCIS		equ BIT3  ; Buffer Completion Interrupt Status
+
 ;=============================================================================
 ;               CODE
 ;=============================================================================
@@ -259,18 +293,31 @@ PO_PICB_REG	equ 18h	; PCM Out Position In Current Buffer Register
 ; CODE for INTEL ICH AC'97 AUDIO CONTROLLER
 
 DetectICH:
-	; 10/06/2017
-	; 05/06/2017
-	; 29/05/2017
-	; 28/05/2017
-	mov     eax, (ICH_DID << 16) + INTEL_VID
-        call    pciFindDevice
-        jnc     short d_ac97_1
+	; 22/11/2023
+	; 19/11/2023
+	; 01/11/2023 - TRDOS 386 Kernel v2.0.7
+	;; 10/06/2017
+	;; 05/06/2017
+	;; 29/05/2017
+	;; 28/05/2017
+	;mov	eax, (ICH_DID << 16) + INTEL_VID
+        ;call	pciFindDevice
+        ;jnc	short d_ac97_1
+	;
+	;; 01/11/2023
+	;mov	eax, (NFORCE_DID << 16) + NFORCE_VID
+        ;call	pciFindDevice
+        ;jnc	short d_ac97_1
 
-	; 01/11/2023
-	mov     eax, (NFORCE_DID << 16) + NFORCE_VID
-        call    pciFindDevice
-        jnc     short d_ac97_1
+	; 19/11/2023
+	mov	esi, valid_ids	; address of Valid ICH (AC97) Device IDs
+	mov	ecx, valid_id_count
+pfd_1:
+	lodsd
+	call	pciFindDevice
+	jnc	short d_ac97_1
+	loop	pfd_1
+	;stc
 
 d_ac97_0:
 ; couldn't find the audio device!
@@ -279,6 +326,9 @@ d_ac97_0:
 ; CODE for VIA VT8233 AUDIO CONTROLLER
 
 DetectVT8233:
+	; 22/11/2023
+	; 02/11/2023
+	; 01/11/2023 - TRDOS 386 Kernel v2.0.7
 	; 06/08/2022 - TRDOS 386 Kernel v2.0.5
 	; 10/06/2017
 	; 05/06/2017
@@ -308,26 +358,29 @@ d_ac97_1:
 	mov	[audio_dev_id], eax
 	mov	[audio_vendor], edx
 
-	; init controller
-	mov	al, PCI_CMD_REG ; command register (04h)
-	call	pciRegRead32
-
-	; eax = BUS/DEV/FN/REG
-	; edx = STATUS/COMMAND
-	; 	SSSSSSSSSSSSSSSSCCCCCCCCCCCCCCCC
-	mov	[audio_stats_cmd], edx
+	; 22/11/2023
+	;; init controller
+	;mov	al, PCI_CMD_REG ; command register (04h)
+	;call	pciRegRead32
+	;
+	;; eax = BUS/DEV/FN/REG
+	;; edx = STATUS/COMMAND
+	;; 	SSSSSSSSSSSSSSSSCCCCCCCCCCCCCCCC
+	;mov	[audio_stats_cmd], edx
 
 	mov	al, PCI_IO_BASE ; IO base address register (10h)
 	;mov	al, NAMBAR_REG	; Native Audio Mixer BAR (10h)
 	call	pciRegRead32
 
-	cmp	word [audio_vendor], INTEL_VID ; 8086h ; AC'97 ?
-	;jne	short d_vt8233_1
-	; 01/11/2023
-	je	short d_ac97_3
-	cmp	word [audio_vendor], NFORCE_VID ; 10DEh  ; AC'97
-	jne	short d_vt8233_1	
-
+	;cmp	word [audio_vendor], INTEL_VID ; 8086h ; AC'97 ?
+	;;jne	short d_vt8233_1
+	;; 01/11/2023
+	;je	short d_ac97_3
+	;cmp	word [audio_vendor], NFORCE_VID ; 10DEh ; AC'97
+	;jne	short d_vt8233_1	
+	; 02/11/2023
+	cmp	word [audio_vendor], VIA_VID	; 1106h ; VT8233-VT8237R 
+	je	short d_vt8233_1
 d_ac97_3:
 	;and	dx, 0FFFEh ; Audio Codec IO_ADDR_MASK
 	; 06/08/2022
@@ -337,13 +390,15 @@ d_ac97_3:
 	mov	al, NABMBAR_REG ; Native Audio Bus Mastering BAR (14h)
 	call	pciRegRead32	
 
-	;and	dx, 0FFC0h ; Audio Controller IO_ADDR_MASK
-	; 06/08/2022
-	and	dl, 0C0h
-	mov	[NABMBAR], dx
-        ;mov	[audio_io_base], dx
-	
-	jmp	short d_ac97_2
+	;;and	dx, 0FFC0h ; Audio Controller IO_ADDR_MASK
+	;; 06/08/2022
+	;and	dl, 0C0h
+	;mov	[NABMBAR], dx
+        ;;mov	[audio_io_base], dx
+	;
+	;jmp	short d_ac97_2
+	; 02/11/2023
+	; NABMBAR = audio_io_base
 
 d_vt8233_1:
 	;and	dx, 0FFC0h ; Audio Controller IO_ADDR_MASK 
@@ -361,13 +416,13 @@ d_ac97_2:
 	; 06/08/2022
 	;and	dx, 0FFh
 
-  	mov     [audio_intr], dl
+	mov     [audio_intr], dl
 
 	retn
 
-	;; (Note: Interrupts are already enabled by TRDOS 386 kernel!)
+	; (Note: Interrupts are already enabled by TRDOS 386 kernel!)
 	;mov	cx, dx
-	
+	;
 	;in	al, 0A1h ; irq 8-15
 	;mov	ah, al
 	;in	al, 21h  ; irq 0-7 
@@ -396,15 +451,15 @@ d_ac97_2:
 	;	the APIC_EN bit in the GEN_CNTL register.
 
 	;mov	eax, 0F861h  ; D31:F0
-		;AL=61h : PIRQ[B] Routing Control Reg, LPC interface
+	;	; AL=61h : PIRQ[B] Routing Control Reg, LPC interface
 	;;mov	dl, [audio_intr]
 	;call	pciRegWrite8
-	;;mov	al, 0D0h ; General Control Register (GEN_CTL)
+	;;mov	al, 0D0h	; General Control Register (GEN_CTL)
 	;;call	pciRegRead32
-	;;or	edx, 100h ; Bit 8, APIC_EN (Enable I/O APIC) 
-	;;;call	pciRegWrite32
+	;;or	edx, 100h	; Bit 8, APIC_EN (Enable I/O APIC) 
+	;;call	pciRegWrite32
 	;;and	edx, ~100h
-	;;call	pciRegWrite32 ; ; Bit 8, APIC_EN (Disable I/O APIC) 
+	;;call	pciRegWrite32	; Bit 8, APIC_EN (Disable I/O APIC) 
 	;
 
 	;mov	dx, 4D1h	; 8259 ELCR2
@@ -423,11 +478,12 @@ d_ac97_2:
 
 	;xor	eax, eax ; 0
 
-	;retn
+	retn
 
 ; CODE for PCI
 
 pciFindDevice:
+	; 19/11/2023
 	; 03/04/2017 ('pci.asm', 20/03/2017)
 	;
 	; scan through PCI space looking for a device+vendor ID
@@ -435,43 +491,58 @@ pciFindDevice:
 	; Entry: EAX=Device+Vendor ID
 	;
 	; Exit: EAX=PCI address if device found
-	;	 EDX=Device+Vendor ID
-	;        CY clear if found, set if not found. EAX invalid if CY set.
+	;	EDX=Device+Vendor ID
+	;       CY clear if found, set if not found. EAX invalid if CY set.
 	;
-	; Destroys: ebx, esi, edi, cl
-	;
+	; Destroys: ebx, edi ; 19/11/2023
 
 	;push	ecx
-	push	eax
+	;push	eax ; * ; 19/11/2023
 	;push	esi
 	;push	edi
-
-        mov     esi, eax                ; save off vend+device ID
-        mov     edi, (80000000h - 100h) ; start with bus 0, dev 0 func 0
-
+	;
+	;mov	esi, eax		; save off vend+device ID
+        ; 19/11/2023
+	mov	ebx, eax
+	;mov	edi, (80000000h - 100h)	; start with bus 0, dev 0 func 0
+	mov	edi, 80000000h
 nextPCIdevice:
-        add     edi, 100h
-        cmp     edi, 80FFF800h		; scanned all devices?
-        stc
-        je      short PCIScanExit       ; not found
+	;add	edi, 100h
+	;cmp	edi, 80FFF800h		; scanned all devices?
+	;stc
+	;je	short PCIScanExit	; not found
 
-        mov     eax, edi                ; read PCI registers
-        call    pciRegRead32
-        cmp     edx, esi                ; found device?
-        jne     short nextPCIdevice
-        clc
-
+	mov 	eax, edi		; read PCI registers
+	call	pciRegRead32
+	; 19/11/2023
+	cmp	edx, ebx
+	;cmp	edx, esi		; found device?
+	;jne	short nextPCIdevice
+	;;clc
+	je	short PCIScanExit	; found
+	; 19/11/2023
+	cmp	edi, 80FFF800h
+	jnb	short pfd_nf		; not found
+	add	edi, 100h
+	jmp	short nextPCIdevice
+pfd_nf:
+	stc
+	retn	
 PCIScanExit:
-	pushf
+	;pushf
 	mov	eax, NOT_BIT31 	; 19/03/2017
 	and	eax, edi	; return only bus/dev/fn #
-	popf
-
+	;popf
+	;
 	;pop	edi
 	;pop	esi
-	pop	edx
+	;pop	edx ; * ; 19/11/2023
 	;pop	ecx
+	;
 	retn
+
+; 26/11/2023
+%if 1
 
 pciRegRead:
 	; 03/04/2017 ('pci.asm', 20/03/2017)
@@ -615,6 +686,148 @@ pciRegWrite32:
         or      eax, PCI32		; call generic PCI access
         jmp	pciRegWrite
 
+%endif
+
+; 26/11/2023 - temporary
+%if 0
+
+; PLAYWAV3.COM, ac97_vra.asm, 19/11/2023, Erdogan Tan
+
+;===============================================================
+; 8/16/32bit PCI reader
+;
+; Entry: EAX=PCI Bus/Device/fn/register number
+;           BIT30 set if 32 bit access requested
+;           BIT29 set if 16 bit access requested
+;           otherwise defaults to 8 bit read
+;
+; Exit:  DL,DX,EDX register data depending on requested read size
+;
+; Note: this routine is meant to be called via pciRegRead8, pciRegread16,
+;	or pciRegRead32, listed below.
+;
+; Note2: don't attempt to read 32bits of data from a non dword aligned reg
+;	 number. Likewise, don't do 16bit reads from non word aligned reg #
+; 
+pciRegRead:
+	push	ebx
+	push	ecx
+        mov     ebx, eax                        ; save eax, dh
+        mov     cl, dh
+        and     eax, (~PCI32)+PCI16             ; clear out data size request
+        or      eax, BIT31                      ; make a PCI access request
+        and     al, ~3 ; NOT 3                  ; force index to be dword
+
+        mov     dx, PCI_INDEX_PORT
+        out     dx, eax                         ; write PCI selector
+
+        mov     dx, PCI_DATA_PORT
+        mov     al, bl
+        and     al, 3                           ; figure out which port to
+        add     dl, al                          ; read to
+
+	in      eax, dx                         ; do 32bit read
+        test    ebx, PCI32
+        jz      short _pregr1
+
+        mov     edx, eax                        ; return 32bits of data
+_pregr1:
+	mov     dx, ax                          ; return 16bits of data
+        test    ebx, PCI32+PCI16
+        jnz     short _pregr2
+        mov     dh, cl                          ; restore dh for 8 bit read
+_pregr2:
+        mov     eax, ebx                        ; restore eax
+        and     eax, (~PCI32)+PCI16             ; clear out data size request
+	pop	ecx
+	pop	ebx
+	retn
+
+pciRegRead8:
+        and     eax, (~PCI16)+PCI32             ; set up 8 bit read size
+        jmp     short pciRegRead		; call generic PCI access
+
+pciRegRead16:
+        and     eax, (~PCI16)+PCI32		; set up 16 bit read size
+        or      eax, PCI16			; call generic PCI access
+        jmp     short pciRegRead
+
+pciRegRead32:
+        and     eax, (~PCI16)+PCI32		; set up 32 bit read size
+        or      eax, PCI32			; call generic PCI access
+        jmp     short pciRegRead
+
+;===============================================================
+; 8/16/32bit PCI writer
+;
+; Entry: EAX=PCI Bus/Device/fn/register number
+;           BIT31 set if 32 bit access requested
+;           BIT30 set if 16 bit access requested
+;           otherwise defaults to 8bit read
+;        DL/DX/EDX data to write depending on size
+;
+;
+; note: this routine is meant to be called via pciRegWrite8, pciRegWrite16,
+; 	or pciRegWrite32 as detailed below.
+;
+; Note2: don't attempt to write 32bits of data from a non dword aligned reg
+;	 number. Likewise, don't do 16bit writes from non word aligned reg #
+;
+pciRegWrite:
+	push	ebx
+	push	ecx
+        mov     ebx, eax                        ; save eax, dx
+        mov     cx, dx
+        or      eax, BIT31                      ; make a PCI access request
+        and     eax, ~PCI16 ; NOT PCI16         ; clear out data size request
+        and     al, ~3 ; NOT 3                  ; force index to be dword
+
+        mov     dx, PCI_INDEX_PORT
+        out     dx, eax                         ; write PCI selector
+
+        mov     dx, PCI_DATA_PORT
+        mov     al, bl
+        and     al, 3                           ; figure out which port to
+        add     dl, al                          ; write to
+
+        mov     eax, edx                        ; put data into eax
+        mov     ax, cx
+
+        out     dx, al
+        test    ebx, PCI16+PCI32                ; only 8bit access? bail
+        jz      short _pregw1
+
+        out     dx, ax                          ; write 16 bit value
+        test    ebx, PCI16                      ; 16bit requested?  bail
+        jnz     short _pregw1
+
+        out     dx, eax                         ; write full 32bit
+_pregw1:
+        mov     eax, ebx                        ; restore eax
+        and     eax, (~PCI32)+PCI16             ; clear out data size request
+        mov     dx, cx                          ; restore dx
+	pop	ecx
+	pop	ebx
+	ret
+
+pciRegWrite8:
+        and     eax, (~PCI16)+PCI32		; set up 8 bit write size
+        jmp     short pciRegWrite		; call generic PCI access
+
+pciRegWrite16:
+        and     eax, (~PCI16)+PCI32		; set up 16 bit write size
+        or      eax, PCI16			; call generic PCI access
+        jmp     short pciRegWrite
+
+pciRegWrite32:
+        and     eax, (~PCI16)+PCI32		; set up 32 bit write size
+        or      eax, PCI32			; call generic PCI access
+        jmp     short pciRegWrite
+
+;===============================================================
+
+%endif
+
 init_codec:
 	; 06/08/2022 - TRDOS 386 v2.0.5
 	; 05/06/2017
@@ -670,7 +883,9 @@ _reset_codec_ok:
 	; (to fix line out -2 channels audio playing- problem on AD1980 codec)  
 
 	sub	eax, eax
-	mov	edx, CODEC_RESET_REG ; 00h ; Reset register
+	; 02/11/2023
+	;mov	edx, CODEC_RESET_REG ; 00h ; Reset register
+	xor	edx, edx ; 00h ; Reset register
 	call	codec_write
 
 	;sub	eax, eax
@@ -678,7 +893,7 @@ _reset_codec_ok:
 	; 15/08/2020
 	; AD1980 BugFix
 	; (set HPSEL -headphone amp to be driven from mixer- and
-	;      CLDIS - center and LFE disable- bits)	
+	;      CLDIS -center and LFE disable- bits)	
 	;mov	eax, 0C00h ; HPSEL = bit 10, CLDIS = bit 11 ; 01/09/2020
  	;mov	edx, CODEC_MISC_CRTL_BITS_REG ; 76h ; Misc Ctrl Bits ; AD1980
 	;call	codec_write
@@ -711,7 +926,9 @@ cold_reset:
 
 	;mov	ecx, 16	; total 2s
 	; 06/08/2022
-	sub	ecx, ecx
+	;sub	ecx, ecx
+	; 22/11/2023
+	; ecx = 0 (from 'delay_100ms')
 	mov	cl, 16
 _crst_wait:
 	;mov	eax, [audio_dev_id]
@@ -752,7 +969,6 @@ _delay_x_ms:
 ;
 ;       Modified:
 ;         None
-;
 
 	; 29/05/2017
 	; 23/04/2017
@@ -869,7 +1085,8 @@ codec_write:
 	
 	shl     edx, VIA_REG_AC97_CMD_SHIFT
 
-        shl     eax, VIA_REG_AC97_DATA_SHIFT ; shl eax, 0
+	; 02/11/2023 (shl eax, 0)
+	;shl	eax, VIA_REG_AC97_DATA_SHIFT ; shl eax, 0
         or      edx, eax
 
         mov     eax, VIA_REG_AC97_CODEC_ID_PRIMARY
@@ -891,7 +1108,9 @@ _codec_check_ready:
 	;mov	ecx, 20	; total 2s
 	; 06/08/2022
 	sub	ecx, ecx
-	mov	cl, 20
+	;mov	cl, 20
+	; 02/11/2023
+	mov	cl, 10	; wait 1s
 _ccr_wait:
 	push	ecx
 
@@ -915,6 +1134,7 @@ _ccr_ok:
         retn
 
 codec_config:
+	; 02/11/2023 - TRDOS 386 Kernel v2.0.7
 	; 06/08/2022 - TRDOS 386 Kernel v2.0.5
 	; 10/06/2017
 	; 29/05/2017
@@ -928,7 +1148,10 @@ codec_config:
 
 	mov     eax, 0202h
 	mov	[audio_master_volume], ax
-	mov	ax, 1F1Fh ; 31,31
+
+	;mov	ax, 1F1Fh ; 31,31
+	; 02/11/2023
+	mov	ax, 0B0Bh
 	;mov	edx, CODEC_MASTER_VOL_REG ; 02h ; Line Out
 	; 06/08/2022
 	sub	edx, edx
@@ -960,7 +1183,7 @@ codec_config:
 	;mov	edx, 0Ch  ; AC97_PHONE_VOL ; TAD Input (Mono)
 	; 06/08/2022
 	sub	edx, edx
-	mov	dl, 0Ch	; AC97_PHONE_VOL ; TAD Input (Mono)
+	mov	dl, 0Ch	  ; AC97_PHONE_VOL ; TAD Input (Mono)
 	call	codec_write
 	;jc	short cconfig_error
 
@@ -977,6 +1200,7 @@ codec_config:
 	mov	ax, 0808h
 	;mov	edx, CODEC_CD_VOL_REG ; 12h ; CR Input (Stereo)
 	; 06/08/2022
+	sub	edx, edx ; 02/11/2023
 	mov	dl, CODEC_CD_VOL_REG ; 12h ; CR Input (Stereo)
 	call	codec_write
 	;jc	short cconfig_error
@@ -1630,7 +1854,8 @@ RestoreIrqs:
 	xor	edx, edx
 	mov	[audio_dev_id], edx ; 0
 	mov	[audio_vendor], edx ; 0
-	mov	[audio_stats_cmd], edx ; 0
+	; 22/11/2023
+	;mov	[audio_stats_cmd], edx ; 0
 
 	;popad
 
@@ -2134,6 +2359,10 @@ sb_rst_retn:
 	retn
 
 ac97_codec_config:
+	; 26/11/2023
+	; 21/11/2023
+	; 20/11/2023
+	; 19/11/2023 (TRDOS 386 v2.0.7)
 	; 10/06/2017
 	; 05/06/2017
 	; 29/05/2017
@@ -2177,15 +2406,15 @@ init_ac97_controller: ; 10/06/2017
 ;	; entry: [audio_freq] = desired sample rate
 		
 ;	mov    	dx, [NAMBAR]               	
-;	add    	dx, CODEC_EXT_AUDIO_CTRL_REG  	; 2Ah  	  
+;	add    	dx, CODEC_EXT_AUDIO_CTRL_REG  	; 2Ah
 ;	in     	ax, dx
 ;	or	ax, 1
 ;	out	dx, ax 				; Enable variable rate audio
 
-;       ;call    delay1_4ms
-;       ;call    delay1_4ms
-;       ;call    delay1_4ms
-;       ;call    delay1_4ms
+;       ;call	delay1_4ms
+;       ;call	delay1_4ms
+;       ;call	delay1_4ms
+;       ;call	delay1_4ms
 
 ;	mov	ax, [audio_freq]		; sample rate
 
@@ -2206,74 +2435,162 @@ init_ac97_controller: ; 10/06/2017
 	;mov    dx, [NABMBAR]			; bus master base address
         ;add	dx, GLOB_STS_REG
         ;mov	ax, 2
-	;out	dx, ax                         
+	;out	dx, ax
 
-        call    delay_100ms ; 29/05/2017
+	; 02/12/2023
+	;call	delay_100ms ; 29/05/2017
+
+	; 02/12/2023
+	call	delay1_4ms
+	call	delay1_4ms
+	call	delay1_4ms
+	call	delay1_4ms
 
 init_ac97_codec:
+	; 26/11/2023
+	; 19/11/2023
+	;   (playwav3.com, ac97_vra.asm, Erdogan Tan, 19/11/2023)
 	; 10/06/2017
 	; 29/05/2017
 	; 28/05/2017 - Erdogan Tan (Ref: KolibriOS, intelac97.asm)
-	;	
+
+	;; 23/11/2023 - temporary
+	;push	ebx
+	;mov	ebx, 0B8000h
+	;mov	al, '?'
+	;mov	ah, 4Eh
+	;mov	[ebx], ax
+	;pop	ebx
+
+	; 19/11/2023
+	mov	ebp, 40	; 21/11/2023
+_initc_1:
+	; 26/11/2023
 	mov	dx, GLOB_CNT_REG ; 2Ch
 	add	dx, [NABMBAR]
 	in	eax, dx
 	; ?
+
+	; 02/12/2023
+	call	delay1_4ms
+
 	mov	dx, GLOB_STS_REG ; 30h
 	add	dx, [NABMBAR]
 	in	eax, dx
 
-	cmp	eax, 0FFFFFFFFh ; -1
-	je	short init_ac97_codec_err1
+	; 02/12/2023
+	call	delay1_4ms
 
+	cmp	eax, 0FFFFFFFFh ; -1
+	jne	short _initc_3
+_initc_2:
+	dec	ebp	; 21/11/2023
+	jz	short _ac97_codec_ready
+
+	call	delay_100ms
+	jmp	short _initc_1
+_initc_3:
 	test	eax, CTRL_ST_CREADY
 	jnz	short _ac97_codec_ready
 
 	call	reset_ac97_codec
-	jc	short init_ac97_codec_err2
+	;jc	short _initc_2
+	; 26/11/2023
+	jmp	short _initc_2
 
 _ac97_codec_ready:
 	mov	dx, [NAMBAR]
 	;add	dx, 0 ; ac_reg_0 ; reset register
 	out	dx, ax
 
+	; 19/11/2023
+	call	delay_100ms
+	; 24/11/2023 - temporary
+	;call	delay_100ms
+	;call	delay_100ms
+	;call	delay_100ms
+
+	or	ebp, ebp  ; 21/11/2023	
+	jnz	short _ac97_codec_init_ok
+
 	xor	eax, eax ; 0
 	mov	dx, [NAMBAR]
-	add	dx, CODEC_REG_POWERDOWN	
+	add	dx, CODEC_REG_POWERDOWN
 	out	dx, ax
 
 	; 10/06/2017
 	; 29/05/2017
 	; wait for 1 second
-	mov	ecx, 1000 ; 1000*0.25ms = 1s
+	;mov	ecx, 1000 ; 1000*0.25ms = 1s
+	; 20/11/2023
+	;mov	ecx, 10
+	mov	cl, 10
+	; 24/11/2023 - temporary
+	;mov	cl, 40
 _ac97_codec_rloop:
-	call	delay1_4ms
-	call	delay1_4ms
-	call	delay1_4ms
-	call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
+	; 19/11/2023
+	; 22/11/2023
+	push	ecx
+	call	delay_100ms
+	pop	ecx
 	;mov	dx, [NAMBAR]
 	;add	dx, CODEC_REG_POWERDOWN
-	in	ax, dx	
-	and	ax, 0Fh
+	in	ax, dx
+
+	; 02/12/2023
+	call	delay1_4ms
+	
+	;and	ax, 0Fh
+	; 21/11/2023
+	and	al, 0Fh
 	cmp	al, 0Fh
 	je	short _ac97_codec_init_ok
+	; 24/11/2023 - temporary
+	;je	short _ac97_codec_init_ok_
+	
 	loop	_ac97_codec_rloop 
-
+	; 22/11/2023
+	; cf = 1
 init_ac97_codec_err1:
-	stc
+	;stc
 init_ac97_codec_err2:
 	retn
 
+;_ac97_codec_init_ok_:
+	;mov	dx, GLOB_STS_REG ; 30h
+	;add	dx, [NABMBAR]
+	;in	eax, dx
+	;test	eax, CTRL_ST_CREADY
+	;jnz	short _ac97_codec_init_ok
+	;stc 
+	;retn
+
 _ac97_codec_init_ok:
-        mov     al, 2 ; force set 16-bit 2-channel PCM
-	mov	dx, GLOB_CNT_REG ; 2Ch
-	add	dx, [NABMBAR]
-	out	dx, eax
+	; 26/11/2023
+	; 23/11/2023
+	;xor	eax, eax
+	; 21/11/2023 - temporary
+	; 19/11/2023
+	;mov	al, 2 ; force set 16-bit 2-channel PCM
+	;mov	dx, GLOB_CNT_REG ; 2Ch
+	;add	dx, [NABMBAR]
+	;out	dx, eax
 
 	;call	delay1_4ms
+	; 23/11/2023 - temporary
+	;call	delay_100ms
 
 	; 10/06/2017
 	call 	reset_ac97_controller
+
+	; 21/11/2023
+	;call	delay1_4ms
+	; 21/11/2023 - temporary
+	call	delay_100ms
 
 ;	call 	setup_ac97_codec
 ;
@@ -2281,21 +2598,118 @@ _ac97_codec_init_ok:
 ;	retn
 
 setup_ac97_codec:
+	; 24/11/2023
+	; 19/11/2023 - TRDOS 386 v2.0.7
+	mov	byte [VRA], 1
+
+	; 25/11/2023 - temporary
+	;jmp	short vra_not_supported
+
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_EXT_AUDIO_REG	; 28h	
+	in	ax, dx
+
+	; 02/12/2023
+	call	delay1_4ms
+
+	test	al, 1 ; BIT0 ; Variable Rate Audio bit
+	jz	short vra_not_supported
+
+	mov    	dx, [NAMBAR]               	
+	add    	dx, CODEC_EXT_AUDIO_CTRL_REG ; 2Ah  	  
+	in     	ax, dx
+
+	; 02/12/2023
+	call	delay1_4ms
+
+	and	al, ~BIT1 ; Clear DRA
+	or	al, AC97_EA_VRA ; 1 ; 04/11/2023
+	out	dx, ax			; Enable variable rate audio
+
+	;mov	ecx, 10
+	; 21/11/2023
+	mov	cl, 10
+check_vra:
+	push	ecx
+	call	delay_100ms
+	pop	ecx
+
+	in	ax, dx
+
+	; 02/12/2023
+	call	delay1_4ms
+
+	test	al, AC97_EA_VRA ; 1
+	jnz	short vra_ok
+
+	loop	check_vra
+
+vra_not_supported:	; 24/11/2023
+	; VRA is not usable
+	;mov	byte [VRA], 0
+	dec	byte [VRA]
+vra_ok:
+	; 20/11/2023
+	; 19/11/2023 - TRDOS 386 v2.0.7
 	; 06/08/2022 - TRDOS 386 v2.0.5
 	; 22/07/2020
 	; 10/06/2017
 	; 29/05/2017
-	mov     eax, 0202h
+
+	;mov     eax, 0202h
+	; 21/11/2023
+	;mov	eax, 0B0Bh
+	; 23/11/2023
+	mov	eax, 1D1Dh
 	mov	[audio_master_volume], ax
-	mov	ax, 1F1Fh ; 31, 31
+	;mov	ax, 1F1Fh ; 31, 31
+
+	; 21/11/2023
+	;push	eax
 	
+	; 20/11/2023
+	;mov	ax, 0B0Bh
+	; 23/11/2023
+	mov	ax, 0202h
+
   	mov     dx, [NAMBAR]
   	add     dx, CODEC_MASTER_VOL_REG	;02h 
 	;xor	ax, ax 	; volume attenuation = 0 (max. volume)
 	; 06/08/2022
-	xor	eax, eax
+	;xor	eax, eax
+	; 19/11/2023
 	out     dx, ax
- 
+
+	; 20/11/2023
+        ;call	delay1_4ms
+        ;call	delay1_4ms
+        ;call	delay1_4ms
+        ;call	delay1_4ms
+	; 21/11/2023 temporary
+	call	delay_100ms
+
+	; 21/11/2023
+	;pop	eax
+	
+	; 23/11/2023
+	; 21/11/2023
+	;mov	ax, 0202h
+
+  	mov     dx, [NAMBAR]
+  	add     dx, CODEC_PCM_OUT_REG		;18h 
+  	;xor    ax, ax
+  	out     dx, ax
+
+	; 20/11/2023
+        ;call	delay1_4ms
+        ;call	delay1_4ms
+        ;call	delay1_4ms
+        ;call	delay1_4ms
+	; 21/11/2023 - temporary
+	call	delay_100ms
+
+; 23/11/2023
+%if 0
   	mov     dx, [NAMBAR]
   	add     dx, CODEC_MASTER_MONO_VOL_REG	;06h 
 	;xor	ax, ax
@@ -2303,11 +2717,6 @@ setup_ac97_codec:
 
   	mov     dx, [NAMBAR]
   	add     dx, CODEC_PCBEEP_VOL_REG	;0Ah 
-  	;xor    ax, ax
-  	out     dx, ax
-
-  	mov     dx, [NAMBAR]
-  	add     dx, CODEC_PCM_OUT_REG		;18h 
   	;xor    ax, ax
   	out     dx, ax
 
@@ -2320,7 +2729,7 @@ setup_ac97_codec:
 
         mov	ax, 0808h
   	mov     dx, [NAMBAR]
-        add	dx, CODEC_LINE_IN_VOL_REG ;10h ; Line Input (Stereo)	
+        add	dx, CODEC_LINE_IN_VOL_REG ;10h ; Line Input (Stereo)
   	out     dx, ax
 
 	;mov	ax, 0808h
@@ -2338,8 +2747,14 @@ setup_ac97_codec:
         ;call    delay1_4ms
         ;call    delay1_4ms
 
-detect_ac97_codec:
-        retn
+	; 21/11/2023 - temporary
+	call	delay_100ms
+%endif
+
+set_volume_ok:
+
+;detect_ac97_codec:
+	retn
 
 set_ac97_bdl: ; Set AC97 (ICH) Buffer Descriptor List
 	; 06/08/2022 - TRDOS 386 v2.0.5
@@ -2379,19 +2794,18 @@ s_ac97_bdl1:
 ; 
 ; Buffer pointers must always be aligned on a Dword boundry.
 ;
-;
 
-;IOC                     equ     BIT31	; Fire an interrupt whenever this
-                                        ; buffer is complete.
+;IOC	equ     BIT31			; Fire an interrupt whenever this
+					; buffer is complete.
 
-;BUP                     equ     BIT30  ; Buffer Underrun Policy.
-                                        ; if this buffer is the last buffer
-                                        ; in a playback, fill the remaining
-                                        ; samples with 0 (silence) or not.
-                                        ; It's a good idea to set this to 1
-                                        ; for the last buffer in playback,
-                                        ; otherwise you're likely to get a lot
-                                        ; of noise at the end of the sound.
+;BUP	equ     BIT30			; Buffer Underrun Policy.
+					; if this buffer is the last buffer
+					; in a playback, fill the remaining
+					; samples with 0 (silence) or not.
+  					; It's a good idea to set this to 1
+					; for the last buffer in playback,
+					; otherwise you're likely to get a lot
+					; of noise at the end of the sound.
 
 ;
 ; Bits 15:0 contain the length of the buffer, in number of samples, which
@@ -2406,9 +2820,10 @@ s_ac97_bdl1:
 
 	mov	eax, esi ; DMA half buffer size
 	add	edx, eax
-	shr	eax, 1 ; count of 16 bit samples
-	;or	eax, IOC+BUP
-	or	eax, IOC ; 11/06/2017
+	shr	eax, 1	; count of 16 bit samples
+	; 19/11/2023
+	or	eax, IOC+BUP
+	;or	eax, IOC ; 11/06/2017
 	stosd
 
 ; 2nd buffer:
@@ -2421,15 +2836,19 @@ s_ac97_bdl1:
 ; 
 	mov	eax, esi ; DMA half buffer size
 	shr	eax, 1 ; count of 16 bit samples
-	;or	eax, IOC+BUP
-	or	eax, IOC ; 11/06/2017
+	; 19/11/2023
+	or	eax, IOC+BUP
+	;or	eax, IOC ; 11/06/2017
 	stosd
 
 	loop    s_ac97_bdl0
 	
 	retn
 
-ac97_start_play:  
+ac97_start_play:
+	; 26/11/2023
+	; 20/11/2023  
+	; 19/11/2023 - TRDOS 386 v2.0.7
 	; 06/08/2022 - TRDOS 386 v2.0.5
 	; 28/05/2017
 	; Derived from 'playWav' procedure in 'ICHWAV.ASM'
@@ -2437,41 +2856,76 @@ ac97_start_play:
 
 	; set output rate
 	; entry: [audio_freq] = desired sample rate
+
+	; 21/11/2023 - temporary
+	;call	ac97_codec_config
+
+; 20/11/2023
+%if 0
+	AC97_EA_VRA equ 0001h ; 04/11/2023
 		
 	mov    	dx, [NAMBAR]               	
-	add    	dx, CODEC_EXT_AUDIO_CTRL_REG  	; 2Ah  	  
+	add    	dx, CODEC_EXT_AUDIO_CTRL_REG  	; 2Ah
 	in     	ax, dx
-	;or	ax, 1
-	; 06/08/2022
-	or	al, 1
-	out	dx, ax 				; Enable variable rate audio
+	and	al, ~BIT1 ; Clear DRA
+	or	al, AC97_EA_VRA ; 1 ; 04/11/2023
+	out	dx, ax			; Enable variable rate audio
 
        ;call    delay1_4ms
        ;call    delay1_4ms
        ;call    delay1_4ms
        ;call    delay1_4ms
+%endif
+
+	; 26/11/2023
+	; 24/11/2023 - temporary
+	;mov	ax, 48000
+
+	; 20/11/2023
+	cmp	byte [VRA], 1
+	jb	short skip_set_rate
 
 	mov	ax, [audio_freq]		; sample rate
 
+;skip_set_rate:	; 24/11/2023
 	mov    	dx, [NAMBAR]               	
 	add    	dx, CODEC_PCM_FRONT_DACRATE_REG	; 2Ch  	  
 	out	dx, ax 				; out sample rate
-		
-       ;call    delay1_4ms
-       ;call    delay1_4ms
-       ;call    delay1_4ms
-       ;call    delay1_4ms
+	
+	; 27/11/2023	
+	;call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
+	; 27/11/2023 - temporary
+	call	delay_100ms
+
+	; 26/11/2023
+skip_set_rate:	; 20/11/2023
+
+	;; 23/11/2023 - temporary
+	;push	ebx
+	;mov	ebx, 0B8000h
+	;mov	al, 'x'
+	;mov	ah, 4Eh
+	;mov	[ebx], ax
+	;pop	ebx
 
 ;
 ; register reset the DMA engine. This may cause a pop noise on the output
 ; lines when the device is reset. Prolly a better idea to mute output, then
 ; reset.
 ;
-        mov     dx, [NABMBAR]
-        add     dx, PO_CR_REG                  ; set pointer to Cntl reg
-        mov     al, RR                         ; set reset
-        out     dx, al                         ; self clearing bit
-;
+	;; 21/11/2023 - temporary
+	;; 20/11/2023
+	;mov	dx, [NABMBAR]
+	;add	dx, PO_CR_REG			; set pointer to Cntl reg
+	;mov	al, RR				; set reset
+	;out	dx, al				; self clearing bit
+
+	; 23/11/2023 - temporary
+	;call	delay_100ms
+
 ;	mov	edi, audio_bdl_buff
 ;	mov	edx, [audio_dmabuff_size]
 ;	shr	edx, 1
@@ -2502,15 +2956,20 @@ ac97_start_play:
 	mov	dx, [NABMBAR]
 	add	dx, PO_BDBAR_REG
 	out	dx, eax
+
+	; 23/11/2023 - temporary
+	call	delay_100ms
 ;
 ; All set. Let's play some music.
-;
 ;
 	;mov	eax, 31
 	; 06/08/2022
 	sub	eax, eax
 	mov	al, 31
 	call    set_ac97_LastValidIndex
+
+	; 23/11/2023 - temporary
+	call	delay_100ms
 
 	mov	byte [audio_play_cmd], 1 ; play command (do not stop) !
 
@@ -2520,11 +2979,23 @@ ac97_play: ; continue to play (after pause)
 	; 28/05/2017
         mov     dx, [NABMBAR]
         add     dx, PO_CR_REG		; PCM out control register
-        mov	al, IOCE+RPBM ; 29/05/2017
-        ;mov	al, 1Dh ; (Ref: KolibriOS, intelac97.asm, 'play:')
+	; 26/11/2023
+	mov	al, IOCE+RPBM ; 29/05/2017
+	; 24/11/2023
+	;mov	al, 1Dh ; (Ref: KolibriOS, intelac97.asm, 'play:')
 	out     dx, al			; set start!
 
 	;mov	byte [audio_play_cmd], 1 ; play command (do not stop) !
+
+	; 24/11/2023 - temporary
+	;mov	ax, 0202h	
+	;mov	dx, [NAMBAR]
+  	;add	dx, CODEC_MASTER_VOL_REG  ; 02h ; Line Out 
+  	;out	dx, ax
+	;mov	ax, 0202h	
+	;mov	dx, [NAMBAR]
+  	;add	dx, CODEC_PCM_OUT_REG ; 18h ; PCM Out 
+  	;out	dx, ax
 
 	retn
 
@@ -2558,10 +3029,15 @@ ac97_volume:
   	add     dx, CODEC_MASTER_VOL_REG  ; 02h ; Line Out 
   	out     dx, ax
 ac97_vol_1:
+	; 21/11/2023
 _ac97_ih5:	; 06/08/2022
 	retn
 
 ac97_int_handler:
+	; 27/11/2023
+	; 24/11/2023
+	; 21/11/2023
+	; 20/11/2023 - TRDOS 386 v2.0.7
 	; 06/08/2022 - TRDOS 386 v2.0.5
 	; 12/10/2017
 	; 10/10/2017
@@ -2582,20 +3058,29 @@ ac97_int_handler:
 	;cmp	byte [audio_busy], 1
 	;jnb	_ac97_ih2 ; busy !
 
-        mov     dx, GLOB_STS_REG
+	; 24/11/2023
+        ;mov	dx, [NABMBAR]
+	;mov	dx, PO_SR_REG
+	;in	ax, dx
+	;test	al, BCIS ; bit 3, 8
+	;jz	short _ac97_ih5
+
+	; 24/11/2023
+	mov	dx, GLOB_STS_REG
         add	dx, [NABMBAR]
 	in	eax, dx
 
-        cmp     eax, 0FFFFFFFFh ; -1
+	cmp	eax, 0FFFFFFFFh ; -1
 	;je	_ac97_ih3 ; exit
 	; 06/08/2022
 	je	short _ac97_ih5
 
-        ;test	eax, 40h ; PCM Out Interrupt
+	;test	eax, 40h ; PCM Out Interrupt
 	; 06/08/2022
 	test	al, 40h
-	jnz     short _ac97_ih0
+	jnz	short _ac97_ih0
 
+	; 24/11/2023
 	test	eax, eax
 	;jz	_ac97_ih3 ; exit
 	; 06/08/2022
@@ -2604,125 +3089,29 @@ ac97_int_handler:
  	;mov	dx, GLOB_STS_REG
         ;add	dx, [NABMBAR]
 	out	dx, eax
-
+	
 	;jmp	_ac97_ih3 ; exit
+	
 	; 06/08/2022
 	retn
+	; 21/11/2023
+	;jmp	short _ac97_ih5
 
 _ac97_ih0:
-	push	eax
+	; 24/11/2023
+	;push	eax
 	; 09/10/2017
 	cmp	byte [audio_play_cmd], 1
-	jb	short _ac97_ih4 ; stop command !
+	;jb	short _ac97_ih4 ; stop command !
+	; 24/11/2023
+	jnb	short _ac97_ih4
 
-	;mov	byte [audio_busy], 1
-
-	;mov	al, 10h
-	;mov	dx, PO_CR_REG
+	;mov	dx, GLOB_STS_REG
         ;add	dx, [NABMBAR]
-	;out	dx, al
-
-	mov	ax, 1Ch ; FIFOE(=16)+BCIS(=8)+LVBCI(=4)
-	mov	dx, PO_SR_REG
-        add	dx, [NABMBAR]
-	out	dx, ax
-
-	mov	dx, PO_CIV_REG
-        add	dx, [NABMBAR]
-	in	al, dx
-
-	;cmp	al, [audio_civ] ; [audio_flag]
-	;je	short _ac97_ih2
-
-	mov	[audio_civ], al
-	dec	al
-	;inc	al ; 11/06/2017
-	and	al, 1Fh
-
-        mov     dx, PO_LVI_REG
-        add	dx, [NABMBAR]
-        out	dx, al
-
-	; 12/10/2017
-	mov	al, [audio_civ]
-	inc	al
-	and	al, 1
-	mov	[audio_flag], al 
-	;; [audio_flag] : 0 = Buffer 1, 1 = Buffer 2
-	;
-	pop	eax
-	;
-	and     eax, 40h
-        mov	dx, [NABMBAR]
-	add	dx, GLOB_STS_REG
 	out	dx, eax
+	;jmp	short _ac97_stop
 
-	;; 13/06/2017
-	;mov	al, 11h ; IOCE + RPBM
-	;mov	dx, PO_CR_REG
-        ;add	dx, [NABMBAR]
-	;out	dx, al
-
-ac97_tuneloop:
-	; 09/10/2017
-	mov	edi, [audio_dma_buff]
-	mov	ecx, [audio_dmabuff_size]
-	shr	ecx, 1 ; dma buff size / 2 = half buffer size
-
-	; 12/10/2017
-	cmp 	byte [audio_flag], 0
-	ja	short _ac97_ih1  ; Playing Half Buffer 2 (Current: FLAG)
-	; Playing Half Buffer 1 (Current: EOL)	
-	add	edi, ecx
-_ac97_ih1: 
-	; Update half buffer 2 while playing half buffer 1 (next: FLAG)
-	; Update half buffer 1 while playing half buffer 2 (next: EOL)
-
-	mov	esi, [audio_p_buffer] ; phy addr of audio buff
-	shr	ecx, 2 ; half buff size / 4
-	rep	movsd 
-
-	; 10/10/2017
-	; switch flag value
-	xor	byte [audio_flag], 1
-	; 12/10/2017
-	; [audio_flag] = 0 : Playing dma half buffer 2 (even index value)
-			   ; Next buffer (to update) is dma half buff 1
-	; 	       = 1 : Playing dma half buffer 1 (odd index value)
-			   ; Next buffer (to update) is dma half buff 2
-_ac97_ih2:
-	;mov	byte [audio_busy], 0
-_ac97_ih3:
-	;pop	edi
-	;pop	esi
-	;pop	ebx ; * must be restored !
-	;pop	ecx
-	;pop	edx
-	;pop	eax ; * must be restored !
-
-	retn
-
-_ac97_ih4:
-	; 09/10/2017
-	call	_ac97_stop
-	;
-	pop	eax
-	;
-	and     eax, 40h
-        mov	dx, [NABMBAR]
-	add	dx, GLOB_STS_REG
-	out	dx, eax
-
-	;; 13/06/2017
-	;mov	al, 11h ; IOCE + RPBM
-	;mov	dx, PO_CR_REG
-        ;add	dx, [NABMBAR]
-	;out	dx, al
-
-	; 10/10/2017
-	;jmp	short _ac97_ih3  ; exit
-	retn
-
+	; 24/11/2023
 ac97_stop: 
 	; 28/05/2017
 	mov	byte [audio_play_cmd], 0 ; stop !
@@ -2761,6 +3150,129 @@ ac97_pause:
 	; 29/05/2017
 	mov 	al, IOCE
 	jmp	short ac97_po_cmd
+
+_ac97_ih4:
+	;mov	byte [audio_busy], 1
+
+	; 24/11/2023
+	push	eax
+
+	mov	ax, 1Ch ; FIFOE(=16)+BCIS(=8)+LVBCI(=4)
+	mov	dx, PO_SR_REG
+        add	dx, [NABMBAR]
+	out	dx, ax
+
+	mov	dx, PO_CIV_REG
+        add	dx, [NABMBAR]
+	in	al, dx
+
+	;cmp	al, [audio_civ] ; [audio_flag]
+	;je	short _ac97_ih2
+
+	; 21/11/2023
+	;mov	[audio_civ], al
+	; 20/11/2023
+	mov	ah, al
+	dec	al
+	;inc	al ; 11/06/2017
+	and	al, 1Fh
+
+        mov     dx, PO_LVI_REG
+        add	dx, [NABMBAR]
+        out	dx, al
+
+	; 12/10/2017
+	;mov	al, [audio_civ]
+	;inc	al
+	;and	al, 1
+	;mov	[audio_flag], al 
+	; 27/11/2023
+	; 20/11/2023
+	;inc	ah
+	and	ah, 1
+	mov	[audio_flag], ah
+	
+	;; [audio_flag] : 0 = Buffer 1, 1 = Buffer 2
+	;
+	; 21/11/2023
+	;call	ac97_tuneloop
+
+	; 24/11/2023
+ac97_tuneloop:
+	; 09/10/2017
+	mov	edi, [audio_dma_buff]
+	mov	ecx, [audio_dmabuff_size]
+	shr	ecx, 1 ; dma buff size / 2 = half buffer size
+
+	; 12/10/2017
+	cmp 	byte [audio_flag], 0
+	ja	short _ac97_ih1  ; Playing Half Buffer 2 (Current: FLAG)
+	; Playing Half Buffer 1 (Current: EOL)	
+	add	edi, ecx
+_ac97_ih1: 
+	; Update half buffer 2 while playing half buffer 1 (next: FLAG)
+	; Update half buffer 1 while playing half buffer 2 (next: EOL)
+
+	mov	esi, [audio_p_buffer] ; phy addr of audio buff
+	shr	ecx, 2 ; half buff size / 4
+	rep	movsd 
+
+	; 10/10/2017
+	; switch flag value
+	xor	byte [audio_flag], 1
+
+	; 27/11/2023
+	; 21/11/2023 - temporary
+	;push	ebx
+	;mov	ebx, 0B8002h
+	;mov	al, [audio_flag]
+	;add	al, '1'
+	;mov	ah, 0Fh
+	;mov	[ebx], ax
+	;pop	ebx
+	
+	; 12/10/2017
+	; [audio_flag] = 0 : Playing dma half buffer 2 (even index value)
+			   ; Next buffer (to update) is dma half buff 1
+	; 	       = 1 : Playing dma half buffer 1 (odd index value)
+			   ; Next buffer (to update) is dma half buff 2
+	; 24/11/2023
+	;retn
+
+	;
+	; 24/11/2023
+	pop	eax
+	; 24/11/2023
+	; 20/11/2023
+	;and	eax, 40h
+        mov	dx, [NABMBAR]
+	add	dx, GLOB_STS_REG
+	out	dx, eax
+
+	;; 13/06/2017
+	;mov	al, 11h ; IOCE + RPBM
+	;mov	dx, PO_CR_REG
+        ;add	dx, [NABMBAR]
+	;out	dx, al
+
+	; 24/11/2023
+	;mov	dx, [NABMBAR]
+	;add	dx, PO_SR_REG	; set pointer to Status reg
+	;mov	ax, 1Ch
+	;out	dx, ax
+
+	; 24/11/2023	
+_ac97_ih2:
+	;mov	byte [audio_busy], 0
+_ac97_ih3:
+	;pop	edi
+	;pop	esi
+	;pop	ebx ; * must be restored !
+	;pop	ecx
+	;pop	edx
+	;pop	eax ; * must be restored !
+
+	retn
 
 reset_ac97_controller:
 	; 10/06/2017
@@ -3184,3 +3696,79 @@ ac97_gdmabo_1:
 	add	dx, [NABMBAR]
 	in	ax, dx ; remain dwords
 	jmp	short ac97_gdmabo_2
+
+ac97_codec_info:
+	; 19/11/2023
+	; ENTRY: none
+	; RETURN: 
+	;	eax = Extended Audio ID (MX28) in ax
+	;	 ax bit 0 - VRA bit
+	;	 hw of eax = PCM output sample rate (48000)
+	;	ebx = VENDOR ID 1, VENDOR ID 2 (bx)
+	;	cf = 1 -> error
+
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_POWER_CTRL_REG ; 26h
+	in	ax, dx
+	and	al, 0Fh
+	jnz	short ac97_c_inf_1
+	call	delay_100ms
+	in	ax, dx
+	and	al, 0Fh
+	jnz	short ac97_c_inf_1
+	call	delay_100ms
+	in	ax, dx
+	and	al, 0Fh
+	jnz	short ac97_c_inf_1
+	stc
+	retn
+ac97_c_inf_1:
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_PCM_FRONT_DACRATE_REG 
+	in	ax, dx	; PCM Output Sample Rate
+			; 48000 Hz
+	shl	eax, 16
+	call	delay_100ms
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_EXT_AUDIO_REG ; 28h
+	in	ax, dx
+	push	eax
+	call	delay_100ms
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_VENDOR_ID1
+	in	ax, dx
+	shl	eax, 16
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_VENDOR_ID2
+	in	ax, dx
+	mov	ebx, eax
+	pop	eax
+	retn
+
+; 19/11/2023
+; Valid ICH device IDs
+
+valid_ids:
+dd	(ICH_DID << 16) + INTEL_VID  	 ; 8086h:2415h 
+dd	(ICH0_DID << 16) + INTEL_VID 	 ; 8086h:2425h 
+dd	(ICH2_DID << 16) + INTEL_VID 	 ; 8086h:2445h 
+dd	(ICH3_DID << 16) + INTEL_VID 	 ; 8086h:2485h 
+dd	(ICH4_DID << 16) + INTEL_VID 	 ; 8086h:24C5h
+dd	(ICH5_DID << 16) + INTEL_VID 	 ; 8086h:24D5h
+dd	(ICH6_DID << 16) + INTEL_VID 	 ; 8086h:266Eh
+dd	(ESB6300_DID << 16) + INTEL_VID  ; 8086h:25A6h
+dd	(ESB631X_DID << 16) + INTEL_VID  ; 8086h:2698h
+dd	(ICH7_DID << 16) + INTEL_VID 	 ; 8086h:27DEh
+dd	(MX82440_DID << 16) + INTEL_VID  ; 8086h:7195h
+dd	(SI7012_DID << 16)  + SIS_VID	 ; 1039h:7012h
+dd 	(NFORCE_DID << 16)  + NVIDIA_VID ; 10DEh:01B1h
+dd 	(NFORCE2_DID << 16) + NVIDIA_VID ; 10DEh:006Ah
+dd 	(AMD8111_DID << 16) + AMD_VID 	 ; 1022h:746Dh
+dd 	(AMD768_DID << 16)  + AMD_VID 	 ; 1022h:7445h
+dd 	(CK804_DID << 16) + NVIDIA_VID	 ; 10DEh:0059h
+dd 	(MCP04_DID << 16) + NVIDIA_VID	 ; 10DEh:003Ah
+dd 	(CK8_DID << 16) + NVIDIA_VID	 ; 1022h:008Ah
+dd 	(NFORCE3_DID << 16) + NVIDIA_VID ; 10DEh:00DAh
+dd 	(CK8S_DID << 16) + NVIDIA_VID	 ; 10DEh:00EAh
+
+valid_id_count:	equ ($ - valid_ids)>>2 ; 19/11/2023

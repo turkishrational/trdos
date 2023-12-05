@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.6) - MAIN PROGRAM : trdosk3.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.7) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 30/08/2023  (Previous: 07/08/2022)
+; Last Update: 02/12/2023  (Previous: 30/08/2023, TRDOS 386 v2.0.6)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -2337,6 +2337,7 @@ loc_run_err_pass_restore_cdir:
 	retn
 
 print_directory_list:
+	; 02/12/2023 (TRDOS 386 v2.0.7) 
 	; 07/08/2022
 	; 27/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 10/02/2016
@@ -2346,11 +2347,38 @@ print_directory_list:
 	mov	word [AttributesMask], 0800h ; ..except volume names..
 	mov	al, [Current_Drv]
 	mov	[RUN_CDRV], al
+	; 02/12/2023
+	cmp	al, 2
+	jnb	short get_dfname_fchar
+	mov	al, [TIMER_LOW+1]
+	shr	al, 1	; 512/18.2 (>= 28 seconds)
+	xchg	al, [P_TIMER]  ; 28 seconds
+	cmp	al, [P_TIMER]
+	je	short get_dfname_fchar
+	call	get_media_change_status
+	jc	short pdl_chdrv
+	cmp	ah, 6
+	jne	short get_dfname_fchar
+pdl_chdrv:
+	push	esi
+	mov	dl, [RUN_CDRV]
+	call	change_current_drive
+	pop	esi
+	jnc	short get_dfname_fchar
+	mov	esi, Msg_Not_Ready_Read_Err
+	;call	print_msg
+	;retn
+	jmp	print_msg		
+
 get_dfname_fchar:
 	lodsb
 	cmp	al, 20h
 	je	short get_dfname_fchar
-        jb      loc_print_dir_call_all
+	;jb	loc_print_dir_call_all
+	; 02/12/2023
+	ja	short get_dfname_fchar_2
+	jmp	loc_print_dir_call_all
+get_dfname_fchar_2:
 	cmp	al, '-'
 	jne	short loc_print_dir_call_flt
 get_next_attr_char:

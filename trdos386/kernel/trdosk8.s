@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.5) - MAIN PROGRAM : trdosk8.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.7) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 09/08/2022  (Previous: 17/04/2021)
+; Last Update: 04/12/2023  (Previous: 09/08/2022)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -553,6 +553,9 @@ com_iret:
 ;	pop 	eax
 ;	iretd
 
+; 21/11/2023
+%if 0
+
 sp_init:
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 07/11/2015
@@ -855,6 +858,7 @@ sp_invp_err:
 b_div_tbl: ; Baud rate divisor table (115200/divisor)
 	db 1, 12, 6, 3, 8, 4, 1
 
+%endif
 
 ; 23/10/2015
 com1_irq4:
@@ -862,9 +866,9 @@ com1_irq4:
 com2_irq3:
 	dd dummy_retn
 
+; 21/11/2023
 dummy_retn:
-	retn
-
+	;retn
 wakeup:
 	; 24/01/2016
 	retn
@@ -1825,6 +1829,7 @@ set_dev_IRQ_service:
 	retn		
 
 sysaudio: ; AUDIO FUNCTIONS
+	; 19/11/2023 (TRDOS 386 v2.0.7)
 	; 29/07/2022 (TRDOS 386 v2.0.5)
 	; 12/02/2021 (TRDOS 386 v2.0.3) 
 	; 28/07/2020
@@ -1932,7 +1937,9 @@ sysaudio: ; AUDIO FUNCTIONS
 	;    	04/06/2017
 	;	BH = 14 -> GET AUDIO DEVICE INFO
 	;	     BL: 0 = Audio Controller Info
-	;	       > 0 = Invalid for now! 
+	;	     ; 19/11/2023	
+	;	     BL: 1 = Audio (AC'97) Codec Info	
+	;	     BL > 1 = Invalid for now! 
 	;
 	;	22/06/2017	
 	;	BH = 15 -> GET CURRENT SOUND DATA (for graphics)
@@ -1954,7 +1961,6 @@ sysaudio: ; AUDIO FUNCTIONS
 	;		  FFh = Get current flag value
 	;			(Half buffer number -1)
 	;
-	;
 	; Outputs:
 	;
 	;	For BH = 0 -> Beep
@@ -1971,7 +1977,7 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	      5-FFh : unknown/invalid
 	;	    AL = mode status
 	;		 bit 0 = mono /stereo (1 = stereo)
-	;		 bit 1 = 8 bit / 16 bit ( 1 = 16 bit)
+	;		 bit 1 = 8 bit / 16 bit (1 = 16 bit)
 	;	    04/06/2017
 	;	    EBX = PCI DEVICE/VENDOR ID (if >0)
 	;		 (BX = VENDOR ID) 
@@ -2027,10 +2033,18 @@ sysaudio: ; AUDIO FUNCTIONS
 	;		 (00000000BBBBBBBBDDDDDFFF00000000)
 	;	    EDX = NABMBAR/NAMBAR (for AC97)
 	;		  (Low word, DX = NAMBAR address)
-	;	    EDX = Base IO Addr (DX) for SB16 & VT8233	  			  		
+	;	    EDX = Base IO Addr (DX) for SB16 & VT8233
 	;	    (if CF = 1 -> Error code in EAX)	
-	;	                 (ERR_DEV_NOT_RDY = 15)  
-	;
+	;	                 (ERR_DEV_NOT_RDY = 15) 
+	;	(for BL = 1) -for AC97- ; 19/11/2023	
+	;	    EAX = Extended Audio ID (MX28) in AX
+	;	     AX bit 0 - VRA bit
+	;	     HW of EAX = PCM output sample rate (HZ)
+	;	    EBX = VENDOR ID 1 (BX), VENDOR ID 2 (HW)
+	;	    (if CF = 1 -> Error code in EAX)	
+	;	                 (ERR_DEV_NOT_RDY = 15)
+	;	    Note: EAX & EBX = 0 (for SB16,VIA,HDA)		
+ 	;
 	;	22/06/2017	
 	;	For BH = 15 -> GET CURRENT SOUND DATA
 	;			 (for graphics)
@@ -2043,7 +2057,6 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	     Current DMA Buffer Position to EDX
 	;	     virtual address as EAX bytes.)
 	;	 ((If CF = 1 ->  Error code in EAX))
-	;
 	;
 	;	10/10/2017	
 	;	For BH = 16 -> UPDATE DMA BUFFER DATA
@@ -2093,8 +2106,8 @@ AUDIO1L	EQU	$ - AUDIO1
 soundc_detect:
 	; FUNCTION = 1
 	; bl = Audio device type number 
-	; (0= pc speaker, 1 = sound blaster 16, 2 = intel ac97
-	;  3= via vt823x, 4 = intel HDA, 0FFh= any)
+	; (0 = pc speaker, 1 = sound blaster 16, 2 = intel ac97
+	;  3 = via vt823x, 4 = intel HDA, 0FFh = any)
 	
 	; 04/06/2017
 	mov	ah, [audio_device]
@@ -2175,13 +2188,6 @@ soundc_dev_err:
 	;mov	al, ERR_DEV_NOT_RDY
 	jmp	short sysaudio_err
 
-sound_buff_error:
-	mov	eax, ERR_BUFFER ; Buffer error !
-	; 29/07/2022
-	;sub	eax, eax
-	;mov	al, ERR_BUFFER
-	jmp	short sysaudio_err
-
 soundc_respond_err:
 	; ERR_TIME_OUT ; 'time out !' error	
 	mov	eax, ERR_DEV_NOT_RESP ; 'device not responding !' error
@@ -2194,9 +2200,10 @@ sysaudio_err:
 	jmp	error
 
 sound_alloc:
-	; FUNCTION =  2
+	; FUNCTION = 2
 	; ecx = audio buffer size (in bytes)
 	; edx = audio buffer address (virtual)
+	; 25/11/2023
 	; 27/07/2020
 	; 28/05/2017
 	; 01/05/2017, 15/05/2017
@@ -2205,8 +2212,20 @@ sound_alloc:
 	ja	short snd_alloc_0
 	; Max. 64KB DMA buffer !!!
 	cmp	ecx, 32768
+	jna	short snd_alloc_6
+	; 25/11/2023
+sound_buff_error:
+	mov	eax, ERR_BUFFER ; Buffer error !
+	; 29/07/2022
+	;sub	eax, eax
+	;mov	al, ERR_BUFFER
+	jmp	short sysaudio_err
+snd_alloc_0:	
+	; 25/11/2023
+	; Max 128KB DMA buffer size (2 half buffers)
+	cmp	ecx, 65536
 	ja	short sound_buff_error
-snd_alloc_0:
+snd_alloc_6:
 	; 15/05/2017
 	cmp	ecx, 4096 ; PAGE_SIZE
 	jb	short sound_buff_error
@@ -2217,7 +2236,11 @@ snd_alloc_0:
 	; audio buffer exists !
 	mov	bl, [u.uno]
 	cmp	bl, [audio_user]
-	jne	sndc_owner_error ; not owner !
+	;jne	sndc_owner_error ; not owner !
+	; 25/11/2023
+	je	short snd_alloc_7
+	jmp	sndc_owner_error ; not owner !
+snd_alloc_7:
 	cmp	eax, edx ; same virtual buffer address ?
 	jne	short snd_alloc_1
 	cmp	ecx, [audio_buff_size]
@@ -2239,20 +2262,25 @@ snd_alloc_1:
 snd_alloc_2:
 	mov	ebx, edx
 	; 01/05/2017
-	mov	edx, ~PAGE_OFF ; truncating page offsets
-			       ; for aligning to page borders	
-	;and	eax, edx
-	and	ebx, edx
-	and	ecx, edx
+	;mov	edx, ~PAGE_OFF ; truncating page offsets
+	;		       ; for aligning to page borders	
+	;;and	eax, edx
+	;and	ebx, edx
+	; 26/11/2023
+	;and	ecx, edx
+	and	ebx, ~PAGE_OFF
+	mov	edx, ecx
 	; 15/05/2017
 	; EAX = Beginning address (physical)
 	; EAX = 0 -> Allocate mem block from the 1st proper aperture	
 	; ECX = Number of bytes to be allocated		
 	call	allocate_memory_block
-	jc	sound_buff_error
+	jc	short sound_buff_error
+
 	; EAX = Physical address of the allocated memory block
-	; ECX = Allocated bytes (as truncated to page border)
+	; ECX = Allocated bytes (as rounded up to page border)
 	; EBX = Virtual address (as truncated to page border)
+	push	edx ; 26/11/2023
 	push	eax
 	push	ebx
 	push	ecx
@@ -2260,13 +2288,28 @@ snd_alloc_2:
 	pop	ecx
 	pop	ebx
 	pop	eax
+	pop	edx ; 26/11/2023
 	jc	short snd_alloc_4  ; insufficient memory, buff error
 	; eax = physical address of the user's audio buffer
 	; ebx = virtual address of the user's audio buffer
-	; ecx = buffer size (in bytes)
+	; 26/11/2023
+	; ecx = allocated buffer size (in bytes)
+	;		 -rounded up to page boundary-
+	; edx = requested buffer size (in bytes)
 	mov	[audio_p_buffer], eax
 	mov	[audio_buffer], ebx
- 	mov	[audio_buff_size], ecx
+	; 26/11/2023
+	;mov	ecx, edx
+	;; 25/11/2023
+	;cmp	ecx, 65536
+	;jb	short snd_alloc_5
+	;dec	ecx
+	;; ecx = 65535
+	;; (DMA half buffer's sample count must be < 65536)
+;snd_alloc_5:
+ 	;mov	[audio_buff_size], ecx
+	; 26/11/2023
+	mov	[audio_buff_size], edx
 	mov	dl, [u.uno]
 	mov	[audio_user], dl
 	mov	[u.r0], eax
@@ -2280,13 +2323,15 @@ snd_alloc_4:
 	; EAX = Beginning address (physical)
 	; ECX = Number of bytes to be deallocated
 	call	deallocate_memory_block
-	jmp	sound_buff_error  ; insufficient memory, buff error
+	jmp	sound_buff_error ; insufficient memory, buff error
 
 soundc_init:
 	; FUNCTION = 3 
 	; bl = method (0= s.r.b., 1= callback, 2= auto incr s.r.b.)
 	; cl = signal response byte (initial or fixed) value
 	; edx = signal response byte or callback address
+	; 04/12/2023
+	; 02/12/2023
 	; 07/08/2022
 	; 29/07/2022
 	; 27/07/2020
@@ -2460,9 +2505,20 @@ sndc_init2:
 	cmp	ecx, edx
 	je	short sndc_init5
 
+	; 04/12/2023
+	cmp	eax, sb16_dma_buffer	; reserved buffer ?
+	je	short sndc_init20 ; it isn't an allocated mem buff
+
 	xchg	ecx, edx
-	call	deallocate_memory_block
+	; 26/11/2023 
+	; round up (always -rounded up- page count is allocated)
+	; ((so deallocation must be done for the rounded up value))
+	;add	ecx, PAGE_SIZE - 1   ; 4095
+	;call	deallocate_memory_block
+	call	deallocate_memory_block_x 
+			; deallocate ((ecx+4095)>>12) pages
 	xchg	edx, ecx
+sndc_init20:
 	xor	eax, eax
 sndc_init3:
 	; 12/05/2017
@@ -2476,6 +2532,13 @@ sndc_init5:	; 29/07/2022
 	retn 
 
 sndc_init4:
+	; 02/12/2023 - TRDOS 386 v2.0.7
+	cmp	ecx, 65536
+	ja	short sndc_init21
+	mov	eax, sb16_dma_buffer ; use already reserved buffer
+	jmp	short sndc_init17	
+
+sndc_init21:
 	; EAX = Beginning address (physical)
 	; EAX = 0 -> Allocate mem block from the 1st proper aperture	
 	; ECX = Number of bytes to be allocated	(>0)	
@@ -2969,7 +3032,13 @@ snd_disable_2:
 	;sub	ecx, ecx
 	;xchg	ecx, [audio_dmabuff_size]
 	mov	ecx, [audio_dmabuff_size]
-	call	deallocate_memory_block
+	; 26/11/2023 
+	; round up (always -rounded up- page count is allocated)
+	; ((so deallocation must be done for the rounded up value))
+	;add	ecx, PAGE_SIZE - 1   ; 4095
+	;call	deallocate_memory_block
+	call	deallocate_memory_block_x 
+			; deallocate ((ecx+4095)>>12) pages
 snd_disable_3:
 	retn
 
@@ -3033,12 +3102,19 @@ snd_dma_map_6:
 soundc_info:
 	; FUNCTION = 14 
 	; Get Audio Controller Info
+	; 19/11/2023
 	; 30/07/2022
 	; 10/06/2017
 	; 05/06/2017
-	and	bl, bl ; 0
-	jz	short sndc_info_0
-	; invalid parameter !
+	
+	;and	bl, bl ; 0
+	;jz	short sndc_info_0
+	
+	; 19/11/2023
+	cmp	bl, 1
+	jna	short sndc_info_0
+
+; invalid parameter !
 ; 30/07/2022
 	;mov	eax, ERR_INV_PARAMETER ; 23
 ;sndc_inf_error:
@@ -3058,6 +3134,12 @@ sndc_info_0:
 snd_data_dev_err:
 	jmp	soundc_dev_err
 sndc_info_3:
+	; 19/11/2023
+	;cmp	bl, 1
+	;je	short sndc_info_4
+	and	bl, bl
+	jnz	short sndc_info_4
+
 	mov	ebx, [audio_vendor]
 	mov	ecx, [audio_dev_id]
 	;mov	al,  [audio_device]
@@ -3074,7 +3156,7 @@ sndc_info_1:
 	; !!! SB16 or VT8233 (VT8237R) !!!
 	movzx	edx, word [audio_io_base]	
 sndc_info_2:
-	mov	ah, al ;  [audio_device]
+	mov	ah, al ; [audio_device]
 	mov	al, [audio_intr] 
 
 	; EAX = IRQ Number in AL
@@ -3095,6 +3177,28 @@ sndc_info_2:
 	mov	[ebp+24], ecx  ; ecx
   			  		
  	retn
+
+sndc_info_4:
+	; 19/11/2023
+	cmp	al, 2 ; Intel AC97 (ICH) Audio Controller
+	je	short sndc_info_7
+sndc_info_5:
+	; return ZERO if it is not AC97 audio controller codec
+	xor	eax, eax ; 0
+	xor	ebx, ebx ; 0
+sndc_info_6:	
+	mov	[u.r0], eax
+	mov	ebp, [u.usp]
+	mov	[ebp+16], ebx  ; ebx
+	retn
+sndc_info_7:
+	call	ac97_codec_info
+	jc	short sndc_info_5
+
+	; 26/11/2023 - temporary
+	;and	al, 0FEh	; clear VRA support bit for test
+
+	jmp	short sndc_info_6	
 
 sound_data:
 	; FUNCTION = 15 
@@ -3320,6 +3424,8 @@ snd_update_3:
 	retn
 
 set_irq_callback_service:
+	; 23/11/2023
+	; 20/11/2023 (TRDOS 386 Kernel v2.0.7)
 	; 30/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 03/08/2020
 	; 10/06/2017
@@ -3339,7 +3445,7 @@ set_irq_callback_service:
 	;	   (AL = user number) 
 	; 	 
 	;	BL = IRQ number (Hardware interrupt request number)
-	;	     (0 t0 15 but IRQ 0,1,2,6,8,14,15 are prohibited)
+	;	     (0 to 15 but IRQ 0,1,2,6,8,14,15 are prohibited)
 	;	     IRQ numbers 3,4,5,7,9,10,11,12,13 are valid
 	;	     (numbers >15 are invalid)
 	;
@@ -3376,7 +3482,7 @@ set_irq_callback_service:
 	;
 	; TRDOS 386 - IRQ CALLBACK structures (parameters):
 	;	
-	;	   [u.irqlock] = 1 word, IRQ flags (0-15) that indicates
+	;	   [u.irqlock]	: 1 word, IRQ flags (0-15) that indicates
 	;			which IRQs are locked by (that) user.
 	;		        Lock and unlock (by user) will change
 	;			these flags or 'terminate process' (sysexit)
@@ -3384,7 +3490,7 @@ set_irq_callback_service:
 	;			               
 	;		   	Bit 0 is for IRQ 0 and Bit 15 is for IRQ 15
 	;
-	;	   IRQ(x).owner	 : 1 byte, user, [u.uno], 0 = free (unlocked)	
+	;	   IRQ(x).owner	: 1 byte, user, [u.uno], 0 = free (unlocked)	
 	;
 	;	   IRQ(x).method : 1 byte for callback method & status
 	;			   0 = Signal Response Byte method
@@ -3399,7 +3505,7 @@ set_irq_callback_service:
 	;			  (a fixed value by user or a counter value
 	;			 from 0 to 255, which is increased by every
 	;			 interrupt just before putting it into 
-	;			 the Signal Response byte address
+	;			 the Signal Response byte address)
 	;			 (This is not used in callback serv method)
 	;	    	  
 	;	   IRQ(x).addr	: 1 dword
@@ -3423,14 +3529,15 @@ set_irq_callback_service:
 
 	movzx	edi, bl ; save IRQ number
 
-		;  IRQ 0,1,2,6,8,14,15 are prohibited
+		; IRQ 0,1,2,6,8,14,15 are prohibited
 	;IRQenum: ; 'trdosk9.s'
 	;	db  0,0,0,1,2,3,0,4,0,5,6,7,8,9,0,0
 
 	movzx	esi, byte [edi+IRQenum] ; IRQ availability 
 					; enumeration/index
-	;dec	esi
-	dec	si
+	; 20/11/2023
+	dec	esi
+	;dec	si
 	js	short scbs_1 ;  0 -> 0FFFFh  
 
 	; ESI = IRQ callback parameters index number (0 to 8)
@@ -3560,7 +3667,9 @@ scbs_10:
 	; eax = physical address of the virtual address in user's space
 	mov	edx, eax
 scbs_11:
-	shl	si, 2		; byte (index) to dword (offset)
+	;shl	si, 2		; byte (index) to dword (offset)
+	; 23/11/2023
+	shl	esi, 2
 	mov	[esi+IRQ.addr], edx
 
 	inc	byte [u.irqc]	; increase IRQ (in use) count
@@ -3576,7 +3685,6 @@ scbs_12:
 	;mov 	[u.r0], eax ; 0	
 
 	retn	; return with success (cf=0, eax=0)
-
 
 sysdma: ; DMA FUNCTIONS
 	; 08/08/2022
