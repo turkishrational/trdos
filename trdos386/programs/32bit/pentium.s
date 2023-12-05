@@ -113,10 +113,10 @@ _rele 	equ 39
 ss_di	equ	10000h
 
 start:
-		jmp	short loc_196
+;		jmp	short loc_196
 ; ДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДД
-		db  90h	;
-		times 63h db 0
+;		db  90h	;
+;		times 63h db 0
 ; ДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДД
 
 loc_196:				; CODE XREF: start+88j
@@ -179,7 +179,7 @@ loc_1D3:				; CODE XREF: start+D6j
 		rep stosw
 		dec	ax
 		;xor	ebp, ebp
-		mov	cl, 0F0h
+		mov	cx, 0F0h
 loc_1ED:				; CODE XREF: start+F1j
 		mov	bp, di
 		mov	[ss_di+ebp], ax
@@ -597,9 +597,7 @@ loc_392:				; CODE XREF: sub_2FC+87j
 		mov	[esi+4], bh
 		mov	bl, [esi+3]
                 ;mov    ax, [ebx-7D95h]
-		;mov	ax, [ebx+_826Bh]
-		add	bx, _826Bh
-		mov	ax, [ebx]
+		mov	ax, [ebx+_826Bh]
 		add	ax, [esi]
 		mov	[esi], ax
 		call	sub_2C6
@@ -723,7 +721,8 @@ loc_423:				; CODE XREF: seg000:loc_41Cj
 
 		mov	si, [word_5AF2]
 		or	si, si
-		jnz	loc_4CF
+		jz	short loc_447
+		jmp	loc_4CF
 
 ; ДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДДД
 
@@ -776,20 +775,11 @@ loc_470:				; CODE XREF: seg000:0458j
 
 loc_483:				; CODE XREF: seg000:047Fj
 		mov	[byte_5AEF], al
-
-		cmp	si, _5A57h
-		jb	short xxxx
-
-		xor ah, ah
-		int 32h
-xxxx:
 		lodsw
 		add	ax, ax
 		movzx	edi, ax
 		;mov	ax, [edi-7D95h]	
-                ;mov    ax, [edi+_826Bh]
-		add	di, _826Bh
- 		mov	ax, [edi]
+                mov     ax, [edi+_826Bh]
 		add	bx, ax
 		mov	[word_5AF0], bx
 
@@ -800,7 +790,7 @@ loc_495:				; CODE XREF: seg000:04B7j seg000:04DCj
 		jz	short loc_44F
 		cmp	al, 20h
 		je	short loc_4AF
-		ja	short loc_4B9
+		jnb	short loc_4B9
 		xor	ah, ah
 		mov	dx, 3Ch
 		mul	dx
@@ -9495,8 +9485,7 @@ loc_29C8:				; CODE XREF: sub_2993+30j
 
 loc_29D0:				; CODE XREF: sub_2993+38j
 		cmp	ah, 0E0h
-		jnz	short loc_29D8
-		jmp	loc_2AB0
+		jz	loc_2AB0
 
 loc_29D8:				; CODE XREF: sub_2993+40j
 		mov	si, [ebp+4]
@@ -9723,8 +9712,8 @@ sub_2B18:				; CODE XREF: start+F6p	start+13Ap
 		int	34h ; TRDOS 386 - IOCTL interrupt
 
 		mov	al, 0FFh
-		call	sub_2B36
-		retn
+		;call	sub_2B36
+		;retn
 
 ; ЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫ S U B	R O U T	I N E ЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫЫ
 
@@ -21623,6 +21612,7 @@ _598Fh:
 		db  4Fh	; O
 		db  4Eh	; N
 		db    0
+_59A8h:
 		db  58h	; X
 		db    0
 		db 0E1h	; б
@@ -21649,12 +21639,14 @@ _598Fh:
 		db  55h	; U
 		db  44h	; D
 		db    0
+_59C2h:
 		db  50h	; P
 		db    0
 		db 0F5h	; х
 		db    0
 		db  20h
 		db    0
+_59C8h:
 		db  35h	; 5
 		db    0
 		db  1Dh
@@ -21684,6 +21676,7 @@ _598Fh:
 		db  52h	; R
 		db  45h	; E
 		db    0
+_59E5h:
 		db  5Ah	; Z
 		db    0
 		db  3Bh	; ;
@@ -21691,8 +21684,10 @@ _598Fh:
 		db  20h
 		db  0Ah
 		db    0
+_59ECh:
 		db 0FEh	; ю
 		db 0FFh
+_59EEh:
 		db    0
 		db    0
 		db 0A5h	; Ґ
@@ -21701,6 +21696,7 @@ _598Fh:
 		db  20h
 		db  20h
 		db    0
+_59F6h:
 		db    0
 		db    0
 		db 0D7h	; Ч
@@ -21709,6 +21705,7 @@ _598Fh:
 		db  20h
 		db  20h
 		db    0
+_59FEh:
 		db  91h	; ‘
 		db    0
 		db 0C3h	; Г
@@ -21731,6 +21728,7 @@ _598Fh:
 		db  52h	; R
 		db  69h	; i
 		db    0
+_5A14h:
 		db  23h	; #
 		db    0
 		db  18h
@@ -21763,8 +21761,10 @@ _598Fh:
 		db  52h	; R
 		db  0Ah
 		db    0
+_5A34h:
 		db 0FEh	; ю
 		db 0FFh
+_5A36h:
 		db 0C8h	; И
 		db    0
 		db 0A5h	; Ґ
@@ -21780,6 +21780,7 @@ _598Fh:
 		db  55h	; U
 		db  44h	; D
 		db    0
+_5A45h:
 		db 0AAh	; Є
 		db    0
 		db 0CDh	; Н
@@ -21817,6 +21818,7 @@ _5A57h:
 		db  4Eh	; N
 		db  45h	; E
 		db    0
+_5A69h:
 		db 0CBh	; Л
 		db    0
 		db  1Dh
@@ -21859,6 +21861,7 @@ _5A57h:
 		db  67h	; g
 		db  67h	; g
 		db    0
+_5A93h:
 		db 0C6h	; Ж
 		db    0
 		db  2Ch	; ,
@@ -21880,6 +21883,7 @@ _5A57h:
 		db  67h	; g
 		db  67h	; g
 		db    0
+_5AA8h:
 		db 0CBh	; Л
 		db    0
 		db  3Bh	; ;
@@ -21922,14 +21926,17 @@ _5A57h:
 		db  67h	; g
 		db  67h	; g
 		db    0
+_5AD2h:
 		db    0
 		db    0
 		db    0
 		db    0
 		db  0Ah
 		db    0
+_5AD8h:
 		db 0FEh	; ю
 		db 0FFh
+_5ADAh:
 		db 0FFh
 		db 0FFh
 _5ADCh:
@@ -21953,14 +21960,14 @@ _5ADCh:
 		db  4Eh	; N
 		db    0
 _5AEFh:
-byte_5AEF:	db 0			; DATA XREF: seg000:loc_483w
+byte_5AEF:	db 18h			; DATA XREF: seg000:loc_483w
 					; seg000:04F5r	...
-word_5AF0:	dw 0			; DATA XREF: seg000:0491w seg000:04FEr ...
-word_5AF2:	dw 0			; DATA XREF: seg000:043Cr seg000:0496w
+word_5AF0:	dw 1818h		; DATA XREF: seg000:0491w seg000:04FEr ...
+word_5AF2:	dw 3Ch			; DATA XREF: seg000:043Cr seg000:0496w
 word_5AF4:	dw 0			; DATA XREF: seg000:loc_417r
 					; seg000:041Ew	...
 word_5AF6:	dw 0			; DATA XREF: seg000:04CCw seg000:04FAr ...
-byte_5AF8:	db 0			; DATA XREF: seg000:04C3w
+byte_5AF8:	db 0C6h			; DATA XREF: seg000:04C3w
 _5AF9h:					; seg000:loc_4CFr ...
 		db 0C6h	; Ж
 		db 0C6h	; Ж
@@ -63689,7 +63696,7 @@ _0A137h:
 		db    0
 
 prg_msg:
-db	'ERDOGAN TAN - TRDOS 386 VGA Test - PENTIUM.PRG'
+db	'ERDOGAN TAN - TRDOS 386 VGA TEST - PENTIUM.PRG'
 db	0Dh, 0Ah
 db	'28/08/2016'
 db	0Dh, 0Ah
