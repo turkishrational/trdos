@@ -1,0 +1,505 @@
+     1                                  ; ****************************************************************************
+     2                                  ; dropz3.s (for TRDOS 386)
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; DROPZ3.PRG ! VGA DEMO (and LCD monitor MODE 13h test) program by Erdogan TAN
+     5                                  ;
+     6                                  ; 30/10/2017
+     7                                  ;
+     8                                  ; [ Last Modification: 07/12/2023 ] 
+     9                                  ;
+    10                                  ; Derived from source code of 'DROPZ.COM' ('dropz.asm') by baze/3SC
+    11                                  ;				      (17/04/2000) 
+    12                                  ; Assembler: NASM 2.15 (2.11)
+    13                                  ; ----------------------------------------------------------------------------
+    14                                  ;	   nasm  dropz.s -l dropz.txt -o DROPZ.PRG	
+    15                                  ; ****************************************************************************
+    16                                  
+    17                                  ;-------------------------------------------------------------------------------
+    18                                  ; dr()pz [refined], 256B intro, 1st place at Demobit 98 demoparty
+    19                                  ; coded by -baze-> of 3SC [with help of bEETLE and loveC (many refinements)]
+    20                                  ; e-mail: baze@decef.elf.stuba.sk
+    21                                  ;-------------------------------------------------------------------------------
+    22                                  ; This source code is written to be compiled by cool Netwide Assembler (NASM).
+    23                                  ; Visit it's web site at www.web-sites.co.uk/nasm.
+    24                                  ;-------------------------------------------------------------------------------
+    25                                  ; And now few comments in worldwide used Slovak language :)
+    26                                  
+    27                                  ;------------------------------------------------------------------------------
+    28                                  ; TRDOS 386, TRDOS v2.0
+    29                                  ;------------------------------------------------------------------------------
+    30                                  
+    31                                  ; 14/07/2020
+    32                                  ; 31/12/2017
+    33                                  ; TRDOS 386 (v2.0) system calls
+    34                                  _ver 	equ 0
+    35                                  _exit 	equ 1
+    36                                  _fork 	equ 2
+    37                                  _read 	equ 3
+    38                                  _write	equ 4
+    39                                  _open	equ 5
+    40                                  _close 	equ 6
+    41                                  _wait 	equ 7
+    42                                  _create	equ 8
+    43                                  _rename	equ 9
+    44                                  _delete	equ 10
+    45                                  _exec	equ 11
+    46                                  _chdir	equ 12
+    47                                  _time 	equ 13
+    48                                  _mkdir 	equ 14
+    49                                  _chmod	equ 15
+    50                                  _rmdir	equ 16
+    51                                  _break	equ 17
+    52                                  _drive	equ 18
+    53                                  _seek	equ 19
+    54                                  _tell 	equ 20
+    55                                  _memory	equ 21
+    56                                  _prompt	equ 22
+    57                                  _path	equ 23
+    58                                  _env	equ 24
+    59                                  _stime	equ 25
+    60                                  _quit	equ 26
+    61                                  _intr	equ 27
+    62                                  _dir	equ 28
+    63                                  _emt 	equ 29
+    64                                  _ldrvt 	equ 30
+    65                                  _video 	equ 31
+    66                                  _audio	equ 32
+    67                                  _timer	equ 33
+    68                                  _sleep	equ 34
+    69                                  _msg    equ 35
+    70                                  _geterr	equ 36
+    71                                  _fpstat	equ 37
+    72                                  _pri	equ 38
+    73                                  _rele	equ 39
+    74                                  _fff	equ 40
+    75                                  _fnf	equ 41
+    76                                  _alloc	equ 42
+    77                                  _dalloc equ 43
+    78                                  _calbac equ 44
+    79                                  _dma	equ 45		
+    80                                  
+    81                                  %macro sys 1-4
+    82                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    83                                      ; 03/09/2015	
+    84                                      ; 13/04/2015
+    85                                      ; Retro UNIX 386 v1 system call.	
+    86                                      %if %0 >= 2   
+    87                                          mov ebx, %2
+    88                                          %if %0 >= 3    
+    89                                              mov ecx, %3
+    90                                              %if %0 = 4
+    91                                                 mov edx, %4   
+    92                                              %endif
+    93                                          %endif
+    94                                      %endif
+    95                                      mov eax, %1
+    96                                      ;int 30h
+    97                                      int 40h ; TRDOS 386 (TRDOS v2.0)	   
+    98                                  %endmacro
+    99                                  
+   100                                  ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
+   101                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+   102                                  
+   103                                  ;------------------------------------------------------------------------------
+   104                                  ; CODE
+   105                                  ;------------------------------------------------------------------------------
+   106                                  
+   107                                  [BITS 32]
+   108                                  [org 0]
+   109                                  
+   110                                  ;SQUARE_PIXELS equ 1 ; 07/12/2023 ; dropz3.s
+   111                                  SQUARE_PIXELS equ 0 ; 07/12/2023 ; dropz4.s
+   112                                  
+   113                                  Start:
+   114                                  	; clear bss
+   115 00000000 B9[00100200]            	mov	ecx, EOF
+   116 00000005 BF[D2010000]            	mov	edi, bss_start
+   117 0000000A 29F9                    	sub	ecx, edi
+   118 0000000C C1E902                  	shr	ecx, 2
+   119 0000000F 31C0                    	xor	eax, eax
+   120 00000011 F3AB                    	rep	stosd
+   121                                  
+   122 00000013 56                      	push	esi		; naplnime niecim zasobnik pre nahodne cisla
+   123 00000014 56                      	push	esi
+   124                                  
+   125 00000015 B013                    	mov	al, 13h
+   126                                  	;int	10h		; inicializacia grafickeho modu 320x200x256
+   127 00000017 CD31                    	int	31h
+   128                                  
+   129                                  	; DIRECT VGA MEMORY ACCESS
+   130                                  	; bl = 0, bh = 5
+   131                                  	; Direct access/map to VGA memory (0A0000h)
+   132                                  
+   133                                  	sys	_video, 0500h
+    82                              <1> 
+    83                              <1> 
+    84                              <1> 
+    85                              <1> 
+    86                              <1>  %if %0 >= 2
+    87 00000019 BB00050000          <1>  mov ebx, %2
+    88                              <1>  %if %0 >= 3
+    89                              <1>  mov ecx, %3
+    90                              <1>  %if %0 = 4
+    91                              <1>  mov edx, %4
+    92                              <1>  %endif
+    93                              <1>  %endif
+    94                              <1>  %endif
+    95 0000001E B81F000000          <1>  mov eax, %1
+    96                              <1> 
+    97 00000023 CD40                <1>  int 40h
+   134 00000025 3D00000A00              	cmp	eax, 0A0000h
+   135                                  	;jne	ENDPROG
+   136 0000002A 7405                    	je	short _x
+   137 0000002C E932010000              	jmp	ENDPROG
+   138                                  _x:
+   139                                  	; 07/12/2023
+   140                                  	; MODE 13h 60 Hz (for LCD monitor) Test program by Erdogan TAN
+   141                                  
+   142                                  ;; start of 70Hz to 60Hz conversion - 07/12/2023
+   143                                   
+   144 00000031 31C0                    	xor	eax, eax
+   145                                  
+   146 00000033 BAD4030000              	mov	edx, 3D4h
+   147                                  	
+   148 00000038 BB11000000              	mov	ebx, 0011h	; Turn off write protect to CRTC registers
+   149                                  	;mov	ax, bx
+   150                                  	;out	dx, ax
+   151 0000003D B403                    	mov	ah, 3
+   152 0000003F CD34                    	int	34h
+   153                                  	
+   154                                  	;mov	dx, 3D4h
+   155 00000041 66BB060B                	mov	bx, 0B06h	; New vertical total=525 lines, bits 0-7
+   156                                  	;mov	ax, bx
+   157                                  	;out	dx, ax
+   158 00000045 B403                    	mov	ah, 3
+   159 00000047 CD34                    	int	34h
+   160                                  
+   161                                  	;mov	dx, 3D4h
+   162 00000049 66BB073E                	mov	bx, 3E07h	; New vertical total=525 lines, bits 8-9
+   163                                  	;mov	ax, bx
+   164                                  	;out	dx, ax
+   165 0000004D B403                    	mov	ah, 3
+   166 0000004F CD34                    	int	34h
+   167                                  
+   168                                  %if SQUARE_PIXELS
+   169                                  	;mov	dx, 3D4h
+   170                                  	mov	bx, 0B910h	; Vsync start=scanline 185
+   171                                  	;mov	ax, bx
+   172                                  	;out	dx, ax
+   173                                  	mov	ah, 3
+   174                                  	int	34h
+   175                                  
+   176                                  	;mov	dx, 3D4h
+   177                                  	mov	bx, 8F12h	; Vertical display end=scanline 399, bits 0-7
+   178                                  	;mov	ax, bx
+   179                                  	;out	dx, ax
+   180                                  	mov	ah, 3
+   181                                  	int	34h
+   182                                  
+   183                                  	;mov	dx, 3D4h
+   184                                  	mov	bx, 0B815h	; vertical blanking start=scanline 440, bits 0-7
+   185                                  	;mov	ax, bx
+   186                                  	;out	dx, ax
+   187                                  	mov	ah, 3
+   188                                  	int	34h
+   189                                  
+   190                                  	;mov	dx, 3D4h
+   191                                  	mov	bx, 0E216h	; Adjust vblank end position
+   192                                  	;mov	ax, bx
+   193                                  	;out	dx, ax
+   194                                  	mov	ah, 3
+   195                                  	int	34h
+   196                                  
+   197                                  	;mov	dx, 3D4h
+   198                                  	mov	bx, 8511h	; Vsync length=2 lines + turn write protect back on
+   199                                  	;mov	ax, bx
+   200                                  	;out	dx, ax
+   201                                  	mov	ah, 3
+   202                                  	int	34h
+   203                                  %else
+   204                                  	;mov	dx, 3D4h
+   205 00000051 66BB160B                	mov	bx, 0B16h	; Adjust vblank end position=scanline 524
+   206                                  	;mov	ax, bx
+   207                                  	;out	dx, ax
+   208 00000055 B403                    	mov	ah, 3
+   209 00000057 CD34                    	int	34h
+   210                                  
+   211                                  	;mov	dx, 3D4h
+   212 00000059 66BB10D7                	mov	bx, 0D710h	; Vsync start=scanline 215
+   213                                  	;mov	ax, bx
+   214                                  	;out	dx, ax
+   215 0000005D B403                    	mov	ah, 3
+   216 0000005F CD34                    	int	34h
+   217                                  
+   218                                  	;mov	dx, 3D4h
+   219 00000061 66BB1189                	mov	bx, 8911h	; Vsync length=2 lines + turn write protect back on
+   220                                  	;mov	ax, bx
+   221                                  	;out	dx, ax
+   222 00000065 B403                    	mov	ah, 3
+   223 00000067 CD34                    	int	34h
+   224                                  %endif
+   225                                  
+   226                                  ;; end of 70Hz to 60Hz conversion - 07/12/2023
+   227                                  
+   228                                  ; VYPOCET PALETY FARIEB
+   229                                  
+   230 00000069 B100                    	mov	cl, 0		; do CL hodnota "256" (CH = ?, minus 1 byte)
+   231                                  PALETTE:
+   232 0000006B 66BAC803                	mov	dx, 3C8h	; do DX port PEL ADDRESS registra
+   233 0000006F 88C8                    	mov	al, cl
+   234                                  	;out	dx, al		; odoslanie indexu farby
+   235 00000071 B401                    	mov	ah, 1	
+   236 00000073 CD34                    	int	34h
+   237 00000075 42                      	inc	edx		; do DX port PEL DATA registra
+   238 00000076 B000                    	mov	al, 0
+   239                                  	;out	dx, al		; odoslanie zlozky R
+   240 00000078 CD34                    	int	34h
+   241 0000007A 88C8                    	mov	al, cl
+   242 0000007C D0E8                    	shr	al, 1                                             
+   243                                  	;out	dx, al		; odoslanie zlozky G
+   244 0000007E CD34                    	int	34h
+   245 00000080 88C8                    	mov	al, cl
+   246 00000082 3C40                    	cmp	al, 64
+   247 00000084 7202                    	jb	short OKPAL
+   248                                  	;mov	ax, 4A3Fh	; do AH cislo DOS sluzby na realokaciu pamate
+   249 00000086 B03F                    	mov	al, 3Fh
+   250                                  OKPAL:
+   251                                  	;out	dx, al		; odoslanie zlozky B
+   252                                  	;mov	ah, 1
+   253 00000088 CD34                    	int	34h
+   254                                  	;loop	PALETTE		; opakujeme pre vsetky farby
+   255 0000008A FEC9                    	dec	cl
+   256 0000008C 75DD                    	jnz	short PALETTE
+   257                                  
+   258                                  ; ALOKACIA PAMATE POTREBNEJ PRE DVE 256 x 256 PIXELOVE MAPY
+   259                                  
+   260                                  ;	;mov	ah, 4Ah
+   261                                  ;	mov	bh, 3*16	; do BX aspon 3*16*256 paragrafov (BL = ?, -1B)
+   262                                  ;	int	21h		; alokujeme 3 segmenty (program + 2 mapy)
+   263                                  ;	jc	near ENDPROG	; ak je malo pamate, ukoncime program
+   264                                  
+   265                                  ;	mov	ax, cs
+   266                                  ;	add	ah, 16
+   267                                  ;	mov	ds, ax		; do DS segmentova adresa prvej mapy
+   268                                  ;	add	ah, 16
+   269                                  ;	mov	es, ax		; do ES segmentova adresa druhej mapy
+   270                                  
+   271 0000008E BA[00100000]            	mov	edx, DrawSegment ; *
+   272 00000093 BD[00100100]            	mov	ebp, EffectSegment ; *	
+   273                                  
+   274                                  ; VYPIS BITMAPOVEHO TEXTU
+   275                                  
+   276                                  WATER:
+   277                                  	;push	ebp ; ***
+   278 00000098 52                      	push	edx ; ***
+   279                                  	
+   280                                  	;push	es		; ulozime ES (budeme potrebovat pointer na mapu)
+   281                                  	;mov	ax, 1130h	; sluzba VGA BIOS - informacie o fonte
+   282 00000099 B830110000              	mov	eax, 1130h
+   283                                  	;mov	bh, 3		; budeme pouzivat font 8 x 8 pixelov
+   284                                  	;int	10h		; v ES:BP je adresa fontu
+   285 0000009E BB01000000              	mov	ebx, 1	; VGA Font 8x8
+   286                                  	;xor	ecx, ecx 
+   287 000000A3 BA[D2010000]            	mov	edx, VgaFont8Buffer
+   288 000000A8 CD31                    	int	31h
+   289                                  
+   290 000000AA 5A                      	pop	edx ; ***
+   291                                  	;pop	ebp ; ***
+   292                                  
+   293 000000AB BB[A8010000]            	mov	ebx, TEXT	; ideme "virit hladinu" textom
+   294 000000B0 BE26400000              	mov	esi, 64*256+38	; do SI umiestnenie textu v mape
+   295 000000B5 E8B8000000              	call	DRAWTEX		; zavolame vypis znakoveho retazca
+   296 000000BA BE64640000              	mov	esi, 100*256+100
+   297 000000BF E8AE000000              	call	DRAWTEX		; a to celkovo 3 krat
+   298 000000C4 BE24880000              	mov	esi, 136*256+36
+   299 000000C9 E8A4000000              	call	DRAWTEX
+   300                                  
+   301                                  	;pop	es		; obnovime pointer na pixelovu mapu
+   302                                  
+   303                                  ; "KVAPNUTIE" NA HLADINU
+   304                                  
+   305                                  RANDOM:
+   306 000000CE 5E                      	pop	esi		; nahodne cisla x[n] = (5 * x[n-1] + 7) % 65536
+   307 000000CF 668D74B607              	lea	si, [esi+4*esi+7]; takto pocita uvedeny vyraz loveC :)
+   308 000000D4 C60432FF                	mov	byte [edx+esi], 255 ; umiestnime na nahodne miesto mapy kvapku
+   309 000000D8 56                      	push	esi		; ulozime nahodne cislo do buducej iteracie
+   310                                  
+   311                                  ; VYPOCET SIRENIA VLNENIA V MAPE (nemam miesto na odvodenie vztahov z fyziky)
+   312                                  	
+   313                                  WATLINE:
+   314 000000D9 8A443A01                	mov	al, [edx+edi+1]
+   315 000000DD 02443AFF                	add	al, [edx+edi-1]	; spocitame okolite pixely
+   316 000000E1 02843A00010000          	add	al, [edx+edi+256]
+   317 000000E8 02843A00FFFFFF          	add	al, [edx+edi-256]
+   318 000000EF D0E8                    	shr	al, 1		; vydelime sucet dvoma
+   319 000000F1 2A443D00                	sub	al, [ebp+edi]	; odcitame predchadzajucu fazu
+   320 000000F5 7302                    	jnc	short OK	; pripadne orezeme zaporne vlny ...
+   321 000000F7 B000                    	mov	al, 0		; ... ziskame tak vacsiu amplitudu (0 - 255)
+   322                                  OK:
+   323                                  	;stosb			; ulozime pixel
+   324 000000F9 88443D00                	mov	[ebp+edi], al
+   325 000000FD 6647                    	inc	di
+   326 000000FF 6609FF                  	or	di, di
+   327 00000102 75D5                    	jnz	short WATLINE	; opakujeme pre vsetky pixely v mape
+   328                                  
+   329                                  	;push	ds		; ulozime DS (neskor POPneme do ES)
+   330 00000104 52                      	push	edx ; *(*)
+   331                                  	;push	es
+   332                                  	;pop	ds		; do DS hodnota ES (vymena pointrov na mapy)
+   333                                  	;mov	edx, ebp ; **
+   334                                  	;push	word 0A000h
+   335                                  	;pop	es		; do ES segmentova adresa zaciatku videoram
+   336                                  
+   337                                  ; CAKANIE NA NOVY SNIMOK
+   338                                  
+   339                                  FRAME:
+   340 00000105 66BADA03                	mov	dx, 3DAh	; do DX port INPUT STATUS registra (DH = 3, -1B)
+   341 00000109 B400                    	mov	ah, 0
+   342                                  	;in	al, dx
+   343 0000010B CD34                    	int	34h
+   344 0000010D 2408                    	and	al, 8
+   345 0000010F 74F4                    	jz	short FRAME	; pockame na novy snimok
+   346                                  
+   347                                  ; VYKRESLENIE MAPY NA OBRAZOVKU
+   348 00000111 89EA                    	mov	edx, ebp ; **
+   349                                  
+   350 00000113 BF20000000              	mov	edi, 32		; budeme vykreslovat od 32. stlpca (centrovanie)
+   351 00000118 31F6                    	xor	esi, esi	; do SI zaciatok vykreslovanej mapy
+   352 0000011A BDC8000000              	mov	ebp, 200	; kreslime 200 riadkov
+   353                                  DRAW:
+   354 0000011F B180                    	mov	cl, 128		; prenasame 256 bajtov, cize 128 slov (word)
+   355                                  	;rep	movsw		; prenos slov z mapy do videoram (rychlejsie)
+   356                                  draw_loop:
+   357 00000121 668B0432                	mov	ax, [edx+esi]
+   358 00000125 66898700000A00          	mov	[edi+0A0000h], ax
+   359 0000012C 6683C602                	add	si, 2
+   360 00000130 6683C702                	add	di, 2
+   361 00000134 E2EB                    	loop	draw_loop	
+   362 00000136 0FB61C32                	movzx	ebx, byte [edx+esi] ; vyberieme hodnotu z mapy kvoli "osciloskopu"
+   363 0000013A 08DB                    	or	bl, bl		; je vyska hladiny v mape nulova? ...
+   364 0000013C 7412                    	jz	short NOOSCIL	; ... ak ano, nevykreslujeme pixel (estetika)
+   365 0000013E C6843B80FF090050        	mov	byte [ebx+edi+0A0000h-128], 80	; inak vykreslime symetricky dva pixely
+   366 00000146 F7DB                    	neg	ebx		; s danou intenzitou
+   367 00000148 C6843B80FF090050        	mov	byte [ebx+edi+0A0000h-128], 80
+   368                                  NOOSCIL:
+   369 00000150 6683C740                	add	di, 64		; posunieme sa na dalsi riadok obrazovky
+   370 00000154 4D                      	dec	ebp
+   371 00000155 75C8                    	jnz	short DRAW	; a opakujeme pre vsetky riadky
+   372                                  
+   373                                  	;pop	es		; dokoncenie vymeny ES <-> DS
+   374 00000157 5D                      	pop	ebp ; *(*)
+   375                                  
+   376                                  	;push	edx ; ****
+   377                                  	;;in	al, 60h		; test klavesy ESC
+   378                                  	;mov	dx, 60h
+   379                                  	;;mov	ah, 0
+   380                                  	;int	34h
+   381                                  	;pop	edx ; ****
+   382                                  	;dec	al
+   383                                  	;jnz	WATER		; ak nebola stlacena, skok na dalsi snimok
+   384                                  
+   385 00000158 B401                    	mov	ah, 1
+   386 0000015A CD32                    	int	32h
+   387                                  	;jz	WATER
+   388 0000015C 7505                    	jnz	short ENDPROG
+   389 0000015E E935FFFFFF              	jmp	WATER
+   390                                  
+   391                                  ENDPROG:
+   392 00000163 66B80300                	mov	ax, 03h
+   393                                  	;mov	al, 3
+   394                                  	;int	10h		; nastavenie textoveho rezimu
+   395 00000167 CD31                    	int	31h
+   396                                  
+   397 00000169 5E                      	pop	esi
+   398 0000016A 5E                      	pop	esi		; oprava zasobnika po nahodnych cislach
+   399                                  
+   400                                  	sys	_exit		; navrat do operacneho systemu
+    82                              <1> 
+    83                              <1> 
+    84                              <1> 
+    85                              <1> 
+    86                              <1>  %if %0 >= 2
+    87                              <1>  mov ebx, %2
+    88                              <1>  %if %0 >= 3
+    89                              <1>  mov ecx, %3
+    90                              <1>  %if %0 = 4
+    91                              <1>  mov edx, %4
+    92                              <1>  %endif
+    93                              <1>  %endif
+    94                              <1>  %endif
+    95 0000016B B801000000          <1>  mov eax, %1
+    96                              <1> 
+    97 00000170 CD40                <1>  int 40h
+   401                                  
+   402                                  ; RUTINA NA VYPIS TEXTOVEHO RETAZCA
+   403                                  
+   404                                  DRAWTEX:
+   405 00000172 0FB63B                  	movzx	edi, byte [ebx]	; do DI ASCII hodnota znaku
+   406 00000175 43                      	inc	ebx		; zvysime ukazovatel na text
+   407 00000176 C1E703                  	shl	edi, 3		; DI = DI * 8, mame offset znaku vo fonte
+   408 00000179 742C                    	jz	short RETURN	; ak bol znak nulovy, koniec vypisu
+   409 0000017B B108                    	mov	cl, 8		; budeme vypisovat 8 riadkov
+   410                                  CHARLIN:
+   411 0000017D 8A87[D2010000]          	mov	al, [VgaFont8Buffer+edi] ; vyberieme bajt z predlohy znaku
+   412 00000183 47                      	inc	edi		; zvysime ukazovatel na dalsi bajt predlohy
+   413 00000184 B508                    	mov	ch, 8		; znak ma 8 stlpcov
+   414                                  ROTATE:
+   415 00000186 D0E0                    	shl	al, 1		; do CARRY pixel z predlohy
+   416 00000188 7307                    	jnc	short NOPIXEL	; ak pixel nebol nastaveny, nic nekreslime
+   417 0000018A 81043204030402          	add	dword [edx+esi], 02040304h ; inak pripocitame "stvorpixel"
+   418                                  NOPIXEL:
+   419 00000191 6683C604                	add	si, 4		; posunieme sa na dalsi pixel v mape
+   420 00000195 FECD                    	dec	ch
+   421 00000197 75ED                    	jnz	short ROTATE	; opakujeme 8-krat
+   422 00000199 6681C6E003              	add	si, 1024-32	; posunieme sa na dalsi riadok
+   423 0000019E E2DD                    	loop	CHARLIN		; opakujeme 8-krat (LOOP trik, CH = 0, setrime)
+   424 000001A0 6681C620E0              	add	si, 32-8192	; posunieme sa na dalsi znak
+   425 000001A5 EBCB                    	jmp	short DRAWTEX	; skok na vypis dalsieho znaku
+   426                                  RETURN:
+   427 000001A7 C3                      	retn
+   428                                  
+   429                                  ;------------------------------------------------------------------------------
+   430                                  ; DATA
+   431                                  ;------------------------------------------------------------------------------
+   432                                  
+   433                                  TEXT:
+   434 000001A8 64722829707A00          	db	"dr()pz", 0	; hadajte co :)
+   435 000001AF 627900                  	db	"by",0
+   436 000001B2 2D62617A653E00          	db	"-baze>", 0
+   437                                  
+   438                                  ;-------------------------------------------------------------------------------
+   439                                  ; Initially, this intro was hacked up during sleepless night before party.
+   440                                  ; Few days after Demobit 98 we made this refined version. Although it is not
+   441                                  ; as carefully optimized as it can be [loveC was able to make it in less than
+   442                                  ; 230 bytes], I decided to spread this [almost original] code. It is easier
+   443                                  ; to understand and it actually shows our poor mental state at given time :)
+   444                                  ;-------------------------------------------------------------------------------
+   445                                  
+   446                                  ;db	"Erdogan Tan [01/11/2017]"
+   447 000001B9 4572646F67616E2054-     db	"Erdogan Tan [05/12/2023]", 0
+   447 000001C2 616E205B30352F3132-
+   447 000001CB 2F323032335D00     
+   448                                  
+   449                                  ;------------------------------------------------------------------------------
+   450                                  ; UNINITIALIZED DATA
+   451                                  ;------------------------------------------------------------------------------
+   452                                  
+   453                                  bss_start:
+   454                                  
+   455                                  ABSOLUTE bss_start
+   456                                  
+   457                                  alignb 2 
+   458                                  
+   459                                  VgaFont8Buffer:
+   460 000001D2 <res 800h>              	resb	8*256
+   461                                  
+   462                                  ;alignb	65536
+   463 000009D2 <res 62Eh>              alignb 4096
+   464                                  
+   465                                  DrawSegment:
+   466 00001000 <res 10000h>            	resb	65536
+   467                                  
+   468                                  EffectSegment:
+   469 00011000 <res 10000h>            	resb  	65536
+   470                                  
+   471                                  EOF:

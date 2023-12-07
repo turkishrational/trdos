@@ -1,0 +1,303 @@
+     1                                  ; ****************************************************************************
+     2                                  ; m13x60hz.s (Mode 13h .. 320x200, 256 colors, 60hz test for TRDOS 386)
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; M13X60HZ.PRG ! MODE 13h 60 Hz (for LCD monitor) Test program by Erdogan TAN
+     5                                  ;
+     6                                  ; 06/12/2023
+     7                                  ;
+     8                                  ; Assembler: NASM 2.15 (2.11)
+     9                                  ; ----------------------------------------------------------------------------
+    10                                  ;	   nasm  m13x60hz.s -l m13x60hz.txt -o M13X60HZ.PRG	
+    11                                  ; ****************************************************************************
+    12                                  
+    13                                  ;------------------------------------------------------------------------------
+    14                                  ; TRDOS 386, TRDOS v2.0
+    15                                  ;------------------------------------------------------------------------------
+    16                                  
+    17                                  ; 14/07/2020
+    18                                  ; 31/12/2017
+    19                                  ; TRDOS 386 (v2.0) system calls
+    20                                  _ver 	equ 0
+    21                                  _exit 	equ 1
+    22                                  _fork 	equ 2
+    23                                  _read 	equ 3
+    24                                  _write	equ 4
+    25                                  _open	equ 5
+    26                                  _close 	equ 6
+    27                                  _wait 	equ 7
+    28                                  _create	equ 8
+    29                                  _rename	equ 9
+    30                                  _delete	equ 10
+    31                                  _exec	equ 11
+    32                                  _chdir	equ 12
+    33                                  _time 	equ 13
+    34                                  _mkdir 	equ 14
+    35                                  _chmod	equ 15
+    36                                  _rmdir	equ 16
+    37                                  _break	equ 17
+    38                                  _drive	equ 18
+    39                                  _seek	equ 19
+    40                                  _tell 	equ 20
+    41                                  _memory	equ 21
+    42                                  _prompt	equ 22
+    43                                  _path	equ 23
+    44                                  _env	equ 24
+    45                                  _stime	equ 25
+    46                                  _quit	equ 26
+    47                                  _intr	equ 27
+    48                                  _dir	equ 28
+    49                                  _emt 	equ 29
+    50                                  _ldrvt 	equ 30
+    51                                  _video 	equ 31
+    52                                  _audio	equ 32
+    53                                  _timer	equ 33
+    54                                  _sleep	equ 34
+    55                                  _msg    equ 35
+    56                                  _geterr	equ 36
+    57                                  _fpstat	equ 37
+    58                                  _pri	equ 38
+    59                                  _rele	equ 39
+    60                                  _fff	equ 40
+    61                                  _fnf	equ 41
+    62                                  _alloc	equ 42
+    63                                  _dalloc equ 43
+    64                                  _calbac equ 44
+    65                                  _dma	equ 45		
+    66                                  
+    67                                  %macro sys 1-4
+    68                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    69                                      ; 03/09/2015	
+    70                                      ; 13/04/2015
+    71                                      ; Retro UNIX 386 v1 system call.	
+    72                                      %if %0 >= 2   
+    73                                          mov ebx, %2
+    74                                          %if %0 >= 3    
+    75                                              mov ecx, %3
+    76                                              %if %0 = 4
+    77                                                 mov edx, %4   
+    78                                              %endif
+    79                                          %endif
+    80                                      %endif
+    81                                      mov eax, %1
+    82                                      ;int 30h
+    83                                      int 40h ; TRDOS 386 (TRDOS v2.0)	   
+    84                                  %endmacro
+    85                                  
+    86                                  ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
+    87                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    88                                  
+    89                                  ;------------------------------------------------------------------------------
+    90                                  ; CODE
+    91                                  ;------------------------------------------------------------------------------
+    92                                  
+    93                                  [BITS 32]
+    94                                  [org 0]
+    95                                  
+    96                                  ;SQUARE_PIXELS equ 1
+    97                                  SQUARE_PIXELS equ 0
+    98                                  
+    99                                  Start:
+   100                                  	; set videdo mode 13h (320x200, 256 colors)
+   101 00000000 B013                    	mov	al, 13h
+   102 00000002 CD31                    	int	31h
+   103                                  
+   104                                  	; DIRECT VGA MEMORY ACCESS
+   105                                  	; bl = 0, bh = 5
+   106                                  	; Direct access/map to VGA memory (0A0000h)
+   107                                  
+   108                                  	sys	_video, 0500h
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1> 
+    72                              <1>  %if %0 >= 2
+    73 00000004 BB00050000          <1>  mov ebx, %2
+    74                              <1>  %if %0 >= 3
+    75                              <1>  mov ecx, %3
+    76                              <1>  %if %0 = 4
+    77                              <1>  mov edx, %4
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80                              <1>  %endif
+    81 00000009 B81F000000          <1>  mov eax, %1
+    82                              <1> 
+    83 0000000E CD40                <1>  int 40h
+   109                                  	
+   110 00000010 3D00000A00              	cmp	eax, 0A0000h
+   111 00000015 7558                    	jne	short ENDPROG
+   112                                  
+   113 00000017 31C0                    	xor	eax, eax
+   114                                  
+   115 00000019 BAD4030000              	mov	edx, 3D4h
+   116                                  
+   117                                  	;cli
+   118                                  	
+   119 0000001E BB11000000              	mov	ebx, 0011h	; Turn off write protect to CRTC registers
+   120                                  	;mov	ax, bx
+   121                                  	;out	dx, ax
+   122 00000023 B403                    	mov	ah, 3
+   123 00000025 CD34                    	int	34h
+   124                                  	
+   125                                  	;mov	dx, 3D4h
+   126 00000027 66BB060B                	mov	bx, 0B06h	; New vertical total=525 lines, bits 0-7
+   127                                  	;mov	ax, bx
+   128                                  	;out	dx, ax
+   129 0000002B B403                    	mov	ah, 3
+   130 0000002D CD34                    	int	34h
+   131                                  
+   132                                  	;mov	dx, 3D4h
+   133 0000002F 66BB073E                	mov	bx, 3E07h	; New vertical total=525 lines, bits 8-9
+   134                                  	;mov	ax, bx
+   135                                  	;out	dx, ax
+   136 00000033 B403                    	mov	ah, 3
+   137 00000035 CD34                    	int	34h
+   138                                  
+   139                                  %if SQUARE_PIXELS
+   140                                  	;mov	dx, 3D4h
+   141                                  	mov	bx, 0B910h	; Vsync start=scanline 185
+   142                                  	;mov	ax, bx
+   143                                  	;out	dx, ax
+   144                                  	mov	ah, 3
+   145                                  	int	34h
+   146                                  
+   147                                  	;mov	dx, 3D4h
+   148                                  	mov	bx, 8F12h	; Vertical display end=scanline 399, bits 0-7
+   149                                  	;mov	ax, bx
+   150                                  	;out	dx, ax
+   151                                  	mov	ah, 3
+   152                                  	int	34h
+   153                                  
+   154                                  	;mov	dx, 3D4h
+   155                                  	mov	bx, 0B815h	; vertical blanking start=scanline 440, bits 0-7
+   156                                  	;mov	ax, bx
+   157                                  	;out	dx, ax
+   158                                  	mov	ah, 3
+   159                                  	int	34h
+   160                                  
+   161                                  	;mov	dx, 3D4h
+   162                                  	mov	bx, 0E216h	; Adjust vblank end position
+   163                                  	;mov	ax, bx
+   164                                  	;out	dx, ax
+   165                                  	mov	ah, 3
+   166                                  	int	34h
+   167                                  
+   168                                  	;mov	dx, 3D4h
+   169                                  	mov	bx, 8511h	; Vsync length=2 lines + turn write protect back on
+   170                                  	;mov	ax, bx
+   171                                  	;out	dx, ax
+   172                                  	mov	ah, 3
+   173                                  	int	34h
+   174                                  %else
+   175                                  	;mov	dx, 3D4h
+   176 00000037 66BB160B                	mov	bx, 0B16h	; Adjust vblank end position=scanline 524
+   177                                  	;mov	ax, bx
+   178                                  	;out	dx, ax
+   179 0000003B B403                    	mov	ah, 3
+   180 0000003D CD34                    	int	34h
+   181                                  
+   182                                  	;mov	dx, 3D4h
+   183 0000003F 66BB10D7                	mov	bx, 0D710h	; Vsync start=scanline 215
+   184                                  	;mov	ax, bx
+   185                                  	;out	dx, ax
+   186 00000043 B403                    	mov	ah, 3
+   187 00000045 CD34                    	int	34h
+   188                                  
+   189                                  	;mov	dx, 3D4h
+   190 00000047 66BB1189                	mov	bx, 8911h	; Vsync length=2 lines + turn write protect back on
+   191                                  	;mov	ax, bx
+   192                                  	;out	dx, ax
+   193 0000004B B403                    	mov	ah, 3
+   194 0000004D CD34                    	int	34h
+   195                                  %endif
+   196                                  	;sti
+   197                                  
+   198                                  	; fill screen with VGA palette
+   199 0000004F BF00000A00              	mov	edi, 0A0000h
+   200 00000054 31F6                    	xor	esi, esi
+   201 00000056 4E                      	dec	esi
+   202 00000057 B900FA0000              	mov	ecx, 64000
+   203 0000005C BB40010000              	mov	ebx, 320
+   204                                  filloop:	
+   205 00000061 46                      	inc	esi
+   206 00000062 89F0                    	mov	eax, esi
+   207 00000064 31D2                    	xor	edx, edx
+   208 00000066 F7F3                    	div	ebx
+   209 00000068 AA                      	stosb
+   210 00000069 E2F6                    	loop	filloop
+   211                                  
+   212                                  	; getchar (wait for keystroke before exit)
+   213 0000006B 31C0                    	xor	eax, eax
+   214 0000006D CD32                    	int	32h
+   215                                  
+   216                                  ENDPROG:
+   217                                  	; set video mode 03h
+   218 0000006F 66B80300                	mov	ax, 3
+   219 00000073 CD31                    	int	31h
+   220                                  
+   221                                  	sys	_exit
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1> 
+    72                              <1>  %if %0 >= 2
+    73                              <1>  mov ebx, %2
+    74                              <1>  %if %0 >= 3
+    75                              <1>  mov ecx, %3
+    76                              <1>  %if %0 = 4
+    77                              <1>  mov edx, %4
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80                              <1>  %endif
+    81 00000075 B801000000          <1>  mov eax, %1
+    82                              <1> 
+    83 0000007A CD40                <1>  int 40h
+   222                                  hang:
+   223 0000007C 90                      	nop
+   224 0000007D EBFD                    	jmp	short hang
+   225                                  
+   226                                  
+   227                                  %if 0
+   228                                  
+   229                                  60hz.cpp
+   230                                  
+   231                                  // License: public domain.
+   232                                  
+   233                                  #include <dos.h>
+   234                                  #include <conio.h>
+   235                                  
+   236                                  void set_video_mode(int mode)
+   237                                  {
+   238                                  	union REGS regs;
+   239                                  	regs.x.ax = mode;
+   240                                  	int86(0x10, &regs, &regs);
+   241                                  }
+   242                                  
+   243                                  void main()
+   244                                  {
+   245                                  	set_video_mode(0x13);
+   246                                  	disable();
+   247                                  	outpw(0x3D4, 0x0011); // Turn off write protect to CRTC registers
+   248                                  	outpw(0x3D4, 0x0B06); // New vertical total=525 lines, bits 0-7
+   249                                  	outpw(0x3D4, 0x3E07); // New vertical total=525 lines, bits 8-9
+   250                                  #ifdef SQUARE_PIXELS
+   251                                  	outpw(0x3D4, 0xB910); // Vsync start=scanline 185
+   252                                  	outpw(0x3D4, 0x8F12); // Vertical display end=scanline 399, bits 0-7
+   253                                  	outpw(0x3D4, 0xB815); // Vertical blanking start=scanline 440, bits 0-7
+   254                                  	outpw(0x3D4, 0xE216); // Adjust vblank end position
+   255                                  	outpw(0x3D4, 0x8511); // Vsync length=2 lines + turn write protect back on
+   256                                  #else
+   257                                  	outpw(0x3D4, 0x0B16); // Adjust vblank end position=scanline 524
+   258                                  	outpw(0x3D4, 0xD710); // Vsync start=scanline 215
+   259                                  	outpw(0x3D4, 0x8911); // Vsync length=2 lines + turn write protect back on
+   260                                  #endif
+   261                                  	enable();
+   262                                  	// fill screen with VGA palette
+   263                                  	unsigned char far *s = (unsigned char far *)MK_FP(0xA000, 0);
+   264                                  	for(unsigned int i = 0; i < 64000; ++i) s[i] = i%320;
+   265                                  	getch();
+   266                                  	// restore DOS video mode
+   267                                  	set_video_mode(0x03);
+   268                                  }
+   269                                  
+   270                                  %endif
+   271                                  
