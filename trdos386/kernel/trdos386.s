@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.7
 ; ----------------------------------------------------------------------------
-; Last Update: 04/12/2023 (Previous: 30/08/2023)
+; Last Update: 07/12/2023 (Previous: 30/08/2023)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -355,7 +355,7 @@ V0:
 	int	10h
 	;cmp	ax, 4Fh
 	;jne	short v2
-	mov	[edid], al ; 4Fh > 0	
+	mov	[edid], al ; 4Fh > 0
 ;V2:
 	; 17/01/2021
 	xor	di, di
@@ -1540,6 +1540,14 @@ dmi:
 	call	memory_info
 	; 14/08/2015
 	;call	getch ; 28/02/2015
+
+	; 07/12/2023
+	; check EDID info for LCD monitor -screen resolution-
+	;	for modifying VGA mode 13h CRTC parameters
+	;	(if it is needed or not)
+
+	call	video_mode_13h_parms
+
 drv_init:
 	sti	; Enable Interrupts 
 	; 06/02/2015
@@ -1835,6 +1843,64 @@ pkl:
 	jmp	short pkl
 pkr:
 	retn
+
+; *************************************
+video_mode_13h_parms:
+	; 07/12/2023 - TRDOS 386 v2.0.7
+	; Check EDID information for LCD monitors
+	; and change mode 13h parameters if it is required
+	; (if resolution > 1280x1024, it is LCD/panel monitor
+	; and Video Mode 13h parameters will be modified for 60HZ
+	; because LCD monitors does/can not display 320x200 70HZ
+	; standard VGA mode)
+
+	cmp	byte [edid], 4Fh
+	jne	short CRT_monitor	
+
+	mov	esi, edid_info
+	add	esi, 26h ; EDID Standard Timing Identification
+	mov	ecx, 8
+chk_edid:
+	lodsw
+	cmp	al, 129	; (1280/8)-31
+	ja	short LCD_monitor ; 16:9
+	cmp	al, 1
+	jna	short CRT_monitor
+	loop	chk_edid
+	;jmp	short CRT_monitor
+	retn
+mode13h_crtc_60hz:
+	db	0Bh, 3Eh, 0B9h, 85h, 8Fh, 0B8h, 0E2h
+LCD_monitor:
+	; modify default (CRTC register) parameters for 60HZ
+	; (320x200 letterbox type screen will appear on LCD screen)
+	;
+	; Note: When/While [PMI32] -protected mode video bios-
+	;	feature is enabled -by user- for MODE 13h, internal
+	;	(TRDOS 386) VGA -video mode setting- parameters
+	;	will not be used (will be bypassed)
+	;	by TRDOS 386 kernel for all standard VGA modes.
+	;	((NVIDIA/ATI Video Bios PMI will be used.))
+	;
+	; 	ref: github, juj/60hz.cpp
+	;	     https://gist.github.com/juj/
+	;
+	mov	cl, 7
+	mov	esi, mode13h_crtc_60hz
+	mov	edi, vga_mode_13h+10+6 ; CRTC Registers (index: 6)
+	movsb		; Vertical Total Register
+	movsb		; Overflow Register
+	mov	edi, vga_mode_13h+10+16 ; CRTC Regs (index: 16)
+	movsb		; Vertical Retrace Start Register
+	movsb		; Vertical Retrace End Register
+	movsb		; Vertical Display Enable/End Register
+	inc	edi
+	inc	edi
+	movsb		; Vertical Blanking Start Register
+	movsb		; Vertical Blanking End Register		
+CRT_monitor:
+	retn
+; *************************************
 
 ; 14/11/2020 (TRDOS 386 v2.0.3)
 vbe3:	db 0  ; VESA VBE version (must be 03h)
@@ -3700,7 +3766,7 @@ starting_msg:
 	;;;db "Turkish Rational DOS v2.0 [18/04/2021] ...", 0
 	;;db "Turkish Rational DOS v2.0 [11/08/2022] ...", 0
 	;db "Turkish Rational DOS v2.0 [30/08/2023] ...", 0
-	db "Turkish Rational DOS v2.0 [04/12/2023] ...", 0
+	db "Turkish Rational DOS v2.0 [07/12/2023] ...", 0
 
 NextLine:
 	db 0Dh, 0Ah, 0
