@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.2 - trhdboot.s
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.7 - trhdboot.s
 ; ----------------------------------------------------------------------------
-; Last Update: 12/09/2020
+; Last Update: 03/05/2024 (Previous: 12/09/2020)
 ; ----------------------------------------------------------------------------
 ; Beginning: 07/09/2020
 ; ----------------------------------------------------------------------------
@@ -22,7 +22,7 @@
 ;
 ; Copyright (C) 2020  Erdogan TAN 
 ; ****************************************************************************
-; assembling: nasm trhdboot.s -l trhdboot.lst -o TRHDBOOT.COM -Z error.txt
+; assembling: nasm trhdboot.s -l trhdboot.txt -o TRHDBOOT.COM -Z error.txt
 
 ; previous version: trhdboot.s v1 -- 18/04/2000
 
@@ -356,7 +356,7 @@ T_21:
 
 	mov	ax, [dosp_start]
 	mov	dx, [dosp_start+2]
-	jmp	T_21	 
+	jmp	short T_21	 
 
 T_22:
 	cmp	word [bootsector+510], 0AA55h
@@ -365,7 +365,8 @@ T_22:
 	cmp	word [bootsector+bsBytesPerSec], 512
 	jne	short T_23
 
-	mov	byte [bootsector+bsMedia], 0F8h
+	; 03/05/2024 (BugFix)
+	cmp	byte [bootsector+bsMedia], 0F8h
 	jne	short T_23
 
 	cmp	byte [fattype], 2
@@ -388,6 +389,7 @@ T_23:
 	mov	si, TrDOS_invalid_bootsector
 	call	print_msg
 	jmp	T_35
+
 T_24:
 	cmp	byte [bootsector+BS_BootSig], 29h
 	jne	short T_23
@@ -423,8 +425,8 @@ T_26:
 
 	mov	si, _no_str
 	call	print_msg
-
 	jmp	T_35
+
 T_27:
 	mov	si, _yes_str
 	call	print_msg
@@ -764,11 +766,11 @@ trdos386bs:
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 TRDOS_FAT32_hd_bs:
-	incbin	'FAT32_BS.BIN'
+	incbin	'FAT32_BS.BIN' ; 27/04/2024
 TRDOS_FAT16_hd_bs: 
-	incbin	'FAT16_BS.BIN'
+	incbin	'FAT16_BS.BIN' ; 26/12/2017
 TRDOS_FAT12_hd_bs: 
-	incbin	'FAT12_BS.BIN'
+	incbin	'FAT12_BS.BIN' ; 26/12/2017
 
 ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ;  messages
@@ -787,7 +789,7 @@ TrDOS_Welcome:
 	db 0Dh, 0Ah
 	db 'TR-DOS 386 v2 Hard Disk Boot Sector Update Utility '
 	db 0Dh, 0Ah
-	db '(c) Erdogan TAN - 2020'
+	db '(c) Erdogan TAN 2020-2024'
 	db 0Dh,0Ah
 	db 0Dh,0Ah
 	db 'Usage: trhdboot <drive> '
@@ -803,7 +805,7 @@ TrDOS_Welcome:
 	db ' hd3       ..for primary dos partition on 4th disk '
 	db 0Dh, 0Ah, 0
 
-	db '12/09/2020'
+	db '03/05/2024'
 	db 0
 
 TrDOS_Do_you_want:

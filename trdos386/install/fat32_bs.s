@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.0 - fat32_bs.s - FAT32 BOOT SECTOR
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.7 - fat32_bs.s - FAT32 BOOT SECTOR
 ; ----------------------------------------------------------------------------
-; Last Update: 31/01/2018
+; Last Update: 27/04/2024 (Previous: 31/01/2018)
 ; ----------------------------------------------------------------------------
 ; Beginning: 13/12/2017
 ; ----------------------------------------------------------------------------
@@ -118,7 +118,7 @@ bs_01:
 		; Check Bytes/Sector value
 		; It must be 512 !? (at least, for TRDOS386) 
 		cmp	word [bp+0Bh], 512 ; [BPB_BytesPerSec]
-		jne	invalid_system_disk
+		jne	short invalid_system_disk
 
 		; Following validation checks (*!*)
 		; are done according to 
@@ -183,7 +183,7 @@ bs_01:
 		jne	short bs_02 ; no..
 		; yes, put sign for disk read subroutine (for LBA read) 
 		;mov	[loc_5A], ax
-		mov	[bp+5Ah], ax ; INC DX (FAT32 LBA read), DEC X
+		mov	[bp+5Ah], ax ; INC DX (FAT32 LBA read), DEC DX
 bs_02:
 		; ..CHS limit setup..
 
@@ -237,8 +237,9 @@ bs_02:
 
 invalid_system_disk:
 		mov	si, Inv_disk_Msg
+getchar_reboot:		; 27/04/2024
 		call	print_msg
-getchar_reboot:
+;getchar_reboot:
 		; Wait for a keystroke just before reboot
 		xor	ah, ah
 		int	16h
@@ -252,8 +253,10 @@ disk_io_error:
 ;		mov	si, Replace_Msg	
 replace_disk:	
 		mov	si, Disk_err_replace_Msg
-		call	print_msg
-		jmp	getchar_reboot
+		;call	print_msg
+		;jmp	getchar_reboot
+		; 27/04/2024
+		jmp	short getchar_reboot
 
 print_msg:
 		; DS:SI = Error message address (ASCIIZ string)	
@@ -265,8 +268,8 @@ bs_03:
 		jz	short bs_04
 		int	10h
 		jmp	short bs_03
-bs_04:
-		retn
+;bs_04:
+		;retn
 
 read_sector:	; 25/12/2017 (Read 1 sector)
 		mov	cx, 1
@@ -289,7 +292,10 @@ disk_read_0:
 		cmp	[bp+2], dl ; 42h ; is LBA mode ready ? 
 		je	short lba_read ; LBA mode is usable/available
 		stc ; cf = 1
+		; 27/04/2024
+bs_04:
 		retn
+
 lba_read:
 		;pushad
 
@@ -362,6 +368,10 @@ disk_read_2:
 		;clc 	; ** (128 sectors/cluster!?)
 		retn
 
+		; 27/04/2024
+		; Filler
+		dd	0
+
 		; Filler
 		db	07h
 		db	14h
@@ -382,13 +392,18 @@ Replace_Msg:
 		db	0Dh, 0Ah, 0
 
 		; Boot sector code writing date (by Erdogan Tan)
-		db	31
-		db	01
-		dw	2018
+		;db	31
+		;db	01
+		;dw	2018
+		db	27
+		db	04
+		dw	2024
 
 		; TRDOS 386 FAT32 boot sector code version
-		db	'v1.0'
-
+		;db	'v1.0'
+		; 27/04/2024
+		db	'v2.0'
+		
 		times	(508+rtsfilename-bsReserved1) - ($ - $$) db 0
 rtsfilename:
                 db      'TRDOS386SYS'

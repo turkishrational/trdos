@@ -2,11 +2,11 @@
 ; HDIMAGE.ASM (HDIMAGE.COM) - TRDOS 386 Hard Disk Image Formatting Utility
 ; 						      (for MSDOS/WINDOWS)
 ; ****************************************************************************
-; Last Update: 04/11/2020
+; Last Update: 03/05/2024 (Previous: 26/10/2020)
 ; ----------------------------------------------------------------------------
 ; Beginning: 03/12/2017
 ; ----------------------------------------------------------------------------
-; Assembler: NASM version 2.14
+; Assembler: NASM version 2.15
 ; ----------------------------------------------------------------------------
 ; Turkish Rational DOS
 ; Operating System Project v2.0 by ERDOGAN TAN (Beginning: 04/01/2016)
@@ -26,7 +26,7 @@
 ; Derived from 'UNIXCOPY.ASM' (UNIXCOPY.COM) source code by Erdogan Tan
 ; (04/12/2015)
 ; ****************************************************************************
-; nasm hdimage.s -l hdimage.lst -o HDIMAGE.COM
+; nasm hdimage.s -l hdimage.txt -o HDIMAGE.COM
 
 ; DTA (PSP+80h= Offset 128)
 DTA_Attrib equ 149 ; PDP+21
@@ -772,25 +772,12 @@ A_42:
 	and	ax, ax
 	;jnz	B_04  ; overlap error (except empty entries)
 	; 24/02/2019
-	;jnz	short A_40
-	; 31/10/2020
-	jz	short A_43 ; empty pt entries
-			; (previous pte is empty)
-	; 31/10/2020
-	mov	ax, [part_table_rel_sec_lw+di] ; previous
-	mov	dx, [part_table_rel_sec_hw+di]
-	add	ax, [part_table_num_sec_lw+di]
-	adc	dx, [part_table_num_sec_hw+di]
-	;jc	short A_40
-		 ; dx:ax = end sector + 1
-	cmp	dx, [part_table_rel_sec_hw+si] ; current
-	jb	short A_43
-	ja	short A_40 ; overlap error !	
-	cmp	ax, [part_table_rel_sec_lw+si]
-	jnb	short A_40 ; overlap error ! 	
+	jnz	short A_40
+
 A_43:
 	cmp	bl, 3
 	jb	short A_42
+
 A_44:
 	mov	si, mbr_editing_options
 	call	print_msg
@@ -948,10 +935,6 @@ cld_1:
 	jb	short cld_2
 	jmp	eetc_2
 cld_2:
-	; 01/11/2020
-	mov	[ep_free_sectors], ax
-	mov	[ep_free_sectors+2], dx
-
 	mov	si, msg_c_ldd_q
 	call	print_msg
 cld_3:	
@@ -1548,11 +1531,6 @@ cpi_5:
 
 	call	partition_type_input
 
-	; 29/10/2020
-	or	al, al
-	;jz	short cpi_6 ; invalid (zero) input or ESC key
-	jz	short cpi_4
-
 	mov	ah, 4 ; user/another type partition flag
 	; al = Partition ID	
 	push	ax
@@ -1733,44 +1711,22 @@ cpp_5:
 	;jnz	short cpp_6
 
 	or	ax, cx
-	jz	short cpp_16 ; 31/10/2020
+	jnz	short cpp_6
 
-	; 31/10/2020
-	mov	al, [sectors]
-	mul	byte [heads]
-	mul	cx
-	; dx:ax = LBA sector address
-	; bl = head = 0
-	; cx = cylinder number
-	; ax = sector number
-	jmp	short cpp_6
-cpp_16:
 	mov	ax, [sectors]
-	; cylinder 0, head 1, sector 1 (LBA = 17 or 63)
-	inc	bl  ; head = 1
-	xor	dx, dx ; 0
-cpp_6:
-	; 31/10/2020
+	
 	mov	[si+ptStartSector], ax
-	mov	[si+ptStartSector+2], dx
+	;mov	[si+ptStartSector+2], cx ; 0
 
 	mov	[pp_StartSector], ax
-	mov	[pp_StartSector+2], dx
+	;mov	[pp_StartSector+2], cx
 
-	or	cx, cx  ; start cylinder ?
-	jnz	short cpp_17 ; > 0
+	sub	[pp_Sectors], ax
+	sbb	[pp_Sectors+2], cx ; 0	
 	
-	;and	bl, bl  ; head = 0 ?
-	;jz	short cpp_17
-
-	; cylinder = 0, head = 1, dx:ax = [sectors]
-
-	;sub	[pp_Sectors], ax
-	;sbb	[pp_Sectors+2], cx ; 0
-
-	sub	[ppn_Sectors], ax
-	sbb	[ppn_Sectors+2], cx ; 0
-cpp_17:
+	; cylinder 0, head 1, sector 1 (LBA = 17 or 63)
+	inc	bl  ; head = 1
+cpp_6:
 	mov	ax, cx
 	mov	byte [si+ptBeginSector], 1 ; sector = 1		
 	jmp	short cpp_8		
@@ -1823,7 +1779,7 @@ cpp_8:
 	mul	cl	
 	; ax = heads*sectors
 
-	mov	bx, [di+free_space.end]	; end cylinder of the partition
+	mov	bx, [di+free_space.end]  ; end cylinder of the partition
 
 	cmp	byte [wholedisk], 0 ; entire free space ?
 	ja	short cpp_10
@@ -1837,11 +1793,10 @@ cpp_8:
 	sbb	dx, 0
 		; dx:ax = end sector
 	div	bx
-		; ax = cylinder number
-	; 31/10/2020
-	;and	dx, dx
-	;jz	short cpp_9
-	;inc	ax ; + 1 (because of remainder > 0)
+		; ax = cylinder count
+	and	dx, dx
+	jz	short cpp_9
+	inc	ax ; + 1 (because of remainder > 0)
 cpp_9:	
 	xchg	ax, bx
 		; bx = end cylinder
@@ -2841,12 +2796,6 @@ B_50:
 	cmp	ah, 4  ; user's partition type input ?
 	jne	short B_51 ; no
 
-	; 29/10/2020
-	; (ah = 0)
-	;or	al, al
-	;jz	A_42  ; invalid partition type input
-	;	      ; or ESC key has been pressed
-
 	; user type input
 	mov	[pp_type_user], al
 	mov	al, ah ; mov al, 4
@@ -2905,7 +2854,7 @@ B_54:
 	mov	byte [pp_type], 1
 
 	call	cpi_2 ; 15/02/2019
-	jmp	short B_50
+	jmp	B_50
 B_106:
 	; 26/10/2020
 	cmp	byte [ppcount], 0  ; primary partition count
@@ -2989,16 +2938,7 @@ B_66:
 	mov	ax, 3 ; set video mode to 03h (80x25 text)
 	int	10h
 
-	; 04/11/2020
-	cmp	byte [pp_type], 1 ; primary dos partition ?
-	je	short B_108
-	; "Create Partition"
-	mov	si, msg_create_partition_h
-	jmp	short B_109
-B_108:
-	; "Create DOS Partition"
 	mov	si, msg_create_dos_partition_h ; header
-B_109:
 	call	print_msg
 	mov	si, msg_create_trdos_partition_s ; size options
 	call	print_msg	
@@ -3020,9 +2960,6 @@ B_67:
 	mov 	byte [wholedisk], 1 ; 09/02/2019
 	jmp	short B_71
 
-B_107:	; 31/10/2020
-	jnz	short B_66  ; ESCape (return to options menu)
-	; partition size input is ZERO !
 B_68:
 	; ZERO partition size message
 	mov	si, msg_zero_partition_size
@@ -3059,14 +2996,8 @@ B_70:
 
 	call	partition_size_input
 	;jc	B_47 ; exit if partition size input is 0
-	;jc	short B_68
-	; 29/10/2020
-	;jnc	short B_107
-	;jz	short B_68 ; partition size input is ZERO !
-	;jmp	short B_66 ; ESCape (return to options menu)	
-	; 31/10/2020
-	jc	short B_107 ; ESC or zero partition size
-;B_107:
+	jc	short B_68
+
 	and	bx, bx ; bx_dx_ax = partition size
 	;jnz	short B_77
 	; 23/02/2019 
@@ -3358,7 +3289,7 @@ B_99:
 	call	partition_size_fixup
 	jc	B_78
 
-	; 16/02/2019
+	 ; 16/02/2019
 	; Force cylinder boundary alignment except
 	;   sectors ('S') and kilobytes ('K') as sizing unit.
 
@@ -3520,8 +3451,6 @@ C_06_exit:
  
 	; Exit	
 	int	20h
-
-;-----------------------------------------------------------------------------
 
 save_mbr_exit:
 	; 24/02/2019
@@ -5745,12 +5674,9 @@ partition_size_input:
 	mov	cx, 100
 	call	div32
 	mov	[pSize_multiplier], ax
-	; 29/10/2020
-	mov	[pSize_multiplier+2], dx
 	mov	ah, 0
 	mov	[msg_psize_unit+1], ah
-	;mov	byte [pSize_maxdigits], 2
-	mov	byte [pSize_maxdigits], 3 ; 29/10/2020
+	mov	byte [pSize_maxdigits], 2
 	mov	al, '%'
 	jmp	short psu_6
 psu_0:
@@ -5824,19 +5750,12 @@ psu_7:
 	mov	ah, 0Eh	; write char as tty		
 	;mov	bx, 7   ; page 0, color 7 (light gray)         
 	int	10h
-	jmp	short psu_7
-psu_8esc:
-	; 29/10/2020 (ESCape)
-	mov	sp, bp ; clean stack
-
-	or	al, al ; zf = 0
-	stc
-	retn	
+	jmp	short psu_7	
 psu_8:
 	and	al, al
 	jz	psu_15 ; check for left arrow key 
 	cmp	al, 27
-	je	short psu_8esc ; ESCAPE key ; 29/10/2020
+	je	psu_16esc ; ESCAPE key
 	ja	psu_14 ; check for left arrow key
 	cmp	al, 13
 	;je	short psu_9  ; ENTER key
@@ -5937,28 +5856,14 @@ psu_15:
 	cmp	ah, 53h ; DEL key (backspace)
 	je	short psu_12
 	jmp	psu_7
+
+psu_16esc:
+	xor	cx, cx ; 0
+	mov	[pSize_temp], cx
+	mov	[pSize_temp+2], cx
 psu_16:
 	mov	sp, bp
 
-	; 29/10/2020
-	cmp	byte [pSize_unit], '%'
-	jne	short psu_23
-
-	cmp	word [pSize_temp], 100 ; 100% limit
-	jna	short psu_17
-
-	; (re)set asciiz number string to '100' 
-
-	sub	bh, bh ; 0 ; video page 0
-	mov	dx, [Cursor_Pos]
-	mov	ah, 2 ; set cursor pos
-	int	10h
-
-	mov	si, msg_100
-	call	print_msg
-
-	jmp	short psu_17
-psu_23:
 	cmp	byte [pSize_unit], 'S'
 	jne	short psu_17 
 
@@ -5972,32 +5877,6 @@ psu_17:
 
 	mov	si, CRLF
 	call	print_msg
-
-	; 29/10/2020
-	cmp	byte [pSize_unit], '%'
-	jne	short psu_18
-	
-	mov	cx, [pSize_temp]
-
-	and	cx, cx
-	jz	short psu_21 ; 0%, ZERO !
-
-	cmp	cx, 100
-	jna	short psu_24
-
-	; show 100% for 1 second (for >100%)
-	call	wait1second ; 29/10/2020
-
-	mov	cx, 100
-psu_24:
-	mov	ax, [pSize_multiplier]
-	mov	dx, [pSize_multiplier+2]
-
-	;mov	cx, [pSize_temp]
-	;and	cx, cx
-	;jz	short psu_21 ; 0%, ZERO !
-
-	jmp	mul32
 psu_18:
 	mov	ax, [pSize_temp]
 	mov	dx, [pSize_temp+2]
@@ -6030,32 +5909,11 @@ psu_19:
 	;jz	short psu_20
 	jz	short psu_22 ; 09/02/2019
 psu_20:
-	;call	mul32
-	;retn
-	; 29/10/2020
-	jmp	mul32
+	call	mul32
+	retn
 psu_21:
-	; zf = 1 ; 29/10/2020
 	stc
 psu_22:
-	retn
-
-;-----------------------------------------------------------------------------
-
-	; 29/10/2020
-wait1second:
-	mov	ah, 2
-	int	1Ah ; get time of day
-	jc	short w1s_2
-w1s_1:
-	push	dx
-	mov	ah, 2
-	int	1Ah ; get time of day
-	pop	ax
-	jc	short w1s_2
-	cmp	dh, ah
-	je	short w1s_1 ; same second
-w1s_2:
 	retn
 
 ;-----------------------------------------------------------------------------
@@ -6161,9 +6019,7 @@ ptu_9:
 	jmp	ptu_0
 
 ptu_10: ; ESCAPE
-	;mov	al, 0
-	; 29/10/2020
-	sub	al, al ; 0
+	mov	al, 0
 	; partition type is 0 (none)
 	jmp	short ptu_12
 ptu_11: ; ENTER
@@ -6406,7 +6262,7 @@ write_byte_decimal:
 	;	DS:SI = decimal number text address
 	;	        (ASCIIZ string)
 	;
-	; (SI, AX, CX will be modified)	
+	; (SI, AX, CX will me modified)	
 
 	mov	si, msg_partition_sectors + 8
 	mov	cl, 10
@@ -6658,7 +6514,7 @@ sortpt_3:
 	; Sort until we don't do a swap
 
 	or	cl, cl ; sort changed ?
-	jz	short sortpt_8 ; no
+	jz	short sortpt_8 ; no.
 sortpt_4:
 	xor	cl, cl
 
@@ -6688,30 +6544,19 @@ sortpt_6:
 	xchg	di, ax
 
 	cmp	[part_table_end_cyl+di], ax ; previous > current
-	;ja	short sortpt_7 ; swap order indicators
-		; 31/10/2020
-		; current end cyl >= previous end cyl
-	; 31/10/2020
-	jb	short sortpt_5  
-		; current end cyl > previous end cyl
-	
-	and	ax, ax ; cylinder 0 ?
-	jnz	short sortpt_5 ; no
-		; current end cyl = previous end cyl, cyl > 0
-	
-	; current end cyl = previous end cyl = 0	
+	ja	short sortpt_7 ; swap order indicators
 
 	; If current entry is empty partition entry
 	; and previous entry is not empty partition entry
 	; swap them.
-	;
-	mov	ax, [part_table_num_sec_hw+di] ; previous entry
-	or	ax, [part_table_num_sec_lw+di]
-	jz	short sortpt_5
 
 	mov	ax, [part_table_num_sec_hw+si] ; current entry
 	or	ax, [part_table_num_sec_lw+si]
 	jnz	short sortpt_5
+
+	mov	ax, [part_table_num_sec_hw+di] ; previous entry
+	or	ax, [part_table_num_sec_lw+di]
+	jz	short sortpt_5
 sortpt_7:
 	; Swap the order indicators
 
@@ -6721,10 +6566,8 @@ sortpt_7:
 
 	mov	cl, 1 ; sort changed
 	jmp	short sortpt_5
-
 sortpt_8:
-	; 30/10/2020
-	;mov 	byte [p_sorted], 1 ; 04/02/2019
+	mov 	byte [p_sorted], 1 ; 04/02/2019
 
 	retn
 
@@ -6764,9 +6607,7 @@ find_part_free_space:  ; find/calculate free space for partitions
 	;mov	[last_found_partition], al ; 0
 
 	mov	[_i_], ax ; 0
-	;jmp	short fpfs_2
-	; 31/10/020
-	jmp	short fpfs_3
+	jmp	short fpfs_2
 fpfs_1:	
 	inc	byte [_i_]
 ;;fpfs_2:
@@ -6776,10 +6617,9 @@ fpfs_1:
 fpfs_3:
 	; Find space between start of disk and first partition
 
-	;mov	ax, [_i_]
-	mov	bx, [_i_] ; 31/10/2020
+	mov	ax, [_i_]
 fpfs_2:
-	;mov	bx, ax ; 31/10/2020
+	mov	bx, ax
 	;mov	al, [sort+bx]
 	mov	cl, [sort+bx] ; 15/02/2019
 
@@ -6794,9 +6634,7 @@ fpfs_2:
 	mov	[last_found_partition], cl ; 15/02/2019
 
 	xor	cl, cl ; 0 	
-	;mov	al, 1 ; LBA = 1 (after MBR) ; ah = 0
-	; 03/11/2020
-	mov	al, [sectors] ; 63 or 17 ; 03/11/2020	
+	mov	al, 1 ; LBA = 1 (after MBR) ; ah = 0
 	
 	cmp	byte [p_type], 5  ; EXTENDED
 	jne	short fpfs_4
@@ -6806,7 +6644,7 @@ fpfs_2:
 
 	; 13/02/2019
 	; LBA value of free space start
-	;mov	al, [sectors] ; 03/11/2020
+	mov	al, [sectors]
 	mul	byte [heads]
 		; ax = start sector (for Extended Partition)
 	inc	cl ; 1  ; cx = start cylinder = 1
@@ -6872,9 +6710,6 @@ fpfs_4:
 	;mov	al, [sort+bx]
 
 	;mov	[last_found_partition], al
-
-	; 31/10/2020
-	jmp	fpfs_9
 
 	; Look for space between the rest of the partitions
 
@@ -7003,7 +6838,7 @@ fpfs_11:
 		   ; (min. cylinder count = 1 for a valid/usable free space)
 	mov	ax, [part_table_end_cyl+bx]
 	;cmp	[part_table_end_cyl+bx], cx
-	cmp	ax, cx	; cx = end cylinder of the disk
+	cmp	ax, cx
 	jb	short fpfs_12
 	jmp	fpfs_15
 fpfs_12:
@@ -7013,10 +6848,10 @@ fpfs_12:
 
 	inc	byte [freespace_count]
 
-	mov	[free_space.end+di], cx	; end cyl. of free space 5 (gap 5) 
+	mov	[free_space.end+di], cx  ; end cyl. of free space 5 (gap 5) 
 	;mov	ax, [part_table_end_cyl+bx]
-	mov	dx, cx	; cx = end cylinder of the disk
-	sub	dx, ax	; ax = end cylinder of the last partition
+	mov	dx, cx
+	sub	dx, ax
 	mov	[free_space.space+di], dx ; di = 4*16
 	inc	ax
 	mov	[free_space.start+di], ax
@@ -7059,7 +6894,6 @@ fpfs_13:
 	
 	; 15/02/2019
 	;sub	ax, ax
-	; ah = 0 ; 31/10/2020
 	sub	dx, dx
 
 	;inc	al ; LBA = 1 (after MBR) ; ah = 0
@@ -7200,7 +7034,7 @@ find_enough_free_sectors:
 	;	22/02/2019
 	;	[freespace_count] = number of free spaces/gaps
 	; OUTPUT:
-	;	DX:AX = Available space
+	;	DX:AX = AX = Available space
 	;	If CF = 0 -> DX:AX >= Request
 	;	If CF = 1 -> DX:AX < Request
 	;	CX = Index of available space in free space structure
@@ -7228,11 +7062,10 @@ fefss_1:
 	je	short fefss_8
 	jb	short fefss_7 ; 18/02/2019
 fefss_2:
-	; 30/10/2020
-	;cmp	word [bx], 0
-	;jne	short fefss_3
-	;cmp	word [bx+2], 0
-	;je	short fefss_6	
+	cmp	word [bx], 0
+	jne	short fefss_3
+	cmp	word [bx+2], 0
+	je	short fefss_6	
 fefss_3:
 	cmp	di, [bx+2]
 	ja	short fefss_6
@@ -7863,10 +7696,6 @@ edit_ext_table_create:
 	call	check_ext_free_space
 	jc	eetc_9	; error, no free space in extented partition
 
-	; 30/10/2020
-	mov	[ep_free_sectors], ax
-	mov	[ep_free_sectors+2], dx
-
 	cmp	byte [ldrives], 4
 	jnb	eetc_2	; error, write program limit message
 
@@ -7944,56 +7773,27 @@ eetc_1:
 	mov	[ldd_start], ax
 	mov	[ldd_start+2], dx
 
-	; 01/11/2020
-	cmp	word [lcylinders], 65535  
-			; sign for using all of available sectors	
-	jb	short eetc_11
+	; 04/03/2019
+	add	ax, cx
+	adc	dx, bx
 
-	mov	ax, [ep_free_sectors]
-	mov	dx, [ep_free_sectors+2]
-	jmp	short eetc_12
-eetc_11:
+	push	dx
+	push	ax	
+
 	mov	al, [heads]
 	mul	byte [sectors]
 	mul	word [lcylinders]
-eetc_12:
-	; 01/11/2020
-	xor	bp, bp
+
 	mov	[ldd_size], ax
 	mov	[ldd_size+2], dx
 
-	; 1st ldd start sector is always 63 or 17 (= spt)
-	;sub	ax, cx ; cx = 63 or 17, [sectors]
-	;sbb	dx, bx ; sbb dx, 0
+	mov	[di+ptStartSector], cx
+	mov	[di+ptStartSector+2], bx
 
-	; 01/11/2020	
+	pop	ax
+	pop	dx
+
 	jmp	eetc_4
-
-	;mov	[di+ptStartSector], cx
-	;mov	[di+ptStartSector+2], bx
-	;
-	;; 01/11/2020
-	;mov	[di+ptSectors], ax
-	;mov	[di+ptSectors+2], dx
-	;
-	;mov	cx, ax
-	;mov	bx, dx
-	;; cx:bx = volume size of logical -dos- drive
-	;
-	;pop	ax ; ldd's LBA
-	;pop	dx
-	;; dx:ax = start sector address of ldd
-	;
-	;; 01/11/2020
-	;add	cx, ax
-	;adc	bx, dx
-	;sub	cx, 1
-	;sbb	bx, 0
-	;; bx:cx = end sector address of ldd
-	;push	cx
-	;push	bx
-	;
-	;jmp	eetc_4
 
 eetc_3:
 	; [ldrives] >= 1
@@ -8025,52 +7825,27 @@ eetc_3:
 	mov	[bp+ldd_start], ax
 	mov	[bp+ldd_start+2], dx
 
-	push	dx ; ldd's start sector LBA
+	push	dx
 	push	ax
 	
 	sub	ax, cx
 	sbb	dx, bx
-	; dx:ax = offset from start of the ep start sector
 
 	mov	[si+ptStartSector], ax
 	mov	[si+ptStartSector+2], dx
 
-	; 01/11/2020
-	cmp	word [lcylinders], 65535  
-			; sign for using all of available sectors	
-	jb	short eetc_13
-
-	mov	ax, [ep_free_sectors]
-	mov	dx, [ep_free_sectors+2]
-	jmp	short eetc_14
-eetc_13:
 	mov	al, [heads]
 	mul	byte [sectors]
 	mul	word [lcylinders]
-eetc_14:
-	; 01/11/2020
+
 	mov	[bp+ldd_size], ax
 	mov	[bp+ldd_size+2], dx
 
  	mov	[si+ptSectors], ax
 	mov	[si+ptSectors+2], dx
 
-	; 01/11/2020
-	mov	cx, ax
-	mov	bx, dx
-	; cx:bx = volume size of logical -dos- drive
-
-	pop	ax ; ldd's start sector LBA	
+	pop	ax
 	pop	dx
-
-	; 01/11/2020
-	add	cx, ax
-	adc	bx, dx
-	sub	cx, 1
-	sbb	bx, 0
-	; bx:cx = end sector address of ldd
-	push	cx
-	push	bx
 
 	; calculate CHS from LBA
 	call	lba_to_chs
@@ -8085,20 +7860,15 @@ eetc_14:
 	or	dl, ah		
 	mov	[si+ptBeginSector], dl
 
- 	;;mov	ax, [si+ptSectors]
-	;;mov	dx, [si+ptSectors+2]
- 	;mov	ax, [bp+ldd_size]
-	;mov	dx, [bp+ldd_size+2]
-	;sub	ax, 1
-	;sbb	dx, 0
-	;add	ax, [bp+ldd_start]
-	;adc	dx, [bp+ldd_start+2]
-	;	; dx:ax = end sector
-	
-	; 01/11/2020
-	pop	ax
-	pop	dx
-	; dx:ax = end sector address of ldd
+ 	;mov	ax, [si+ptSectors]
+	;mov	dx, [si+ptSectors+2]
+ 	mov	ax, [bp+ldd_size]
+	mov	dx, [bp+ldd_size+2]
+	sub	ax, 1
+	sbb	dx, 0
+	add	ax, [bp+ldd_start]
+	adc	dx, [bp+ldd_start+2]
+		; dx:ax = end sector
 
 	call	lba_to_chs
 		; ax = cylinder
@@ -8130,45 +7900,13 @@ eetc_14:
 
 	mov	cx, [sectors]
 	sub	bx, bx ; 0
-	; 01/11/2020
-	mov	ax, [bp+ldd_size]
-	mov	dx, [bp+ldd_size+2]
-	;sub	ax, cx
-	;sbb	dx, bx ; sbb dx, 0 
-eetc_4:	
-	mov	[di+ptStartSector], cx
-	mov	[di+ptStartSector+2], bx
-
-	; 01/11/2020
-	; 1st ldd start sector is always 63 or 17 (= spt)
-	sub	ax, cx ; cx = 63 or 17, [sectors]
-	sbb	dx, bx ; sbb dx, 0
-
-	; 01/11/2020
-	mov	[di+ptSectors], ax
-	mov	[di+ptSectors+2], dx
-
-	mov	cx, [bp+ldd_size]
-	mov	bx, [bp+ldd_size+2]
-	; cx:bx = volume size of logical -dos- drive
-
 	mov	ax, [bp+ldd_start]
 	mov	dx, [bp+ldd_start+2]
-	; dx:ax = start sector address of ldd (EBR addr)
-
-	; 01/11/2020
-	add	cx, ax
-	adc	bx, dx
-	sub	cx, 1
-	sbb	bx, 0
-	; bx:cx = end sector address of ldd
-	push	bx
-	push	cx
-;eetc_4:
-	; 01/11/2020
-	; stack = end sector address of ldd
-	; dx:ax = start sector address of ldd
-
+	add	ax, cx
+	adc	dx, bx
+	mov	[di+ptStartSector], cx
+	mov	[di+ptStartSector+2], bx
+eetc_4:	
 	; calculate CHS from LBA
 
 	call	lba_to_chs
@@ -8179,43 +7917,21 @@ eetc_4:
 	;mov	byte [di+ptBootable], 0
 	mov	[di+ptBeginHead], dh
 	mov	[di+ptBeginCylinder], al
-	;mov	bl, ah
-	;shl	bl, 6
-	;or	dl, bl
-	; 01/11/2020		
-	shl	ah, 6
-	or	dl, ah
+	mov	bl, ah
+	shl	bl, 6
+	or	dl, bl		
 	mov	[di+ptBeginSector], dl
 
-	;add	ax, [lcylinders]
-	;dec	ax ; end cylinder
-	;mov	bx, ax
-
-	; 01/11/2020
-	pop	ax
-	pop	dx
-	; dx:ax = end sector address of ldd
-
-	call	lba_to_chs
-		; ax = cylinder
-		; dl = sector
-		; dh = head
-
+	add	ax, [lcylinders]
+	dec	ax ; end cylinder
+	mov	bx, ax
+		
 	;mov	[di+ptFileSystemID], 0
-	;mov	cx, [heads]
-	;dec	cl
-	;mov	[di+ptEndHead], cl
-	; 01/11/2020
-	mov	[di+ptEndHead], dh
-
-	mov	cx, ax ; 01/11/2020
-	
-	; 02/11/2020
-	; cx = ax = end cylinder of the ldd
-	; [endcyl] = end cylinder of the ep
-
+	mov	cx, [heads]
+	dec	cl
+	mov	[di+ptEndHead], cl
 	mov	[di+ptEndCylinder], al
-	;mov	dx, [sectors]
+	mov	dx, [sectors]
 	shl	ah, 6
 	or	ah, dl	
 	mov	[di+ptEndSector], ah
@@ -8224,63 +7940,28 @@ eetc_4:
 	; Check unused space if it is 3rd LDD
 	; (write message to add unused space.)
 
-	; 02/11/2020
-	;cmp	byte [ldrives], 3
-	;jb	eetc_7
+	cmp	byte [ldrives], 3
+	jb	eetc_7
 
-	; 01/11/2020
-	cmp	word [lcylinders], 65535  
-			; sign for using all of available sectors	
-	jnb	eetc_7	; no need to add unused sector 
-			; (there are not any unused sectors)
+	mov	ax, dx ; sectors
+	mul	cx ; * [heads] - 1
 
-	; cx = cylinder number (0 to 1023)
-
-	; 02/11/2020
-	cmp	byte [ldrives], 3 ; is this logical drive 4 ?
-	jnb	short eetc_15  
-			; force to show unused space message
-
-	; 02/11/2020
-	; (add unused space if cyl nums are same or diff is 1)
-	inc	cx  ; tolerate cylinder numbers n and n-1 
-	cmp	cx, [endcyl] ; < end cylinder of the ep ?  
-	jb	eetc_7  ; the end cyl number of the last ldd
-			; is 2 or more cyls less than
-			; the end cyl number of the ep
-			; (a next ldd can be added to
-			; extd partition with 2 or more cyls)
-	dec	cx 
-		; cx = end cylinder of the ldd
-eetc_15:
-	; 02/11/2020
-	mov	al, [ldrives]
-	add	al, '1' ; 03/11/2020
-	mov	[char_lddn], al
-
-	mov	al, [sectors]
-	mov	bh, al
-	mov	bl, [heads]
-	dec	bl
-	mul	bl ; [sectors] * [heads] - 1
-
+	push	dx
 	push	ax
 
-	mov	al, bh  ; [sectors]
-	;mul	byte [heads]
-	inc	bl
-	mul	bl
-		; ax = heads * sectors
-	mul	cx ; * end cylinder
-		; dx:ax = end cylinder * heads * sectors
+	mov	al, [sectors]
+	mul	byte [heads]
+	mul	bx ; * end cylinder
+	
 	pop	cx
-	add	ax, cx ; + (sectors * (heads - 1))
-	adc	dx, 0	
+	add	ax, cx
+	pop	cx
+	adc	dx, cx	
 
 	; 03/03/2019
 	mov	cx, [sectors]
-	dec	cl  ; [sectors] - 1
-	add	ax, cx ; + (sectors - 1)
+	dec	cl	; [sectors] - 1
+	add	ax, cx
 	adc	dx, 0
 		; DX:AX = end LBA
 	
@@ -8300,7 +7981,7 @@ eetc_6:
 	sub	ah, ah
 	int	16h
 	cmp	al, 13 ; ENTER
-	je	short eetc_7 ; continue  ; 01/11/2020
+	je	short eetc_7 ; continue
 	cmp	al, 27 ; ESC
 	jne	short eetc_6
 
@@ -8308,7 +7989,7 @@ eetc_6:
 	; change end cylinder value
 	mov	al, [epnumber]
 	dec	al
-	mov	ah, 18	; primary partition table structure size
+	mov	ah, 18  ; primary partition table structure size
 	mul	ah
 	mov	si, ax
 	mov	ax, [si+part_table_end_cyl]
@@ -8324,22 +8005,23 @@ eetc_6:
 	mov	dx, bx
 	add	ax, 1
 	adc	dx, 0
-		; dx:ax = end of extd partition + 1 
-
-	; 02/11/2020
+		; dx:ax = end of ext partition + 1 
 	sub	ax, [bp+ldd_start]
 	sbb	dx, [bp+ldd_start+2]
-	sub	ax, [di+ptStartSector]
-	sbb	dx, [di+ptStartSector+2]
 		; dx:ax = new sector count of the ldd
-
-	mov	[di+ptSectors], ax
-	mov	[di+ptSectors+2], dx
+	;mov	[bp+ldd_size], ax
+	;mov	[bp+ldd_size+2], dx	
 	jmp	short eetc_8
 eetc_7:
-	mov	ax, [di+ptSectors]
-	mov	dx, [di+ptSectors+2]
+	mov	ax, [bp+ldd_size]
+	mov	dx, [bp+ldd_size+2]
+		; dx:ax = sector count	
 eetc_8:
+	sub	ax, [sectors]
+	sbb	dx, 0	
+	mov	[di+ptSectors], ax
+	mov	[di+ptSectors+2], dx
+
 	; Get proper FAT type in [ldd_type]
 	; by using DX:AX - size -
 	call	size_to_fat_type
@@ -8530,9 +8212,7 @@ get_ldd_size:	; Get requested logical dos drive size (from user)
 	;add	di, ax
 
 	mov	si, msg_use_all_space
-	; 01/11/2020
-	;call	print_msg
-	jmp	short gldds_2
+	call	print_msg
 
 	; Calculate available space
 
@@ -8558,66 +8238,37 @@ get_ldd_size:	; Get requested logical dos drive size (from user)
 	;jmp	short gldds_0
 
 	; 05/03/2019
-	;call	check_ext_free_space
-	;jc	short gldds_cancel
-	
-	; 01/11/2020
-	; 30/10/2020
-	;mov	ax, [ep_free_sectors]
-	;mov	dx, [ep_free_sectors+2]
-	
+	call	check_ext_free_space
+	jc	short gldds_cancel
 		; DX:AX = free sectors in extended partition
-	;jmp	short gldds_2
+	jmp	short gldds_2
 gldds_1:
 	mov	si, msg_use_entire_ep_space
-	;call	print_msg
-	
-	; 01/11/2020
-	; Calculate free space in extended partition
-	;mov	ax, [ep_Size]
-	;mov	dx, [ep_Size+2]
-gldds_2:
-	; 01/11/2020
 	call	print_msg
 
+	; Calculate free space in extended partition
+	mov	ax, [ep_Size]
+	mov	dx, [ep_Size+2]
+gldds_2:
+	; subtrack start offset (which always equals to spt value)
+	sub	ax, [sectors]
+	sbb	dx, 0
+
+	mov	cx, ax
 	mov	al, [heads]
 	mul	byte [sectors]
-	mov	cx, ax
-		
-	mov	ax, [ep_free_sectors]
-	mov	dx, [ep_free_sectors+2]
-
-	; 01/11/2020
-	; this is needed for partition size input
-	; (maximum available sectors)
-	;mov	[pp_Sectors], ax
-	;mov	[pp_Sectors+2], dx
-
-	; 01/11/2020
-	; subtrack start offset (which always equals to spt value)
-	;sub	ax, [sectors]
-	;sbb	dx, 0
-
-	;mov	cx, ax
-	;mov	al, [heads]
-	;mul	byte [sectors]
-	;xchg	ax, cx
+	xchg	ax, cx
 		; dx:ax = sectors
 		; cx = heads*spt 
-	;call	div32
+	call	div32
 		; ax = cylinders
 		; bx = remainder
  		; dx = 0
-	;and	bx, bx
-	;jz	short gldds_3
-	;inc	ax
-	; 01/11/2020
-	div	cx
-	;and	dx, dx
-	;jz	short gldds_3
-	;inc	ax
+	and	bx, bx
+	jz	short gldds_3
+	inc	ax
 gldds_3:
-	mov	[lcylinders], ax ; <= 65535 (< 65535)
+	mov	[lcylinders], ax
 gldds_getchar:
 	xor	ah, ah
 	int	16h
@@ -8629,10 +8280,6 @@ gldds_getchar:
 	je	short gldds_4
 	cmp	al, 'Y'
 	jne	short gldds_getchar
-
-	; 01/11/2020
-	mov	word [lcylinders], 65535 ; sign for all free sectors
-	
 	mov	si, _msg_YES
 	;call	print_msg
 	;retn
@@ -8669,37 +8316,25 @@ gldds_5:
 	cmp	al, 32 ; SPACE key
 	je	short gldds_28
 	
-	; 01/11/2020
-	;mov	byte [pSize_unit], '%'
+	mov	byte [pSize_unit], '%'
 	cmp	al, '%'
 	je	short gldds_6
-	;mov	byte [pSize_unit], 'M'
+	mov	byte [pSize_unit], 'M'
 	cmp	al, 13 ; 0Dh, Carriage Return key
-	;je	short gldds_6
-	jne	short gldds_29
-	; 01/11/2020
-	mov	al, 'M'
-	jmp	short gldds_6
-gldds_29:
+	je	short gldds_6
 	and	al, 0DFh
 	cmp	al, 'M'
 	je	short gldds_6
-	;mov	[pSize_unit], al
+	mov	[pSize_unit], al
 	cmp	al, 'G'
 	je	short gldds_6
 	cmp	al, 'C'
 	jne	short gldds_25
 gldds_6:
-	; 01/11/2020
-	mov	[pSize_unit], al
-
 	; Set maximum sector count (all of extended partition)
-	;mov	al, [sectors]
-	;mul	byte [heads]
-	;mul	word [lcylinders]
-	; 01/11/2020	
-	mov	ax, [ep_free_sectors]
-	mov	dx, [ep_free_sectors+2]
+	mov	al, [sectors]
+	mul	byte [heads]
+	mul	word [lcylinders]
 	mov	[pp_Sectors], ax
 	mov	[pp_Sectors+2], dx
 	
@@ -8707,30 +8342,20 @@ gldds_6:
 	jc	short gldds_cancel
 		; DX:AX = Partition size in sectors
 	;or	bx, bx
-	;jnz	short gldds_cancel
-
-	; 01/11/2020
-	mov	[ppn_Sectors], ax
-	mov	[ppn_Sectors+2], dx
-		
+	;jnz	short gldds_cancel		
 	mov	cx, ax
 	mov	al, [heads]
 	mul	byte [sectors]
 	xchg	ax, cx
 		; dx:ax = sectors
 		; cx = heads*spt 
-	;call	div32
+	call	div32
 		; ax = cylinders
 		; bx = remainder
  		; dx = 0
-	;and	bx, bx
-	;jz	short gldds_7
-	;inc	ax
-	; 01/11/2020
-	div	cx
-	;and	dx, dx
-	;jz	short gldds_7
-	;inc	ax
+	and	bx, bx
+	jz	short gldds_7
+	inc	ax
 gldds_7:
 	cmp	ax, [lcylinders]
 	ja	short gldds_9
@@ -8746,23 +8371,9 @@ gldds_9:
 	je	short gldds_10
 
 	; Tolerate 1 cylinder if unit is not cylinder
-	;dec	ax
-	;cmp	ax, [lcylinders]
-	;jna	short gldds_8
-
-	; 01/11/2020
-	; Tolerate sectors if sectorcount doesn't over ep limit
-	mov	ax, [ppn_Sectors]
-	mov	dx, [ppn_Sectors+2]
-	cmp	dx, [ep_free_sectors+2]
-	ja	short gldds_10
-	jb	short gldds_30
-	cmp	ax, [ep_free_sectors]
-	ja	short gldds_10
-gldds_30:
-	mov	word [lcylinders], 65535 ; sign for all free sectors
-	retn
-
+	dec	ax
+	cmp	ax, [lcylinders]
+	jna	short gldds_8
 gldds_10:
 	; clear screen
 	mov	ax, 3 ; set video mode to 03h (80x25 text)
@@ -8836,42 +8447,8 @@ gldds_18:
 
 gldds_22:
 	; '%'
-	; 01/11/2020
-	mov	dx, [ep_Size+2]
-	mov	ax, [ep_Size] ; *
-	and	dx, dx
-	jz	short gldds_33 ; dx = 0
-	mov	cx, 1
-gldds_31:
-	shl	cx, 1
-	call	div32
-	or	dx, dx
-	jz	short gldds_32 ; *
-	mov	ax, [ep_Size]	
-	mov	dx, [ep_Size+2]
-	jmp	short gldds_31
-gldds_32:
-	mov	dx, [ep_free_sectors+2]
-	; ep free secors <= ep size
-gldds_33:
-	push	ax ; * ; dx = 0 (ep size weight)
-	mov	ax, [ep_free_sectors]
-	mov	cx, 100
-	;and	dx, dx
-	;jnz	short gldds_34
-	;mul	cx
-	;jmp	short gldds_35
-;gldds_34:
-	call	mul32
-		; dx:ax = 100 * ep free sectors weight
-;gldds_35:
-	pop	cx ; *
-	call	div32 ; 100 * ep free sectors / ep size
-		; ax = % value (<= 100)
-	or	ax, ax
-	jnz	short gldds_23
-	inc	ax ; 0 -> 1
-
+	add	bx, free_space.percent_unused
+	mov	ax, [bx]
 gldds_23:	
 	mov	bp, sp
 gldds_24:	
@@ -8946,12 +8523,6 @@ init_ext_partition_tables:
 	mul	ah
 	mov	si, part_table_rel_sec_lw
 	add	si, ax
-	; 02/11/2020
-	;(save end cylinder for comparising later)
-	mov	ax, [si-2] ; part_table_end_cyl 
-			; 16 bit cylinder number
-	mov	[endcyl], ax
-	;
 	mov	ax, [si]
 	mov	dx, [si+2]
 	mov	[ep_StartSector], ax
@@ -9237,11 +8808,11 @@ TRDOS386_MASTERBOOT_SECTOR:
 TRDOS_FAT_hd_bs:
 	;incbin 'TRHDBS.BIN'
 TRDOS_FAT32_hd_bs:
-	incbin	'FAT32_BS.BIN'
+	incbin	'FAT32_BS.BIN' ; 27/04/2024
 TRDOS_FAT16_hd_bs: 
-	incbin	'FAT16_BS.BIN'
+	incbin	'FAT16_BS.BIN' ; 26/12/2017
 TRDOS_FAT12_hd_bs: 
-	incbin	'FAT12_BS.BIN'
+	incbin	'FAT12_BS.BIN' ; 26/12/2017
 
 TRDOS_TRFS1_chs_bs:
 	incbin	'TRFS1CHS.BIN' ; Singlix FS1 (CHS+LBA Disk) BS		
@@ -9320,7 +8891,7 @@ TrDOS_Welcome:
 	db	0Dh, 0Ah
 	db	'TR-DOS 386 Fixed Disk Image Format Utility'
 	db	0Dh, 0Ah
-	db	"v1.0.041120 (c) Erdogan TAN 2019-2020"
+	db	"v1.1.240503 (c) Erdogan TAN 2019-2024"
 	db	0Dh,0Ah
 	db	0Dh,0Ah
 	db	'Usage: hdimage <image file name> '
@@ -9674,7 +9245,7 @@ MBIDCode:
 PTable_Buffer:
 	times	64 db 0
  
-	db	'(c) Erdogan TAN 2019-2020'
+	db	'(c) Erdogan TAN 2019-2024'
 
 img_file_name:  
 	times	13 db 0
@@ -9877,9 +9448,7 @@ msg_create_ldd_max_error:
 
 msg_c_ldd_unused_warning:
 	db	0Dh, 0Ah
-	db	"There is unused extended partition space after logical dos drive "
-char_lddn:
-	db	"4 !"
+	db	"There is unused extended partition space after logical dos drive 4 !"
 	db 	0Dh, 0Ah
 	db	"(Press ESC to add unused space or press ENTER to continue.)"	 
 	db 	0Dh, 0Ah, 0
@@ -9956,10 +9525,6 @@ HDFORMAT_FSINFO_BUFF:
 	dd	000000002h ; FSI_Nxt_Free
 	times	12 db 0	   ; FSI_Reserved2
 	dd	0AA550000h ; FSI_TrailSig	  		
-
-; 29/10/2020
-msg_100:
-	db	'100', 0
 
 SizeOfFile equ $-100
 
@@ -10096,11 +9661,10 @@ freespace_count: resw 1
 last_found_partition: resb 1
 p_type: resb 1	
 
-; 30/10/2020
-;p_sorted:
-;	resb 1
-;ep_sorted:
-;	resb 1
+p_sorted:
+	resb 1
+ep_sorted:
+	resb 1
 
 _e_:	resb 1
 
@@ -10200,15 +9764,11 @@ cylinder_boundary: resb 1
 ldd_start:	resd 4
 ; 03/03/2019
 ldd_size:	resd 4
-; 30/10/2020
-ep_free_sectors: resd 1
 
 ; 25/02/2019
 pte_address:	resw 1
 ; 02/03/2019
 lcylinders:	resw 1
-; 02/11/2020
-endcyl:		resw 1
 
 ;bss_clear_end: ; 18/02/2019  ; temporary
 
