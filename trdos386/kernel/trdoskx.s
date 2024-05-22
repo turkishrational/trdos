@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.7) - UNINITIALIZED DATA : trdoskx.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.8) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 04/12/2023 (Previous: 29/06/2022 - Kernel v2.0.5)
+; Last Update: 22/05/2024 (Previous: 04/12/2023 - Kernel v2.0.7)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -62,13 +62,15 @@ PTable_hd3: resb 64
 ;PTable_ep2: resb 64
 ;PTable_ep3: resb 64
 
+; 22/05/2024
+HD_LBA_yes: resd 1
 ; 13/08/2020
 scount: resb 1 ; 16/05/2016 (diskio.s, 'int33h:')
-	resb 1
-	resb 1
-	resb 1
-	
-HD_LBA_yes: resb 1
+; 22/05/2024
+	;resb 1
+	;resb 1
+	;resb 1
+;HD_LBA_yes: resb 1
 PP_Counter: resb 1
 EP_Counter: resb 1
 ; 13/08/2020

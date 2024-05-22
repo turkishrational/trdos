@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.7
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.8
 ; ----------------------------------------------------------------------------
-; Last Update: 07/12/2023 (Previous: 30/08/2023)
+; Last Update: 22/05/2024 (Previous: 07/12/2023)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -3763,10 +3763,11 @@ panic_msg:
 ;       db 0Dh, 0Ah, 0
 
 starting_msg:
-	;;;db "Turkish Rational DOS v2.0 [18/04/2021] ...", 0
-	;;db "Turkish Rational DOS v2.0 [11/08/2022] ...", 0
-	;db "Turkish Rational DOS v2.0 [30/08/2023] ...", 0
-	db "Turkish Rational DOS v2.0 [07/12/2023] ...", 0
+	;;;;db "Turkish Rational DOS v2.0 [18/04/2021] ...", 0
+	;;;db "Turkish Rational DOS v2.0 [11/08/2022] ...", 0
+	;;db "Turkish Rational DOS v2.0 [30/08/2023] ...", 0
+	;db "Turkish Rational DOS v2.0 [07/12/2023] ...", 0
+	db "Turkish Rational DOS v2.0 [22/05/2024] ...", 0
 
 NextLine:
 	db 0Dh, 0Ah, 0
@@ -3824,10 +3825,11 @@ DMonth:
 ; 15/11/2020
 db	0
 kernel_version_msg: ; 17/04/2021
-;;;db	"TRDOS (386) Kernel v2.0.4 by Erdogan Tan"
-;;db	"TRDOS (386) Kernel v2.0.5 by Erdogan Tan" ; 11/08/2022
-;db	"TRDOS (386) Kernel v2.0.6 by Erdogan Tan" ; 29/08/2023
-db	"TRDOS (386) Kernel v2.0.7 by Erdogan Tan" ; 20/10/2023
+;;;;db	"TRDOS (386) Kernel v2.0.4 by Erdogan Tan"
+;;;db	"TRDOS (386) Kernel v2.0.5 by Erdogan Tan" ; 11/08/2022
+;;db	"TRDOS (386) Kernel v2.0.6 by Erdogan Tan" ; 29/08/2023
+;db	"TRDOS (386) Kernel v2.0.7 by Erdogan Tan" ; 20/10/2023
+db	"TRDOS (386) Kernel v2.0.8 by Erdogan Tan" ; 16/05/2024
 db	0
 
 ; 20/02/2017

@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.6) - DRV INIT : trdosk2.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.8) - DRV INIT : trdosk2.s
 ; ----------------------------------------------------------------------------
-; Last Update: 29/08/2023 (Previous: 30/07/2022)
+; Last Update: 22/05/2024 (Previous: 29/08/2023)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -14,6 +14,7 @@
 ;
 
 ldrv_init: ; Logical Drive Initialization
+	; 22/05/2024 (TRDOS 386 Kernel v2.0.8)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 30/08/2020
 	; 25/08/2020
@@ -69,8 +70,12 @@ load_next_hd_partition_table:
 	; 15/07/2020
 	mov	cl, [eax+20]
 	and	cl, 40h
-	mov	[HD_LBA_yes], cl
-	
+	;mov	[HD_LBA_yes], cl
+	; 22/05/2024 (BugFix)
+	movzx	eax, dl
+	add	eax, HD_LBA_yes - 80h
+	mov	[eax], cl
+
 	call	load_masterboot
 	;jc	short pass_pt_this_hard_disk
 	; 13/08/2020
@@ -279,9 +284,15 @@ loc_set_ep_start_sector:
 	mov	[MBR_EP_StartSector], ecx 
 	; 20/07/2020
 loc_validate_hde_partition_next:
+	; 22/05/2024 (BugFix)
+	movzx	edi, dl
+	add	edi, HD_LBA_yes - 80h
+	;
 	mov	[EP_StartSector], ecx ; Extended partition's start sector
         mov	ebx, MasterBootBuff
-	cmp	byte [HD_LBA_yes], 1 ; LBA ready = Yes
+	; 22/05/2024
+	cmp	byte [edi], 1 ; LBA ready = Yes
+	;cmp	byte [HD_LBA_yes], 1 ; LBA ready = Yes
 	jb	short loc_hd_load_ep_05h ; cf = 1 ; 20/07/2020 
 	; 11/08/2020
 	; (BugFix for extended partition type 05h beyond CHS limit)
@@ -350,13 +361,13 @@ loc_hd_load_ep_05h:
 ;loc_hd_move_ep_table:
 	;;pop	edi
 	;;push	edi  ; PTable_ep?
-	;mov	edi, [esp]        
+	;mov	edi, [esp]
         ;mov	esi, PartitionTable ; Extended
 	;mov	ebx, esi
 	;;mov	ecx, 16
 	;mov	cl, 16
        	;rep	movsd
-	;mov	esi, ebx 
+	;mov	esi, ebx
 ;loc_set_hde_sub_partition_count:
 	;mov	byte [PP_Counter], 4
 	;mov	byte [EP_Counter], 0
@@ -405,7 +416,6 @@ loc_validate_minidisk_partition:
 	; 13/08/2020
 	inc	byte [EP_Counter] ; current (sub partition) index 
 				  ; in current extended partition
-
 	mov	edi, EP_StartSector
 
 	; Input -> ESI = PartitionTable offset
@@ -764,7 +774,7 @@ loc_set_FAT16_RootDirLoc:
 	movzx	eax, byte [esi+LD_BPB+BPB_NumFATs]
 	movzx	edx, word [esi+LD_BPB+BPB_FATSz16]
 	mul	edx
-	add	eax, [esi+LD_FATBegin]  
+	add	eax, [esi+LD_FATBegin]
 	mov	[esi+LD_ROOTBegin], eax
 loc_set_FAT16_data_begin:
 	mov	[esi+LD_DATABegin], eax 
