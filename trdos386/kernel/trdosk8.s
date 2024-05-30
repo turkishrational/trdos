@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.7) - MAIN PROGRAM : trdosk8.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.8) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 04/12/2023  (Previous: 09/08/2022)
+; Last Update: 24/05/2024  (Previous: 04/12/2023)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -40,7 +40,7 @@ set_run_sequence:
 	;	   a) If present priority is high ([u.pri]=2) 
 	;	      and requested priority is also high, 
 	;	      there is nothing to do! Because it has been
-	;	      done already (before this attempt).		 	
+	;	      done already (before this attempt).
 	;	   b) If present priority is high ([u.pri]=2)
 	;	      and requested priority is not high, there is
 	;	      nothing to do! Because, it's current
@@ -68,24 +68,24 @@ set_run_sequence:
 	;	      process will be added to ('runq_event') high
 	;	      priority run queue and then present (running)
 	;	      process will be stopped (swapped/switched out)
-	;	      immediately if it is in user mode, or it's 
-	;	      [u.quant] value will be reset to 0 and (then) 
-	;	      it will be stopped at 'sysret' stage.			
+	;	      immediately if it is in user mode, or it's
+	;	      [u.quant] value will be reset to 0 and (then)
+	;	      it will be stopped at 'sysret' stage.
 	;	   b) If requested priority of the requested
 	;	      (next) process is high (event) and priority
 	;	      of present process is also high, the requested
 	;	      process will be added to ('runq_event') high
-	;	      priority run queue and present (running) 
-	;	      process will be allowed to run until it's 
-	;	      time quantum will be elapsed ([u.quant]=0).	
+	;	      priority run queue and present (running)
+	;	      process will be allowed to run until it's
+	;	      time quantum will be elapsed ([u.quant]=0).
 	;	   c) If requested priority of the requested
-	;	      (next) process is not high ('run for event'), 
+	;	      (next) process is not high ('run for event'),
 	;	      there is nothing to do. Because, it's current
 	;	      run queue is unspecified, here. (It may be in
 	;	      a waiting list or in a run queue; if the new
 	;	      priority would be used to add it to relavant
         ;             run queue, this would be wrong, unnecessary
-	;	      and destabilizing duplication!) 
+	;	      and destabilizing duplication!)
 	;
 	; OUTPUT ->
 	;	none
@@ -97,15 +97,15 @@ set_run_sequence:
 	;	NOTE: 
         ;          * Processes in 'run as regular' queue can run
 	;	     if there is no process in 'run for event' queue
-	;	     ('run for event' processes have higher priority)	 		 
+	;	     ('run for event' processes have higher priority)
 	;	   * When [u.quant] time quantum of a process is
 	;	     elapsed, it's high priority ('run for event')
 	;	     status will be disabled, it can be run in sequence
 	;	     of it's actual run queue.
-	;	   * A 'run on background' process will always be 
+	;	   * A 'run on background' process will always be
 	;	     sequenced in 'run on background' (low priority)
 	;	     queue, it can run only when other priority queues
-	;	     are empty. (idle time processes, e.g. printing)  	 	
+	;	     are empty. (idle time processes, e.g. printing)
 	;
 	; Modified registers: eax, ebx, edx
 	;
@@ -124,14 +124,14 @@ srunseq_1:
 
 srunseq_2:
 	;;this not necessary ! 23/12/2016
-        ;;cmp	al, nproc	; number of processes = 16 
-	;;jnb	short srunseq_5	; error ! invalid process number 
+        ;;cmp	al, nproc	; number of processes = 16
+	;;jnb	short srunseq_5	; error ! invalid process number
 
 	; dl = priority
 	cmp	dl, 2 		; event queue
 	jb	short srunseq_1 ; requested process is not present
 				; process and priority of requested
-				; process is not high (event), 
+				; process is not high (event),
 				; there is nothing to do!
 	
 	; requested process is not present process
@@ -179,7 +179,7 @@ srunseq_6:
 
 	inc	ebx
 	inc	ebx
-	; ebx = runq_background ; 'run on backgroud' queue 
+	; ebx = runq_background ; 'run on backgroud' queue
 
 	jmp	short srunseq_4
 clock:
@@ -208,7 +208,7 @@ clock:
 	cmp	byte [multi_tasking], 0
 	jna	short clk_2
 	;
-	inc	byte [p_change] ; it is time to change running process	
+	inc	byte [p_change] ; it is time to change running process
 	retn
 clk_1:
 	dec	byte [u.quant]
@@ -266,7 +266,7 @@ int34h: ; #IOCTL# (I/O port access support for ring 3)
 	;; 15/01/2017
 	; 14/01/2017
 	; 02/01/2017
-	;;mov	byte [ss:intflg], 34h	; IOCTL interrupt 
+	;;mov	byte [ss:intflg], 34h	; IOCTL interrupt
 	sti
 	
 	;sti	; enable interrupts
@@ -351,7 +351,7 @@ int34h_7:
 int34h_8:
 	xchg	al, ah
 	iretd
-			
+
 INT4Ah:
 	; 24/01/2016
 	; this procedure will be called by 'RTC_INT' (in 'timer.s')
@@ -388,7 +388,7 @@ comm_int:
 	; 09/11/2015
 	; 08/11/2015
 	; 07/11/2015
-	; 06/11/2015 (serial4.asm, 'serial')	
+	; 06/11/2015 (serial4.asm, 'serial')
 	; 01/11/2015
 	; 26/10/2015
 	; 23/10/2015
@@ -440,7 +440,7 @@ com_i0:
 	; 20/11/2015
 	in	al, dx		; read interrupt id. register
 	JMP	$+2	   	; I/O DELAY
-	and	al, 4		; received data available?	
+	and	al, 4		; received data available?
 	jz	short com_eoi	; (transmit. holding reg. empty)
 	;
 	; 20/11/2015
@@ -460,14 +460,14 @@ com_i0:
    	; response
 	; 17/11/2015
 	; set request for response status
-        inc     byte [ebx+req_resp-8] ; 1 
+        inc     byte [ebx+req_resp-8] ; 1
 	;
 	add	dx, 3FDh-3F8h	; (3FDh, 2FDh)
-	in	al, dx	   	; read line status register 
+	in	al, dx	   	; read line status register
 	JMP	$+2	   	; I/O DELAY
 	and	al, 20h	   	; transmitter holding reg. empty?
 	jz	short com_eoi 	; no
-	mov 	al, 0FFh   	; response			
+	mov 	al, 0FFh   	; response
 	sub	dx, 3FDh-3F8h 	; data port (3F8h, 2F8h)
 	out	dx, al	   	; send on serial port
 	; 17/11/2015
@@ -509,7 +509,7 @@ com_i3:
 com_i4:
 	; 27/07/2014
 	; 09/07/2014
-	shl	bl, 1	
+	shl	bl, 1
 	add	ebx, ttychr
 	; 23/07/2014 (always overwrite)
 	;;cmp	word [ebx], 0
@@ -578,7 +578,7 @@ sp_init:
 	;
 	;  (*) Communication parameters (except BAUD RATE):
 	;	Bit	4	3	2	1	0
-	;		-PARITY--   STOP BIT  -WORD LENGTH-	 		 
+	;		-PARITY--   STOP BIT  -WORD LENGTH-
 	;  this one -->	00 = none    0 = 1 bit  11 = 8 bits
 	;		01 = odd     1 = 2 bits	10 = 7 bits
 	;		11 = even
@@ -588,12 +588,12 @@ sp_init:
 	;		------------------------
 	;	value	0    0    0  | Default (Divisor = 1)
 	;		0    0    1  | 9600 (12)
-	;		0    1    0  | 19200 (6) 
-	;		0    1	  1  | 38400 (3) 
+	;		0    1    0  | 19200 (6)
+	;		0    1	  1  | 38400 (3)
 	;		1    0	  0  | 14400 (8)
 	;		1    0	  1  | 28800 (4)
 	;		1    1    0  | 57600 (2)
-	;		1    1    1  | 115200 (1) 	
+	;		1    1    1  | 115200 (1)
 	
 	; References:	
 	; (1) IBM PC-XT Model 286 BIOS Source Code
@@ -601,24 +601,24 @@ sp_init:
 	; (2) Award BIOS 1999 - ATORGS.ASM
 	; (3) http://wiki.osdev.org/Serial_Ports
 	;
-	; Set communication parameters for COM1 (= 03h)	
+	; Set communication parameters for COM1 (= 03h)
 	;
-	mov	ebx, com1p		; COM1 parameters  
+	mov	ebx, com1p		; COM1 parameters
 	mov	dx, 3F8h		; COM1
 	 ; 29/10/2015
 	mov	cx, 301h  ; divisor = 1 (115200 baud)
-	call	sp_i3	; call A4	
+	call	sp_i3	; call A4
 	test	al, 80h
 	jz	short sp_i0 ; OK..
 		; Error !
 	;mov	dx, 3F8h
 	sub	dl, 5 ; 3FDh -> 3F8h
 	mov	cx, 30Eh  ; divisor = 12 (9600 baud)
-	call	sp_i3	; call A4	
+	call	sp_i3	; call A4
 	test	al, 80h
 	jnz	short sp_i1
 sp_i0:
-        ; (Note: Serial port interrupts will be disabled here...)	
+        ; (Note: Serial port interrupts will be disabled here...)
         ; (INT 14h initialization code disables interrupts.)
 	;
 	mov	byte [ebx], 0E3h ; 11100011b
@@ -628,14 +628,14 @@ sp_i1:
 	mov	dx, 2F8h		; COM2
 	 ; 29/10/2015
 	mov	cx, 301h  ; divisor = 1 (115200 baud)
-	call	sp_i3	; call A4	
+	call	sp_i3	; call A4
 	test	al, 80h
 	jz	short sp_i2 ; OK..
 		; Error !
 	;mov	dx, 2F8h
 	sub	dl, 5 ; 2FDh -> 2F8h
 	mov	cx, 30Eh  ; divisor = 12 (9600 baud)
-	call	sp_i3	; call A4	
+	call	sp_i3	; call A4
 	test	al, 80h
 	jnz	short sp_i7
 sp_i2:
@@ -706,7 +706,7 @@ sp_i3:
 	mov	al, ch ; 3		; 8 data bits, 1 stop bit, no parity
 	;and	al, 1Fh ; Bits 0,1,2,3,4	
 	add	dl, 2	; 3FBh (2FBh)	; Line control register
-	out	dx, al			
+	out	dx, al
 	JMP	$+2			; I/O DELAY
 	; 29/10/2015
 	dec 	dl 	; 3FAh (2FAh)	; FIFO Control register (16550/16750)
@@ -741,7 +741,7 @@ sp_setp: ; Set serial port communication parameters
 	; 07/11/2015
 	; 29/10/2015
 	; 29/06/2015
-	; Retro UNIX 386 v1 feature only !	
+	; Retro UNIX 386 v1 feature only !
 	;
 	; INPUT:
 	;	AL = 0 for COM1
@@ -751,13 +751,13 @@ sp_setp: ; Set serial port communication parameters
 	;	CL = Line status
 	;	CH = Modem status
 	;   If cf = 1 -> Error code in [u.error]
-	;		 'invalid parameter !' 
+	;		 'invalid parameter !'
 	;		 	 or
 	;		 'device not ready !' error
 	;	
 	;  (*) Communication parameters (except BAUD RATE):
 	;	Bit	4	3	2	1	0
-	;		-PARITY--   STOP BIT  -WORD LENGTH-	 		 
+	;		-PARITY--   STOP BIT  -WORD LENGTH-
 	;  this one -->	00 = none    0 = 1 bit  11 = 8 bits
 	;		01 = odd     1 = 2 bits	10 = 7 bits
 	;		11 = even
@@ -806,7 +806,7 @@ stp_dnr_err:
 	retn
 sp_setp2:
 	cmp	dh, 2 ; COM2 (2F?h)
-	;jna	sp_i6 
+	;jna	sp_i6
 		      ; COM1 (3F?h)
 	; 29/07/2022
 	ja	short sp_i5
@@ -848,7 +848,7 @@ sp_i5:
 	retn
 
 sp_invp_err:
-	mov	dword [u.error], ERR_INV_PARAMETER ; 'invalid parameter !' 
+	mov	dword [u.error], ERR_INV_PARAMETER ; 'invalid parameter !'
 	xor	ecx, ecx
 	dec	ecx ; 0FFFFh
 	stc
@@ -877,14 +877,14 @@ set_working_path_x:
 		; 17/10/2016 (TRDOS 386 - FFF & FNF)
 		;mov	ax, 1 
 			; File name is needed/forced (AL=1)
-			; Change directory as temporary (AH=0)	
+			; Change directory as temporary (AH=0)
 		; 29/07/2022
 		xor	eax, eax
 		inc	al
 		; eax = 1
 set_working_path_xx: ; 30/12/2017 (syschdir)
 		; This is needed for preventing wrong Find Next File
-		; system call after sysopen, syscreate, sysmkdir etc. 
+		; system call after sysopen, syscreate, sysmkdir etc.
 		; Find Next File must immediate follow Find First File)
 
 		mov	[FFF_Valid], ah ; 0 ; reset ; 17/10/2016
@@ -918,7 +918,7 @@ set_working_path:
 		;        (DS=CS)       
 		;        AX, BX, CX, DX, DI will be changed
 		;   cf = 1 -> Error code in AX (AL)
-		;        stc & AX = 0 -> Bad command or path name 
+		;        stc & AX = 0 -> Bad command or path name
 		; -----------------------------------------------
 		;
 		; TRDOS 386 (05/10/2016)
@@ -932,7 +932,7 @@ set_working_path:
 		; 
 		; OUTPUT:
 		;	FindFile structure has been set
-		;       RUN_CDRV points previous current drive  
+		;       RUN_CDRV points previous current drive
 		;       ESI = FindFile_Name address ; 12/10/2016
 		;
 		;       cf = 1 -> Error code in EAX (AL)
@@ -946,7 +946,7 @@ set_working_path:
 		mov	[SWP_DRV], ax
 
 		; TRDOS 386 ring 3 (user's page directory)
-		; to ring 0 (kernel's page directory) 
+		; to ring 0 (kernel's page directory)
 		; transfer modifications (05/10/2016).
 
 		push	ebp
@@ -1010,7 +1010,7 @@ loc_swp_checkfile_name:
 		call	check_filename
 		jnc	short loc_swp_drv
 
-		inc	byte [SWP_inv_fname] ; set 	
+		inc	byte [SWP_inv_fname] ; set
 loc_swp_drv:
 		mov	dh, [Current_Drv]
                ;mov	[RUN_CDRV], dh
@@ -1043,7 +1043,7 @@ loc_swp_change_directory:
 loc_swp_change_prompt_dir_string:
 		; esi = PATH_Array
 		; eax = Current Directory First Cluster
-		; edi = Logical DOS Drive Description Table	
+		; edi = Logical DOS Drive Description Table
 		call	change_prompt_dir_str 
 		sub	eax, eax ; 0
 		jmp	loc_swp_retn 
@@ -1052,9 +1052,9 @@ reset_working_path:
 		; 06/10/2016 - TRDOS 386 (TRDOS v2.0)
 		;
 		; TRDOS v1.0 (DIR.ASM, "proc_reset_working_path")
-		; 05/02/2011 - 08/02/2011 
+		; 05/02/2011 - 08/02/2011
 		;
-		; Restores current drive and directory 
+		; Restores current drive and directory
 		; 
 		; INPUT: none
 		; OUTPUT: DL = SWP_DRV, EAX = 0 -> OK
@@ -1097,10 +1097,10 @@ get_file_name:
 		; 15/10/2016 - TRDOS 386 (TRDOS v2.0)
 		; Convert file name 
 		;	from directory entry format
-                ; 	to (8.3) dot file name format 
+                ; 	to (8.3) dot file name format
 		;
 		; TRDOS v1.0 (DIR.ASM, "get_file_name")
-                ; 2005 - 09/10/2011 	
+                ; 2005 - 09/10/2011
 		; INPUT: 
 		;	DS:SI -> Directory Entry Format File Name
 		;       ES:DI -> DOS Dot File Name Address
@@ -1119,7 +1119,7 @@ get_file_name:
 		; Modified registers: EAX, ECX
 
                 ; 2005 (TRDOS 8086) - 2016 (TRDOS 386)
-                            
+
 		push	edi
 		push	esi
 		lodsb
@@ -1154,7 +1154,7 @@ pass_gfn_fn:
 		cmp	al, 20h
 		jna	short pass_gfn_ext
 		stosb
-pass_gfn_ext:		
+pass_gfn_ext:
 		xor	al, al
 		stosb
 		pop	esi
@@ -1176,7 +1176,7 @@ set_hardware_int_vector:
 		;	AH > 0 -> set
 		;	AH = 0 -> reset
 		;	
-		; Modified registers: eax, ebx, edx, edi 
+		; Modified registers: eax, ebx, edx, edi
 		;
 		
 		shl	al, 2 ; IRQ number * 4
@@ -1295,7 +1295,7 @@ IRQsrv_0:
 		dec	bl  ; IRQ index number, 0 to 8
 		;js	IRQsrv_5 ; not available to use here!?
 		; 29/07/2022
-		js	short IRQsrv_j5  ; (jump to IRQsrv_5)		
+		js	short IRQsrv_j5  ; (jump to IRQsrv_5)
 		;		 
 		cmp	byte [ebx+IRQ.method], 80h ; using by a dev or kernel? 
 		jb	short IRQsrv_1 ; no
@@ -1305,7 +1305,7 @@ IRQsrv_0:
 		; we need to call 'dev_IRQ_service'
 
 		; IRQ number in AL
-		call	dev_IRQ_service	 ; IRQ service for device drivers	
+		call	dev_IRQ_service	 ; IRQ service for device drivers
 		; IRQ number in AL
 IRQsrv_1:		
 		; check user callback service status
@@ -1331,7 +1331,7 @@ IRQsrv_1:
 
 		; Signal Response Byte method
 		;mov	edx, [edx+IRQ.addr] ; Signal Response Byte address
-		;			    ; (Physical address, non-swappable) 	
+		;			    ; (Physical address, non-swappable)
 		and	ah, 2 ; bit 1, (S.R.B.) counter (auto increment) method
 		mov	ah, [ebx+IRQ.srb] ; Signal Response Byte value
 		jz	short IRQsrv_2 ; fixed S.R.B. value
@@ -1349,7 +1349,7 @@ IRQsrv_2:
 IRQsrv_3:
 		; the owner is not current user/process
 		; AL = process number
-		mov	dl, 2 ; priority, 2 = event (high)	
+		mov	dl, 2 ; priority, 2 = event (high)
 		call	set_run_sequence
 
 		; [u.irqwait] = waiting IRQ number for callback service
@@ -1430,21 +1430,21 @@ set_IRQ_callback_addr:
 		;
 		; INPUT:
 		;	EDX = callback routine/service address
-		;	      (virtual, not physical address!)	
+		;	      (virtual, not physical address!)
 		;	[u.sp] = kernel stack, points to
 		;		 user's EIP,CS,EFLAGS,ESP,SS
 		;		 registers.
 		; OUTPUT:
 		;	EIP (user) = callback (service) address
 		;	CS (user) = UCODE
-		;	EFLAGS (user) = flags before callback 	 
-		;       ESP (user) = ESP-4 (user, before callback) 
+		;	EFLAGS (user) = flags before callback
+		;       ESP (user) = ESP-4 (user, before callback)
 		;	[ESP](user) = EIP (user) before callback
 		;
 		; Note: If CPU was in user mode while entering 
 		;	the timer interrupt service routine,
 		;	'IRET' will get return to callback routine
-		;	immediately. If CPU was in system/kernel mode  
+		;	immediately. If CPU was in system/kernel mode
 		;	'iret' will get return to system call and
 		;	then, callback routine will be return address
 		;	from system call. (User's callback/service code
@@ -1461,7 +1461,7 @@ set_IRQ_callback_addr:
 		;	    <load DMA buffer with audio data>
 		;	    ...
 		;	    mov eax, 39 ; 'sysrele'
-		;	    int 40h ; TRDOS 386 system call (interrupt)		
+		;	    int 40h ; TRDOS 386 system call (interrupt)
 		;
 		
 		;mov	edx, [edx+IRQ.addr] ; Callback service address
@@ -1478,7 +1478,7 @@ IRQsrv_5:
 		mov	al, 20h ; 01/08/2020
 		cli
 		;cmp	al, 7
-		cmp	byte [IRQnum], 7 ; 01/08/2020	
+		cmp	byte [IRQnum], 7 ; 01/08/2020
 		jna	short IRQsrv_6
 		;
 		;;mov	al, EOI	; end of interrupt
@@ -1537,7 +1537,7 @@ IRQsrv_7:
 ;		;
 ;		; OUTPUT:
 ;		;    cf = 0 -> 
-;		;      EAX (AL) = device entry/index number 	 	
+;		;      EAX (AL) = device entry/index number
 ;		;    cf = 1 -> device not found (installed)
 ;		;	       or invalid device name
 ;		;	       (AL=0)
@@ -1563,7 +1563,7 @@ IRQsrv_7:
 ;		jne	short gdn_2
 ;		call 	lodsb_capitalize
 ;		cmp	al, 'V'
-;		jne	short gdn_2			
+;		jne	short gdn_2
 ;		lodsb
 ;		cmp	al, '/'
 ;		je	short gdn_4
@@ -1644,7 +1644,7 @@ IRQsrv_7:
 ;		; convert KDEV_NAME index to 
 ;		; KDEV_NUMBER index
 ;		; (different names are used for same devices)
-;		; (example: "COM1" & "TTY8" = device number 18) 
+;		; (example: "COM1" & "TTY8" = device number 18)
 ;		mov	ebx, eax ; < 256
 ;		mov	al, [KDEV_NUMBER+ebx]
 ;
@@ -1671,7 +1671,7 @@ IRQsrv_7:
 ;		; al = 0 to NumOfInstallableDevices - 1 (<=7Fh)
 ;
 ;		mov	ebx, eax
-;		add	bl, NumOfKernelDevices 	; < NUMOFDEVICES	
+;		add	bl, NumOfKernelDevices 	; < NUMOFDEVICES
 ;
 ;		; check if empty dev entry in the list
 ;		cmp	byte [DEV_OPENMODE+ebx], 0
@@ -1687,7 +1687,7 @@ IRQsrv_7:
 ;		mov	[DEV_ACCESS+ebx], al ; (all) device list
 ;gdn_20:	
 ;		mov	al, bl
-;		; eax = device index/entry number ; < NUMOFDEVICES  
+;		; eax = device index/entry number ; < NUMOFDEVICES
 ;		retn
 
 ;lodsb_capitalize:
@@ -1718,9 +1718,9 @@ IRQsrv_7:
 ;	; INPUT -> 
 ;	;	EAX = Device Number (AL)
 ;	;        CL = Open mode (1 = read, 2 = write)
-;	;	 CH = Device access byte (bit 0 = 0)		
+;	;	 CH = Device access byte (bit 0 = 0)
 ;	; OUTPUT ->
-;	;	EAX = Device Number	
+;	;	EAX = Device Number
 ;	;	CF = 0 -> device has been opened
 ;	;	CF = 1 -> device could not be opened
 ;	;
@@ -1748,7 +1748,7 @@ IRQsrv_7:
 ;	; INPUT -> 
 ;	;	EAX = Device Number (AL)
 ;	;        CL = Open mode (1 = read, 2 = write)
-;	;	 CH = Device access byte (bit 0 = 0)		
+;	;	 CH = Device access byte (bit 0 = 0)
 ;	; OUTPUT ->
 ;	;	EAX = Device Number	
 ;	;	CF = 0 -> device has been closed
@@ -1766,7 +1766,7 @@ IRQsrv_7:
 ;d_close_1:
 ;       jmp	dword [ebx+IDEV_CADDR-4]
 ;d_close_2:
-;	jmp	dword [ebx+KDEV_CADDR-4]	
+;	jmp	dword [ebx+KDEV_CADDR-4]
 
 ;rnull:
 ;	; 07/10/2016 - TRDOS 386 (TRDOS v2.0)
@@ -1787,7 +1787,7 @@ dev_IRQ_service:
 	;	
 	push	ebx
 	movzx	ebx, al
-	shl	bl, 2 ; * 4	
+	shl	bl, 2 ; * 4
 	mov	ebx, [ebx+DEV_INT_HNDLR]
 	and 	ebx, ebx
         jz	short dIRQ_s_retn
@@ -1798,7 +1798,7 @@ dev_IRQ_service:
 	pop	eax
 dIRQ_s_retn:
 	pop	ebx
-	retn		
+	retn
 
 set_dev_IRQ_service:
 	; 09/08/2022
@@ -1821,15 +1821,16 @@ set_dev_IRQ_service:
 	;
 	;push	esi
 	movzx	esi, al
-	;shl	si, 2 ; * 4	
+	;shl	si, 2 ; * 4
 	; 09/08/2022
 	shl	esi, 2 ; * 4
 	mov	[esi+DEV_INT_HNDLR], ebx
 	;pop	esi
-	retn		
+	retn
 
 sysaudio: ; AUDIO FUNCTIONS
-	; 19/11/2023 (TRDOS 386 v2.0.7)
+	; 23/05/2024 (TRDOS 386 v2.0.8)
+ 	; 19/11/2023 (TRDOS 386 v2.0.7)
 	; 29/07/2022 (TRDOS 386 v2.0.5)
 	; 12/02/2021 (TRDOS 386 v2.0.3) 
 	; 28/07/2020
@@ -1857,7 +1858,7 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	     BL = 0 : PC SPEAKER
 	;		  1 : SOUND BLASTER 16
 	;		  2 : INTEL AC'97
-	;		  3 : VIA VT8237R (VT8233)			 				
+	;		  3 : VIA VT8237R (VT8233)
 	;		  4 : INTEL HDA
 	;	      5-FEh : unknown/invalid
 	;	        ; 04/06/2017
@@ -1870,24 +1871,24 @@ sysaudio: ; AUDIO FUNCTIONS
 	;		      (This is not DMA buffer!)
 	;
 	;	BH = 3 -> INITIALIZE AUDIO DEVICE
-	;	     BL = 0,2 -> for Signal Response Byte	 	
+	;	     BL = 0,2 -> for Signal Response Byte
 	;	     	CL = Signal Response Byte Value (fixed)
 	;				if BL = 0
 	;	             auto increment of S.R.B. value
 	;			 	if BL = 2
 	;	        EDX = Signal Response (Return) Byte Address
 	;	     	   			
-	;	     BL = 1 for CallBack Method	 	
+	;	     BL = 1 for CallBack Method
 	;	    	EDX = CallBack Service Address (Virtual)
 	;
-	;	     BL > 2 -> invalid function	
+	;	     BL > 2 -> invalid function
 	;
 	;	    (Audio buffer must be allocated before
-	;	     initialization.) 		
+	;	     initialization.)
 	;
 	;	BH = 4 -> START TO PLAY
 	;	     BL = Mode
-	;		  Bit 0 = mono/stereo (1 = stereo)		
+	;		  Bit 0 = mono/stereo (1 = stereo)
 	;		  Bit 1 = 8 bit / 16 bit (1 = 16 bit)
 	;	     CX = Sampling Rate (Hz)
 	;
@@ -1912,17 +1913,18 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	BH = 11 -> SET VOLUME LEVEL
 	;	     BL: (Bit 0 to 6)
 	;		  0 = Master (Playback, Lineout) volume
-	;	     CL = Left Channel Volume
-	;	     CH = Right Channel Volume
+	;		  1 = PCM out volume ; 23/05/2024
+	;	     CL = Left Channel Volume (0 to 31 max)
+	;	     CH = Right Channel Volume (0 to 31 max)
 	;	
 	;	     Note: If BL >= 80h (Bit 7 of BL is set),
 	;	     volume level will be set for next playing
 	;	     (actual volume level will not be changed
-	;	     immediately)	
+	;	     immediately)
 	;
 	;	BH = 12 -> DISABLE AUDIO DEVICE
-	;	     (reset audio device and unlink dma buffer)	
-	;	     BL = Any	  		  	  	
+	;	     (reset audio device and unlink dma buffer)
+	;	     BL = Any
 	;
 	;    	12/05/2017
 	;	BH = 13 -> MAP DMA BUFFER TO USER
@@ -1933,22 +1935,22 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	     EDX = Virtual Address of the buffer
 	;		  (Will be rounded up to page borders)
 	;
-	;	05/06/2017	
+	;	05/06/2017
 	;    	04/06/2017
 	;	BH = 14 -> GET AUDIO DEVICE INFO
 	;	     BL: 0 = Audio Controller Info
-	;	     ; 19/11/2023	
-	;	     BL: 1 = Audio (AC'97) Codec Info	
+	;	     ; 19/11/2023
+	;	     BL: 1 = Audio (AC'97) Codec Info
 	;	     BL > 1 = Invalid for now! 
 	;
 	;	22/06/2017	
 	;	BH = 15 -> GET CURRENT SOUND DATA (for graphics)
 	;	     BL: 0 -> PCM OUT data
-	;	       > 0 -> Invalid for now! 
+	;	       > 0 -> Invalid for now!
 	;	     ECX = 0 -> Get DMA Buffer Pointer
 	;		 EDX = Not Used
-	;	     ECX > 0 -> Byte count for buffer (EDX)	 	
-	;	         EDX = Buffer Address (Virtual)	
+	;	     ECX > 0 -> Byte count for buffer (EDX)
+	;	         EDX = Buffer Address (Virtual)
 	;
 	;	10/10/2017	
 	;	BH = 16 -> UPDATE DMA BUFFER DATA
@@ -1961,6 +1963,11 @@ sysaudio: ; AUDIO FUNCTIONS
 	;		  FFh = Get current flag value
 	;			(Half buffer number -1)
 	;
+	;	24/05/2024
+	;	BH = 17 -> GET VOLUME LEVEL
+	;	     BL:  0 = Master (Playback, Lineout) volume
+	;		  1 = PCM out volume
+	;
 	; Outputs:
 	;
 	;	For BH = 0 -> Beep
@@ -1972,7 +1979,7 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	    AH = 0 : PC SPEAKER
 	;		 1 : SOUND BLASTER 16
 	;		 2 : INTEL AC'97
-	;		 3 : VIA VT8237R (VT8233)			 				
+	;		 3 : VIA VT8237R (VT8233)
 	;		 4 : INTEL HDA
 	;	      5-FFh : unknown/invalid
 	;	    AL = mode status
@@ -1991,13 +1998,13 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	    (if CF = 1 -> Error code in EAX)
 	;
 	;	For BH = 4 -> START TO PLAY
-	;	    none (if CF = 1 -> Error code in EAX)	
+	;	    none (if CF = 1 -> Error code in EAX)
 	;
 	;	For BH = 5 -> PAUSE
-	;	    none (if CF = 1 -> Error code in EAX)	
+	;	    none (if CF = 1 -> Error code in EAX)
 	;
 	;	For BH = 6 -> CONTINUE TO PLAY
-	;	    none (if CF = 1 -> Error code in EAX)	
+	;	    none (if CF = 1 -> Error code in EAX)
 	;
 	;	For BH = 7 -> STOP
 	;	    none (if CF = 1 -> Error code in EAX)
@@ -2020,7 +2027,7 @@ sysaudio: ; AUDIO FUNCTIONS
 	;    	12/05/2017
 	;	For BH = 13 -> MAP DMA BUFFER TO USER
 	;	    EAX = Physical Address of the buffer
-	;	    (if CF = 1 -> Error code in EAX)	
+	;	    (if CF = 1 -> Error code in EAX)
 	;
 	;    	04/06/2017
 	;	For BH = 14 -> GET AUDIO DEVICE INFO
@@ -2034,16 +2041,16 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	    EDX = NABMBAR/NAMBAR (for AC97)
 	;		  (Low word, DX = NAMBAR address)
 	;	    EDX = Base IO Addr (DX) for SB16 & VT8233
-	;	    (if CF = 1 -> Error code in EAX)	
-	;	                 (ERR_DEV_NOT_RDY = 15) 
-	;	(for BL = 1) -for AC97- ; 19/11/2023	
+	;	    (if CF = 1 -> Error code in EAX)
+	;	                 (ERR_DEV_NOT_RDY = 15)
+	;	(for BL = 1) -for AC97- ; 19/11/2023
 	;	    EAX = Extended Audio ID (MX28) in AX
 	;	     AX bit 0 - VRA bit
 	;	     HW of EAX = PCM output sample rate (HZ)
 	;	    EBX = VENDOR ID 1 (BX), VENDOR ID 2 (HW)
 	;	    (if CF = 1 -> Error code in EAX)	
 	;	                 (ERR_DEV_NOT_RDY = 15)
-	;	    Note: EAX & EBX = 0 (for SB16,VIA,HDA)		
+	;	    Note: EAX & EBX = 0 (for SB16,VIA,HDA)
  	;
 	;	22/06/2017	
 	;	For BH = 15 -> GET CURRENT SOUND DATA
@@ -2052,7 +2059,7 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	 If ECX input is 0 
 	;	    EAX = DMA Buffer Current Position (Offset)
 	;	 If ECX input >  0
-	;	    EAX = Actual transfer count 		 	
+	;	    EAX = Actual transfer count
 	;	    (Sound samples will be copied from 
 	;	     Current DMA Buffer Position to EDX
 	;	     virtual address as EAX bytes.)
@@ -2063,8 +2070,20 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	    EAX = 0, if the updated (or current)
 	;		     half buffer is DMA half buffer 1
 	;	    EAX = 1, if the updated (or current)
-	; 		     half buffer is DMA half buffer 2 	  	
-	;	    (If CF = 1 -> Error code in EAX)	
+	; 		     half buffer is DMA half buffer 2
+	;	    (If CF = 1 -> Error code in EAX)
+	;
+	;	24/05/2024
+	;	For BH = 17 -> GET VOLUME LEVEL
+	;	    IF BL input is 0
+	;		Master (Playback, Lineout) volume
+	;	    If BL input is 1
+	;		PCM out volume
+	;	    If BL input > 1
+	;		Invalid for now ; 24/05/2024
+	;
+	;	    CL = Left Channel Volume (0 to 31 max)
+	;	    CH = Right Channel Volume (0 to 31 max)
 	;	
 
 	cmp	bh, AUDIO1L/4
@@ -2081,7 +2100,7 @@ sysaudio: ; AUDIO FUNCTIONS
 	;jc	error
 	jmp	sysret	
 
-AUDIO1:	dd	_beep ; 12/02/2021	
+AUDIO1:	dd	_beep ; 12/02/2021
 	;dd	beep ; FUNCTION = 0 (bl = Duration Counter
 		     ; 		     cx = Frequency Divisor
 	dd	soundc_detect
@@ -2100,6 +2119,7 @@ AUDIO1:	dd	_beep ; 12/02/2021
 	dd	soundc_info
 	dd	sound_data
 	dd	sound_update
+	dd	sound_getvol ; 24/05/2024
 	
 AUDIO1L	EQU	$ - AUDIO1
 
@@ -2120,7 +2140,7 @@ soundc_detect:
 	cmp	ah, bl
 	jne	short soundc_dev_err
 
-sysaudio0:	
+sysaudio0:
 	mov	al, [audio_mode]
 sysaudio1:
 	mov	[u.r0], eax
@@ -2138,7 +2158,7 @@ soundc_get_dev:
 	; 28/05/2017
 	jb	short soundc_get_dev_sb
 	ja	short soundc_dev_err  ; temporary (28/05/2017)
-	;  		
+	;
 	call	DetectVT8233
 	jc	short soundc_dev_err
 	; eax = 0
@@ -2153,10 +2173,10 @@ soundc_get_dev:
 soundc_get_pci_dev_ok: ; 28/05/2017
 	inc	byte [audio_pci] ; = 1
 soundc_get_dev_ok:
-	
+
 soundc_get_dev_sb16_ok:
 	mov	[audio_device], al
-	mov	[audio_mode], ah ; stereo (bit0), 16 bit (bit1) capability	
+	mov	[audio_mode], ah ; stereo (bit0), 16 bit (bit1) capability
 	jmp	short sysaudio1
 
 soundc_get_dev_sb:
@@ -2174,7 +2194,7 @@ soundc_get_dev_ich:
 	;cmp	bl, 2 ; Intel AC'97 Audio Controller (ICH)
 	;jne	short soundc_dev_err ; Temporary  (28/05/2017)
 	;			     ; (Here will be modified just after
-	;			     ; new sound card code will be ready!)  	
+	;			     ; new sound card code will be ready!)
 	call	DetectICH
 	jc	short soundc_dev_err
 	;
@@ -2189,7 +2209,7 @@ soundc_dev_err:
 	jmp	short sysaudio_err
 
 soundc_respond_err:
-	; ERR_TIME_OUT ; 'time out !' error	
+	; ERR_TIME_OUT ; 'time out !' error
 	mov	eax, ERR_DEV_NOT_RESP ; 'device not responding !' error
 	; 29/07/2022
 	;sub	eax, eax
@@ -2263,7 +2283,7 @@ snd_alloc_2:
 	mov	ebx, edx
 	; 01/05/2017
 	;mov	edx, ~PAGE_OFF ; truncating page offsets
-	;		       ; for aligning to page borders	
+	;		       ; for aligning to page borders
 	;;and	eax, edx
 	;and	ebx, edx
 	; 26/11/2023
@@ -2273,7 +2293,7 @@ snd_alloc_2:
 	; 15/05/2017
 	; EAX = Beginning address (physical)
 	; EAX = 0 -> Allocate mem block from the 1st proper aperture	
-	; ECX = Number of bytes to be allocated		
+	; ECX = Number of bytes to be allocated
 	call	allocate_memory_block
 	jc	short sound_buff_error
 
@@ -2431,7 +2451,7 @@ sndc_init1:
 	jmp	short sndc_init10
 sndc_init13:
 	; 28/05/2017
-	cmp	byte [audio_device], 2 ; AC 97 (ICH)	
+	cmp	byte [audio_device], 2 ; AC 97 (ICH)
 	;jne	soundc_respond_err ; temporary (28/05/2017)
 	; 29/07/2022
 	je	short sndc_init16
@@ -2444,7 +2464,7 @@ sndc_init16:
 	jc	short sndc_init15
 
 	mov	ebx, ac97_int_handler
-	jmp	short sndc_init10	
+	jmp	short sndc_init10
 
 sndc_init9:
 	;call	reset_codec
@@ -2457,7 +2477,7 @@ sndc_init9:
 
 	call	channel_reset
 
-	; setup the Codec (actually mixer registers) 
+	; setup the Codec (actually mixer registers)
         call    codec_config  ; unmute codec, set rates.
 	;jc	soundc_respond_err ; codec error !
 	; 29/07/2022
@@ -2466,7 +2486,7 @@ sndc_init9:
 	mov	ebx, vt8233_int_handler
 sndc_init10:
 	; 13/04/2017
-	mov	al, [audio_intr] ; IRQ number	
+	mov	al, [audio_intr] ; IRQ number
 	call	set_dev_IRQ_service
 
 	; SETUP (audio) INTERRUPT CALLBACK SERVICE
@@ -2474,7 +2494,7 @@ sndc_init10:
 	mov	bh, [audio_cb_mode]
 	inc	bh  ; 1 = Signal Response Byte method (fixed value)
 		    ; 2 = Callback service method
-		    ; 3 = Auto Increment S.R.B. method 	
+		    ; 3 = Auto Increment S.R.B. method
 	mov	cl, [audio_srb]
 	mov	edx, [audio_cb_addr]
 	mov	al, [audio_user]
@@ -2487,7 +2507,7 @@ sndc_init10:
 	;
 	mov	dword [u.error], eax
 
-	mov	al, [audio_intr] ; IRQ number	
+	mov	al, [audio_intr] ; IRQ number
 	xor	ebx, ebx ; reset IRQ handler address
 	call	set_dev_IRQ_service
 
@@ -2515,7 +2535,7 @@ sndc_init2:
 	; ((so deallocation must be done for the rounded up value))
 	;add	ecx, PAGE_SIZE - 1   ; 4095
 	;call	deallocate_memory_block
-	call	deallocate_memory_block_x 
+	call	deallocate_memory_block_x
 			; deallocate ((ecx+4095)>>12) pages
 	xchg	edx, ecx
 sndc_init20:
@@ -2536,12 +2556,12 @@ sndc_init4:
 	cmp	ecx, 65536
 	ja	short sndc_init21
 	mov	eax, sb16_dma_buffer ; use already reserved buffer
-	jmp	short sndc_init17	
+	jmp	short sndc_init17
 
 sndc_init21:
 	; EAX = Beginning address (physical)
-	; EAX = 0 -> Allocate mem block from the 1st proper aperture	
-	; ECX = Number of bytes to be allocated	(>0)	
+	; EAX = 0 -> Allocate mem block from the 1st proper aperture
+	; ECX = Number of bytes to be allocated	(>0)
 	call	allocate_memory_block
 	;jc	sound_buff_error
 	; 29/07/2022
@@ -2572,7 +2592,7 @@ sndc_init17:	; 29/07/2022
 ;	xor	eax, eax ; 0
 ;	mov	[audio_dma_buff], eax ; 0
 ;	mov	[audio_dmabuff_size], ecx ; 0
-;	jmp	sound_buff_error				
+;	jmp	sound_buff_error
 ;
 ;sndc_init4:
 	cmp	byte [audio_device], 3
@@ -2581,7 +2601,7 @@ sndc_init17:	; 29/07/2022
 	jne	short sndc_init18 ; 28/05/2017
 
 ; 29/07/2022
-;	call	set_vt8233_bdl	
+;	call	set_vt8233_bdl
 ;sndc_init5:
 ;	;sub	eax, eax ; 0
 ;	;mov	[u.r0], eax ; 0 = no error, successful
@@ -2599,7 +2619,7 @@ sndc_init18:
 sound_play:
 	; FUNCTION = 4 
 	; bl = Mode 
-	;      bit 0 = mono/stereo (1 = stereo)		
+	;      bit 0 = mono/stereo (1 = stereo)
 	;      bit 1 = 8 bit / 16 bit (1 = 16 bit)
 	; cx = Sampling Rate (Hz)
 
@@ -2613,16 +2633,16 @@ sound_play:
 	;	to 16 bit samples and mono samples must be
 	;	converted to stereo samples...)
 	 
-	; 30/07/2022	
+	; 30/07/2022
 	; 28/07/2020
-	; 27/07/2020	 	
+	; 27/07/2020
 	; 28/05/2017
 	; 15/05/2017, 20/05/2017
 	; 21/04/2017, 24/04/2017
 	; ... device check at first
 	mov	al, [audio_device]
-	or	al, al ; 0 ; pc speaker or invalid 
-	;jz	beeper_gfx ; 'video.s' ; temporary 
+	or	al, al ; 0 ; pc speaker or invalid
+	;jz	beeper_gfx ; 'video.s' ; temporary
 	; 30/07/022
 	jnz	short snd_play_7
 	jmp	beeper_gfx
@@ -2690,7 +2710,7 @@ snd_play_0:
 
 	; here, if [audio_flag] = 0, interrupt handler will update
 				; dma half buffer 2 
-				; (user's audio buffer data will be 
+				; (user's audio buffer data will be
 				; copied into dma half buffer 2) 
 	;; 20/05/2017
 	;mov	byte [audio_flag], 1 ; next half (on next time)
@@ -2865,7 +2885,7 @@ sndc_reset_1:
 	;retn
 	; 30/07/2022
 	jnc	short sndc_reset_ok
-	jmp	soundc_respond_err	
+	jmp	soundc_respond_err
 sndc_reset_2:
 	; 30/07/2022
 	;cmp	al, 2
@@ -2879,7 +2899,7 @@ soundc_cancel:
 	; Cancel audio callback service
 	; 30/07/2022
 	; 22/04/2017
-	mov	al, [audio_user]	
+	mov	al, [audio_user]
 	cmp	al, [u.uno]
 	jne	short snd_nothing
 	; RESET (audio) INTERRUPT CALLBACK SERVICE
@@ -2897,7 +2917,7 @@ sound_dalloc:
 	; FUNCTION = 10
 	; Deallocate (ring 3) audio buffer
 	; 22/04/2017
-	mov	al, [audio_user]	
+	mov	al, [audio_user]
 	cmp	al, [u.uno]
 	jne	short snd_nothing
 	mov	ebx, [audio_buffer]
@@ -2914,11 +2934,14 @@ sound_dalloc:
 sound_volume:
 	; FUNCTION = 11
 	; Set sound volume level
+	; 23/05/2024
 	; 30/07/2022
 	; 28/05/2017
 	; 20/05/2017
 	; 22/04/2017, 24/04/2017
-	; bl = component (0 = master/playback/lineout volume)
+	; bl = component
+	;		0 = master/playback/lineout volume
+	;		1 = PCM out volume ; 23/05/2024
 	; cl = left channel volume level (0 to 31)
 	; ch = right channel volume level (0 to 31)
 
@@ -2933,10 +2956,13 @@ snd_vol_0:
 	retn
 snd_vol_1:
 	; set volume level immediate (BL< 80h)
-	cmp	bl, 0
-	;ja	snd_nothing ; temporary.
+	;cmp	bl, 0
+	;;ja	snd_nothing ; temporary.
 	; 30/07/2022
-	ja	short snd_vol_0
+	;ja	short snd_vol_0
+	; 23/05/2024
+	cmp	bl, 1
+	ja	short snd_vol_0 ; temporary
 
 	call	snd_dev_check
 	;jc	snd_nothing ; temporary.
@@ -3089,7 +3115,7 @@ snd_dma_map_6:
 	mov	ebx, edx
 	shr	ecx, 12 ; byte count to page count
 	; eax = physical address of (audio) dma buffer
-	; ebx = virtual address of (audio) dma buffer (user's pgdir) 
+	; ebx = virtual address of (audio) dma buffer (user's pgdir)
 	; ecx = page count (>0)
 	call	direct_memory_access
 	pop	eax
@@ -3145,7 +3171,7 @@ sndc_info_3:
 	;mov	al,  [audio_device]
 	cmp	al, 2 ; AC'97 (ICH)
 	jne	short sndc_info_1
-	; Intel AC97 (ICH) Audio Controller (=2)	
+	; Intel AC97 (ICH) Audio Controller (=2)
 	mov	dx, [NABMBAR]
 	shl	edx, 16
 	mov	dx, [NAMBAR]
@@ -3154,7 +3180,7 @@ sndc_info_1:
 	; 05/06/2017
 	; Note: Intel HDA code (here) is not ready yet!
 	; !!! SB16 or VT8233 (VT8237R) !!!
-	movzx	edx, word [audio_io_base]	
+	movzx	edx, word [audio_io_base]
 sndc_info_2:
 	mov	ah, al ; [audio_device]
 	mov	al, [audio_intr] 
@@ -3175,7 +3201,7 @@ sndc_info_2:
 	mov	[ebp+16], ebx  ; ebx
 	mov	[ebp+20], edx  ; edx
 	mov	[ebp+24], ecx  ; ecx
-  			  		
+
  	retn
 
 sndc_info_4:
@@ -3186,7 +3212,7 @@ sndc_info_5:
 	; return ZERO if it is not AC97 audio controller codec
 	xor	eax, eax ; 0
 	xor	ebx, ebx ; 0
-sndc_info_6:	
+sndc_info_6:
 	mov	[u.r0], eax
 	mov	ebp, [u.usp]
 	mov	[ebp+16], ebx  ; ebx
@@ -3198,7 +3224,7 @@ sndc_info_7:
 	; 26/11/2023 - temporary
 	;and	al, 0FEh	; clear VRA support bit for test
 
-	jmp	short sndc_info_6	
+	jmp	short sndc_info_6
 
 sound_data:
 	; FUNCTION = 15 
@@ -3245,13 +3271,13 @@ sound_data_0:
 	;jz	get_dma_buffer_offset
 	; 30/07/2022
 	jnz	short sound_data_1
-	jmp	get_dma_buffer_offset		
+	jmp	get_dma_buffer_offset
 	
 sound_data_1:
 	;mov	eax, [audio_dmabuff_size]
 	;shr	eax, 1 ; half buffer size
 	;cmp	ecx, eax
-	;ja	short sound_buff_error	
+	;ja	short sound_buff_error
 
 	cmp	ecx, [audio_dmabuff_size]
 	;ja	sound_buff_error
@@ -3286,7 +3312,7 @@ sound_data_3:
 	pop	ecx
 	;jc	sound_buff_error
 	; 30/07/2022
-	jc	short sound_data_5	
+	jc	short sound_data_5
 	
 	; eax = physical address of user's buffer
 	mov	ebx, eax  
@@ -3343,7 +3369,7 @@ sound_update:
 	; FUNCTION = 16 
 	; bl = 
 	;    0 = automatic (sequental) update (with flag switch!)
-	;    1 = update dma half buffer 1 (without flag switch!)		
+	;    1 = update dma half buffer 1 (without flag switch!)
 	;    2 = update dma half buffer 2 (without flag switch!)
 	;  FFh = get current flag value	
 	;      0 = dma half buffer 1 (will be played next)
@@ -3423,6 +3449,27 @@ snd_update_3:
 
 	retn
 
+sound_getvol:
+	; FUNCTION = 17
+	; Get sound volume level
+	; 24/05/2024
+	; bl = component
+	;		0 = master/playback/lineout volume
+	;		1 = PCM out volume
+	; Return:
+	; cl = left channel volume level (0 to 31)
+	; ch = right channel volume level (0 to 31)
+
+	cmp	bl, 1
+	ja	short snd_gvol_0 ; temporary ; 24/05/2024
+	je	short snd_gvol_1
+	mov	cx, [audio_master_volume]
+snd_gvol_0:
+	retn
+snd_gvol_1:
+	mov	cx, [audio_pcmo_volume]
+	retn
+
 set_irq_callback_service:
 	; 23/11/2023
 	; 20/11/2023 (TRDOS 386 Kernel v2.0.7)
@@ -3437,13 +3484,13 @@ set_irq_callback_service:
 	; 24/02/2017, 26/02/2017, 28/02/2017
 	; 21/02/2017 - TRDOS 386 (TRDOS v2.0)
 	;
-	; Link or unlink IRQ callback service to/from user (ring 3)	
+	; Link or unlink IRQ callback service to/from user (ring 3)
 	;
 	; INPUT ->
 	;	If AL = 0, the caller is 'syscalbac';
 	;	   otherwise, the caller is 'sysaudio' or ...
 	;	   (AL = user number) 
-	; 	 
+	;
 	;	BL = IRQ number (Hardware interrupt request number)
 	;	     (0 to 15 but IRQ 0,1,2,6,8,14,15 are prohibited)
 	;	     IRQ numbers 3,4,5,7,9,10,11,12,13 are valid
@@ -3451,11 +3498,11 @@ set_irq_callback_service:
 	;
 	;	BH = 0 = Unlink IRQ (in BL) from user (ring 3) service
 	;	     1 = Link IRQ by using Signal Response Byte method
-	;	     2 = Link IRQ by using Callback service method 		
-	;	     3 = Link IRQ by using Auto Increment S.R.B. method 	
+	;	     2 = Link IRQ by using Callback service method
+	;	     3 = Link IRQ by using Auto Increment S.R.B. method
 	;	    >3 = invalid 
-	;		 (syscallback version will return to user) 	
-	;	
+	;		 (syscallback version will return to user)
+	;
 	;	CL = Signal Return/Response Byte value 
 	;
 	;	If BH = 3, kernel will put a counter value ; 03/08/2020
@@ -3464,33 +3511,33 @@ set_irq_callback_service:
 	;	
 	;	NOTE: counter value, for example: even and odd numbers
 	;	      may be used for -audio- DMA buffer switch 
-	;	      within double buffer method, etc. 		
+	;	      within double buffer method, etc.
 	;
 	;	EDX = Signal return (Response) byte address
 	;	       		  - or -
 	;	      Interrupt/Callback service/routine address
-	; 	
+	;
 	;	      (virtual address in user's memory space)
 	;
 	; OUTPUT ->
 	;	CF = 0 & EAX = 0 -> Successful setting
-	;	CF = 1 & EAX > 0 -> IRQ is prohibited or locked 
+	;	CF = 1 & EAX > 0 -> IRQ is prohibited or locked
 	;			by another process
 	;		 eax = ERR_PERM_DENIED -> prohibited or locked
 	;		 eax = ERR_INV_PARAMETER -> 
 	;		       invalid parameter/option or bad address
 	;
 	; TRDOS 386 - IRQ CALLBACK structures (parameters):
-	;	
+	;
 	;	   [u.irqlock]	: 1 word, IRQ flags (0-15) that indicates
 	;			which IRQs are locked by (that) user.
 	;		        Lock and unlock (by user) will change
 	;			these flags or 'terminate process' (sysexit)
 	;			will clear these flags and unlock those IRQs.
-	;			               
+	;
 	;		   	Bit 0 is for IRQ 0 and Bit 15 is for IRQ 15
 	;
-	;	   IRQ(x).owner	: 1 byte, user, [u.uno], 0 = free (unlocked)	
+	;	   IRQ(x).owner	: 1 byte, user, [u.uno], 0 = free (unlocked)
 	;
 	;	   IRQ(x).method : 1 byte for callback method & status
 	;			   0 = Signal Response Byte method
@@ -3498,7 +3545,7 @@ set_irq_callback_service:
 	;			   >1 = invalid for current 'syscalback'.
 	;			or(+) 80h = IRQ is in use by system (ring 0)
 	;			            function (audio etc.) or
-	;			   	    a device driver.	   	
+	;			   	    a device driver.
 	;			(system function will ignore the lock/owner)
 	;
 	;	   IRQ(x).srb	: 1 byte, Signal Return/Response byte value
@@ -3507,7 +3554,7 @@ set_irq_callback_service:
 	;			 interrupt just before putting it into 
 	;			 the Signal Response byte address)
 	;			 (This is not used in callback serv method)
-	;	    	  
+	;
 	;	   IRQ(x).addr	: 1 dword
 	;			  Signal Response Byte address (physical)
 	;			  		-or-
@@ -3533,7 +3580,7 @@ set_irq_callback_service:
 	;IRQenum: ; 'trdosk9.s'
 	;	db  0,0,0,1,2,3,0,4,0,5,6,7,8,9,0,0
 
-	movzx	esi, byte [edi+IRQenum] ; IRQ availability 
+	movzx	esi, byte [edi+IRQenum] ; IRQ availability
 					; enumeration/index
 	; 20/11/2023
 	dec	esi
@@ -3547,10 +3594,10 @@ set_irq_callback_service:
 
 	dec	bh
 	; bh = method (0 = signal response byte, 1 = callback)
-	;	      (2 = auto increment of signal response byte) 
+	;	      (2 = auto increment of signal response byte)
 
 	cmp	byte [esi+IRQ.owner], 0 ; locked ?
-	jna	short scbs_6	; no... OK...	
+	jna	short scbs_6	; no... OK...
 
 scbs_1:
 	; permission denied (prohibited IRQ)
@@ -3611,7 +3658,7 @@ scbs_4: ; unlink the requested IRQ (if it belongs to current user)
 ;scbs_5:
 ;	sub	ah, ah
 	;mov	[u.r0], eax ; 0
-	retn	
+	retn
 
 scbs_6:
 	; 14/04/2017
@@ -3637,21 +3684,21 @@ scbs_8:
 	mov	[esi+IRQ.method], bh
 
 ;	test	bh, 1
-;	jnz	short scbs_9 	 ; Callback method, CX will not be used 
-;			
+;	jnz	short scbs_9 	 ; Callback method, CX will not be used
+;
 ;	test	bh, 2		 ; use auto increment (counter) method
 ;	jz	short scbs_10	 ; (count can be used for buffer switch)
 ;scbs_9:
 ;	xor	ecx, ecx ; 0
 
-scbs_10:			      	
+scbs_10:
 	;mov	[esi+IRQ.method], bh
 	mov	[esi+IRQ.srb], cl
-	mov	byte [esi+IRQ.dev], 0 ; device number is always 0 
+	mov	byte [esi+IRQ.dev], 0 ; device number is always 0
 				 ; for this system call
 	;test	bh, 1
 	and	bh, 1 ; 17/04/2017
-	jnz	short scbs_11	 ; callback method, use virtual address 
+	jnz	short scbs_11	 ; callback method, use virtual address
 
 	push	ebx ; IRQ number (in BL)
 	mov	ebx, edx
@@ -3700,28 +3747,28 @@ sysdma: ; DMA FUNCTIONS
 	;	        Buffer Size (max.) = 65536 bytes
 	;	   BL > 0 -> Allocate (a new) DMA buffer
  	;	   ECX = DMA Buffer Size in bytes (<=128KB)
-	;	   EDX = Virtual Address of DMA buffer 	
-	;		
+	;	   EDX = Virtual Address of DMA buffer
+	;
 	;	BH = 1 -> Initialize (Start) DMA service
-	;	     BL, bit 0 to 3 = Channel Number (0 to 7)	
-	;	     BL, bit 7 = Auto Initialized Mode 
+	;	     BL, bit 0 to 3 = Channel Number (0 to 7)
+	;	     BL, bit 7 = Auto Initialized Mode
 	;			(If bit 7 is set)
 	;		 bit 6 = Record (read) mode (0= playback)
 	;	     ECX = byte count (0 = use dma buffer size)
 	;	     EDX = physical buffer address
-	;	     	   (0 = use dma buffer -start- address)		
+	;	     	   (0 = use dma buffer -start- address)
 	;
 	;	BH = 2 -> Get Current DMA Buffer Offset
 	;	     BL = DMA channel number	
-	;		
+	;
 	;	BH = 3 -> Get Current DMA count down value
-	;	     BL = DMA channel number (0 tO 7)	
+	;	     BL = DMA channel number (0 tO 7)
 	;
 	;	BH = 4 -> Get Current DMA channel (in progress)
 	;
 	;	BH = 5 -> Get System's Default DMA Buffer Address
 	;
-	;	BH = 6 -> Get Current DMA Buffer Address	
+	;	BH = 6 -> Get Current DMA Buffer Address
 	;
 	;	BH = 7 -> Stop DMA service
 	;
@@ -3731,12 +3778,12 @@ sysdma: ; DMA FUNCTIONS
 	;	    EAX = Physical address of DMA buffer
 	;	    ECX = Allocated buffer size in bytes
 	;		  - page count * 4096 -
-	;		  (may be bigger than requested)	
+	;		  (may be bigger than requested)
 	;	    If BL input > 0,
 	;	       'sysalloc:' system call will be used with
   	;	       EBX (for 'sysalloc') = EDX (for 'sysdma')
 	;	       ECX is same, byte count (buffer size)
-	;	       EDX = 1024*1024*16 ; 16 MB upper limit	 		        	 
+	;	       EDX = 1024*1024*16 ; 16 MB upper limit
 	;	    If BL input = 0,
 	;	       Default DMA buffer (SB16 buffer) will be
 	;	       checked and if it is free, it's address
@@ -3744,14 +3791,14 @@ sysdma: ; DMA FUNCTIONS
 	;	       will be returned in ECX (as 65536)
 	;
 	;	    If CF = 1, error code is in EAX
-	;	       EAX = -1 ; DMA buffer allocation error! 		
+	;	       EAX = -1 ; DMA buffer allocation error!
 	;	       EAX = 11 ; 'Permission Denied' error !
 	;
 	;	       Note: 'sysalloc' error return method
-	;		      will be applied if BL input > 0 !		
+	;		      will be applied if BL input > 0 !
 	;
 	; 	 For BH = 1 ; Initialize (Start) DMA
-	;	     EAX = 0 (Successful)	
+	;	     EAX = 0 (Successful)
 	;	     If CF = 1, error code is in EAX
 	;
 	; 	 For BH = 2 ; Get Current DMA Buffer Offset
@@ -3759,7 +3806,7 @@ sysdma: ; DMA FUNCTIONS
 	;	     ;
 	;	      AX = DMA buffer offset
 	;	     EAX bits 16 to 23 = Page register value
-	;		   	
+	;
 	; 	 For BH = 3 ; Get Current DMA count down value
 	;	     EAX = Count down value (remain bytes)
 	;	
@@ -3769,18 +3816,18 @@ sysdma: ; DMA FUNCTIONS
 	;		AH > 0 if the dma channel is in use by
 	;		       another user/process
 	;	     EAX = -1 (0FFFFFFFFh) 
-	;		    if DMA service is not in use	    		
-	;	 	    (stopped or not initialized/started)	
+	;		    if DMA service is not in use
+	;	 	    (stopped or not initialized/started)
 	;
 	;	 For BH = 5 ; Get System's Default DMA Buff Addr
 	;	     EAX = Default DMA Buffer Address (Physical)
-	;		 = offset 'sb16_dma_buffer:'	
+	;		 = offset 'sb16_dma_buffer:'
 	;	     ECX = Buffer size
-	;		 = 65536 
+	;		 = 65536
 	;
 	;	 For BH = 6 ; Get Current DMA Buffer Address
 	;	     EAX = Current DMA buffer address (Physical)
-	;	     ECX = Current DMA buffer size (setting value)	   		  	 		
+	;	     ECX = Current DMA buffer size (setting value)
 	;	     Note: These values are for current dma channel
 	;		   settings for the user/process
 	;	     ** For now (for current TRDOS 386 version)
@@ -3789,13 +3836,13 @@ sysdma: ; DMA FUNCTIONS
 	;		(no multi tasking on DMA service) !!! **
 	;	     (Once, current DMA user must stop it's own DMA
 	;	      DMA service, than another user/program 
-	;	      can use DMA service with same dma channel 
-	;	      or with another DMA channel.)	 			      		
+	;	      can use DMA service with same dma channel
+	;	      or with another DMA channel.)
 	;
 	;	 For BH = 7 ; Stop DMA service (for current user
-	;	     and current DMA channel)	
+	;	     and current DMA channel)
 	;	     EAX = 0 ; successful
-	;	     CF = 1 & EAX > 0 (= -1) -> Error		
+	;	     CF = 1 & EAX > 0 (= -1) -> Error
 
 	cmp	bh, 7
 	jna	short sysdma_0
@@ -3862,7 +3909,7 @@ sysdma_10:
 	jnz	short sysdma_11
 
 	mov	edx, eax
-	jmp	short sysdma_12	
+	jmp	short sysdma_12
 
 sysdma_02:
 	; Only one user is permitted for audio/dma functions
@@ -3877,7 +3924,7 @@ sysdma_02:
 	cmp	bl, [u.uno]
 	jne	short sysdma_0_err
 
-sysdma_03: 
+sysdma_03:
 	mov	bl, [dma_user]
 	and	bl, bl
 	jnz	short sysdma_04
@@ -3910,12 +3957,12 @@ sysdma_05:
 	and	cx, ~PAGE_OFF ; not 4095
 	;cmp	ecx, 65536
 	;ja	sysdma_err
-	push	ecx	; buffer size (allocated pages * 4096) 
+	push	ecx	; buffer size (allocated pages * 4096)
 	push	eax	; offset sb16_dma_buffer
 	mov	ebx, edx
 	shr	ecx, 12 ; byte count to page count
 	; eax = physical address of (audio) dma buffer
-	; ebx = virtual address of (audio) dma buffer (user's pgdir) 
+	; ebx = virtual address of (audio) dma buffer (user's pgdir)
 	; ecx = page count (>0)
 	call	direct_memory_access
 	pop	eax
@@ -3965,7 +4012,7 @@ sysdma_14:
 	add	eax, ecx
 	;jc	sysdma_err ; 02/09/2017
 	; 30/07/2022
-	jc	short sysdma_06 ; jmp sysdma_err	
+	jc	short sysdma_06 ; jmp sysdma_err
 		
 	cmp	eax, esi
 	;ja	sysdma_err
@@ -3988,7 +4035,7 @@ sysdma_14:
 	jne	short sysdma_15
 	jmp	sysdma_0_err
 sysdma_15:
-	mov	byte [dma_mode], 48h ; single mode playback	
+	mov	byte [dma_mode], 48h ; single mode playback
 
 	test	bl, 80h ; DMA mode - BL, bit 7, auto init -
 	jz	short sysdma_16	
@@ -4032,7 +4079,7 @@ sysdma_2:
 	mov	dl, [dma_adr+esi]
 	in	al, dx			; get dma position
 	movzx	ebx, al
-	in	al, dx			
+	in	al, dx
 	mov	bh, al
 
 	cmp	si, 4	; channel number ?
@@ -4074,7 +4121,7 @@ sysdma_3:
 	out	dx, al			; flip-flop clear
 	mov	dl, [dma_cnt+esi] ; dma count register addr
 	in	al, dx
-	movzx	ebx, al	
+	movzx	ebx, al
 	in	al, dx
 	mov     bh, al
 	
@@ -4208,10 +4255,10 @@ gdmi1:
 	and	al, 3
 	; 08/08/2017
 	or	al, [dma_mode] ; 58h    ; dma mode for SB16
-	out	dx, al			
+	out	dx, al
 
-	mov	dl, [dma_adr+esi]	
-	mov	al, bl			
+	mov	dl, [dma_adr+esi]
+	mov	al, bl
 	out	dx, al			; offset low
 
 	mov	al, bh
@@ -4236,7 +4283,7 @@ gdmi2:
 	and	bl, 0FEh ; clear bit 0 (not necessary)
 gdmi3:	
 	mov	al, bl
-	out	dx, al			; page			
+	out	dx, al			; page
 	
 	mov	dl, [dma_mask+esi]
 	mov	al, [dma_channel]  ; 13/07/2017

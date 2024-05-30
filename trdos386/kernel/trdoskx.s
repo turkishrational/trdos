@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.8) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 22/05/2024 (Previous: 04/12/2023 - Kernel v2.0.7)
+; Last Update: 24/05/2024 (Previous: 04/12/2023 - Kernel v2.0.7)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -741,11 +741,18 @@ audio_mode:	resb 1
 audio_play_cmd: resb 1  ; Play/Stop command (1 = play, 0 = stop)
 ; 21/11/2023
 ;audio_civ: ; 28/05/2017 ; Current Buffer Index (AC'97)
+; 23/05/2024
+LVI:			; AC'97 Last Valid Buffer Index
 audio_flag_eol:	resb 1  ; End of Link status (vt8233, EOL/FLAG)
 
 audio_master_volume:
 audio_master_volume_l: resb 1 ; sound volume (lineout) left channel
 audio_master_volume_r: resb 1 ; sound volume (lineout) right channel
+
+; 24/05/2024
+audio_pcmo_volume:
+audio_pcmo_volume_l: resb 1 ; PCM out volume left channel
+audio_pcmo_volume_r: resb 1 ; PCM out volume right channel
 
 alignb 4
 
