@@ -1,30 +1,181 @@
-; 19/05/2024
-; 18/11/2023
-; 17/11/2023
-; 16/11/2023
-; 15/11/2023
-; 14/11/2023
-; 13/11/2023
-; 03/11/2023 - 11/11/2023
-; DOS based .WAV player using AC'97 and codec interface.
-; ---------------------------------------------------------------
-; NASM version: Erdogan Tan (29/11/2016)
-; Last Update: 17/02/2017 (by Erdogan Tan)
+; ****************************************************************************
+; playwav6.asm (for Retro DOS)
+; ----------------------------------------------------------------------------
+; PLAYWAV6.COM ! AC'97 (ICH) .WAV PLAYER program by Erdogan TAN
+;
+; 30/05/2024
+;
+; [ Last Modification: 30/05/2024 ]
+;
+; Modified from PLAYWAV6.PRG .wav player program by Erdogan Tan, 27/11/2023
+; Modified from PLAYWAV4.COM .wav player program by Erdogan Tan, 19/05/2024
+;
+; Assembler: NASM version 2.15
+;	     nasm playwav6.asm -l playwav6.txt -o PLAYWAV6.COM	
+; ----------------------------------------------------------------------------
+; Derived from '.wav file player for DOS' Jeff Leyda, Sep 02, 2002
 
-; TUNELOOP version (playing without interrupt) - 06/11/2023 - Erdogan Tan
+; previous version: playwav4.asm (19/05/2024)
+
+; TUNELOOP version (playing without AC97 interrupt) - 06/11/2023 - Erdogan Tan
 ; sample rate conversion version - 18/11/2023 - Erdogan Tan
 
-; ICHWAV.ASM
+; CODE
+
+%macro sys_msg 2
+   	; 30/05/2024
+	mov	si, %1	; message
+  	mov	bl, %2	; text color
+	xor	bh, bh	; video page 0
+	mov	ah, 0Eh
+	call	p_msg
+%endmacro
 
 ; player internal variables and other equates.
 BUFFERSIZE      equ     64 * 1024       ; 64k file buffer size.
 ENDOFFILE       equ     BIT0            ; flag for knowing end of file
 
-;===========================================================================
-; entry: none. File is already open and [filehandle] filled.
-; exit:  not until the song is finished or the user aborts.
-;
-playWav:
+[BITS 16]
+
+[ORG 100h] 
+
+	%include 'ac97.inc' ; 17/02/2017
+
+_STARTUP:
+	; 30/05/2024
+	; Prints the Credits Text.
+	sys_msg Credits, 0Bh
+
+	; 30/05/2024
+        call    setFree			; deallocate unused DOS mem
+
+	; 17/02/2017
+	; Clear BSS (uninitialized data) area
+	xor	ax, ax ; 0
+	mov	cx, (bss_end - bss_start)/2
+	mov	di, bss_start
+	rep	stosw
+
+	; Detect (& Enable) AC'97 Audio Device
+	call	DetectAC97
+	;jnc	short GetFileName
+	; 30/05/2024
+	jnc	short allocate_memory
+
+	; 30/05/2024
+_dev_not_ready:
+	; couldn't find the audio device!
+	sys_msg noDevMsg, 0Fh
+        jmp     Exit
+
+	; 30/05/2024
+allocate_memory:
+
+; allocate 256 bytes of data for DCM_OUT Buffer Descriptor List. (BDL)
+
+        mov     ax, BDL_SIZE / 16
+        call    memAlloc
+        mov     [BDL_BUFFER], ax		; segment 
+
+; allocate 2 buffers, 64k each for now.
+
+        mov     ax, BUFFERSIZE / 16		; 64k for .WAV file
+        call    memAlloc
+        mov     [WAV_BUFFER1], ax		; segment
+
+	mov	ax, BUFFERSIZE / 16
+	call	memAlloc
+	mov	[WAV_BUFFER2], ax
+
+	; 30/05/2024
+GetFileName:
+	mov	di, wav_file_name 
+	mov	si, 80h
+	mov	bl, [si]
+	xor	bh, bh
+	inc	bx
+	mov	byte [si+bx], 0		; make AsciiZ filename.
+	inc	si
+ScanName:
+	lodsb
+	test	al, al
+	jz	pmsg_usage
+	cmp	al, 20h
+	je	short ScanName	; scan start of name.
+	stosb
+	mov	ah, 0FFh
+a_0:	
+	inc	ah
+a_1:
+	lodsb
+	stosb
+	cmp	al, '.'
+	je	short a_0	
+	and	al, al
+	jnz	short a_1
+
+	or	ah, ah		; if period NOT found,
+	jnz	short _1 	; then add a .WAV extension.
+SetExt:
+	dec	di
+	mov	dword [di], '.WAV'
+	mov	byte [di+4], 0
+
+_1:
+	call	write_audio_dev_info 
+
+; open the file
+        ; open existing file
+	mov     al, OPEN		; open existing file
+	mov	dx, wav_file_name
+        call    openFile ; no error? ok.
+        jnc     short _gsr
+
+; file not found!
+	sys_msg noFileErrMsg, 0Fh
+_exit_:
+        jmp     Exit
+
+_gsr:  
+       	call    getSampleRate		; read the sample rate
+                                        ; pass it onto codec.
+	; 25/11/2023
+	jc	short _exit_		; nothing to do
+
+	mov	[sample_rate], ax
+	mov	[stmo], cl
+	mov	[bps], dl
+
+	; 26/11/2023
+	mov	byte [fbs_shift], 0 ; 0 = stereo and 16 bit 
+	dec	cl
+	jnz	short _gsr_1 ; stereo
+	inc	byte [fbs_shift] ; 1 = mono or 8 bit		
+_gsr_1:	
+	cmp	dl, 8 
+	ja	short _gsr_2 ; 16 bit samples
+	inc	byte [fbs_shift] ; 2 = mono and 8 bit
+_gsr_2:	
+	; 29/05/2024
+	call	write_ac97_pci_dev_info
+
+	; 30/05/2024
+	; 29/05/2024
+	;call	check_vra
+
+	; 30/05/2024
+	call	codecConfig		; unmute codec, set rates.
+	jc	init_err
+
+	; 25/11/2023
+	call	write_VRA_info
+
+	; 01/05/2017
+	call	write_wav_file_info
+
+	; 25/11/2023
+	; ------------------------------------------
+
 	; 18/11/2023 (ich_wav4.asm)
 	; 13/11/2023 (ich_wav3.asm)
 
@@ -34,7 +185,7 @@ playwav_48_khz:
 	mov	word [loadfromwavfile], loadFromFile
 	;mov	word [loadsize], 0 ; 65536
 	mov	word [buffersize], 32768 ; samples
-	jmp	playWav_vra
+	jmp	PlayNow ; 30/05/2024
 
 chk_sample_rate:
 	; set conversion parameters
@@ -205,15 +356,18 @@ ss_2:
 	shr	ax, 1	; buffer size is 16 bit sample count
 	mov	[buffersize], ax 
 	mov	[loadfromwavfile], bx
-	jmp	short playWav_vra
+	jmp	short PlayNow
 
 vra_needed:
 	; 13/11/2023
 	pop	ax ; discard return address to the caller
-	mov	dx, msg_no_vra
-	jmp	vra_err
+	; 30/05/2024
+vra_err:
+	sys_msg msg_no_vra, 0Fh 
+	jmp	Exit
 
-	; 13/11/2023
+	; 30/05/2024
+	; 13/11/2023  (ich_wav4.asm)
 loadfromwavfile:
 	dw	loadFromFile
 loadsize:	; read from wav file
@@ -221,92 +375,69 @@ loadsize:	; read from wav file
 buffersize:	; write to DMA buffer
 	dd	32768 ; 16 bit samples (not bytes)
 
-playWav_vra:
-	; 07/11/2023
-	; clear buffer 2
-        ;push	es
-	;mov	ax, [WAV_BUFFER2]
-	;mov	es, ax
-	;sub	ax, ax
-	;mov	di, ax ; 17/02/2017
-	;mov	cx, (BUFFERSIZE/2)
-	;rep	stosw
-	;pop	es	     
-	
-	; load 64k into buffer 1
-        mov     ax, [WAV_BUFFER1]
-        ;call	loadFromFile
-	; 13/11/2023
-	call	word [loadfromwavfile]
+PlayNow: 
+	; 30/05/2024
+	; playwav4.asm
+_2:	
+	call	check4keyboardstop	; flush keyboard buffer
+	jc	short _2		; 07/11/2023
 
-	; and 64k into buffer 2
-	mov     ax, [WAV_BUFFER2]
-       	;call	loadFromFile
-	; 13/11/2023
-	call	word [loadfromwavfile]
-
-; register reset the DMA engine. This may cause a pop noise on the output
-; lines when the device is reset. Prolly a better idea to mute output, then
-; reset.
-;
+ 	;call	codecConfig		; unmute codec, set rates.
 	; 11/11/2023
-        ;mov	dx, [NABMBAR]
-        ;add	dx, PO_CR_REG		; set pointer to Ctrl reg
-        ;mov	al, RR			; set reset
-	;out	dx, al			; self clearing bit
+	;jc	short init_err
 
-; write last valid index to 31 to start with.
-; The Last Valid Index register tells the DMA engine when to stop playing.
-; 
-; As we progress through the song we change the last valid index to always be
-; something other than the index we're currently playing.  
+; position file pointer to start in actual wav data
+; MUCH improvement should really be done here to check if sample size is
+; supported, make sure there are 2 channels, etc.  
 ;
-	; 08/11/2023
-	;; 07/11/2023
-	;mov	al, 1
-        ;;mov	al, 31
-	;call	setLastValidIndex
+        mov     ah, 42h
+        mov     al, 0                           ; from start of file
+        mov     bx, [filehandle]
+        xor     cx, cx
+        mov     dx, 44                          ; jump past .wav/riff header
+        int     21h
 
-; create Buffer Descriptor List
-;
-; A buffer descriptor list is a list of pointers and control bits that the
-; DMA engine uses to know where to get the .wav data and how to play it.
-;
-; I set it up to use only 2 buffers of .wav data, and whenever 1 buffer is
-; playing, I refresh the other one with good data.
-;
-;
-; For the control bits, you can specify that the DMA engine fire an interrupt
-; after a buffer has been processed, but I poll the current index register
-; to know when it's safe to update the other buffer.
-;
-; I set the BUP bit, which tells the DMA engine to just play 0's (silence)
-; if it ever runs out of data to play. Good for safety.
-;
-        push    es
-        mov     ax, [BDL_BUFFER]		; get segment # for BDL
-        mov     es, ax
+	; 30/05/2024
+	sys_msg nextline, 07h
 
-        mov     cx, 32 / 2                      ; make 32 entries in BDL
-        xor     di, di                          
-_0:
+; play the .wav file. Most of the good stuff is in here.
 
-; set buffer descriptor 0 to start of data file in memory
-        movzx   eax, word [WAV_BUFFER1]
-        shl     eax, 4                          ; convert seg:off ->0:offset
-        stosd                                   ; store pointer to wavbuffer1
+	call    PlayWav
 
-;
-; set length to 32k samples. 1 sample is 16bits or 2bytes.
-; Set control (bits 31:16) to BUP, bits 15:0=number of samples.
-; 
+; close the .wav file and exit.
 
-; 17/02/2017 (Erdogan Tan)
-; Intel® 82801AA (ICH) & Intel® 82801AB (ICH0) I/O Controller Hub AC’97
-; Programmer’s Reference Manual
+Exit:  
+        call    closeFile
+         
+	mov	ax, 4c00h	; bye !
+	int	21h
+here:
+	jmp	short here	; do not come here !
 
-; 2.2.1 Buffer Descriptor List  (on Page 13)
-	;
+	; 30/05/2024
+pmsg_usage:
+	sys_msg msg_usage, 0Bh
+	jmp	short Exit
+
+	; 30/05/2024
+init_err:
+	sys_msg msg_init_err, 0Fh
+	jmp	short Exit
+
+	; 30/05/2024
+error_exit:
+	sys_msg msg_error, 0Eh
+	jmp	short Exit
+
+	; --------------------------------------------
+	
+	; 29/05/2024 (TYRDOS 386, playwav7.s)
+	; ((Modified from playwav4.asm, ich_wav4.asm))
+	; ------------------
+;playwav_vra:
+PlayWav:
+	; create Buffer Descriptor List
+
 	;  Generic Form of Buffer Descriptor
 	;  ---------------------------------
 	;  63   62    61-48    47-32   31-0
@@ -314,61 +445,18 @@ _0:
 	;  IOC  BUP -reserved- Buffer  Buffer
 	;		      Length   Pointer
 	;		      [15:0]   [31:0]
-	;
-	;  IOC:	Interrupt On Completion. 
-	;	1 = Enabled. 
-	;	    When this is set, it means that the controller should
-	;	    issue an interrupt upon completion of this buffer.
-	;	    It should also set the IOC bit in the status register
-	;	0 = Disabled	
-	;
-	;  BUP: Buffer Underrun Policy.
-	;       0 = When this buffer is complete,
-	;	    if the next buffer is not yet ready 
-	;	    (i.e., the last valid buffer has been processed),
-	;	    then continue to transmit the last valid sample.
-	;	1 = When this buffer is complete,
-	;     	    if this is the last valid buffer, transmit zeros after
-	;	    this buffer has been processed completely.
-	;	    This bit typically is set only if this is the last 
-	;	    buffer in the current stream.
-	;
-	; [31:0]: Buffer pointer. This field points to the location of
-	;	  the data buffer. Since samples can be as wide as one
-	;	  word, the buffer must be aligned with word boundaries,
-	;	  to prevent samples from straddling DWord boundaries.
-	;
-	; [15:0]: Buffer Length: This is the length of the data buffer,
-	;	  in number of samples. The controller uses this data
-	;	  to determine the length of the buffer, in bytes.
-	;	  "0" indicates no sample to process.
 
-; ICH2AC97.INC
+        push    es
+        mov     ax, [BDL_BUFFER]		; get segment # for BDL
+        mov     es, ax
 
-;	IOC	equ     BIT31   ; Fire an interrupt whenever this
-				; buffer is complete.
+        mov     cx, 32 / 2                      ; make 32 entries in BDL
+        xor     di, di
+_0:
+        movzx   eax, word [WAV_BUFFER1]
+        shl     eax, 4                          ; convert seg:off ->0:offset
+        stosd                                   ; store pointer to wavbuffer1
 
-;	BUP	equ     BIT30   ; Buffer Underrun Policy.
-				; if this buffer is the last buffer
-				; in a playback, fill the remaining
-				; samples with 0 (silence) or not.
-				; It's a good idea to set this to 1
-				; for the last buffer in playback,
-				; otherwise you're likely to get a lot
-				; of noise at the end of the sound.
-;
-; Bits 15:0 contain the length of the buffer, in number of samples, which
-; are 16 bits each, coupled in left and right pairs, or 32bits each.
-; Luckily for us, that's the same format as .wav files.
-;
-; A value of FFFF is 65536 samples. Running at 44.1Khz, that's just about
-; 1.5 seconds of sample time. FFFF * 32bits is 1FFFFh bytes or 128k of data.
-;
-; A value of 0 in these bits means play no samples.
-;
-
-; ICHWAV.ASM
-				    ; 19/05/2024
 	;mov	eax, BUFFERSIZE / 2 ; size of buffer (32K) in (16bit) words
 	; 13/11/2023 (ich_wav3.asm) - 18/11/2023 (ich_wav4.asm)
 	mov	eax, [buffersize]
@@ -378,15 +466,10 @@ _0:
 	or	eax, BUP
 	stosd
 
-; 2nd buffer:
-
         movzx   eax, word [WAV_BUFFER2]
         shl     eax, 4                          ; convert seg:off ->0:offset
         stosd                                   ; store pointer to wavbuffer2
 
-; set length to 64k (32k of two 16 bit samples)
-; Set control (bits 31:16) to BUP, bits 15:0=number of samples
-; 
 	;mov	eax, BUFFERSIZE / 2 ; size of half buffer (32K)
 	; 13/11/2023 (ich_wav3.asm) - 18/11/2023 (ich_wav4.asm)
 	mov	eax, [buffersize]
@@ -399,12 +482,20 @@ _0:
         loop    _0
         pop     es
 
-;
-; tell the DMA engine where to find our list of Buffer Descriptors.
-; this 32bit value is a flat mode memory offset (ie no segment:offset)
-;
-; write NABMBAR+10h with offset of buffer descriptor list
-;
+	; load 64k into buffer 1
+        mov     ax, [WAV_BUFFER1]
+        ;call	loadFromFile
+	; 13/11/2023
+	call	word [loadfromwavfile]
+
+	; and 64k into buffer 2
+	mov     ax, [WAV_BUFFER2]
+       	;call	loadFromFile
+	; 13/11/2023
+	call	word [loadfromwavfile]
+	
+	; write NABMBAR+10h with offset of buffer descriptor list
+
         movzx   eax, word [BDL_BUFFER]
 	shl     eax, 4                          ; convert seg:off to 0:off
         mov     dx, [NABMBAR]
@@ -414,214 +505,27 @@ _0:
 	; 19/05/2024
 	call	delay1_4ms
 
-;
-; All set. Let's play some music.
-;
-
-	; 08/11/2023
-	; 07/11/2023
-	; 08/12/2016
-	; 07/10/2016
-        ;mov	al, 1
         mov	al, 31
 	call	setLastValidIndex
 
-	; 06/11/2023 (not neccessary)
-	;; 05/11/2023
-	;; reset current index
-	;mov	al, 0
-	;call	setCurrentIndex
-
-	; 06/11/2023
-	;mov	byte [tLoop], 1 ; 30/11/2016
-
 	; 19/05/2024
-	call	delay1_4ms
+	;call	delay1_4ms
 
 	; 17/02/2017
-        mov     dx, [NABMBAR]
-        add     dx, PO_CR_REG                   ; PCM out Control Register
+        mov	dx, [NABMBAR]
+        add	dx, PO_CR_REG		; PCM out Control Register
         ;mov	al, IOCE + RPBM	; Enable 'Interrupt On Completion' + run
 	;			; (LVBI interrupt will not be enabled)
 	; 06/11/2023 (TUNELOOP version, without interrupt)
 	mov	al, RPBM
-	out     dx, al                          ; Start bus master operation.
+	out	dx, al			; Start bus master operation.
 
 	; 19/05/2024
 	; 06/11/2023
-	call	delay1_4ms
-	call	delay1_4ms
-	call	delay1_4ms
-	call	delay1_4ms
-
-; while DMA engine is running, examine current index and wait until it hits 1
-; as soon as it's 1, we need to refresh the data in wavbuffer1 with another
-; 64k. Likewise when it's playing buffer 2, refresh buffer 1 and repeat.
-   
-; 06/11/2023 (TUNELOOP version, without interrupt)
-%if 0
-	; 08/12/2016
-	; 28/11/2016
-p_loop:
-	call    check4keyboardstop      ; keyboard halt?
-        jc	short r_loop 	; no ; 05/11/2023
-
-	;mov	byte [tLoop], 0
-	; 04/11/2023
-	;mov	byte [audio_play_cmd], 0
-	;call	ac97_stop
-	;retn
-_exit_:
-	; 04/11/2023
-	; finished with song, stop everything
-	call	ac97_stop
-	
-	; restore previous interrupt vector and interrupt_status
-	cli
-	in	al, 0A1h ; irq 8-15
-	mov	al, [IRQ_status+1]
-	out	0A1h, al 
-	in	al, 021h ; irq 0-7
-	mov	al, [IRQ_status]
-	out	21h, al 
-	; ...
-	push	es
-	xor	ax, ax
-	mov	es, ax
-	mov	ax, [IRQ_vector]
-	mov	[es:bx], ax
-	mov	ax, [IRQ_vector+2]
-	mov	[es:bx+2], ax
-	pop	es
-	sti
-	retn
-
-r_loop:
-	; 07/12/2016 - Erdogan Tan
-	nop
-	nop
-	nop
-	; 17/02/2017
-	mov	al, [tBuff]
-	dec	al ; 1-32 -> 0-31 or 0 -> 0FFh
-	js	short  p_loop
-	mov	byte [tBuff], 0 ; reset
-	and	al, 1
-	jnz	short q_loop
-        mov     ax, [WAV_BUFFER2] ; [tBuff]=2 (from tuneLoop)
-s_loop:
-	;call	loadFromFile
-	; 13/11/2023 - 18/11/2023
-	call	[loadfromwavfile]
-	;jc	short _exit_
-	; 05/11/2023
-	jc	short exit_loop
-	jmp	short r_loop
-q_loop:
-     	mov     ax, [WAV_BUFFER1] ; [tBuff]=1 (from tuneLoop)
-        ;call	loadFromFile
-	;jc	short _exit_
-	;jmp	short r_loop
-	; 05/11/2023
-	jmp	short s_loop
-
-exit_loop: 
-	mov	byte [tLoop], 0
-	retn
-		
-tuneLoop:
-	; 05/11/2023
-	; 08/12/2016
-	; 28/11/2016 - Erdogan Tan
-	
-	cmp	byte [tLoop], 1
-	jb	short _exit_ ; 05/11/2023
-_tlp_1:	
-	; 17/02/2017
-	call	getCurrentIndex
-	inc	al ; 0-31 -> 1-32
-	mov	[tBuff], al
-
-	; 05/11/2023
-	dec	ax
-	dec	ax
-	and	al, 1Fh
-	call	setLastValidIndex
-
-	; 05/11/2023
-	; 17/02/2017 - Buffer switch test (temporary)
-	push	ds
-	push	si 
-	mov	si, 0B800h ; video display page segment
-	mov	ds, si
-	sub	si, si ; 0
-	mov	ah, 4Eh
-	and	al, 1
-	add	al, '1'
-	mov	[si], ax ; show current play buffer (1, 2)
-	pop	si
-	pop	ds
-
-	; 17/02/2017
-
-	;test	byte [irq_status], LVBCI ; last buff completion intr.
-	;jz	short _tlp2 ; BCIS ; Buffer completion interrupt
-
-	; Last Valid Buffer Completion Interrupt (LVBCI).
-	;   1 = Last valid buffer has been processed. 
-	;	It remains active until cleared by software. 
-	;	This bit indicates the occurrence of the event 
-	;	signified by the last valid buffer being processed.
-	;	Thus, this is an event status bit that can be cleared
-	;	by software once this event has been recognized.
-	;	This event causes an interrupt if the enable bit
-	;	in the Control Register is set. The interrupt is
-	;	cleared when the software clears this bit.
-	;	In the case of Transmits (PCM out, Modem out) this bit
-	;	is set, after the last valid buffer has been
-	;	fetched (not after transmitting it).
-	;	While in the case of Receives, this bit is set after
-	;	the data for the last buffer has been written to memory.
-	;   0 = Cleared by writing a "1" to this bit position.
-
-	; Note: We are not using LVBCI 
-	;     Last Buffer Completion Interrupt !!!
-
-	; 17/02/2017
-        ;mov     dx, [NABMBAR]
-        ;add     dx, PO_SR_REG	; PCM out Status register
-        ;mov     al, [irq_status]
-        ;out     dx, al		; Clear (LVBCI) interrupt status
-	;retn
-
-;_tlp2:
-	; Buffer Completion Interrupt Status (BCIS).
-	;   1 =	Set by the hardware after the last sample 
-	; 	of a buffer has been processed, AND if the Interrupt
-	; 	on Completion (IOC) bit is set in the command byte of 
-	; 	the buffer descriptor. It remains active
-	; 	until cleared by software.
-	;   0 =	Cleared by writing a "1" to this bit position.
-
-	; 17/02/2017
-        mov     dx, [NABMBAR]
-        add     dx, PO_SR_REG	; PCM out Status register
-        mov     al, [pcm_irq_status] ; 05/11/2023
-        out     dx, al		; Clear (BCI) interrupt status
-	retn
-
-;_exit_:
-;	mov	byte [tLoop], 0
-;_exit:
-;       ; finished with song, stop everything
-;	mov     dx, [NABMBAR]		
-;       add     dx, PO_CR_REG           ; PCM out Control Register
-;       mov     al, 0
-;       out     dx, al                  ; stop player
-;_return:
-;	retn
-
-%endif
+	call	delay1_4ms	; 30/05/2024
+	;call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
 
 ; while DMA engine is running, examine current index and wait until it hits 1
 ; as soon as it's 1, we need to refresh the data in wavbuffer1 with another
@@ -630,20 +534,20 @@ _tlp_1:
 ; 18/11/2023
 ; 08/11/2023
 ; 07/11/2023
-%if 1
-
+	
 tuneLoop:
+	; 30/05/2024
 	; 18/11/2023 (ich_wav4.asm)
 	; 08/11/2023
 	; 06/11/2023
 	mov	al, '1'
 	call	tL0
 tL1:
-	call    updateLVI	; /set LVI != CIV/
-	jz	short _exit_	; 08/11/2023
-	call    check4keyboardstop
-	jc	short _exit_
-	call    getCurrentIndex
+	call	updateLVI	; /set LVI != CIV/
+	jz	short _exitt_	; 08/11/2023
+	call	check4keyboardstop
+	jc	short _exitt_
+	call	getCurrentIndex
 	test	al, BIT0
 	jz	short tL1	; loop if buffer 2 is not playing
 
@@ -652,15 +556,15 @@ tL1:
 	;call	loadFromFile
 	; 18/11/2023
 	call	word [loadfromwavfile]
-	jc	short _exit_	; end of file
+	jc	short _exitt_	; end of file
 
 	mov	al, '2'
 	call	tL0
 tL2:
 	call    updateLVI
-	jz	short _exit_	; 08/11/2023
+	jz	short _exitt_	; 08/11/2023
 	call    check4keyboardstop
-	jc	short _exit_
+	jc	short _exitt_
 	call    getCurrentIndex
 	test	al, BIT0
 	jnz	short tL2	; loop if buffer 1 is not playing
@@ -671,13 +575,16 @@ tL2:
 	; 18/11/2023
 	call	word [loadfromwavfile]
 	jnc	short tuneLoop
-_exit_:
+_exitt_:
 	mov	dx, [NABMBAR]		
 	add	dx, PO_CR_REG	; PCM out Control Register
 	mov	al, 0
 	out	dx, al		; stop player
 
-	add	al, '0'
+	; 30/05/2024
+	mov	al, '0'
+
+	;add	al, '0'
 	;call	tL0
 	;
 	;retn
@@ -703,217 +610,189 @@ tL0:
 	pop	ds
 	retn
 
-%endif
+	; ------------------
 
-; 08/11/2023
-; 07/11/2023
-%if 0
+	; 30/05/2024
+DetectAC97:
+DetectICH:
+	; 22/11/2023
+	; 19/11/2023
+	; 01/11/2023 - TRDOS 386 Kernel v2.0.7
+	;; 10/06/2017
+	;; 05/06/2017
+	;; 29/05/2017
+	;; 28/05/2017
 
-tuneLoop:
-	; 07/11/2023
-	;mov	dx, NABMBAR
-	;add	dx, PO_CIV_REG ; 14h
-tL1:
-	call    updateLVI	; set LVI != CIV
-	call    check4keyboardstop
-	jc	short _exit_
-	call    getCurrentIndex
-	test	al, BIT0
-	jz	short tL1	; loop if buffer 2 is not playing
+	; 19/11/2023
+	mov	si, valid_ids	; address of Valid ICH (AC97) Device IDs
+	mov	cx, valid_id_count
+pfd_1:
+	lodsd
+	call	pciFindDevice
+	jnc	short d_ac97_1
+	loop	pfd_1
 
-	; load buffer 1
-	mov     ax, [WAV_BUFFER1]
-	call	loadFromFile
-	jc	short _exit_	; end of file
-tL2:
-	call    updateLVI
-	call    check4keyboardstop
-	jc	short _exit_
-	call    getCurrentIndex
-	test	al, BIT0
-	jnz	short tL2	; loop if buffer 1 is not playing
-
-	; load buffer 2
-	mov     ax, [WAV_BUFFER2]
-	call	loadFromFile
-	jnc	short tuneLoop
-_exit_:
-	mov	dx, [NABMBAR]		
-	add	dx, PO_CR_REG	; PCM out Control Register
-	mov	al, 0
-	out	dx, al		; stop player
+	;stc
 	retn
 
-%endif
+d_ac97_1:
+	; eax = BUS/DEV/FN
+	;	00000000BBBBBBBBDDDDDFFF00000000
+	; edx = DEV/VENDOR
+	;	DDDDDDDDDDDDDDDDVVVVVVVVVVVVVVVV
 
-; load data from file in 32k chunks. Would be nice to load 1 64k chunk,
-; but in DOS you can only load FFFF bytes at a time.
+	; playwav4.asm - 19/05/2024
+
+	mov	[bus_dev_fn], eax
+	mov	[dev_vendor], edx
+
+	; get ICH base address regs for mixer and bus master
+
+        mov     al, NAMBAR_REG
+        call    pciRegRead16			; read PCI registers 10-11
+        ;and    dx, IO_ADDR_MASK 		; mask off BIT0
+	; 19/05/2024
+	and	dl, 0FEh
+
+        mov     [NAMBAR], dx			; save audio mixer base addr
+
+	mov     al, NABMBAR_REG
+        call    pciRegRead16
+        ;and    dx, IO_ADDR_MASK
+	; 19/05/2024
+	and	dl, 0C0h
+
+        mov     [NABMBAR], dx			; save bus master base addr
+
+	mov	al, AC97_INT_LINE ; Interrupt line register (3Ch)
+	call	pciRegRead8 ; 17/02/2017
+
+	mov     [ac97_int_ln_reg], dl
+
+	;clc
+
+	retn
+
+; FILE.ASM
+;open or create file
 ;
-; entry: ax = segment to load data to
-; exit: CY set if end of file reached.
-; note: last file buffer is padded with 0's to avoid pops at the end of song.
-; assumes file is already open. uses [filehandle]
-
-; 07/11/2023
-%if 0
-
-loadFromFile:
-	; 07/11/2023
-	; 06/11/2023
-	; 17/02/2017
-	;push	ax
-	;push	cx
-	;push	dx
-	;push	bx
-
-	;push	es
-	;push	ds
-	
-        test    byte [flags], ENDOFFILE	; have we already read the
-	;stc				; last of the file?
-	; 05/11/2023
-	;jnz	endLFF
-	jz	short lff_12	; 06/11/2023
-	; 06/11/2023
-	;;mov	byte [tLoop], 0
-	;jmp	endLFF
-	stc
+;input: ds:dx-->filename (asciiz)
+;       al=file Mode (create or open)
+;output: none  cs:[filehandle] filled
+;
+openFile:	; (playwav4.asm)
+	push	ax
+	push	cx
+	mov	ah, 3Bh			; start with a mode
+	add	ah, al			; add in create or open mode
+	xor	cx, cx
+	int	21h
+	jc	short _of1
+	;mov	[cs:filehandle], ax
+	mov	[filehandle], ax
+_of1:
+	pop	cx
+	pop	ax
 	retn
 
-lff_12:	; 06/11/2023    
-	mov	[fbs_seg], ax ; save buffer segment
-	xor	dx, dx
-lff_0:
-	mov	[fbs_off], dx ; buffer offset
+; close the currently open file
+; input: none, uses cs:[filehandle]
+closeFile:	; (playwav4.asm)
+	push	ax
+	push	bx
+	cmp	word [filehandle], -1
+	jz	short _cf1
+	mov     bx, [filehandle]  
+	mov     ax,3e00h
+        int     21h              ;close file
+_cf1:
+	pop	bx
+	pop	ax
+	retn
 
-	mov     bx, (BUFFERSIZE / 2)	; 32k chunk
-	mov	cl, [fbs_shift]   
-	and	cl, cl
-	jz	short lff_1 ; stereo, 16 bit	
+getSampleRate:	; (playwav4.asm)
+	; 08/12/2016
+; reads the sample rate from the .wav file.
+; entry: none - assumes file is already open
+	; 19/11/2016 - Erdogan Tan
+; exit: ax = sample rate (11025, 22050, 44100, 48000)
+;	cx = number of channels (mono=1, stereo=2)
+;	dx = bits per sample (8, 16)
 
-	; fbs_shift =
-	;	2 for mono and 8 bit sample (multiplier = 4)
-	;	1 for mono or 8 bit sample (multiplier = 2)
-	shr	bx, cl ; 32K / multiplier
+	push    bx
 
-	mov	ax, cs
-	mov	dx, temp_buffer ; temporary buffer for wav data
-lff_1:
-	; 17/02/2017 (stereo/mono, 8bit/16bit corrections)
-	; load file into memory
-        mov	cx, bx                         
-	mov	bx, [filehandle]
-	mov     ds, ax
-       	mov	ah, 3fh
-	int	21h
+        mov     ah, 42h
+        mov     al, 0				; from start of file
+        mov     bx, [filehandle]
+        xor     cx, cx
+        mov     dx, 08h				; "WAVE"
+        int     21h
 
-	mov	bx, cs
-	mov	ds, bx
+        mov     dx, smpRBuff
+        mov     cx, 28				; 28 bytes
+	mov	ah, 3fh
+        int     21h
 
-	jc	short lff_9 ; error !
+	cmp	word [smpRBuff], 'WA'
+	jne	short gsr_stc
 
-	and	ax, ax
-	jz	short lff_10
-	
-	mov	bl, [fbs_shift] ; shift count  
-	or	bl, bl
-	jz	short lff_7 ; 16 bit stereo samples
+	cmp	word [smpRBuff+2], 'VE'
+	jne	short gsr_stc
 
-	push	es
-	; 06/11/2023
-	;push	di
-	;push	si
-	mov	di, [fbs_off]
-	mov	si, [fbs_seg] ; buffer segment
-	mov	es, si
-	mov	si, temp_buffer ; temporary buffer address
-	mov	cl, [bps] ; bits per sample (8 or 16)
-	cmp	cl, 8
-	jne	short lff_4 ; 16 bit samples
-	; 8 bit samples
-	mov	cx, ax ; byte count
-	dec	bl  ; shift count, 1 = stereo, 2 = mono
-	jz	short lff_3 ; 8 bit, stereo
-lff_2:
-	; mono & 8 bit
-	lodsb
-	shl	ax, 8 ; convert 8 bit sample to 16 bit sample
-	stosw	; left channel
-	stosw	; right channel
-	loop	lff_2
-	jmp	short lff_6	
-lff_3:
-	; stereo & 8 bit
-	lodsb
-	shl	ax, 8 ; convert 8 bit sample to 16 bit sample
-	stosw
-	loop	lff_3			
-	jmp	short lff_6
-lff_4:
-	; 16 bit mono samples
-	mov	cx, ax ; word count
-lff_5:	
-	lodsw
-	stosw	; left channel
-	stosw	; right channel
-	loop	lff_5
-lff_6:
-	mov	ax, di ; save next buffer offset/position
-	; 06/11/2023
-	;pop	si
-	;pop	di
-	pop	es
-;lff_7:        
-	; 06/11/2023
-	and	ax, ax
-	jz	short endLFF ; end of 2nd half
-	mov	cx, (BUFFERSIZE / 2)
-lff_7:
-	cmp	ax, cx
-	je	short endLFF	 ; 06/11/2023
-	;jb	short lff_11
-	;xor	cx, cx
-	;sub	cx, ax
-	;neg	cx
-	jmp	short lff_11
-lff_8:
-	; 07/11/2023
-	cmp	word [fbs_off], (BUFFERSIZE / 2) ; 32768
-	jnb	short endLFF
-	
-	mov	dx, ax ; buffer offset
-	mov	ax, [fbs_seg] ; buffer segment
-	jmp	lff_0
-lff_9:  
-	; 07/11/2023
-	;; 06/11/2023 (temporary)
-	;mov	al, '!'  ; error
-	;call	tL0
+	cmp	word [smpRBuff+12], 1	; Offset 20, must be 1 (= PCM)
+	jne	short gsr_stc
 
-	xor	ax, ax
-lff_10:
-	; 07/11/2023
-	;mov	cx, (BUFFERSIZE / 2)  
-lff_11:
-	call    padfill				; blank pad the remainder
-        ;clc					; don't exit with CY yet.
-        or	byte [flags], ENDOFFILE		; end of file flag
-endLFF:
-        ;pop	ds
-	;pop	es
-	; 06/11/2023
-	;pop	bx
-	;pop	dx
-        ;pop	cx
-        ;pop	ax
+
+	mov	cx, [smpRBuff+14]	; return num of channels in CX
+        mov     ax, [smpRBuff+16]	; return sample rate in AX
+	mov	dx, [smpRBuff+26]	; return bits per sample value in DX
+gsr_retn:
+        pop     bx
         retn
 
-%endif
+gsr_stc:
+	stc
+	jmp	short gsr_retn
 
-; 08/11/2023
-; 07/11/2023
-%if 1
+; ----	30/05/2024 (playwav4.asm, 19/05/2024)
 
+; MEMALLOC.ASM
+;-- SETFREE: Release memory not used  ----------------
+;-- Input    : ES = address of PSP
+;-- Output   : none
+;-- Register : AX, BX, CL and FLAGS are changed 
+;-- Info     : Since the stack-segment is always the last segment in an 
+;              EXE-file, ES:0000 points to the beginning and SS:SP
+;              to the end of the program in memory. Through this the
+;              length of the program can be calculated 
+; call this routine once at the beginning of the program to free up memory
+; assigned to it by DOS.
+
+setFree:
+	mov	bx, 65536/16	; 4K paragraphs ; 17/02/2017 (Erdogan Tan)		
+
+	mov	ah, 4Ah		; pass new length to DOS
+	int	21h
+
+	retn			; back to caller 
+				; new size (allocated memory) = 64KB
+
+memAlloc:
+; input: AX = # of paragraphs required
+; output: AX = segment of block to use
+
+	push	bx
+	mov	bx, ax
+	mov	ah, 48h
+	int	21h
+	pop	bx
+	retn
+
+; ----
+
+; /////
+
+	; 30/05/2024 (ich_wav4.asm, 19/05/2024)
 loadFromFile:
 	; 07/11/2023
 
@@ -1057,8 +936,6 @@ lff_4:
 	xor	ax, ax
 	jmp	short lff_3
 
-%endif
-
 ; entry ds:ax points to last byte in file
 ; cx=target size
 ; note: must do byte size fill
@@ -1086,187 +963,209 @@ padfill:
 	;pop	di
         pop	es
 	retn
-
-; returns AL = current index value
-getCurrentIndex:
-	; 08/11/2023
-	;push	dx
-	mov	dx, [NABMBAR]      		
-	add	dx, PO_CIV_REG
-	in	al, dx
-	;pop	dx
-uLVI2:	;	06/11/2023
-	retn
-
-; examines the CIV and the LVI. When they're the same, we set LVI <> CIV
-; that way, we never run out of buffers to play
-
-; 08/11/2023
-%if 0
-	; 07/11/2023
-updateLVI:
-	push	ax
-	push	dx
-	; 06/11/2023
-	mov	dx, [NABMBAR]
-	add	dx, PO_CIV_REG
-	; (Current Index Value and Last Valid Index value)
-	in	ax, dx
-
-	cmp	al, ah ; is current index = last index ?
-	jne	short uLVI1
-
-	call	setNewIndex
-uLVI1:
-	pop	dx
-	pop	ax
-	retn
-
-setNewIndex:
-	; 07/11/2023
-	push	ax
-        call    getCurrentIndex                 ; get CIV
-        test    byte [flags], ENDOFFILE
-        jnz     short sni_1
-        ; not at the end of the file yet.
-        dec     al                              ; make new index <> current
-        and     al, INDEX_MASK                  ; make sure new value is 0-31
-sni_1:
-        call    setLastValidIndex               ; write new value
-        clc
-        pop	ax
-	retn
-
-%endif	
-
-; 08/11/2023
-; 07/11/2023
-;%if 1
-updateLVI:
-	; 06/11/2023
-	mov	dx, [NABMBAR]      		
-	add	dx, PO_CIV_REG
-	; (Current Index Value and Last Valid Index value)
-	in	ax, dx
-
-	cmp	al, ah ; is current index = last index ?
-	jne	short uLVI2
-
-	; 08/11/2023	
-	call	getCurrentIndex
- 
-	test	byte [flags], ENDOFFILE
-	;jnz	short uLVI1
-	jz	short uLVI0  ; 08/11/2023
-
-	; 08/11/2023
-	push	ax
-	mov	dx, [NABMBAR]
-	add	dx, PO_SR_REG  ; PCM out status register
-	in	ax, dx
-
-	test	al, 3 ; bit 1 = Current Equals Last Valid (CELV)
-		      ; (has been processed)
-		      ; bit 0 = 1 -> DMA Controller Halted (DCH)
-	pop	ax
-	jz	short uLVI1
-uLVI3:
-	xor	ax, ax
-	; zf = 1
-	retn
-uLVI0:
-        ; not at the end of the file yet.
-	dec	al
-	and	al, 1Fh
-uLVI1:
-	;call	setLastValidIndex
-;uLVI2:
-	;retn
-
-;%endif
+; /////
 	
-;input AL = index # to stop on
-setLastValidIndex:
-	; 08/11/2023
-	;push	dx
-	mov	dx, [NABMBAR]
-	add	dx, PO_LVI_REG
-        out     dx, al
-	;pop	dx
+write_audio_dev_info:
+	; 30/05/2024
+     	sys_msg msgAudioCardInfo, 0Fh
 	retn
 
-; 06/11/2023
-;	; 05/11/2023
-;setCurrentIndex:
-;	;push	dx
-;	mov	dx, [NABMBAR]
-;	add	dx, PO_CIV_REG
-;	out	dx, al
-;	;pop	dx
-;	retn
+write_wav_file_info:
+	; 30/05/2024
+	; 01/05/2017
+	sys_msg msgWavFileName, 0Fh
+	sys_msg wav_file_name, 0Fh
 
-; checks if either shift key has been pressed. Exits with CY if so.
-; 
-check4keyboardstop:
-
-; 06/11/2023
-%if 1
-	; 19/05/2024
-	; 08/11/2023
-	; 04/11/2023
-	mov	ah, 1
-	int	16h
-	jz	short _cksr
-
-	xor	ah, ah
-	int	16h
-
-	;;;
-	; 19/05/2024 (change PCM out volume)
-	cmp	al, '+'
-	jne	short p_1
+write_sample_rate:
+	; 30/05/2024
+	; 01/05/2017
+	mov	ax, [sample_rate]
+	; ax = sample rate (hertz)
+	xor	dx, dx
+	mov	cx, 10
+	div	cx
+	add	[msgHertz+4], dl
+	sub	dx, dx
+	div	cx
+	add	[msgHertz+3], dl
+	sub	dx, dx
+	div	cx
+	add	[msgHertz+2], dl
+	sub	dx, dx
+	div	cx
+	add	[msgHertz+1], dl
+	add	[msgHertz], al
 	
-	mov	al, [volume]
-	cmp	al, 0
-	jna	short p_3
-	dec	al
-	jmp	short p_2
-p_1:
-	cmp	al, '-'
-	jne	short p_4
+	; 30/05/2024
+	sys_msg msgSampleRate, 0Fh
 
-	mov	al, [volume]
-	cmp	al, 31
-	jnb	short p_3
-	inc	al
-p_2:
-	mov	[volume], al
-	mov	ah, al
-	mov     dx, [NAMBAR]
-  	;add    dx, CODEC_MASTER_VOL_REG
-	add	dx, CODEC_PCM_OUT_REG
-	out     dx, ax
+	; 19/11/2016
+	mov	dx, msg16Bits
+	cmp	byte [bps], 16
+	je	short wsr_1
+	mov	dx, msg8Bits
+wsr_1:
+	; 30/05/2024
+	sys_msg dx, 0Fh
 
-	call    delay1_4ms
-        call    delay1_4ms
-        call    delay1_4ms
-        call    delay1_4ms
+	mov	dx, msgMono
+	cmp	byte [stmo], 1
+	je	short wsr_2
+	mov	dx, msgStereo
+wsr_2:
+	; 30/05/2024
+	sys_msg dx, 0Fh
+	; 30/05/2024
+	sys_msg	nextline, 07h
+        retn
 
-	clc
-p_3:
+write_ac97_pci_dev_info:
+	; 30/05/2024
+	; 06/06/2017
+	; 03/06/2017
+	; BUS/DEV/FN
+	;	00000000BBBBBBBBDDDDDFFF00000000
+	; DEV/VENDOR
+	;	DDDDDDDDDDDDDDDDVVVVVVVVVVVVVVVV
+
+	mov	eax, [dev_vendor]
+	xor	bh, bh
+	mov	bl, al
+	mov	dl, bl
+	and	bl, 0Fh
+	mov	al, [bx+hex_chars]
+	mov	[msgVendorId+3], al
+	mov	bl, dl
+	shr	bl, 4
+	mov	al, [bx+hex_chars]
+	mov	[msgVendorId+2], al
+	mov	bl, ah
+	mov	dl, bl
+	and	bl, 0Fh
+	mov	al, [bx+hex_chars]
+	mov	[msgVendorId+1], al
+	mov	bl, dl
+	shr	bl, 4
+	mov	al, [bx+hex_chars]
+	mov	[msgVendorId], al
+	shr	eax, 16
+	mov	bl, al
+	mov	dl, bl
+	and	bl, 0Fh
+	mov	al, [bx+hex_chars]
+	mov	[msgDevId+3], al
+	mov	bl, dl
+	shr	bl, 4
+	mov	al, [bx+hex_chars]
+	mov	[msgDevId+2], al
+	mov	bl, ah
+	mov	dl, bl
+	and	bl, 0Fh
+	mov	al, [bx+hex_chars]
+	mov	[msgDevId+1], al
+	mov	bl, dl
+	shr	bl, 4
+	mov	al, [bx+hex_chars]
+	mov	[msgDevId], al
+
+	mov	eax, [bus_dev_fn]
+	shr	eax, 8
+	mov	bl, al
+	mov	dl, bl
+	and	bl, 7 ; bit 0,1,2
+	mov	al, [bx+hex_chars]
+	mov	[msgFncNo+1], al
+	mov	bl, dl
+	shr	bl, 3
+	mov	dl, bl
+	and	bl, 0Fh
+	mov	al, [bx+hex_chars]
+	mov	[msgDevNo+1], al
+	mov	bl, dl
+	shr	bl, 4
+	mov	al, [bx+hex_chars]
+	mov	[msgDevNo], al
+	mov	bl, ah
+	mov	dl, bl
+	and	bl, 0Fh
+	mov	al, [bx+hex_chars]
+	mov	[msgBusNo+1], al
+	mov	bl, dl
+	shr	bl, 4
+	mov	al, [bx+hex_chars]
+	mov	[msgBusNo], al
+
+	;mov	ax, [ac97_NamBar]
+	mov	ax, [NAMBAR]
+	mov	bl, al
+	mov	dl, bl
+	and	bl, 0Fh
+	mov	al, [bx+hex_chars]
+	mov	[msgNamBar+3], al
+	mov	bl, dl
+	shr	bl, 4
+	mov	al, [bx+hex_chars]
+	mov	[msgNamBar+2], al
+	mov	bl, ah
+	mov	dl, bl
+	and	bl, 0Fh
+	mov	al, [bx+hex_chars]
+	mov	[msgNamBar+1], al
+	mov	bl, dl
+	shr	bl, 4
+	mov	al, [bx+hex_chars]
+	mov	[msgNamBar], al
+
+	;mov	ax, [ac97_NabmBar]
+	mov	ax, [NABMBAR]
+	mov	bl, al
+	mov	dl, bl
+	and	bl, 0Fh
+	mov	al, [bx+hex_chars]
+	mov	[msgNabmBar+3], al
+	mov	bl, dl
+	shr	bl, 4
+	mov	al, [bx+hex_chars]
+	mov	[msgNabmBar+2], al
+	mov	bl, ah
+	mov	dl, bl
+	and	bl, 0Fh
+	mov	al, [bx+hex_chars]
+	mov	[msgNabmBar+1], al
+	mov	bl, dl
+	shr	bl, 4
+	mov	al, [bx+hex_chars]
+	mov	[msgNabmBar], al
+
+	xor	eax, eax
+	mov	al, [ac97_int_ln_reg]
+	mov	cl, 10
+	div	cl
+	add	[msgIRQ], ax
+	and	al, al
+	jnz	short _w_ac97imsg_
+	mov	al, [msgIRQ+1]
+	mov	ah, ' '
+	mov	[msgIRQ], ax
+_w_ac97imsg_:
+	; 30/05/2024
+	sys_msg msgAC97Info, 07h
+
+        retn
+
+	; 30/05/2024
+write_VRA_info:
+	sys_msg	msgVRAheader, 07h
+	cmp	byte [VRA], 0
+	jna	short _w_VRAi_no
+_w_VRAi_yes:
+	sys_msg msgVRAyes, 07h
 	retn
-p_4:
-	;;;
-	
-	stc
-_cksr:
+_w_VRAi_no:
+	sys_msg msgVRAno, 07h
 	retn
 
-; 19/05/2024
-volume:	db 0
-
-%endif
-
+; 30/05/2024 (playwav6.asm)
 ; 18/11/2023 (ich_wav3.asm & ich_wav4.asm)
 ; 15/11/2023 (ich_wav3.asm)	
 ; 14/11/2023
@@ -3628,7 +3527,7 @@ interpolating_3_8bit_mono:
 	stosw		; original sample (L)
 	stosw		; original sample (R)
 	mov	al, bl
-	add	al, dl	
+	add	al, dl
 	rcr	al, 1
 	mov	bh, al	; interpolated middle (temporary)
 	add	al, bl
@@ -3650,7 +3549,7 @@ interpolating_3_8bit_stereo:
 	; al = [previous_val_l]
 	; ah = [previous_val_r]
 	; dl = [next_val_l]
-	; dh = [next_val_r]	
+	; dh = [next_val_r]
 	; original-interpolated-interpolated
 	mov	bx, ax
 	sub	al, 80h
@@ -3661,7 +3560,7 @@ interpolating_3_8bit_stereo:
 	shl	ax, 8	; convert 8 bit sample to 16 bit sample
 	stosw		; original sample (R)
 	mov	al, bl
-	add	al, dl	; [next_val_l]	
+	add	al, dl	; [next_val_l]
 	rcr	al, 1
 	push	ax ; *	; al = interpolated middle (L) (temporary)
 	add	al, bl	; [previous_val_l]
@@ -3702,7 +3601,7 @@ interpolating_2_8bit_mono:
 	stosw		; original sample (L)
 	stosw		; original sample (R)
 	mov	al, bl
-	add	al, dl	
+	add	al, dl
 	rcr	al, 1
 	sub	al, 80h
 	shl	ax, 8	; convert 8 bit sample to 16 bit sample
@@ -3715,7 +3614,7 @@ interpolating_2_8bit_stereo:
 	; al = [previous_val_l]
 	; ah = [previous_val_r]
 	; dl = [next_val_l]
-	; dh = [next_val_r]	
+	; dh = [next_val_r]
 	; original-interpolated
 	mov	bx, ax
 	sub	al, 80h
@@ -3752,7 +3651,7 @@ interpolating_3_16bit_mono:
 	add	dh, 80h
 	add	ax, dx
 	rcr	ax, 1
-	pop	bx ; *		
+	pop	bx ; *
 	xchg	bx, ax	; bx  = interpolated middle (temporary)
 	add	ax, bx	; [previous_val] + interpolated middle
 	rcr	ax, 1
@@ -3815,6 +3714,7 @@ interpolating_3_16bit_stereo:
 	stosw 		; interpolated sample 2 (L)
 	retn
 
+
 interpolating_2_16bit_mono:
 	; 16/11/2023
 	; ax = [previous_val]
@@ -3872,7 +3772,7 @@ interpolating_5_8bit_mono:
 	stosw		; original sample (L)
 	stosw		; original sample (R)
 	mov	al, bl
-	add	al, dl	
+	add	al, dl
 	rcr	al, 1
 	mov	bh, al	; interpolated middle (temporary)
 	add	al, bl  ; [previous_val]
@@ -3915,7 +3815,7 @@ interpolating_5_8bit_stereo:
 	; al = [previous_val_l]
 	; ah = [previous_val_r]
 	; dl = [next_val_l]
-	; dh = [next_val_r]	
+	; dh = [next_val_r]
 	; original-interpltd-interpltd-interpltd-interpltd
 	mov	bx, ax
 	sub	al, 80h
@@ -4037,7 +3937,7 @@ interpolating_4_8bit_stereo:
 	; al = [previous_val_l]
 	; ah = [previous_val_r]
 	; dl = [next_val_l]
-	; dh = [next_val_r]	
+	; dh = [next_val_r]
 	; original-interpolated-interpolated-interpolated
 	mov	bx, ax
 	sub	al, 80h
@@ -4308,3 +4208,998 @@ next_val_r: dw 0
 faz:	db 0	
 	
 ; --------------------------------------------------------
+; 27/05/2024 - (TRDOS 386 Kernel) audio.s
+; --------------------------------------------------------
+
+NOT_PCI32_PCI16	EQU 03FFFFFFFh ; NOT BIT31+BIT30 ; 19/03/2017
+NOT_BIT31 EQU 7FFFFFFFh
+
+pciFindDevice:
+	; 19/11/2023
+	; 03/04/2017 ('pci.asm', 20/03/2017)
+	;
+	; scan through PCI space looking for a device+vendor ID
+	;
+	; Entry: EAX=Device+Vendor ID
+	;
+	; Exit: EAX=PCI address if device found
+	;	EDX=Device+Vendor ID
+	;       CY clear if found, set if not found. EAX invalid if CY set.
+	;
+	; Destroys: ebx, edi ; 19/11/2023
+
+        ; 19/11/2023
+	mov	ebx, eax
+	mov	edi, 80000000h
+nextPCIdevice:
+	mov 	eax, edi		; read PCI registers
+	call	pciRegRead32
+	; 19/11/2023
+	cmp	edx, ebx
+	je	short PCIScanExit	; found
+	; 19/11/2023
+	cmp	edi, 80FFF800h
+	jnb	short pfd_nf		; not found
+	add	edi, 100h
+	jmp	short nextPCIdevice
+pfd_nf:
+	stc
+	retn
+PCIScanExit:
+	;pushf
+	mov	eax, NOT_BIT31 	; 19/03/2017
+	and	eax, edi	; return only bus/dev/fn #
+	retn
+
+pciRegRead:
+	; 30/05/2024
+	; 03/04/2017 ('pci.asm', 20/03/2017)
+	;
+	; 8/16/32bit PCI reader
+	;
+	; Entry: EAX=PCI Bus/Device/fn/register number
+	;           BIT30 set if 32 bit access requested
+	;           BIT29 set if 16 bit access requested
+	;           otherwise defaults to 8 bit read
+	;
+	; Exit:  DL,DX,EDX register data depending on requested read size
+	;
+	; Note1: this routine is meant to be called via pciRegRead8,
+	;	 pciRegread16 or pciRegRead32, listed below.
+	;
+	; Note2: don't attempt to read 32 bits of data from a non dword
+	;	 aligned reg number. Likewise, don't do 16 bit reads from
+	;	 non word aligned reg #
+	
+	push	ebx
+	push	cx
+        mov     ebx, eax		; save eax, dh
+        mov     cl, dh
+
+        and     eax, NOT_PCI32_PCI16	; clear out data size request
+        or      eax, BIT31		; make a PCI access request
+        and     al, ~3 ; NOT 3		; force index to be dword
+
+        mov     dx, PCI_INDEX_PORT
+	out	dx, eax			; write PCI selector
+		
+        mov     dx, PCI_DATA_PORT
+        mov     al, bl
+        and     al, 3			; figure out which port to
+        add     dl, al			; read to
+
+	test    ebx, PCI32+PCI16
+        jnz     short _pregr0
+
+	in	al, dx			; return 8 bits of data
+
+	mov	dl, al
+	mov     dh, cl			; restore dh for 8 bit read
+	jmp	short _pregr2
+_pregr0:	
+	test    ebx, PCI32
+        jnz	short _pregr1
+
+	in	ax, dx
+
+	mov     dx, ax			; return 16 bits of data
+	jmp	short _pregr2
+_pregr1:
+	in	eax, dx			; return 32 bits of data
+
+	mov	edx, eax
+_pregr2:
+	mov     eax, ebx		; restore eax
+        and     eax, NOT_PCI32_PCI16	; clear out data size request
+	pop	cx
+	pop	ebx
+	retn
+
+pciRegRead8:
+        and     eax, NOT_PCI32_PCI16	; set up 8 bit read size
+        jmp     short pciRegRead	; call generic PCI access
+
+pciRegRead16:
+        and     eax, NOT_PCI32_PCI16	; set up 16 bit read size
+        or      eax, PCI16		; call generic PCI access
+        jmp     short pciRegRead
+
+pciRegRead32:
+        and     eax, NOT_PCI32_PCI16	; set up 32 bit read size
+        or      eax, PCI32		; call generic PCI access
+        jmp     pciRegRead
+
+pciRegWrite:
+	; 30/05/2024
+	; 03/04/2017 ('pci.asm', 29/11/2016)
+	;
+	; 8/16/32bit PCI writer
+	;
+	; Entry: EAX=PCI Bus/Device/fn/register number
+	;           BIT31 set if 32 bit access requested
+	;           BIT30 set if 16 bit access requested
+	;           otherwise defaults to 8bit read
+	;        DL/DX/EDX data to write depending on size
+	;
+	; Note1: this routine is meant to be called via pciRegWrite8, 
+	;	 pciRegWrite16 or pciRegWrite32 as detailed below.
+	;
+	; Note2: don't attempt to write 32bits of data from a non dword
+	;	 aligned reg number. Likewise, don't do 16 bit writes from
+	;	 non word aligned reg #
+
+	push	ebx
+	push	ecx
+        mov     ebx, eax		; save eax, edx
+        mov     ecx, edx
+	and     eax, NOT_PCI32_PCI16	; clear out data size request
+        or      eax, BIT31		; make a PCI access request
+        and     al, ~3 ; NOT 3		; force index to be dword
+
+        mov     dx, PCI_INDEX_PORT
+	out	dx, eax			; write PCI selector
+		
+        mov     dx, PCI_DATA_PORT
+        mov     al, bl
+        and     al, 3			; figure out which port to
+        add     dl, al			; write to
+
+	test    ebx, PCI32+PCI16
+        jnz     short _pregw0
+	
+	mov	al, cl 			; put data into al
+	out	dx, al
+	
+	jmp	short _pregw2
+_pregw0:
+	test    ebx, PCI32
+        jnz     short _pregw1
+	
+	mov	ax, cx			; put data into ax
+	out	dx, ax
+
+	jmp	short _pregw2
+_pregw1:
+	mov	eax, ecx		; put data into eax
+	out	dx, eax
+_pregw2:
+        mov     eax, ebx		; restore eax
+        and     eax, NOT_PCI32_PCI16	; clear out data size request
+        mov     edx, ecx		; restore dx
+	pop	ecx
+	pop	ebx
+	retn
+
+pciRegWrite8:
+        and     eax, NOT_PCI32_PCI16	; set up 8 bit write size
+        jmp	short pciRegWrite	; call generic PCI access
+
+pciRegWrite16:
+        and     eax, NOT_PCI32_PCI16	; set up 16 bit write size
+        or      eax, PCI16		; call generic PCI access
+        jmp	short pciRegWrite
+
+pciRegWrite32:
+        and     eax, NOT_PCI32_PCI16	; set up 32 bit write size
+        or      eax, PCI32		; call generic PCI access
+        jmp	pciRegWrite
+
+; --------------------------------------------------------
+; 19/05/2024 - (playwav4.asm) ac97_vra.asm
+; --------------------------------------------------------
+
+	; 13/11/2023
+
+;VRA:	db 1
+
+codecConfig:
+	; 30/05/2024
+	; 19/05/2024
+	; 19/11/2023
+	; 15/11/2023
+	; 04/11/2023
+	; 17/02/2017 
+	; 07/11/2016 (Erdogan Tan)
+
+	;AC97_EA_VRA equ 1
+	AC97_EA_VRA equ BIT0
+
+	; 04/11/2023
+init_ac97_controller:
+	mov	eax, [bus_dev_fn]
+	mov	al, PCI_CMD_REG
+	call	pciRegRead16		; read PCI command register
+	or      dl, IO_ENA+BM_ENA	; enable IO and bus master
+	call	pciRegWrite16
+
+	;call	delay_100ms
+
+	; 19/05/2024
+	; ('PLAYMOD3.ASM', Erdogan Tan, 18/05/2024)
+
+init_ac97_codec:
+	; 18/11/2023
+	mov	bp, 40
+	; 29/05/2024
+	;mov	bp, 1000
+_initc_1:
+	; 30/05/2024
+	mov	dx, GLOB_STS_REG ; 30h
+	add	dx, [NABMBAR]
+	in	eax, dx
+
+	; 19/05/2024
+	call	delay1_4ms
+
+	cmp	eax, 0FFFFFFFFh ; -1
+	jne	short _initc_3
+_initc_2:
+	dec	bp
+	jz	short _ac97_codec_ready
+
+	call	delay_100ms
+	jmp	short _initc_1
+_initc_3:
+	test	eax, CTRL_ST_CREADY
+	jnz	short _ac97_codec_ready
+
+	; 30/05/2024
+	cmp	byte [reset], 1
+	jnb	short _initc_2
+
+	call	reset_ac97_codec
+	; 30/05/2024
+	mov	byte [reset], 1
+	; 19/05/2024
+	jmp	short _initc_2
+
+_ac97_codec_ready:
+	mov	dx, [NAMBAR]
+	;add	dx, 0 ; ac_reg_0 ; reset register
+	out	dx, ax
+	
+	call	delay_100ms
+
+	; 19/11/2023
+	or	bp, bp
+	jnz	short _ac97_codec_init_ok
+
+	xor	ax, ax ; 0
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_REG_POWERDOWN
+	out	dx, ax
+
+	; 30/05/2024
+	call	delay1_4ms
+
+	; 19/11/2023
+	; wait for 1 second
+	; 19/05/2024
+	mov	cx, 1000 ; 1000*4*0.25ms = 1s
+	;;mov	cx, 10
+	; 30/05/2024
+	;mov	cx, 40
+_ac97_codec_rloop:
+	;call	delay_100ms
+
+	; 30/05/2024
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_REG_POWERDOWN
+	in	ax, dx
+
+	call	delay1_4ms
+	
+	and	ax, 0Fh
+	cmp	al, 0Fh
+	je	short _ac97_codec_init_ok
+	loop	_ac97_codec_rloop 
+
+init_ac97_codec_err1:
+	;stc	; cf = 1 ; 19/05/2024
+init_ac97_codec_err2:
+	retn
+
+_ac97_codec_init_ok:
+	call 	reset_ac97_controller
+
+	; 30/05/2024
+	; 19/05/2024
+	;call	delay_100ms
+
+	; 30/05/2024
+	call	delay1_4ms
+	call	delay1_4ms
+	call	delay1_4ms
+	call	delay1_4ms
+
+setup_ac97_codec:
+	; 12/11/2023
+	cmp	word [sample_rate], 48000
+	je	short skip_rate
+	
+	; 30/05/2024
+	; 19/05/2024
+	;call	delay1_4ms
+
+	; 30/05/2024
+	;cmp	byte [VRA], 0
+	;jna	short skip_rate
+
+	; 11/11/2023
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_EXT_AUDIO_CTRL_REG  	; 2Ah
+	in	ax, dx
+
+	; 30/05/2024
+	; 19/05/2024
+	call	delay1_4ms
+	
+	;and	al, ~BIT1 ; Clear DRA
+	;;;
+	; 30/05/2024
+	and	al, ~(BIT1+BIT0) ; Clear DRA+VRA
+	out	dx, ax
+
+	call	check_vra
+
+	cmp	byte [VRA], 0
+	jna	short skip_rate
+
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_EXT_AUDIO_CTRL_REG  	; 2Ah
+	in	ax, dx
+	;and	al, ~BIT1 ; Clear DRA
+	;;;
+
+	or	al, AC97_EA_VRA ; 1 ; 04/11/2023
+	; 30/05/2024
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_EXT_AUDIO_CTRL_REG  	; 2Ah
+
+	out	dx, ax			; Enable variable rate audio
+
+	mov	cx, 10
+check_vra_loop:
+	call	delay_100ms
+	; 30/05/2024
+	;call	delay1_4ms
+
+	; 30/05/2024
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_EXT_AUDIO_CTRL_REG  	; 2Ah
+	; 11/11/2023
+	in	ax, dx
+	
+	test	al, AC97_EA_VRA ; 1
+	jnz	short set_rate
+
+	; 11/11/2023
+	loop	check_vra_loop
+
+;vra_not_supported:	; 19/05/2024
+	mov	byte [VRA], 0
+	jmp	short skip_rate
+
+set_rate:
+	mov	ax, [sample_rate] ; 17/02/2017 (Erdogan Tan)
+
+	mov    	dx, [NAMBAR]               	
+	add    	dx, CODEC_PCM_FRONT_DACRATE_REG	; 2Ch  	  
+	out	dx, ax 			; PCM Front/Center Output Sample Rate
+
+	;call	delay_100ms
+	; 30/05/2024
+	call	delay1_4ms
+
+	; 12/11/2023
+skip_rate:
+	mov	ax, 0202h
+  	mov	dx, [NAMBAR]
+  	add	dx, CODEC_MASTER_VOL_REG	;02h 
+	out	dx, ax
+
+	; 11/11/2023
+	call	delay1_4ms
+	call	delay1_4ms
+	call	delay1_4ms
+	call	delay1_4ms
+
+	mov	ax, 0202h
+  	mov	dx, [NAMBAR]
+  	add	dx, CODEC_PCM_OUT_REG		;18h 
+  	out	dx, ax
+	
+	; 11/11/2023
+	call	delay1_4ms
+	call	delay1_4ms
+	call	delay1_4ms
+	call	delay1_4ms
+
+	; 30/05/2024
+	; 19/05/2024
+	;clc
+
+        retn
+
+reset_ac97_controller:
+	; 19/05/2024
+	; 11/11/2023
+	; 10/06/2017
+	; 29/05/2017
+	; 28/05/2017
+	; reset AC97 audio controller registers
+	xor     ax, ax
+        mov	dx, PI_CR_REG
+	add	dx, [NABMBAR]
+	out     dx, al
+
+	; 19/05/2024
+	call	delay1_4ms
+
+        mov     dx, PO_CR_REG
+	add	dx, [NABMBAR]
+	out     dx, al
+
+	; 19/05/2024
+	call	delay1_4ms
+
+        mov     dx, MC_CR_REG
+	add	dx, [NABMBAR]
+	out     dx, al
+
+	; 19/05/2024
+	call	delay1_4ms
+
+        mov     al, RR
+        mov     dx, PI_CR_REG
+	add	dx, [NABMBAR]
+	out     dx, al
+
+	; 19/05/2024
+	call	delay1_4ms
+
+        mov     dx, PO_CR_REG
+	add	dx, [NABMBAR]
+	out     dx, al
+
+	; 19/05/2024
+	call	delay1_4ms
+
+        mov     dx, MC_CR_REG
+	add	dx, [NABMBAR]
+	out     dx, al
+
+	; 19/05/2024
+	call	delay1_4ms
+
+	retn
+
+reset_ac97_codec:
+	; 11/11/2023
+	; 28/05/2017 - Erdogan Tan (Ref: KolibriOS, intelac97.asm)
+	mov	dx, GLOB_CNT_REG ; 2Ch
+	add	dx, [NABMBAR]
+	in	eax, dx
+
+	;test	eax, 2
+	; 06/08/2022
+	test	al, 2
+	jz	short _r_ac97codec_cold	
+
+	call	warm_ac97codec_reset
+	jnc	short _r_ac97codec_ok
+_r_ac97codec_cold:
+        call    cold_ac97codec_reset
+        jnc     short _r_ac97codec_ok
+	
+	; 16/04/2017
+        ;xor	eax, eax	; timeout error
+       	;stc
+	retn
+
+_r_ac97codec_ok:
+        xor     eax, eax
+        ;mov	al, VIA_ACLINK_C00_READY ; 1
+        inc	al
+	retn
+
+warm_ac97codec_reset:
+	; 11/11/2023
+	; 06/08/2022 - TRDOS 386 v2.0.5
+	; 28/05/2017 - Erdogan Tan (Ref: KolibriOS, intelac97.asm)
+	mov	eax, 6
+	mov	dx, GLOB_CNT_REG ; 2Ch
+	add	dx, [NABMBAR]
+	out	dx, eax
+
+	mov	cx, 10	; total 1s
+_warm_ac97c_rst_wait:
+	call	delay_100ms
+
+	mov	dx, GLOB_STS_REG ; 30h
+	add	dx, [NABMBAR]
+	in	eax, dx
+
+	test	eax, CTRL_ST_CREADY
+	jnz	short _warm_ac97c_rst_ok
+
+        dec     cx
+        jnz     short _warm_ac97c_rst_wait
+
+_warm_ac97c_rst_fail:
+        stc
+_warm_ac97c_rst_ok:
+	retn
+
+cold_ac97codec_reset:
+	; 11/11/2023
+	; 06/08/2022 - TRDOS 386 v2.0.5
+	; 28/05/2017 - Erdogan Tan (Ref: KolibriOS, intelac97.asm)
+        mov	eax, 2
+	mov	dx, GLOB_CNT_REG ; 2Ch
+	add	dx, [NABMBAR]
+	out	dx, eax
+
+	call	delay_100ms 	; wait 100 ms
+	call	delay_100ms 	; wait 100 ms
+	call	delay_100ms 	; wait 100 ms
+	call	delay_100ms 	; wait 100 ms
+
+	mov	cx, 16	; total 20*100 ms = 2s
+
+_cold_ac97c_rst_wait:
+	mov	dx, GLOB_STS_REG ; 30h
+	add	dx, [NABMBAR]
+	in	eax, dx
+
+	test	eax, CTRL_ST_CREADY
+	jnz	short _cold_ac97c_rst_ok
+
+	call	delay_100ms
+
+        dec     cx
+        jnz     short _cold_ac97c_rst_wait
+
+_cold_ac97c_rst_fail:
+        stc
+_cold_ac97c_rst_ok:
+	retn
+
+; 30/05/2024
+%if 1
+check_vra:
+	; 30/05/2024
+	mov	byte [VRA], 1
+
+	; 29/05/2024 - audio.s (TRDOS 386 Kernel) - 27/05/2024
+	; 24/05/2024
+	; 23/05/2024
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_EXT_AUDIO_REG	; 28h
+	in	ax, dx
+
+	; 30/05/2024
+	; 23/05/2024
+	call	delay1_4ms
+
+	; 30/05/2024
+	test	al, BIT0
+	;test	al, 1 ; BIT0 ; Variable Rate Audio bit
+	jnz	short check_vra_ok
+
+vra_not_supported:
+	; 13/11/2023
+	mov	byte [VRA], 0
+check_vra_ok:
+	retn
+%endif
+
+; --------------------------------------------------------
+
+PORTB		EQU 061h
+REFRESH_STATUS	EQU 010h	; Refresh signal status
+
+delay_100ms:
+	; 11/11/2023
+	; 29/05/2017
+	; 24/03/2017 ('codec.asm')
+	; wait 100 ms
+	push	cx
+	mov	cx, 400  ; 400*0.25ms
+_delay_x_ms:
+	call	delay1_4ms
+        loop	_delay_x_ms
+	pop	cx
+	retn
+
+delay1_4ms:
+        push    ax 
+        push    cx
+        mov     cx, 16			; close enough.
+	in	al,PORTB
+	and	al,REFRESH_STATUS
+	mov	ah,al			; Start toggle state
+	or	cx, cx
+	jz	short _d4ms1
+	inc	cx			; Throwaway first toggle
+_d4ms1:	
+	in	al,PORTB		; Read system control port
+	and	al,REFRESH_STATUS	; Refresh toggles 15.085 microseconds
+	cmp	ah,al
+	je	short _d4ms1		; Wait for state change
+
+	mov	ah,al			; Update with new state
+	dec	cx
+	jnz	short _d4ms1
+
+	; 30/05/2024
+	clc
+
+        pop     cx
+        pop     ax
+        retn
+
+; --------------------------------------------------------
+; 19/05/2024 - (playwav4.asm) ich_wav4.asm
+; --------------------------------------------------------
+
+check4keyboardstop:
+	; 19/05/2024
+	; 08/11/2023
+	; 04/11/2023
+	mov	ah, 1
+	int	16h
+	;clc
+	jz	short _cksr
+
+	xor	ah, ah
+	int	16h
+
+	;;;
+	; 19/05/2024 (change PCM out volume)
+	cmp	al, '+'
+	jne	short p_1
+	
+	mov	al, [volume]
+	cmp	al, 0
+	jna	short p_3
+	dec	al
+	jmp	short p_2
+p_1:
+	cmp	al, '-'
+	jne	short p_4
+
+	mov	al, [volume]
+	cmp	al, 31
+	jnb	short p_3
+	inc	al
+p_2:
+	mov	[volume], al
+	mov	ah, al
+	mov     dx, [NAMBAR]
+  	;add    dx, CODEC_MASTER_VOL_REG
+	add	dx, CODEC_PCM_OUT_REG
+	out     dx, ax
+
+	call    delay1_4ms
+        call    delay1_4ms
+        call    delay1_4ms
+        call    delay1_4ms
+_cksr:		; 19/05/2024
+	clc
+p_3:
+	retn
+p_4:
+	;;;
+;_cskr:	
+	stc
+	retn
+
+; returns AL = current index value
+getCurrentIndex:
+	; 08/11/2023
+	;push	dx
+	mov	dx, [NABMBAR]
+	add	dx, PO_CIV_REG
+	in	al, dx
+	;pop	dx
+uLVI2:	;	06/11/2023
+	retn
+
+updateLVI:
+	; 06/11/2023
+	mov	dx, [NABMBAR]
+	add	dx, PO_CIV_REG
+	; (Current Index Value and Last Valid Index value)
+	in	ax, dx
+
+	cmp	al, ah ; is current index = last index ?
+	jne	short uLVI2
+
+	; 08/11/2023	
+	call	getCurrentIndex
+ 
+	test	byte [flags], ENDOFFILE
+	;jnz	short uLVI1
+	jz	short uLVI0  ; 08/11/2023
+
+	; 08/11/2023
+	push	ax
+	mov	dx, [NABMBAR]
+	add	dx, PO_SR_REG  ; PCM out status register
+	in	ax, dx
+
+	test	al, 3 ; bit 1 = Current Equals Last Valid (CELV)
+		      ; (has been processed)
+		      ; bit 0 = 1 -> DMA Controller Halted (DCH)
+	pop	ax
+	jz	short uLVI1
+uLVI3:
+	xor	ax, ax
+	; zf = 1
+	retn
+uLVI0:
+        ; not at the end of the file yet.
+	dec	al
+	and	al, 1Fh
+uLVI1:
+	;call	setLastValidIndex
+;uLVI2:
+	;retn
+
+;input AL = index # to stop on
+setLastValidIndex:
+	; 08/11/2023
+	;push	dx
+	mov	dx, [NABMBAR]
+	add	dx, PO_LVI_REG
+        out     dx, al
+	;pop	dx
+	retn
+
+; 29/05/2024
+; 19/05/2024
+volume: db	02h
+	
+; --------------------------------------------------------
+
+; DATA
+
+FileHandle:	
+	dd	-1
+
+; 30/05/2024
+reset:	db	0
+
+Credits:
+	db	'Tiny WAV Player for Retro DOS by Erdogan Tan. '
+	db	'May 2024.',10,13,0
+	db	'30/05/2024', 10,13,0
+
+msgAudioCardInfo:
+	db 	'for Intel AC97 (ICH) Audio Controller.', 10,13,0
+
+msg_usage:
+	db	'usage: playwav6 filename.wav',10,13,0 ; 30/05/2024
+
+noDevMsg:
+	db	'Error: Unable to find AC97 audio device!'
+	db	10,13,0
+
+noFileErrMsg:
+	db	'Error: file not found.',10,13,0
+
+msg_error:	; 30/05/2024
+
+; 29/05/2024
+; 11/11/2023
+msg_init_err:
+	db	CR, LF
+	db	"AC97 Controller/Codec initialization error !"
+	db	CR, LF, "$"
+
+; 25/11/2023
+msg_no_vra:
+	db	10,13
+	db	"No VRA support ! Only 48 kHZ sample rate supported !"
+	db	10,13,0
+
+; 29/05/2024 (TRDOS 386)
+; 17/02/2017
+; Valid ICH device IDs
+
+valid_ids:
+dd	(ICH_DID << 16) + INTEL_VID  	 ; 8086h:2415h
+dd	(ICH0_DID << 16) + INTEL_VID 	 ; 8086h:2425h
+dd	(ICH2_DID << 16) + INTEL_VID 	 ; 8086h:2445h
+dd	(ICH3_DID << 16) + INTEL_VID 	 ; 8086h:2485h
+dd	(ICH4_DID << 16) + INTEL_VID 	 ; 8086h:24C5h
+dd	(ICH5_DID << 16) + INTEL_VID 	 ; 8086h:24D5h
+dd	(ICH6_DID << 16) + INTEL_VID 	 ; 8086h:266Eh
+dd	(ESB6300_DID << 16) + INTEL_VID  ; 8086h:25A6h
+dd	(ESB631X_DID << 16) + INTEL_VID  ; 8086h:2698h
+dd	(ICH7_DID << 16) + INTEL_VID 	 ; 8086h:27DEh
+; 03/11/2023 - Erdogan Tan
+dd	(MX82440_DID << 16) + INTEL_VID  ; 8086h:7195h
+dd	(SI7012_DID << 16)  + SIS_VID	 ; 1039h:7012h
+dd 	(NFORCE_DID << 16)  + NVIDIA_VID ; 10DEh:01B1h
+dd 	(NFORCE2_DID << 16) + NVIDIA_VID ; 10DEh:006Ah
+dd 	(AMD8111_DID << 16) + AMD_VID 	 ; 1022h:746Dh
+dd 	(AMD768_DID << 16)  + AMD_VID 	 ; 1022h:7445h
+dd 	(CK804_DID << 16) + NVIDIA_VID	 ; 10DEh:0059h
+dd 	(MCP04_DID << 16) + NVIDIA_VID	 ; 10DEh:003Ah
+dd 	(CK8_DID << 16) + NVIDIA_VID	 ; 1022h:008Ah
+dd 	(NFORCE3_DID << 16) + NVIDIA_VID ; 10DEh:00DAh
+dd 	(CK8S_DID << 16) + NVIDIA_VID	 ; 10DEh:00EAh
+
+valid_id_count:	equ ($ - valid_ids)>>2 ; 05/11/2023
+
+msgWavFileName:	db 0Dh, 0Ah, "WAV File Name: ",0
+msgSampleRate:	db 0Dh, 0Ah, "Sample Rate: "
+msgHertz:	db "00000 Hz, ", 0 
+msg8Bits:	db "8 bits, ", 0 
+;msgMono:	db "Mono", 0Dh, 0Ah, 0
+msgMono:	db "Mono", 0
+msg16Bits:	db "16 bits, ", 0 
+;msgStereo:	db "Stereo"
+msgStereo:	db "Stereo",0
+nextline:	db 0Dh, 0Ah, 0
+
+; 03/06/2017
+hex_chars	db "0123456789ABCDEF", 0
+msgAC97Info	db 0Dh, 0Ah
+		db "AC97 Audio Controller & Codec Info", 0Dh, 0Ah 
+		db "Vendor ID: "
+msgVendorId	db "0000h Device ID: "
+msgDevId	db "0000h", 0Dh, 0Ah
+		db "Bus: "
+msgBusNo	db "00h Device: "
+msgDevNo	db "00h Function: "
+msgFncNo	db "00h"
+		db 0Dh, 0Ah
+		db "NAMBAR: "
+msgNamBar	db "0000h  "
+		db "NABMBAR: "
+msgNabmBar	db "0000h  IRQ: "
+msgIRQ		dw 3030h
+		db 0Dh, 0Ah, 0
+; 25/11/2023
+msgVRAheader:	db "VRA support: "
+		db 0	
+msgVRAyes:	db "YES", 0Dh, 0Ah, 0
+msgVRAno:	db "NO ", 0Dh, 0Ah
+		db "(Interpolated sample rate playing method)"
+		db 0Dh, 0Ah, 0
+
+; 30/05/2024
+print_msg:
+	mov	bx, 07h
+p_msg:
+	push	es
+	push	bp
+	push	cx
+	push	dx
+
+	push	ds
+	pop	es
+	mov	bp,si
+	mov	ah, 03h ; Return cursor position (in DX)
+	; bh = video page number 	
+	int	10h
+	xor	cx, cx
+p_msg_0:	
+	lodsb
+	or	al, al
+	jz	short p_msg_1
+	inc	cx
+	jmp	short p_msg_0
+p_msg_1:
+	or	cx, cx
+	jz	short p_msg_x
+	; cx = number of chars
+	; dx = screen (cursor) position
+	; bl = color/attribute
+	; bh = video page number
+	; es:bp = string buffer
+	;mov	al, 1 ; attribute in BL, update cursor pos
+	;mov	ah, 13h ; write character string
+ 	mov	ax, 1301h
+	int	10h
+p_msg_x:
+	pop	dx
+	pop	cx
+	pop	bp
+	pop	es
+	retn
+
+EOF: 
+
+; BSS
+
+; 17/02/2017
+bss_start:
+
+ABSOLUTE bss_start
+
+alignb 2
+
+; 30/05/2024
+VRA:		resb 1	; Variable Rate Audio Support Status
+		resb 1
+; 28/11/2016
+
+smpRBuff:	resw 14 ; 19/11/2016 - Erdogan Tan
+
+filehandle:	resw 1
+
+flags:		resb 1
+; 06/11/2023
+ac97_int_ln_reg: resb 1
+
+; 30/05/2024
+wav_file_name:
+		resb 80 ; wave file, path name (<= 80 bytes)
+
+		resw 1	
+
+; 17/02/2017
+; NAMBAR:  Native Audio Mixer Base Address Register
+;    (ICH, Audio D31:F5, PCI Config Space) Address offset: 10h-13h
+; NABMBAR: Native Audio Bus Mastering Base Address register
+;    (ICH, Audio D31:F5, PCI Config Space) Address offset: 14h-17h
+NAMBAR:		resw 1			; BAR for mixer
+NABMBAR:	resw 1			; BAR for bus master regs
+
+; 256 byte buffer for descriptor list
+BDL_BUFFER:	resw 1			; segment of our 256byte BDL buffer
+WAV_BUFFER1:	resw 1			; segment of our WAV storage
+; 64k buffers for wav file storage
+WAV_BUFFER2:	resw 1			; segment of 2nd wav buffer
+
+; 12/11/2016 - Erdogan Tan
+
+bus_dev_fn:	resd 1
+dev_vendor:	resd 1
+
+; 06/11/2023
+sample_rate:	resw 1
+
+; 19/11/2016
+stmo:		resw 1 
+bps:		resw 1
+
+; 08/11/2023
+; 07/11/2023
+fbs_shift:	resb 1
+		resb 1 ; 08/11/2023
+
+;alignb 2
+
+; 32 kilo bytes for temporay buffer
+; (for stereo-mono, 8bit/16bit corrections)
+;temp_buffer:	resb 32768
+; 18/11/2023
+temp_buffer:	resb 56304  ; (44.1 kHZ stereo 14076 samples)	
+
+;alignb 16
+bss_end:

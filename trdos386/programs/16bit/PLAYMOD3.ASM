@@ -1,24 +1,24 @@
 ; ****************************************************************************
-; playmod2.asm (for MSDOS)
+; playmod3.asm (for MSDOS)
 ; ----------------------------------------------------------------------------
-; PLAYMOD2.COM ! ICH AC97 MOD PLAYER & VGA DEMO program by Erdogan TAN
+; PLAYMOD3.COM ! ICH AC97 MOD PLAYER & VGA DEMO program by Erdogan TAN
 ;
 ; 18/02/2017
 ;
-; [ Last Modification: 20/05/2024 ]
+; [ Last Modification: 19/05/2024 ]
 ;
 ; Derived from source code of 'PLAYWAV.COM' ('PLAYWAV.ASM') by Erdogan Tan
 ;							      (17/02/2017)
-; Modified from 'PLAYMOD.COM' ('playmod.asm') source code 
-;		 VIA VT8237 MOD PLAYER & VGA DEMO program by Erdogan TAN
-;							     (15/02/2017)	
+; Modified from 'PLAYMOD2.COM' ('playmod2.asm') source code 
+;		 AC97 MOD PLAYER & VGA DEMO program (tuneloop version)
+;						by Erdogan TAN (12/05/2024)
 ;
 ; Derived from source code of 'PLAY.EXE' (TINYPLAY) by Carlos Hasan (1993)
 ;          PLAY.EXE: PLAY.ASM, MODLOAD.ASM, MODPLAY.ASM, SB.ASM
 ;
-; Assembler: NASM 2.11
+; Assembler: NASM 2.15
 ; ----------------------------------------------------------------------------
-;	   nasm  playmod2.asm -l playmod2.lst -o PLAYMOD2.COM	
+;	   nasm  playmod3.asm -l playmod3.lst -o PLAYMOD3.COM	
 ; ****************************************************************************
 
 ; Tiny MOD Player v0.1b by Carlos Hasan.
@@ -27,15 +27,23 @@
 ;=============================================================================
 ;               PLAYWAV.ASM / PLAYER.ASM / TINYPLAY.ASM
 ;=============================================================================
-; Audio controller, codec & PCI functions are derived from '.wav file player 
+; Audio controller, codec & PCI functions are derived from '.wav file player
 ; for DOS' source code by Jeff Leyda (PLAYER.EXE), Sep 02, 2002.
 
-; TUNELOOP version ; 12/05/2024
+; AC97 Interrupt version ; 12/05/2024
 
 [BITS 16]
 [org 100h]
 
 Start:
+	; 15/05/2024
+	; 13/05/2024
+	; Clear BSS (uninitialized data) area
+	;xor	ax, ax ; 0
+	;mov	cx, (EOF - bss_start)/2
+	;mov	di, bss_start
+	;rep	stosw
+
 	call    DetectICH		; Detect AC97 Audio Device
 GetFileName:    			; Parse  the Command line...
 	mov	si, 80h
@@ -105,8 +113,10 @@ init_codec:
 
 	; 18/02/2017
 	;mov	word [sample_rate], 22050	; Mixing at 22.050 kHz
-	; 14/05/2024
+	; 15/05/2024
 	mov	word [sample_rate], 24000
+	; 16/05/2024
+	;mov	word [sample_rate], 16000
 
 	; 08/05/2024
 	; (48 kHZ mixing is necessary 
@@ -165,9 +175,9 @@ MakeOfs:
 ;       samples played by the Sound Blaster. Note that some samples are
 ;       discarded in the next code, just for fun!
 
-	;in	al, 21h			; disable irq 0!
-	;or	al, 00000001b
-	;out	21h, al
+	;in     al, 21h			; disable irq 0!
+	;or     al, 00000001b
+	;out    21h, al
 		
 	call	ModPlay ; 13/02/2017
 
@@ -178,7 +188,8 @@ MakeOfs:
 	mov     ax, 0003h		; Set Text Mode 80x25x16
 	int     10h
 
-	call	StopPlaying		; STOP!
+	; 16/05/2024
+	;call	StopPlaying		; STOP!
 Exit:           
 	;call   FreeModule		; Free MODule core.
 error_exit:
@@ -233,7 +244,7 @@ _1:
 	mov     al, NABMBAR_REG
         call    pciRegRead16
         ;and    dx, IO_ADDR_MASK
-	;/14/05/2024
+	; 14/05/2024
 	and	dl, 0C0h
 
         mov     [NABMBAR], dx			; save bus master base addr
@@ -262,8 +273,6 @@ _1:
 
 	mov     [ac97_int_ln_reg], dl
 
-; 12/05/2024 (tuneloop version)
-%if 0
 	; 28/11/2016
 	;mov	bx, 1	; 08/05/2024
 	xor	dh, dh	; 17/02/2017
@@ -283,13 +292,31 @@ _1:
 	; save IRQ status
 	mov	[IRQ_status], ax
 
+	; 12/05/2024 (enable AC97 IRQ)
+	;mov	cl, dl
+	;mov	bx, 1
+	;shl	bx, cl
+	;not	bx
+	;and	ax, bx
+	;out	21h, al
+	;mov	al, ah
+	;out	0A1h, al
+
+	; 15/05/2024
+	;and	ax, bx   ; unmask
+ 	btr	ax, dx	 ; unmask
+	out	21h, al  ; enable interrupt (if irq <= 7)
+	mov	al, ah
+	out	0A1h, al ; enable interrupt (if irq > 7)
+	;not	bx
+
 	; 08/05/2024
 	;mov	dx, 4D1h			;8259 ELCR1
         ;in	al, dx
 	;mov	ah, al
-	;mov	dx, 4D0h 
+	;mov	dx, 4D0h
         ;in	al, dx
-	;;or	ax, bx        
+	;;or	ax, bx
 	;bts	ax, cx
 	;mov	dx, 4D0h
 	;out	dx, al                          ;set level-triggered mode
@@ -311,25 +338,35 @@ _1:
 	mov	es, ax
 	; 04/11/2023
 	; save interrupt vector
-	mov	ax, [es:bx]
+	;mov	ax, [es:bx]
+	; 13/05/2024
+	mov	ax, ac97_int_handler
+	xchg	ax, [es:bx]
 	mov	[IRQ_vector], ax
-	mov	ax, [es:bx+2]
+	;mov	ax, [es:bx+2]
+	; 13/05/2024
+	mov	ax, cs
+	xchg	ax, [es:bx+2]
 	mov	[IRQ_vector+2], ax
 
-	mov	word [es:bx], ac97_int_handler
-	mov	ax, cs
-	mov	[es:bx+2], ax
+	; 13/05/2024
+	;mov	word [es:bx], ac97_int_handler
+	;mov	ax, cs
+	;mov	[es:bx+2], ax
+	
 	pop	es
 
 	; 04/11/2023
 	sti
-%endif
+
 	retn
 
-; 12/05/2024 (tuneloop version)
+; 16/05/2024
 %if 0
-
+	; 15/05/2024
 ac97_int_handler:
+	; 13/05/2024
+	; 12/05/2024
 	; 11/05/2024
 	; 11/11/2023
 	; 10/11/2023
@@ -356,26 +393,41 @@ _ih_0:
 	mov	dx, GLOB_STS_REG
         add	dx, [NABMBAR]
 	in	eax, dx
-	
+
 	; 12/05/2024
-	; 09/11/2023,
-        ;cmp	eax, 0FFFFFFFFh ; -1
-	;je	short _ih_2
-	
+	; 09/11/2023
+	;cmp	eax, 0FFFFFFFFh ; -1
+	;je	short _ih_3
+	; 15/05/2024
+	inc	eax	; 0FFFFFFFFh
+	jz	short _ih_3
+	dec	eax	; 0
+	jz	short _ih_3
+
+	; 15/05/2024
+	cmp	byte [tLoop], 1
+	jb	short _ih_2
+
 	; 12/05/2024
 	;test	al, 40h		; PCM Out Interrupt
-	;jnz	short _ih_1
-
-	;test	eax, eax
-	;jz	short _ih_2
-	; 12/05/2024
-	test	ax, PCM_OUT_IRQ+BCIS
+	; 15/05/2024
+	test	al, PCM_OUT_IRQ
 	jnz	short _ih_1
+
+	; 15/05/2024
+	;test	eax, eax
+	;jz	short _ih_3
+
+	; 12/05/2024
+	;test	ax, PCM_OUT_IRQ
+	;jnz	short _ih_1
 
  	;mov	dx, GLOB_STS_REG
         ;add	dx, [NABMBAR]
-	out	dx, eax
+	; 12/05/2024
+	;out	dx, eax
 	jmp	short _ih_2
+	;jmp	short _ih_3
 
 	; .....
 	;mov	al, 1
@@ -383,7 +435,7 @@ _ih_0:
 	;mov	[tLoop], al  ; 1
 
 	;cmp	[inside], al ; 1
-	;jnb	short _ih_3	; busy
+	;jnb	short _ih_2	; busy
 
 	;mov	[inside], al ; 1
 	;
@@ -398,33 +450,58 @@ _ih_0:
 	;
 	;;mov	[pcm_irq_status], al ; 05/11/2023
 	;test	al, BCIS ; Buffer Completion Interrupt Status (Bit 3)
-	;jz	short _ih_2
+	;jz	short _ih_3
 	; .....
 
 _ih_1:
 	; 11/11/2023
-	push	eax
+	;push	eax
+	; 15/05/2024
+	push	ax
 
-	;mov	ax, 1Ch ; FIFOE(=16)+BCIS(=8)+LVBCI(=4)
-	;mov	dx, PO_SR_REG
-        ;add	dx, [NABMBAR]
-	;out	dx, ax
+	; 13/05/2024
+	mov	ax, 1Ch ; FIFOE(=16)+BCIS(=8)+LVBCI(=4)
+	mov	dx, PO_SR_REG
+        add	dx, [NABMBAR]
+	out	dx, ax
 
+	; 13/05/2024
+	mov	dx, PO_CIV_REG
+        add	dx, [NABMBAR]
+	in	al, dx
+	mov	ah, al
+	dec	al
+	and	al, 1Fh
+        mov     dx, PO_LVI_REG
+        add	dx, [NABMBAR]
+        out	dx, al
+	and	ah, 1
+	; 13/05/2024
+	inc	ah
+	mov	[tBuff], ah ; 1 = Buffer 1, 2 = Buffer 2
+
+	; 13/05/2024
 	; 10/11/2023
 	; 28/11/2016 - Erdogan Tan
-	call	tuneLoop
+	;call	tuneLoop
 
 	; 11/11/2023
-	pop	eax
+	;pop	eax
+	; 15/05/2024
+	pop	ax
+
 	mov	dx, GLOB_STS_REG
         add	dx, [NABMBAR]
+_ih_2:			; 12/05/2024
 	out	dx, eax
-_ih_2:
+
+	; 12/05/2024
+_ih_3:
 	; 11/11/2023
-	mov	dx, [NABMBAR]
-	add	dx, PO_SR_REG	; set pointer to Status reg
-	mov	ax, 1Ch
-	out	dx, ax
+	;mov	dx, [NABMBAR]
+	;add	dx, PO_SR_REG	; set pointer to Status reg
+	;mov	ax, 1Ch
+	;out	dx, ax
 
 ;	; 10/11/2023
 ;	mov	al, 20h
@@ -442,7 +519,129 @@ _ih_2:
 	pop	dx
 	pop	eax ; 11/11/2023
 	iret
+%else
+	; 16/05/2024
+	; 15/05/2024
+ac97_int_handler:
+	; 13/05/2024
+	; 12/05/2024
+	; 11/05/2024
+	; 11/11/2023
+	; 10/11/2023
+	; 17/02/2016
+	push	ax ; +	; 16/05/2024
+	;push	eax ; *	; 11/11/2023
+	push	dx ; **
+	; 05/11/2023
+	;push	cx
+	;push	bx
+	;push	si
+	;push	di
 
+	; 16/05/2024
+	; 10/11/2023
+	; EOI at first
+	mov	al, 20h
+	test	byte [ac97_int_ln_reg], 8
+	jz	short _ih_0
+	out 	0A0h, al ; 20h	; EOI
+_ih_0:
+	out	20h, al  ; 20h	; EOI
+
+	; 16/05/2024
+;	mov	dx, GLOB_STS_REG
+;	add	dx, [NABMBAR]
+;	in	eax, dx
+;
+;	inc	eax	; 0FFFFFFFFh
+;	jz	short _ih_3
+;	dec	eax	; 0
+;	;jz	short _ih_3
+;_ih_3:
+;	; 16/05/2024
+;	push	eax ; ***
+
+	; 16/05/2024
+	; 24/11/2023 (TRDOS386 'audio.s')
+        mov	dx, [NABMBAR]
+	add	dx, PO_SR_REG
+	in	ax, dx
+
+	test	al, BCIS ; bit 3, 8
+	jz	short _ih_2
+
+	; 15/05/2024
+	cmp	byte [tLoop], 1
+	jb	short _ih_2
+_ih_1:
+	; 16/05/2024
+	; 13/05/2024
+	;mov	ax, 1Ch ; FIFOE(=16)+BCIS(=8)+LVBCI(=4)
+	;add	dx, PO_SR_REG
+        ;add	dx, [NABMBAR]
+	;out	dx, ax
+
+	; 16/05/2024
+	push	ax ; ****
+
+	; 13/05/2024
+	mov	dx, PO_CIV_REG
+        add	dx, [NABMBAR]
+	in	al, dx
+	mov	ah, al
+	dec	al
+	and	al, 1Fh
+        mov     dx, PO_LVI_REG
+        add	dx, [NABMBAR]
+        out	dx, al
+	and	ah, 1
+	; 13/05/2024
+	inc	ah
+	mov	[tBuff], ah ; 1 = Buffer 1, 2 = Buffer 2
+
+	; 13/05/2024
+	; 10/11/2023
+	; 28/11/2016 - Erdogan Tan
+	;call	tuneLoop
+
+	; 16/05/2024
+	pop	ax ; ****
+
+	; 16/05/2024
+_ih_2:
+	;mov	ax, 1Ch ; FIFOE(=16)+BCIS(=8)+LVBCI(=4)
+	mov	dx, [NABMBAR]
+	add	dx, PO_SR_REG
+	out	dx, ax
+
+;	; 16/05/2024
+;	pop	eax ; ***
+;	
+;	or	eax, eax
+;	jz	short _ih_4
+;	
+;	mov	dx, GLOB_STS_REG
+;	add	dx, [NABMBAR]
+;	out	dx, eax
+
+	; 16/05/2024
+_ih_4:
+	; 10/11/2023
+	;mov	al, 20h
+	;test	byte [ac97_int_ln_reg], 8
+	;jz	short _ih_5
+	;out 	0A0h, al ; 20h	; EOI
+;_ih_5:
+	;out	20h, al  ; 20h	; EOI
+;_ih_6:
+	;pop	di
+	;pop	si
+	;pop	bx
+	;pop	cx
+	pop	dx ; **
+	;pop	eax ; *	; 11/11/2023
+	pop	ax ; + ; 16/05/2024
+	iret
 %endif
 
 ;=============================================================================
@@ -513,7 +712,6 @@ ARCHIVE   EQU   BIT5
 SHAREABLE EQU   BIT7         ;for novell networks
 OPEN	EQU	2		; open existing file
 CREATE	EQU	1		; create new file
-
 
 ; PCI equates
 ; PCI function address (PFA)
@@ -832,7 +1030,7 @@ ICH2_DID        equ     2445h           ; ICH2 I think there are more ICHes.
 ; 17/02/2017 (Erdogan Tan, ref: ALSA Device IDs, ALSA project)
 ICH3_DID	equ     2485h           ; ICH3
 ICH4_DID        equ     24C5h           ; ICH4
-ICH5_DID	equ     24D5h           ; ICH5
+ICH5_DID	equ     24D5h           ; ICH5 
 ICH6_DID	equ     266Eh           ; ICH6
 ESB6300_DID	equ     25A6h           ; 6300ESB
 ESB631X_DID	equ     2698h           ; 631XESB
@@ -1017,7 +1215,7 @@ CODEC_BUSY              equ     BIT0    ; codec register I/O is happening
                                         ; self clearing
 ;
 ; Buffer Descriptors List
-; As stated earlier, each buffer descriptor list is a set of (up to) 32 
+; As stated earlier, each buffer descriptor list is a set of (up to) 32
 ; descriptors, each 8 bytes in length.  Bytes 0-3 of a descriptor entry point
 ; to a chunk of memory to either play from or record to.  Bytes 4-7 of an
 ; entry describe various control things detailed below.
@@ -1059,99 +1257,8 @@ BUP                     equ     BIT30   ; Buffer Underrun Policy.
 ; enable codec, unmute stuff, set output rate to 44.1
 ; entry: ax = desired sample rate
 ;
-
-; 08/04/2024
-%if 0
-
-codecConfig:
-	; 17/02/2017 
-	; 07/11/2016 (Erdogan Tan)
-	PORT_NABM_GLB_CTRL_STAT equ 60h
-
-	;mov    dx, [NAMBAR]               	; mixer base address
-	;add	dx, CODEC_EXT_AUDIO_REG	       	; 28h
-	;in	ax, dx
-	;and	ax, 1
-	;jnz	short _ssr
-	;pop	ax
-	;jmp	short cconf_1
-
-_ssr:
-	mov    	dx, [NAMBAR]
-	add    	dx, CODEC_EXT_AUDIO_CTRL_REG  	; 2Ah
-	in     	ax, dx
-	or	ax, 1
-	out	dx, ax 				; Enable variable rate audio
-
-        call    delay1_4ms
-        call    delay1_4ms
-        call    delay1_4ms
-        call    delay1_4ms
-
-	mov	ax, [sample_rate] ; 17/02/2017 (Erdogan Tan)
-
-	mov    	dx, [NAMBAR]               	
-	add    	dx, CODEC_PCM_FRONT_DACRATE_REG	; 2Ch
-	out	dx, ax 				; out sample rate
-		
-	;mov    dx, [NAMBAR]               	
-	;add    dx, CODEC_LR_ADCRATE_REG 	; 32h
-	;out	dx, ax 
-
-        call    delay1_4ms
-        call    delay1_4ms
-        call    delay1_4ms
-        call    delay1_4ms
-
-;cconf_1:
-	mov     dx, [NAMBAR]			; mixer base address
-        add     dx, CODEC_RESET_REG  		; reset register
-        mov	ax, 42
-	out     dx, ax                          ; reset
-
-	mov     dx, [NABMBAR]			; bus master base address
-        add     dx, PORT_NABM_GLB_CTRL_STAT
-        mov	ax, 2
-	out     dx, ax                         
-
-	mov	cx, 7
-_100ms:
-	push	cx
-        call    delay1_4ms
-        call    delay1_4ms
-        call    delay1_4ms
-        call    delay1_4ms
-	pop	cx
-	loop	_100ms	
 	
-  	mov     dx, [NAMBAR]
-  	add     dx, CODEC_MASTER_VOL_REG        ;02h
-  	xor     ax, ax ; ; volume attenuation = 0 (max. volume)
-  	out     dx, ax
- 
-  	mov     dx, [NAMBAR]
-  	add     dx, CODEC_MASTER_MONO_VOL_REG   ;06h
-  	;xor    ax, ax
-  	out     dx, ax
-
-  	mov     dx, [NAMBAR]
-  	add     dx, CODEC_PCBEEP_VOL_REG        ;0Ah
-  	;xor    ax, ax
-  	out     dx, ax
-
-  	mov     dx, [NAMBAR]
-  	add     dx, CODEC_PCM_OUT_REG		;18h
-  	;xor    ax, ax
-  	out     dx, ax
-
-        call    delay1_4ms
-        call    delay1_4ms
-        call    delay1_4ms
-        call    delay1_4ms
-
-        retn
-
-%else
+	; 15/05/2024
 	; 12/05/2024
 	; 08/05/2024
 	; (ac97_vra.asm, 19/11/2023, Erdogan Tan, playwav3.asm)
@@ -1212,7 +1319,6 @@ _initc_1:
 	add	dx, [NABMBAR]
 	in	eax, dx
 
-	; 14/05/2024
 	; 02/12/2023
 	call	delay1_4ms
 
@@ -1225,7 +1331,6 @@ _initc_1:
 	add	dx, [NABMBAR]
 	in	eax, dx
 
-	; 14/05/2024
 	; 02/12/2023
 	call	delay1_4ms
 
@@ -1275,18 +1380,17 @@ _ac97_codec_ready:
 	; 14/05/2024
 	;mov	ecx, 1000 ; 1000*4*0.25ms = 1s
 	;mov	cx, 10
-	; 20/05/2024
-	;mov	cx, 40	; 19/05/2024
-	mov	ecx, 40
+	; 19/05/2024
+	mov	cx, 40
 _ac97_codec_rloop:
 	;call	delay1_4ms
 	;call	delay1_4ms
 	;call	delay1_4ms
 	;call	delay1_4ms
 	call	delay_100ms
-	
-	mov	dx, [NAMBAR]
-	add	dx, CODEC_REG_POWERDOWN
+
+	;mov	dx, [NAMBAR]
+	;add	dx, CODEC_REG_POWERDOWN
 	in	ax, dx
 
 	; 14/05/2024
@@ -1385,7 +1489,6 @@ check_vra:
 
 	; 13/11/2023
 	;mov	byte [VRA], 0
-	; 14/05/2024
 vra_not_supported:
 	; 08/05/2024
 	mov	word [sample_rate], 48000
@@ -1411,20 +1514,20 @@ set_rate:
 skip_rate:
 	; 11/11/2023 (temporary)
 
-	;mov   	dx, [NAMBAR]               	
+	;mov   	dx, [NAMBAR]
 	;add   	dx, CODEC_PCM_SURND_DACRATE_REG	; 2Eh
 	;out	dx, ax 			; PCM Surround Output Sample Rate
 
 	;call	delay_100ms
 
-	;mov   	dx, [NAMBAR]               	
+	;mov   	dx, [NAMBAR]
 	;add   	dx, CODEC_PCM_LFE_DACRATE_REG	; 30h
 	;out	dx, ax 			; PCM LFE Output Sample Rate
 
 	;call	delay_100ms
 
 	; 05/11/2023 (temporary)
-	;mov	dx, [NAMBAR]               	
+	;mov	dx, [NAMBAR]
 	;add	dx, CODEC_LR_ADCRATE_REG 	; 32h
 	;out	dx, ax 			; PCM Input Sample Rate
 	;
@@ -1457,7 +1560,7 @@ skip_rate:
   	;add	dx, CODEC_PCBEEP_VOL_REG	; 0Ah
   	;out	dx, ax
 
-	; 14/05/2024	
+	; 14/05/2024
 	; 20/11/2023
         call	delay1_4ms
         call	delay1_4ms
@@ -1589,7 +1692,7 @@ reset_ac97_codec:
 	;test	eax, 2
 	; 06/08/2022
 	test	al, 2
-	jz	short _r_ac97codec_cold
+	jz	short _r_ac97codec_cold	
 
 	call	warm_ac97codec_reset
 	jnc	short _r_ac97codec_ok
@@ -1683,8 +1786,6 @@ _delay_x_ms:
 	pop	cx
 	retn
 
-%endif
-
 ;=============================================================================
 ;               ICH_WAV.ASM
 ;=============================================================================
@@ -1698,9 +1799,11 @@ _delay_x_ms:
 ; PLAYMOD.ASM
 ; player internal variables and other equates.
 ;BUFFERSIZE	equ	2048*4		; 8K half buffer size. 18/02/2017
-; 14/05/2024
-BUFFERSIZE	equ	2560*4
-ENDOFFILE	equ	BIT0		; flag for knowing end of file
+; 15/05/2024
+;BUFFERSIZE	equ	2560*4
+; 16/05/2024
+BUFFERSIZE	equ	3840*4
+;ENDOFFILE	equ	BIT0		; flag for knowing end of file
 
 ;===========================================================================
 ; entry: none.  File is already open and [filehandle] filled.
@@ -1727,7 +1830,7 @@ ModPlay: ; 13/02/2017  ; ModPlay Polling!
 	mov	es, cx
 	call	ScopeLoop
 	pop	es
-
+	
         ; load 2048 bytes into buffer 1
 	mov	si, [DMA_BUFFER1]
 	; 11/05/2024
@@ -1868,10 +1971,9 @@ _0:
 ;
 	; 08/12/2016 - Erdogan Tan
 	;mov	eax, BUFFERSIZE
-	;or	eax, IOC + BUP
 	; 12/05/2024
 	mov	eax, BUFFERSIZE/2
-	or	eax, BUP ; (tuneloop without interrupt)
+	or	eax, IOC + BUP
 	stosd
 
 ; 2nd buffer:
@@ -1885,14 +1987,11 @@ _0:
 ; 
 	; 08/12/2016 - Erdogan Tan
 	;mov	eax, BUFFERSIZE
-	;or	eax, IOC + BUP
 	; 12/05/2024
 	mov	eax, BUFFERSIZE/2
-	; 12/05/2024
-	or	eax, BUP ; (tuneloop without interrupt)
+	or	eax, IOC + BUP
 	stosd
         loop    _0
-
 ;
 ; tell the DMA engine where to find our list of Buffer Descriptors.
 ; this 32bit value is a flat mode memory offset (ie no segment:offset)
@@ -1907,29 +2006,45 @@ _0:
         add     dx, PO_BDBAR_REG                ; set pointer to BDL
         out     dx, eax                         ; write to AC97 controller
 
+	; 15/05/2024
+	call	delay1_4ms
 ;
-; All set.  Let's play some music.
+; All set. Let's play some music.
 ;
 	; 08/12/2016
 	; 07/10/2016
         ;mov    al, 1
         mov	al, 31
+
+	; 13/05/2024
 	; 08/05/2024
-	mov	[LVI], al ; 10/11/2023
-	
-	call    setLastValidIndex
+	;mov	[LVI], al ; 10/11/2023
+	;call   setLastValidIndex
+
+	;input AL = index # to stop on
+setLastValidIndex:
+	mov	dx, [NABMBAR]
+	add	dx, PO_LVI_REG
+        out     dx, al
 
 	mov	byte [tLoop], 1 ; 30/11/2016
 
-; 12/05/2024 (tuneloop, without interrupt)
-%if 0
+	; 15/05/2024
+	call	delay1_4ms
+
 	; 12/05/2024	
 	; 17/02/2017
-        ;mov    dx, [NABMBAR]
-        ;add    dx, PO_CR_REG                   ; PCM out Control Register
-        ;mov	al, IOCE + RPBM	; Enable 'Interrupt On Completion' + run
-	;			; (LVBI interrupt will not be enabled)
-        ;out    dx, al                          ; Start bus master operation.
+        mov	dx, [NABMBAR]
+        add	dx, PO_CR_REG			; PCM out Control Register
+        mov	al, IOCE + RPBM	; Enable 'Interrupt On Completion' + run
+				; (LVBI interrupt will not be enabled)
+        out	dx, al				; Start bus master operation.
+
+	; 15/05/2024
+	call	delay1_4ms
+	call	delay1_4ms
+	call	delay1_4ms
+	call	delay1_4ms
 
 ; while DMA engine is running, examine current index and wait until it hits 1
 ; as soon as it's 1, we need to refresh the data in wavbuffer1 with another
@@ -1947,22 +2062,63 @@ _0:
 	;mov	bp, DmaBuffer ; 14/02/2017
 p_loop:
 	mov     ah, 1			; any key pressed?
+	;mov	ah, 11h
 	int     16h			; no, Loop.
 	jz	short q_loop
 
-	mov     ah, 0			; flush key buffer...
+	mov	ah, 0
+	;mov    ah, 10h			; flush key buffer...
 	int     16h
+
+	; 12/05/2024 (change PCM out volume)
+	cmp	al, '+'
+	jne	short p_1
+	
+	mov	al, [volume]
+	cmp	al, 0
+	jna	short q_loop
+	dec	al
+	jmp	short p_2
+p_1:
+	cmp	al, '-'
+	jne	short p_return
+
+	mov	al, [volume]
+	cmp	al, 31
+	jnb	short q_loop
+	inc	al
+p_2:
+	mov	[volume], al
+	mov	ah, al
+	mov     dx, [NAMBAR]
+  	;add    dx, CODEC_MASTER_VOL_REG
+	add	dx, CODEC_PCM_OUT_REG
+	out     dx, ax
+
+	; 12/05/2024
+	call    delay1_4ms
+        call    delay1_4ms
+        call    delay1_4ms
+        call    delay1_4ms
+
+	jmp	short q_loop
+
 p_return:
 	mov	byte [tLoop], 0	; 13/02/2017
+	; 16/05/2024
+	call	StopPlaying
 	pop	es
 	retn
+
 q_loop:
 	; 10/05/2024
 	xor	ax, ax
 	xchg	al, [tBuff] ; AL = [tBuff], [tBuff] = 0
 	cmp	al, 1
 	ja	short r_loop
-	jb	short ScopeLoop
+	;jb	short ScopeLoop
+	; 15/05/2024
+	jb	short x_loop
 	;
      	mov	si, [DMA_BUFFER1] ; [tBuff]=1 (from tuneLoop)
        	jmp	short s_loop 
@@ -1978,7 +2134,12 @@ s_loop:
 	;push	si ; offset
 	;push	cx ; count
 	call    GetSamples_ICH ; 18/02/2017
-	;
+
+	; 15/05/2024
+x_loop:
+	call	ScopeLoop
+	jmp	short p_loop
+
 ScopeLoop:
 	;mov    si, bp			; get current samples
 	mov	si, MOD_BUFFER ; 18/02/2017
@@ -2001,7 +2162,12 @@ DrawLoop:
 	inc     cx
 	cmp     cx, 320			; 320 pixels drawed?
 	jb      short DrawLoop
-	jmp	short p_loop
+	; 15/05/2024
+	;jmp	p_loop
+	retn
+
+; 13/05/2024
+%if 0
 
 tuneLoop:
 	; 11/05/2024
@@ -2053,185 +2219,6 @@ setLastValidIndex:
 	add	dx, PO_LVI_REG
         out     dx, al
 	;pop	dx
-	retn
-
-%else
-	; 12/05/2024
-	; 17/02/2017
-        mov     dx, [NABMBAR]
-        add     dx, PO_CR_REG		; PCM out Control Register
-        ;mov	al, IOCE + RPBM	; Enable 'Interrupt On Completion' + run
-	;			; (LVBI interrupt will not be enabled)
-	; 06/11/2023 (TUNELOOP version, without interrupt)
-	mov	al, RPBM
-	out     dx, al			; Start bus master operation.
-
-	push	es
-	mov	ax, 0A000h
-	mov	es, ax
-
-	; 12/05/2024
-;p_loop:
-;	call	tuneLoop
-;	cmp	byte [tLoop], 0
-;	ja	short p_loop
-;	pop	es
-;	retn
-
-p_loop:
-	mov     ah, 1			; any key pressed?
-	;mov	ah, 11h
-	int     16h			; no, Loop.
-	jz	short q_loop
-
-	mov	ah, 0
-	;mov    ah, 10h			; flush key buffer...
-	int     16h
-
-	; 12/05/2024 (change PCM out volume)
-	cmp	al, '+'
-	jne	short p_1
-	
-	mov	al, [volume]
-	cmp	al, 0
-	jna	short q_loop
-	dec	al
-	jmp	short p_2
-p_1:
-	cmp	al, '-'
-	jne	short p_return
-
-	mov	al, [volume]
-	cmp	al, 31
-	jnb	short q_loop	
-	inc	al
-p_2:
-	mov	[volume], al
-	mov	ah, al
-	mov     dx, [NAMBAR]
-  	;add    dx, CODEC_MASTER_VOL_REG
-	add	dx, CODEC_PCM_OUT_REG
-	out     dx, ax
-
-	; 12/05/2024
-	call    delay1_4ms
-        call    delay1_4ms
-        call    delay1_4ms
-        call    delay1_4ms
-
-	jmp	short q_loop
-
-p_return:
-	pop	es
-	retn
-q_loop:
-tuneLoop:
-	; 12/05/2024
-	; 18/11/2023 (ich_wav4.asm, Erdogan Tan)
-tL1:
-	call    updateLVI	; /set LVI != CIV/
-	;call   check4keyboardstop
-	;jc	short _exit_
-	call   getCurrentIndex
-	test	al, BIT0
-	jz	short tL1	; loop if buffer 2 is not playing
-
-	mov     si, [DMA_BUFFER1]
-	call    GetSamples_ICH
-
-	call	ScopeLoop
-tL2:
-	call    updateLVI
-	;call   check4keyboardstop
-	;jc	short _exit_
-	call   getCurrentIndex
-	test	al, BIT0
-	jnz	short tL2	; loop if buffer 1 is not playing
-
-	mov     si, [DMA_BUFFER2]
-	call    GetSamples_ICH
-
-	call	ScopeLoop
-	jmp	short p_loop
-
-ScopeLoop:
-	;mov    si, bp			; get current samples
-	mov	si, MOD_BUFFER ; 18/02/2017
-	xor     cx, cx			; to be drawed ...
-	xor     dx, dx
-DrawLoop:       
-	mov     bx, dx			; (save Index)
-	mov     di, [Scope+bx]		; get old SCOPE pixel address
-	mov     byte [es:di], 0		; erase it!
-	;lodsb				; get a sample (8-bit)
-	; 14/05/2024
-	lodsw
-	mov     bl, al			; calc new pixel address...
-	xor     bh, bh
-	shl     bx, 1
-	mov     di, [RowOfs+bx]
-	add     di, cx
-	mov     bx, dx			; (restore Index)
-	mov     [Scope+bx], di		; save new address...
-	mov     byte [es:di], 10 ; 0Ah	; and DRAW.
-	add     dx, 2			; the next pixel...
-	inc     cx
-	cmp     cx, 320			; 320 pixels drawed?
-	jb      short DrawLoop
-	retn
-	
-;_exit_:
-	;mov	byte [tLoop], 0
-	;retn
-
-	; 12/05/2024
-updateLVI:
-	; 06/11/2023
-	mov	dx, [NABMBAR]
-	add	dx, PO_CIV_REG
-	; (Current Index Value and Last Valid Index value)
-	in	ax, dx
-
-	cmp	al, ah ; is current index = last index ?
-	jne	short uLVI_exit ; 12/05/2024
-
-	; 08/11/2023	
-	call	getCurrentIndex
-
-	dec	al
-	and	al, 1Fh
-
-;input AL = index # to stop on
-setLastValidIndex:
-	; 08/11/2023
-	;push	dx
-	mov	dx, [NABMBAR]
-	add	dx, PO_LVI_REG
-        out     dx, al
-	;pop	dx
-uLVI_exit:	; 12/05/2024
-	retn
-
-; returns AL = current index value
-getCurrentIndex:
-	;push	dx
-	mov	dx, [NABMBAR]
-	add	dx, PO_CIV_REG
-	in	al, dx
-	;pop	dx
-	retn
-
-	; 12/05/2024
-check4keyboardstop:
-	; 08/11/2023
-	; 04/11/2023
-	mov	ah, 1
-	int	16h
-	jz	short _cksr
-	xor	ah, ah
-	int	16h
-	stc
-_cksr:
 	retn
 
 %endif
@@ -2287,7 +2274,7 @@ LoadModule:
 		;[sp+4] = es
 		;[sp+2] = di
 
-		FileName equ 4		
+		FileName equ 4
 
 		push    bp
 		mov     bp, sp
@@ -2440,7 +2427,7 @@ ReadSample:
 		;mov    dx, [ModInfo.SampOfs+si]
 		;mov    ds, [ModInfo.SampSeg+si]
 		mov	ds, dx
-		xor	dx, dx	
+		xor	dx, dx
 		int     21h
 		pop     ds
 		jc      short CloseFile
@@ -2545,7 +2532,7 @@ BeatTrack:
 		je      VibSlide
 		cmp     dh, 0Ah
 		je      VolSlide
-None:           
+None:
 		retn
 Arpeggio:
 		mov     bx, [di+TrackInfo.ArpIndex]
@@ -2601,12 +2588,12 @@ PortToUp:
 		sub     bx, dx
 		cmp     bx, ax
 		jl      short FixPort
-SetPort:        
+SetPort:
 		mov     [di+TrackInfo.Period], bx
 		add     bx, bx
 		mov     ax, [PitchTable+bx]
 		mov     [di+TrackInfo.Pitch], ax
-NoPort:         
+NoPort:
 		retn
 Vibrato:
 		mov     dh, dl
@@ -2626,17 +2613,17 @@ Vibrato:
 		test    dh, dh
 		jns     short VibUp
 		neg     ax
-VibUp:          
+VibUp:
 		add     ax, [di+TrackInfo.Period]
 		mov     bx, ax
 		cmp     bx, 113
 		jge     short NoLoVib
 		mov     bx, 113
-NoLoVib:        
+NoLoVib:
 		cmp     bx, 856
 		jle     short NoHiVib
 		mov     bx, 856
-NoHiVib:        
+NoHiVib:
 		add     bx, bx
 		mov     ax, [PitchTable+bx]
 		mov     [di+TrackInfo.Pitch], ax
@@ -2657,12 +2644,12 @@ VolSlide:
 		sub     al, dl
 		jge     short NoLoVol
 		xor     al, al
-NoLoVol:        
+NoLoVol:
 		add     al, dh
 		cmp     al, 64
 		jbe     short NoHiVol
 		mov     al, 64
-NoHiVol:        
+NoHiVol:
 		mov     [di+TrackInfo.Volume], al
 		retn
 
@@ -2746,7 +2733,7 @@ InitTonePort:
 		test    dl, dl
 		jne     short SetPortParm
 		mov     dl, [di+TrackInfo.PortParm]
-SetPortParm:    
+SetPortParm:
 		mov     [di+TrackInfo.PortParm], dl
 		mov     [di+TrackInfo.Effect], dx
 		retn
@@ -2758,17 +2745,17 @@ InitVibrato:
 		test    dl, 0Fh
 		jne     short OkDepth
 		or      dl, al
-OkDepth:        
+OkDepth:
 		test    dl, 0F0h
 		jne     short OkRate
 		or      dl, ah
-OkRate:         
+OkRate:
 		mov     [di+TrackInfo.VibParm], dl
 		mov     [di+TrackInfo.Effect], dx
 		test    cx, cx
 		je      short OkPos
 		mov     byte [di+TrackInfo.VibPos], 0
-OkPos:          
+OkPos:
 		retn
 SampleOfs:      
 		test    dl, dl
@@ -2821,7 +2808,7 @@ SetBpm:
 		xor     dx, dx
 		div     bx
 		mov     [BpmSamples], ax
-Skip:           
+Skip:
 		retn
 InitArpeggio:
 		mov     dh, dl
@@ -2869,7 +2856,7 @@ UpdateTracks:
 		mov	cx, NumTracks
 		mov	di, Tracks
 BeatTracks:
-		call	BeatTrack	
+		call	BeatTrack
 		add	di, TrackInfo.size
 		loop	BeatTracks
 		retn
@@ -2889,7 +2876,7 @@ GetTracks:
 		mov     [OrderPos], bl
 		cmp     bl, [ModInfo.OrderLen]
 		jae     short NoUpdate
-NoOrderWrap:    
+NoOrderWrap:
 		xor     bh, bh
 		mov     bl, [ModInfo.Order+bx]
 		shl     bx, 10
@@ -2903,14 +2890,14 @@ NoOrderWrap:
 		mov     [Note], si
 		mov     [Note+2], es
 		inc     byte [OrderPos]
-NoPattWrap:     
+NoPattWrap:
 		inc     byte [Row]
 
 		cld
 		mov	cx, NumTracks
 		mov	di, Tracks
 GetTracks_next:
-		push	cx		
+		push	cx
 		call	GetTrack
 		pop	cx
 		add	di, TrackInfo.size
@@ -2931,7 +2918,7 @@ NoUpdate:
 MixTrack:
 		cmp     word [si+TrackInfo.RepLen], 2
 		ja      short MixLooped
-MixNonLooped:   
+MixNonLooped:
 		les     dx, [si+TrackInfo.Samples]
 		mov     bx, [si+TrackInfo.Position]
 		mov     bp, [si+TrackInfo.Len]
@@ -2947,7 +2934,7 @@ MixNonLooped:
 		mov     al, dl
 		mov     dl, dh
 		xor     dh, dh
-nlMixSamp:      
+nlMixSamp:
 		cmp     si, bp
 		jae     short nlMixBye
 		mov     bl, [es:si]
@@ -2957,7 +2944,7 @@ nlMixSamp:
 		add     ah, al
 		adc     si, dx
 		loop    nlMixSamp
-nlMixBye:       
+nlMixBye:
 		mov     bx, si
 		pop     si
 		pop     dx
@@ -2983,11 +2970,11 @@ MixLooped:
 		mov     al, dl
 		mov     dl, dh
 		xor     dh, dh
-lpMixSamp:      
+lpMixSamp:
 		cmp     si, bp
 		jb      short lpMixNow
 		sub     si, [BufRep]
-lpMixNow:       
+lpMixNow:
 		mov     bl, [es:si]
 		mov     bl, [VolTable+bx]
 		add     [di], bl
@@ -2995,7 +2982,7 @@ lpMixNow:
 		add     ah, al
 		adc     si, dx
 		loop    lpMixSamp
-lpMixBye:       
+lpMixBye:
 		mov     bx, si
 		pop     si
 		pop     dx
@@ -3065,7 +3052,7 @@ NextChunk:
 		push	es
 		push	bx
 		push	di
-MixChunk:       
+MixChunk:
 		;lea    di, [MixBuffer]
 		mov	di, MixBuffer
 		mov     cx, [BpmSamples]
@@ -3096,7 +3083,7 @@ GetSamples_next:
 		pop	di
 		pop	bx
 		pop	es ; es = ds ; 12/05/2024
-CopyChunk:      
+CopyChunk:
 		mov     cx, [BufLen]
 		cmp     cx, bx
 		jbe     short MoveChunk
@@ -3164,7 +3151,7 @@ SetModParms:
 		mov     bx, 24*DefBpm/60
 		div     bx
 		mov     [BpmSamples], ax
-ClearTracks:    
+ClearTracks:
 		mov     di, Tracks
 		mov     ax, ds
 		mov     es, ax
@@ -3187,19 +3174,19 @@ MakePitch:
 		mov     cx, 857
 		xor     bx, bx
 		mov     di, PitchTable
-PitchLoop:      
+PitchLoop:
 		push    ax
 		push    dx
 		cmp     dx, bx
 		jae     short NoDiv
 		div     bx
-NoDiv:          
+NoDiv:
 		stosw
 		pop     dx
 		pop     ax
 		inc     bx
 		loop    PitchLoop
-MakeVolume:     
+MakeVolume:
 		mov     cx, 16640
 		mov     bx, cx
 VolLoop:
@@ -3224,8 +3211,6 @@ StopPlaying:
 	; finished with song, stop everything
 	call	ac97_stop
 
-; 12/05/2024 (tuneloop version)
-%if 0
 	; 11/11/2023
 irq_restore:	
 	; restore previous interrupt vector and interrupt_status
@@ -3247,7 +3232,7 @@ irq_restore:
 	pop	es
 
 	sti
-%endif
+
 	retn
 
 ;=============================================================================
@@ -3298,7 +3283,7 @@ print_msg:
 	; esi = ASCIIZ text address
 	;
 	mov	bx, 7h
-	mov	ah, 0Eh 
+	mov	ah, 0Eh
 pm_next_char:
 	lodsb
 	and	al, al
@@ -3309,7 +3294,7 @@ pm_retn:
 	retn
 
 dword2str:
-	; 13/11/2016 - Erdogan Tan 
+	; 13/11/2016 - Erdogan Tan
 	; eax = dword value
 	;
 	call	dwordtohex
@@ -3487,7 +3472,6 @@ _pmi:
         mov	dx, msgAC97Info
         mov     ah, 9
         int     21h
-
         retn
 
 	; 08/05/2024
@@ -3538,9 +3522,9 @@ ac97_po_cmd:
 
 msg_2017:
 		db	'Tiny MOD Player by Erdogan Tan. May 2024.',10,13
-		db	'usage: playmod2 filename.mod', 10, 13, '$'
+		db	'usage: playmod3 filename.mod', 10, 13, '$'
 		db	'18/02/2017',0
-		db	'20/05/2024',0
+		db	'19/05/2024',0
 
 Credits:	db	'Tiny MOD Player v0.1b by Carlos Hasan. July 1993.'
 CRLF:		; 13/05/2024
@@ -3662,11 +3646,11 @@ IRQ_vector:	resd 1  ; Previous interrupt handler address
 ; 256 byte buffer for descriptor list
 BDL_BUFFER:	resw	1		; segment of our 256byte BDL buffer
 DMA_BUFFER1:	resw 	1		; Pointer to 1st half of DMA Buffer
-DMA_BUFFER2:	resw	1		; Pointer to 2nd half of DMA Buffer
+DMA_BUFFER2:	resw	1		; Pointer to 1st half of DMA Buffer
 
 ; 12/11/2016 - Erdogan Tan
 
-ac97_int_ln_reg: resb 1 
+ac97_int_ln_reg: resb 1
 err_num:	resb 1
 
 bus_dev_fn:	resd 1
@@ -3678,7 +3662,9 @@ LVI:		resb 1
 ; 12/05/2024
 volume:		resb 1
 
-alignb 4
+;alignb 4
+; 13/05/2024
+alignb 16
 
 BdlBuffer:	resb	BDL_SIZE ; 13/02/2017
 DmaBuffer:	resb	2*BUFFERSIZE ; 13/02/2017
