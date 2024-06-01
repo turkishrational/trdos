@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.8 - audio.s
 ; ----------------------------------------------------------------------------
-; Last Update: 27/05/2024  (Previous: 02/12/2023 - Kernel v2.0.7)
+; Last Update: 01/06/2024  (Previous: 02/12/2023 - Kernel v2.0.7)
 ; ----------------------------------------------------------------------------
 ; Beginning: 03/04/2017
 ; ----------------------------------------------------------------------------
@@ -2359,6 +2359,7 @@ sb_rst_retn:
 	retn
 
 ac97_codec_config:
+	; 01/06/2024 (TRDOS 386 v2.0.8)
 	; 26/11/2023
 	; 21/11/2023
 	; 20/11/2023
@@ -2437,9 +2438,10 @@ init_ac97_controller: ; 10/06/2017
         ;mov	ax, 2
 	;out	dx, ax
 
+	; 01/06/2024
 	; 16/05/2024
 	; 02/12/2023
-	call	delay_100ms ; 29/05/2017
+	;call	delay_100ms ; 29/05/2017
 
 	; 02/12/2023
 	;call	delay1_4ms
@@ -2463,6 +2465,9 @@ init_ac97_codec:
 	;mov	[ebx], ax
 	;pop	ebx
 
+	; 01/06/2024
+	mov	byte [reset], 1
+
 	; 19/11/2023
 	mov	ebp, 40	; 21/11/2023
 _initc_1:
@@ -2480,8 +2485,9 @@ _initc_1:
 	add	dx, [NABMBAR]
 	in	eax, dx
 
+	; 01/06/2024
 	; 02/12/2023
-	call	delay1_4ms
+	;call	delay1_4ms
 
 	cmp	eax, 0FFFFFFFFh ; -1
 	jne	short _initc_3
@@ -2495,8 +2501,14 @@ _initc_3:
 	test	eax, CTRL_ST_CREADY
 	jnz	short _ac97_codec_ready
 
+	; 01/06/2024
+	cmp	byte [reset], 0
+	jna	short _initc_2
+
 	call	reset_ac97_codec
 	;jc	short _initc_2
+	; 01/06/2024
+	mov	byte [reset], 0
 	; 26/11/2023
 	jmp	short _initc_2
 
@@ -2505,6 +2517,7 @@ _ac97_codec_ready:
 	;add	dx, 0 ; ac_reg_0 ; reset register
 	out	dx, ax
 
+	; 01/06/2024
 	; 26/05/2024
 	; 19/11/2023
 	call	delay_100ms
@@ -2524,31 +2537,36 @@ _ac97_codec_ready:
 	; 10/06/2017
 	; 29/05/2017
 	; wait for 1 second
+	; 01/06/2024
 	; 16/05/2024
-	;mov	ecx, 1000 ; 1000*0.25ms = 1s
+	mov	ecx, 1000 ; 1000*0.25ms = 1s
 	; 20/11/2023
 	;mov	ecx, 10
 	; 23/05/2024
 	;mov	cl, 10
 	; 24/11/2023 - temporary
-	mov	cl, 40
+	;mov	cl, 40
 	; ecx = 40 ; 23/05/2024
 _ac97_codec_rloop:
+	; 01/06/2024
+	call	delay1_4ms
 	;call	delay1_4ms
 	;call	delay1_4ms
 	;call	delay1_4ms
-	;call	delay1_4ms
+	; 01/06/2024
 	; 19/11/2023
 	; 22/11/2023
-	push	ecx
-	call	delay_100ms
-	pop	ecx
+	;push	ecx
+	;call	delay_100ms
+	;pop	ecx
+
 	;mov	dx, [NAMBAR]
 	;add	dx, CODEC_REG_POWERDOWN
 	in	ax, dx
 
+	; 01/06/2024
 	; 02/12/2023
-	call	delay1_4ms
+	;call	delay1_4ms
 	
 	;and	ax, 0Fh
 	; 21/11/2023
@@ -2597,10 +2615,11 @@ _ac97_codec_init_ok:
 	; 21/11/2023
 	;call	delay1_4ms
 	
+	; 01/06/2024
 	; 24/05/2024
 	; 23/05/2024
 	; 21/11/2023 - temporary
-	call	delay_100ms
+	;call	delay_100ms
 
 ;	call 	setup_ac97_codec
 ;
@@ -2620,6 +2639,8 @@ setup_ac97_codec:
 	call	delay1_4ms
 	;call	delay_100ms
 
+; 01/06/2024
+%if 0
 	; 24/05/2024
 	; 23/05/2024
 	mov	dx, [NAMBAR]
@@ -2634,7 +2655,7 @@ setup_ac97_codec:
 	;
 	test	al, 1 ; BIT0 ; Variable Rate Audio bit
 	jz	short vra_not_supported
-
+%endif
 	mov	dx, [NAMBAR]
 	add	dx, CODEC_EXT_AUDIO_CTRL_REG ; 2Ah
 	in	ax, dx
@@ -2648,24 +2669,56 @@ setup_ac97_codec:
 	;call	delay1_4ms
 	;call	delay1_4ms
 
-	and	al, ~BIT1 ; Clear DRA
+	;and	al, ~BIT1 ; Clear DRA
+	;;;
+	; 01/06/2024
+	and	al, ~(BIT1+BIT0) ; Clear DRA+VRA
+	;mov	dx, [NAMBAR]
+	;add	dx, CODEC_EXT_AUDIO_CTRL_REG ; 2Ah
+	out	dx, ax
+	
+	; 01/06/2024
+	; check VRA
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_EXT_AUDIO_REG	; 28h
+	in	ax, dx
+
+	call	delay1_4ms
+	
+	test	al, 1 ; BIT0	; Variable Rate Audio bit
+	jz	short vra_not_supported
+
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_EXT_AUDIO_CTRL_REG  	; 2Ah
+	in	ax, dx
+
+	;and	al, ~BIT1 ; Clear DRA
+	;;;
+	
 	or	al, AC97_EA_VRA ; 1 ; 04/11/2023
-	out	dx, ax			; Enable variable rate audio
+	
+	;mov	dx, [NAMBAR]
+	;add	dx, CODEC_EXT_AUDIO_CTRL_REG  	; 2Ah
+	
+	out	dx, ax		; Enable variable rate audio
 
-	;mov	ecx, 10
+	; 01/06/2024
+	mov	ecx, 10
 	; 21/11/2023
-	mov	cl, 10
+	;mov	cl, 10
 check_vra:
-	push	ecx
-	call	delay_100ms
-	pop	ecx
+	; 01/06/2024
+	;call	delay_100ms
+	call	delay1_4ms
 
+	;mov	dx, [NAMBAR]
+	;add	dx, CODEC_EXT_AUDIO_CTRL_REG  	; 2Ah
 	in	ax, dx
 
 	; 24/05/2024
 	; 18/05/2024
 	; 02/12/2023
-	call	delay1_4ms
+	;call	delay1_4ms
 
 	test	al, AC97_EA_VRA ; 1
 	jnz	short vra_ok
@@ -2712,13 +2765,14 @@ vra_ok:
 	; 19/11/2023
 	out	dx, ax
 
+	; 01/06/2024
 	; 23/05/2024
 	; 16/05/2024
 	; 20/11/2023
 	call	delay1_4ms
-	call	delay1_4ms
-	call	delay1_4ms
-	call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
 	; 21/11/2023 temporary
 	;call	delay_100ms ; 18/05/2024
 
@@ -2734,13 +2788,14 @@ vra_ok:
   	;xor	ax, ax
   	out	dx, ax
 
+	; 01/06/2024
 	; 23/05/2024
 	; 16/05/2024
 	; 20/11/2023
-        call	delay1_4ms
-        call	delay1_4ms
-        call	delay1_4ms
-        call	delay1_4ms
+        ;call	delay1_4ms
+        ;call	delay1_4ms
+        ;call	delay1_4ms
+	;call	delay1_4ms
 	; 21/11/2023 - temporary
 	;call	delay_100ms ; 18/05/2024
 
@@ -2963,11 +3018,12 @@ ac97_start_play:
 	add	dx, CODEC_PCM_FRONT_DACRATE_REG	; 2Ch
 	out	dx, ax 				; out sample rate
 	
+	; 01/06/2024
 	; 27/11/2023	
-	call	delay1_4ms
-	call	delay1_4ms
-	call	delay1_4ms
-	call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
 	; 27/11/2023 - temporary
 	;call	delay_100ms
 
@@ -3027,9 +3083,10 @@ skip_set_rate:	; 20/11/2023
 	add	dx, PO_BDBAR_REG
 	out	dx, eax
 
+	; 01/06/2024
 	; 24/05/2024
 	; 23/11/2023 - temporary
-	call	delay_100ms
+	;call	delay_100ms
 	; 23/05/2024
 	;call	delay1_4ms
 ;
@@ -3041,15 +3098,16 @@ skip_set_rate:	; 20/11/2023
 	mov	al, 31
 	call    set_ac97_LastValidIndex
 
+	; 01/06/2024
 	; 24/05/2024
 	; 23/11/2023 - temporary
 	;call	delay_100ms
 	; 23/05/2024
-	call	delay1_4ms
+	;call	delay1_4ms
 	; 27/05/2024
-	call	delay1_4ms
-	call	delay1_4ms
-	call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
 
 	mov	byte [audio_play_cmd], 1 ; play command (do not stop) !
 
@@ -3067,14 +3125,15 @@ ac97_play: ; continue to play (after pause)
   	add	dx, CODEC_MASTER_VOL_REG  ; 02h ; Line Out 
   	out	dx, ax
 
+	; 01/06/2024
 	; 19/05/2024 - temporary
 	;call	delay_100ms
 	; 23/05/2024
-	call	delay1_4ms
+	;call	delay1_4ms
 	; 24/05/2024
-	call	delay1_4ms
-	call	delay1_4ms
-	call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
 
 	;mov	ax, 0202h
 	; 23/05/2024
@@ -3089,12 +3148,13 @@ ac97_play: ; continue to play (after pause)
   	add	dx, CODEC_PCM_OUT_REG ; 18h ; PCM Out 
   	out	dx, ax
 
+	; 01/06/2024
 	; 24/05/2024
 	; 23/05/2024
-	call	delay1_4ms
-	call	delay1_4ms
-	call	delay1_4ms
-	call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
 	; 24/05/2024
 	;call	delay_100ms
 	;;;
@@ -3455,6 +3515,7 @@ _ac97_ih3:
 	retn
 
 reset_ac97_controller:
+	; 01/06/2024
 	; 27/05/2024
 	; 16/05/2024
 	; 10/06/2017

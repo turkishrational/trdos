@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.8) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 24/05/2024 (Previous: 04/12/2023 - Kernel v2.0.7)
+; Last Update: 01/06/2024 (Previous: 04/12/2023 - Kernel v2.0.7)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -768,9 +768,12 @@ audio_bdl_buff:	resd 32*8 ; VT8233 (AC97) BDL Buffer Size
 ; 12/05/2017
 base_addr:	resd 1	; 'direct_memory_access' (memory.s)
 
+; 01/06/2024
+reset:		resb 1	; AC97 init
+
 ; 28/08/2017
 ; 20/08/2017
-		resb 1  ;
+		;resb 1 ;
 dma_user:	resb 1	; user number for sysdma
 dma_channel:	resb 1	; dma channel for sysdma
 dma_mode:	resb 1  ; dma mode for sysdma	
