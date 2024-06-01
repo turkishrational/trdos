@@ -5,7 +5,7 @@
 ;
 ; 29/05/2024
 ;
-; [ Last Modification: 31/05/2024 ]
+; [ Last Modification: 01/06/2024 ]
 ;
 ; Modified from PLAYWAV6.PRG .wav player program by Erdogan Tan, 27/11/2023
 ; Modified from PLAYWAV4.COM .wav player program by Erdogan Tan, 19/05/2024
@@ -5435,9 +5435,9 @@ trdos386_err_msg:
 ; 29/05/2024
 ; 11/11/2023
 msg_init_err:
-	db	CR, LF
+	db	10,13
 	db	"AC97 Controller/Codec initialization error !"
-	db	CR, LF, "$"
+	db	10,13,0 ; 01/06/2024
 
 ; 25/11/2023
 msg_no_vra:

@@ -5,7 +5,7 @@
 ;
 ; 25/11/2023
 ;
-; [ Last Modification: 27/11/2023 ]
+; [ Last Modification: 01/06/2024 ]
 ;
 ; Modified from PLAYWAV5.PRG .wav player program by Erdogan Tan, 18/08/2020
 ;
@@ -183,7 +183,6 @@ _3:
 %endif
 	call	write_audio_dev_info 
 
-
 ; open the file
         ; open existing file
         call    openFile ; no error? ok.
@@ -215,7 +214,6 @@ _gsr_1:
 	ja	short _gsr_2 ; 16 bit samples
 	inc	byte [fbs_shift] ; 2 = mono and 8 bit
 _gsr_2:	
-
 	; 06/06/2017
 	sys	_audio, 0E00h ; get audio controller info
 	jc	error_exit ; 25/11/2023
@@ -241,7 +239,22 @@ _gsr_2:
 	;mov	[ac97_NabmBar], dx
 	mov	[ac97_NamBar], edx	
   
+	; 01/06/2024
+	; Reset Audio Device (bh = 8)
+	sys	_audio, 0800h
+	;jc	error_exit	
+	jc	short init_err
+
 	call	write_ac97_pci_dev_info
+
+	; 01/06/2024
+	; 25/11/2023
+	; Get AC'97 Codec info
+	; (Function 14, sub function 1)
+	sys	_audio, 0E01h
+	; Save Variable Rate Audio support bit
+	and	al, 1
+	mov	[VRA], al
 
 	; 25/11/2023
 	call	write_VRA_info
@@ -259,6 +272,11 @@ playwav_48_khz:
 	;mov	dword [loadfromwavfile], loadFromFile
 	;mov	dword [buffersize], 65536
 	jmp	PlayNow
+
+	; 01/06/2024
+init_err:
+	sys	_msg, msg_init_err, 255, 0Eh
+	jmp	Exit
 
 chk_sample_rate:
 	; set conversion parameters
@@ -468,9 +486,11 @@ _2:
 	cmp	eax, 0B8000h
 	jne	short error_exit
 
+	; 01/06/2024
 	; Initialize Audio Device (bh = 3)
 	sys	_audio, 0301h, 0, audio_int_handler 
-;	jc	short error_exit
+	;jc	short error_exit
+	jc	init_err
 _3:
 
 %endif
@@ -521,6 +541,9 @@ pmsg_usage:
 DetectAC97:
 	; Detect (BH=1) AC'97 (BL=2) Audio Device
         sys	_audio, 0102h
+
+; 01/06/2024
+%if 0
 	jc	short DetectAC97_retn
 
 	; 25/11/2023
@@ -530,6 +553,7 @@ DetectAC97:
 	; Save Variable Rate Audio support bit
 	and	al, 1
 	mov	[VRA], al
+%endif
 
 DetectAC97_retn:
 	retn
@@ -762,6 +786,7 @@ lff_11:
 error_exit_2:
 	; 26/11/2023 - temporary
 	;sys	_msg, test_2, 255, 0Ch
+
 	jmp	error_exit
 	
 	; 26/11/2023 - temporary
@@ -833,7 +858,7 @@ _6:
 	dec	bl
 	or	bl, al
 	mov	cx, [sample_rate] 
-	mov	bh, 4 ; start to play	
+	mov	bh, 4 ; start to play
 	sys	_audio
 
 	;mov	ebx, 0B8000h ; video display page address
@@ -1267,8 +1292,9 @@ lff32_3:
 lff44_3:
 lff22_3:
 lff11_3:
+	; 01/06/2024 (BugFix)
 	mov	ecx, [buffersize] ; 16 bit (48 kHZ, stereo) sample size
-	shl	ecx, 1	; byte count
+	;shl	ecx, 1	; byte count ; Bug !
 	sub	ecx, edi
 	jna	short lff8m_4
 	;inc	ecx
@@ -1276,6 +1302,9 @@ lff11_3:
 	xor	eax, eax ; fill (remain part of) buffer with zeros	
 	rep	stosd
 lff8m_4:
+	; 01/06/2024 (BugFix)
+	; cf=1 ; Bug !
+	clc
 	retn
 
 lff8_eof:
@@ -3560,7 +3589,7 @@ interpolating_3_16bit_stereo:
 	mov	ax, [next_val_l]
 	add	ax, bx	; [previous_val_l]
 	rcr	ax, 1
-	xchg	eax, ebx ; ax = [previous_val_l]	
+	xchg	eax, ebx ; ax = [previous_val_l]
 	add	ax, bx	; bx = interpolated middle (L)
 	rcr	ax, 1
 	sub	ah, 80h	; -32768 to +32767 format again
@@ -4090,11 +4119,13 @@ FileHandle:
 
 Credits:
 	db	'Tiny WAV Player for TRDOS 386 by Erdogan Tan. '
-	;db	'August 2020.',10,13,0
-	db	'November 2023.',10,13,0
+	;;db	'August 2020.',10,13,0
+	;db	'November 2023.',10,13,0
+	db	'June 2024.', 10,13,0
 	db	'17/06/2017', 10,13,0
 	db	'18/08/2020', 10,13,0
 	db	'27/11/2023', 10,13,0
+	db	'01/06/2024', 10,13,0
 
 msgAudioCardInfo:
 	db 	'for Intel AC97 (ICH) Audio Controller.', 10,13,0
@@ -4111,6 +4142,12 @@ noFileErrMsg:
 
 trdos386_err_msg:
 	db	'TRDOS 386 System call error !',10,13,0
+
+; 01/06/2024
+msg_init_err:
+	db	10,13
+	db	"AC97 Controller/Codec initialization error !"
+	db	10,13,0
 
 ; 25/11/2023
 msg_no_vra:
