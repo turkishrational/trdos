@@ -5,7 +5,7 @@
 ;
 ; 24/06/2017
 ;
-; [ Last Modification: 08/10/2017 ]
+; [ Last Modification: 02/06/2024 ]
 ;
 ; Derived from source code of 'PLAY.EXE' (TINYPLAY) by Carlos Hasan (1993)
 ;          PLAY.EXE: PLAY.ASM, MODLOAD.ASM, MODPLAY.ASM, SB.ASM
@@ -1879,9 +1879,11 @@ SinTable:
 	db	0
 msg_2017:
 	db	'Tiny MOD Player for TRDOS 386 by Erdogan Tan. '
-	db	'October 2017.',10,13
+	;db	'October 2017.',10,13
+	db	'June 2024.',10,13
 	db	'usage: modplay filename.mod', 10,13,0
 	db	'08/10/2017',10,13,0
+	db	'02/06/2024',10,13,0
 
 Credits:
 	db	'Tiny MOD Player v0.1b by Carlos Hasan. July 1993.'
@@ -1909,7 +1911,9 @@ stmo:	db 1 ; stereo (2) or mono (1)
 bps:	db 8 ; bits per sample (8 or 16)
 Sample_Rate:
 MixSpeed: 
-	dw 22050 ; Hz
+	;dw 22050 ; Hz
+	; 02/06/2024
+	dw 48000 ; Hz	
 
 ; 13/11/2016
 hex_chars: db "0123456789ABCDEF", 0

@@ -5,7 +5,7 @@
 ;
 ; 27/10/2017
 ;
-; [ Last Modification: 04/12/2023 ]  !!! STEREO MOD PLAYING !!!
+; [ Last Modification: 02/06/2024 ]  !!! STEREO MOD PLAYING !!!
 ;
 ; Derived from 'tmodplay.s' (TMODPLAY.PRG, SB16) source code by Erdogan Tan
 ; (27/10/2017). ((Stereo mod playing with TRDOS 386 audio system calls...))
@@ -2608,12 +2608,14 @@ SinTable:
 	db	0
 msg_usage:
 	db	'Tiny MOD Player for TRDOS 386 by Erdogan Tan. '
-	;db	'October 2017.',10,13
-	db	'November 2023.',10,13 ; 27/11/2023
+	;;db	'October 2017.',10,13
+	;db	'November 2023.',10,13 ; 27/11/2023
+	db	'June 2024.',10,13
 	db	'usage: tmodplay filename.mod', 10,13,0
 	db	'29/10/2017',10,13,0
-	db	'27/11/2023',10,13,0
+	;db	'27/11/2023',10,13,0
 	db	'04/12/2023',10,13,0
+	db	'02/06/2024',10,13,0
 
 Credits:
 	db	'Tiny MOD Player v0.1b by Carlos Hasan. July 1993.'
@@ -2647,9 +2649,11 @@ stmo:		db 2 ; stereo (2) or mono (1)
 bps:		db 16 ; bits per sample (8 or 16)
 
 Sample_Rate:
-MixSpeed:	dw 22050 ; Hz
+MixSpeed:	;dw 22050 ; Hz
 		; 27/11/2023
-		;dw 24000 ; Hz	
+		;dw 24000 ; Hz
+		; 02/06/2024
+		dw 48000  ; Hz		
 
 ; 13/11/2016
 hex_chars:	db "0123456789ABCDEF", 0
