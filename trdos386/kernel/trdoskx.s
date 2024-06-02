@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.8) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 01/06/2024 (Previous: 04/12/2023 - Kernel v2.0.7)
+; Last Update: 02/06/2024 (Previous: 04/12/2023 - Kernel v2.0.7)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -754,15 +754,18 @@ audio_pcmo_volume:
 audio_pcmo_volume_l: resb 1 ; PCM out volume left channel
 audio_pcmo_volume_r: resb 1 ; PCM out volume right channel
 
-alignb 4
+; 02/06/2024
+;alignb 4
 
 ; 20/11/2023
 ; 28/05/2017
 ; AC'97 Audio Controller Base Adress Registers
 ;NAMBAR:	resw 1	; Native Audio Mixer Base Address
 ;NABMBAR:	resw 1	; Native Audio Bus Mastering Base Address
-	
-;alignb 4
+
+; 02/06/2024	
+alignb 8
+
 ; 21/04/2017
 audio_bdl_buff:	resd 32*8 ; VT8233 (AC97) BDL Buffer Size
 ; 12/05/2017

@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.8 - audio.s
 ; ----------------------------------------------------------------------------
-; Last Update: 01/06/2024  (Previous: 02/12/2023 - Kernel v2.0.7)
+; Last Update: 02/06/2024  (Previous: 02/12/2023 - Kernel v2.0.7)
 ; ----------------------------------------------------------------------------
 ; Beginning: 03/04/2017
 ; ----------------------------------------------------------------------------
@@ -2472,15 +2472,6 @@ init_ac97_codec:
 	mov	ebp, 40	; 21/11/2023
 _initc_1:
 	; 26/05/2024
-	; 26/11/2023
-	;mov	dx, GLOB_CNT_REG ; 2Ch
-	;add	dx, [NABMBAR]
-	;in	eax, dx
-	;; ?
-	;
-	; 02/12/2023
-	;call	delay1_4ms
-
 	mov	dx, GLOB_STS_REG ; 30h
 	add	dx, [NABMBAR]
 	in	eax, dx
@@ -2518,16 +2509,28 @@ _ac97_codec_ready:
 	out	dx, ax
 
 	; 01/06/2024
+	;;;
+	call	delay1_4ms
+	call	delay1_4ms
+	call	delay1_4ms
+	call	delay1_4ms
+	;;;
+
+	; 01/06/2024
 	; 26/05/2024
 	; 19/11/2023
-	call	delay_100ms
+	;call	delay_100ms
 	; 24/11/2023 - temporary
 	;call	delay_100ms
 	;call	delay_100ms
 	;call	delay_100ms
 
+	; 01/06/2024
+	;;;
+	; 02/06/2024
 	or	ebp, ebp  ; 21/11/2023
 	jnz	short _ac97_codec_init_ok
+	;;;
 
 	xor	eax, eax ; 0
 	mov	dx, [NAMBAR]
@@ -2560,13 +2563,17 @@ _ac97_codec_rloop:
 	;call	delay_100ms
 	;pop	ecx
 
-	;mov	dx, [NAMBAR]
-	;add	dx, CODEC_REG_POWERDOWN
+	; 01/06/2024
+	;;;
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_REG_POWERDOWN
+	;;;
 	in	ax, dx
 
+	; 02/06/2024
 	; 01/06/2024
 	; 02/12/2023
-	;call	delay1_4ms
+	call	delay1_4ms
 	
 	;and	ax, 0Fh
 	; 21/11/2023
@@ -2729,7 +2736,44 @@ vra_not_supported:	; 24/11/2023
 	; VRA is not usable
 	;mov	byte [VRA], 0
 	dec	byte [VRA]
+	; 02/06/2024
+	jmp	short set_volume
+
+	; 02/06/2024
+set_sampling_rate:
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_PCM_FRONT_DACRATE_REG
+	out	dx, ax
+	retn
+
+	; 02/06/2024
+get_sampling_rate:
+	mov	dx, CODEC_PCM_FRONT_DACRATE_REG
+	add	dx, [NAMBAR]
+	in	ax, dx
+	retn
+
 vra_ok:
+	; 02/06/2024
+	; a second test for verifying VRA status
+	; (may be needed for ALC850 codec and CK804 controller)
+	
+	call	get_sampling_rate
+	or	ax, ax
+	jz	short vra_not_supported
+	cmp	ax, 48000
+	jne	short set_volume
+	mov	ax, 24000
+	call	set_sampling_rate
+	call	get_sampling_rate
+	cmp	ax, 48000
+	je	short vra_not_supported
+	mov	ax, 48000
+	call	set_sampling_rate
+	;call	get_sampling_rate
+
+	; 02/06/2024
+set_volume:
 	; 24/05/2024
 	; 18/05/2024 - TRDOS 386 v2.0.8
 	; 20/11/2023
@@ -3220,7 +3264,7 @@ ac97_vol_0:
 	; 23/05/2024
 ac97_vol_2:
 	; 21/11/2023
-_ac97_ih5:	; 06/08/2022
+;_ac97_ih5:	; 06/08/2022
 	retn
 
 ac97_vol_1:
@@ -3256,6 +3300,9 @@ ac97_int_handler:
 	;push	ebx ; * must be saved !
 	;push	esi
 	;push	edi
+
+; 02/06/2024
+%if 0
 
 	;cmp	byte [audio_busy], 1
 	;jnb	_ac97_ih2 ; busy !
@@ -3317,6 +3364,14 @@ _ac97_ih0:
 ac97_stop: 
 	; 28/05/2017
 	mov	byte [audio_play_cmd], 0 ; stop !
+
+%else
+	; 02/06/2024
+_ac97_ih0:
+	cmp	byte [audio_play_cmd], 1
+	jnb	short _ac97_ih4	
+%endif
+
 _ac97_stop: ; 09/10/2017
 	; 29/05/2017
 	;mov	dx, [NABMBAR]
@@ -3347,6 +3402,15 @@ ac97_po_cmd:
 	out	dx, al
 	retn
 
+; 02/06/2024
+%if 1
+	; 24/11/2023
+ac97_stop: 
+	; 28/05/2017
+	mov	byte [audio_play_cmd], 0 ; stop !
+	jmp	short _ac97_stop
+%endif
+
 ac97_pause:
 	; 11/06/2017
 	; 29/05/2017
@@ -3356,8 +3420,20 @@ ac97_pause:
 _ac97_ih4:
 	;mov	byte [audio_busy], 1
 
-; 27/05/2024
+; 02/06/2024
 %if 1
+	; 24/11/2023 (TRDOS386 'audio.s')
+        mov	dx, [NABMBAR]
+	add	dx, PO_SR_REG
+	in	ax, dx
+
+	test	al, BCIS ; bit 3, 8
+	jz	short _ac97_ih2	; 02/06/2024
+
+	; 02/06/2024
+	push	eax ; *
+%else
+	; 27/05/2024
 	; 24/11/2023
 	push	eax
 
@@ -3380,10 +3456,24 @@ _ac97_ih4:
 	dec	al
 	;inc	al ; 11/06/2017
 	and	al, 1Fh
-
-        mov     dx, PO_LVI_REG
+%endif
+	; 02/06/2024
+	mov	dx, PO_CIV_REG
         add	dx, [NABMBAR]
-        out	dx, al
+	in	ax, dx
+			; al = CVI, ah = LVI
+	xchg	ah, al
+			; al = LVI, ah = CVI
+	cmp	al, ah
+	jne	short _ac97_ih5
+
+	dec	al
+	and	al, 1Fh
+
+        ;mov	dx, PO_LVI_REG
+        ;add	dx, [NABMBAR]
+        inc	dx	; 02/06/2024	
+	out	dx, al
 
 	; 12/10/2017
 	;mov	al, [audio_civ]
@@ -3393,44 +3483,9 @@ _ac97_ih4:
 	; 27/11/2023
 	; 20/11/2023
 	;inc	ah
+_ac97_ih5:	; 02/06/2024
 	and	ah, 1
 	mov	[audio_flag], ah
-%else
-	; 27/05/2024
-	; 16/05/2024
-	; (Ref: 'PLAYMOD3.ASM', 16/05/2024, Erdogan Tan)
-
-	push	eax ; *
-
-	; 13/05/2024
-	mov	dx, PO_CIV_REG
-        add	dx, [NABMBAR]
-	in	al, dx
-	mov	ah, al
-	
-	; 23/05/2024
-	; (Ref: 'ich_wav3.asm', 19/05/2024, Erdogan Tan)
-	cmp	al, [LVI]
-	jne	short _ac97_ih6
-
-	dec	al
-	and	al, 1Fh
-        mov     dx, PO_LVI_REG
-        add	dx, [NABMBAR]
-        out	dx, al
-
-	; 23/05/2024
-	xchg	al, [LVI]
-_ac97_ih6:
-	and	ah, 1
-	mov	[audio_flag], ah ; 0 = Buffer 1, 1 = Buffer 2
-
-	; 27/05/2024
-	mov	ax, 1Ch ; FIFOE(=16)+BCIS(=8)+LVBCI(=4)
-	mov	dx, PO_SR_REG
-        add	dx, [NABMBAR]
-	out	dx, ax
-%endif
 
 	;; [audio_flag] : 0 = Buffer 1, 1 = Buffer 2
 	;
@@ -3461,6 +3516,16 @@ _ac97_ih1:
 	; switch flag value
 	xor	byte [audio_flag], 1
 
+; 02/06/2024
+%if 1
+	; 02/06/2024
+	pop	eax ; *
+_ac97_ih2:
+	;mov	ax, 1Ch ; FIFOE(=16)+BCIS(=8)+LVBCI(=4)
+	mov	dx, PO_SR_REG
+	add	dx, [NABMBAR]
+	out	dx, ax
+%else
 	; 27/11/2023
 	; 21/11/2023 - temporary
 	;push	ebx
@@ -3504,6 +3569,8 @@ _ac97_ih1:
 	; 24/11/2023
 _ac97_ih2:
 	;mov	byte [audio_busy], 0
+%endif
+
 _ac97_ih3:
 	;pop	edi
 	;pop	esi
