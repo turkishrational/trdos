@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.8 - audio.s
 ; ----------------------------------------------------------------------------
-; Last Update: 02/06/2024  (Previous: 02/12/2023 - Kernel v2.0.7)
+; Last Update: 03/06/2024  (Previous: 02/12/2023 - Kernel v2.0.7)
 ; ----------------------------------------------------------------------------
 ; Beginning: 03/04/2017
 ; ----------------------------------------------------------------------------
@@ -2736,6 +2736,9 @@ vra_not_supported:	; 24/11/2023
 	; VRA is not usable
 	;mov	byte [VRA], 0
 	dec	byte [VRA]
+
+; 03/06/2024
+%if 0
 	; 02/06/2024
 	jmp	short set_volume
 
@@ -2752,8 +2755,12 @@ get_sampling_rate:
 	add	dx, [NAMBAR]
 	in	ax, dx
 	retn
+%endif
 
 vra_ok:
+
+; 03/06/2024
+%if 0
 	; 02/06/2024
 	; a second test for verifying VRA status
 	; (may be needed for ALC850 codec and CK804 controller)
@@ -2771,6 +2778,7 @@ vra_ok:
 	mov	ax, 48000
 	call	set_sampling_rate
 	;call	get_sampling_rate
+%endif
 
 	; 02/06/2024
 set_volume:
@@ -3460,18 +3468,22 @@ _ac97_ih4:
 	; 02/06/2024
 	mov	dx, PO_CIV_REG
         add	dx, [NABMBAR]
-	in	ax, dx
+	;in	ax, dx
+	; 03/06/2024
+	in	al, dx
 			; al = CVI, ah = LVI
-	xchg	ah, al
-			; al = LVI, ah = CVI
-	cmp	al, ah
-	jne	short _ac97_ih5
+	;xchg	ah, al
+	;		; al = LVI, ah = CVI
+	;cmp	al, ah
+	;jne	short _ac97_ih5
+	; 03/06/2024
+	mov	ah, al
 
 	dec	al
 	and	al, 1Fh
 
-        ;mov	dx, PO_LVI_REG
-        ;add	dx, [NABMBAR]
+	;mov	dx, PO_LVI_REG
+	;add	dx, [NABMBAR]
         inc	dx	; 02/06/2024	
 	out	dx, al
 
@@ -3510,7 +3522,7 @@ _ac97_ih1:
 
 	mov	esi, [audio_p_buffer] ; phy addr of audio buff
 	shr	ecx, 2 ; half buff size / 4
-	rep	movsd 
+	rep	movsd
 
 	; 10/10/2017
 	; switch flag value
