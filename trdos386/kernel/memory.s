@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.7 - memory.s
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.8 - memory.s
 ; ----------------------------------------------------------------------------
-; Last Update: 02/12/2023  (Previous: 29/08/2023)
+; Last Update: 04/06/2024  (Previous: 02/12/2023 - Kernel v2.0.7)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -3133,11 +3133,14 @@ amb_27:
 
 	retn
 
+; 04/06/2024
+%if 0
 deallocate_memory_block_x:
 	; 26/11/2023 - TRDOS 386 v2.0.7
 	; deallocate pages after rounding up
 	; ((audio buffer size etc. may not be rounded up to page boundary)) 
 	add	ecx, PAGE_SIZE - 1   ; 4095
+%endif
 
 deallocate_memory_block:
 	; 03/04/2016

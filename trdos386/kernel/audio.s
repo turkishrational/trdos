@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.8 - audio.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/06/2024  (Previous: 02/12/2023 - Kernel v2.0.7)
+; Last Update: 04/06/2024  (Previous: 02/12/2023 - Kernel v2.0.7)
 ; ----------------------------------------------------------------------------
 ; Beginning: 03/04/2017
 ; ----------------------------------------------------------------------------
@@ -1237,6 +1237,7 @@ codec_config:
 ;	retn
 
 vt8233_int_handler:
+	; 04/06/2024 - TRDOS 386 v2.0.8
 	; 27/07/2020
 	; 22/07/2020
 	; Interrupt Handler for VIA VT8237R Audio Controller
@@ -1322,9 +1323,12 @@ vt8233_tuneLoop:
 _ih2: 
 	; 10/10/2017
 	mov	edi, [audio_dma_buff]
-	mov	ecx, [audio_dmabuff_size]
-	shr	ecx, 1 ; dma buff size / 2 = half buffer size
-	
+	; 04/06/2024
+	;mov	ecx, [audio_dmabuff_size]
+	;shr	ecx, 1 ; dma buff size / 2 = half buffer size
+	mov	ecx, [audio_buff_size]
+	and	cl, ~1 ; word aligned	
+
 	; 22/07/2020
 	; 12/10/2017
 	;cmp	byte [audio_flag], 0
@@ -1436,6 +1440,7 @@ _tlp2:
 	jmp	short channel_reset
 
 set_vt8233_bdl: ; Set VT8237R Buffer Descriptor List
+	; 04/06/2024 - TRDOS 386 v2.0.8
 	; 06/08/2022 - TRDOS 386 v2.0.5
 	; 22/07/2020 - TRDOS 386 v2.0.2
 	; 28/05/2017
@@ -1445,7 +1450,10 @@ set_vt8233_bdl: ; Set VT8237R Buffer Descriptor List
 	; eax = dma buffer address = [audio_DMA_buff]
 	; ecx = dma buffer buffer size = [audio_dmabuff_size]
 
-	shr	ecx, 1 ; dma half buffer size
+	; 04/06/2024
+	; ecx = DMA half buffer size (same as audio buffer size)
+
+	;shr	ecx, 1 ; dma half buffer size
 	mov	esi, ecx
 
         mov     edi, audio_bdl_buff	; get BDL address
@@ -1485,6 +1493,23 @@ s_vt8233_bdl1:
 	;	      then an interrupt is generated at the end of this block.
 
 	mov	eax, esi ; DMA half buffer size
+
+		; 04/06/2024 - Erdogan Tan
+		; NOTE: I have changed DMA half buffer size to
+		; (word aligned) audio buffer size for smooth audio playing
+		; (it was page border aligned before June 4, 2024)
+		;
+		; For example:
+		;    For 65416 bytes audio buffer (22kHz, 16bit samples)
+		;       (user's audio buff virtual addr is mapped to physical)
+		;	((kernel's and user's audio buff pages are same)) 
+		;    1) Memory allocation (of it) is 65536 bytes
+		;    2) DMA half buffer size is 65416 bytes
+		;	(it would be 65536 bytes before this modification)
+		;	((additional 140 bytes would cause to a noise))	     
+		;    3) Total DMA buffer size is 131072 bytes
+		;       (the last 240 bytes will not be used for playing)
+
 	add	edx, eax
 	or	eax, FLAG
 	;or	eax, EOL
@@ -2680,9 +2705,15 @@ setup_ac97_codec:
 	;;;
 	; 01/06/2024
 	and	al, ~(BIT1+BIT0) ; Clear DRA+VRA
-	;mov	dx, [NAMBAR]
-	;add	dx, CODEC_EXT_AUDIO_CTRL_REG ; 2Ah
+	;;;
+	; 04/06/2024
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_EXT_AUDIO_CTRL_REG ; 2Ah
+	;;;
 	out	dx, ax
+
+	; 04/06/2024
+	call	delay1_4ms
 	
 	; 01/06/2024
 	; check VRA
@@ -2704,9 +2735,12 @@ setup_ac97_codec:
 	
 	or	al, AC97_EA_VRA ; 1 ; 04/11/2023
 	
-	;mov	dx, [NAMBAR]
-	;add	dx, CODEC_EXT_AUDIO_CTRL_REG  	; 2Ah
-	
+	;;;
+	; 04/06/2024
+	mov	dx, CODEC_EXT_AUDIO_CTRL_REG  	; 2Ah
+	add	dx, [NAMBAR]
+	;;;
+
 	out	dx, ax		; Enable variable rate audio
 
 	; 01/06/2024
@@ -2718,8 +2752,12 @@ check_vra:
 	;call	delay_100ms
 	call	delay1_4ms
 
-	;mov	dx, [NAMBAR]
-	;add	dx, CODEC_EXT_AUDIO_CTRL_REG  	; 2Ah
+	;;;
+	; 04/06/2024
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_EXT_AUDIO_CTRL_REG  	; 2Ah
+	;;;
+
 	in	ax, dx
 
 	; 24/05/2024
@@ -2727,7 +2765,9 @@ check_vra:
 	; 02/12/2023
 	;call	delay1_4ms
 
-	test	al, AC97_EA_VRA ; 1
+	;test	al, AC97_EA_VRA ; 1
+	; 04/06/2024
+	and	al, AC97_EA_VRA ; 1
 	jnz	short vra_ok
 
 	loop	check_vra
@@ -2927,14 +2967,18 @@ set_volume_ok:
 	retn
 
 set_ac97_bdl: ; Set AC97 (ICH) Buffer Descriptor List
+	; 04/06/2024 - TRDOS 386 v2.0.8
 	; 06/08/2022 - TRDOS 386 v2.0.5
 	; 17/06/2017
 	; 11/06/2017
 	; 28/05/2017
 	; eax = dma buffer address = [audio_DMA_buff]
-	; ecx = dma buffer buffer size = [audio_dmabuff_size]
+	;; ecx = dma buffer buffer size = [audio_dmabuff_size]
 
-	shr	ecx, 1 ; dma half buffer size
+	; 04/06/2024
+	; ecx = DMA half buffer size as truncated for 8 byte alignment
+
+	;shr	ecx, 1 ; dma half buffer size
 	mov	esi, ecx
 
         mov     edi, audio_bdl_buff	; get BDL address
@@ -2989,6 +3033,25 @@ s_ac97_bdl1:
 ;
 
 	mov	eax, esi ; DMA half buffer size
+
+		; 04/06/2024 - Erdogan Tan
+		; NOTE: I have changed DMA half buffer size to truncated
+		; (8 byte aligned) audio buffer size for smooth audio playing
+		; (it was page border aligned before June 4, 2024)
+		;
+		; For example:
+		;    For 65416 bytes audio buffer (22kHz, 16bit samples)
+		;       (user's audio buff virtual addr is mapped to physical)
+		;	((kernel's and user's audio buff pages are same)) 
+		;    1) Memory allocation (of it) is 65536 bytes
+		;    2) DMA half buffer size is 65416 bytes
+		;	(it would be 65536 bytes before this modification)
+		;	((additional 140 bytes would cause to a noise))	     
+		;    3) Total DMA buffer size is 131072 bytes
+		;       (the last 240 bytes will not be used for playing)
+		;
+		; (buffer will be truncated if the size is not a multiple of 8) 
+
 	add	edx, eax
 	shr	eax, 1	; count of 16 bit samples
 	; 19/11/2023
@@ -3288,6 +3351,9 @@ ac97_vol_1:
 	jmp	short ac97_vol_0
 
 ac97_int_handler:
+	; 04/06/2024
+	; 03/06/2024
+	; 02/06/2024 - TRDOS 386 v2.0.8
 	; 27/11/2023
 	; 24/11/2023
 	; 21/11/2023
@@ -3508,8 +3574,11 @@ _ac97_ih5:	; 02/06/2024
 ac97_tuneloop:
 	; 09/10/2017
 	mov	edi, [audio_dma_buff]
-	mov	ecx, [audio_dmabuff_size]
-	shr	ecx, 1 ; dma buff size / 2 = half buffer size
+	; 04/06/2024
+	;mov	ecx, [audio_dmabuff_size]
+	;shr	ecx, 1 ; dma buff size / 2 = half buffer size
+	mov	ecx, [audio_buff_size]
+	and	cl, ~7 ; 8 byte aligned
 
 	; 12/10/2017
 	cmp 	byte [audio_flag], 0
@@ -3763,6 +3832,7 @@ _cold_ac97c_rst_ok:
 	retn
 
 sb16_current_sound_data:
+	; 04/06/2024 - TRDOS 386 v2.0.8
 	; 06/08/2022 - TRDOS 386 v2.0.5
 	; 20/08/2017
 	; 24/06/2017
@@ -3776,6 +3846,7 @@ sb16_current_sound_data:
 	;;mov	edi, [audio_buff_size]
 	;mov	edi, [audio_dmabuff_size]
 	;mov	esi, [audio_dma_buff]
+
 	cmp	edi, ecx
 	jnb	short sb16_gcd_0
 	mov	ecx, edi
@@ -3823,6 +3894,7 @@ sb16_gcd_1:
 ;	retn
 
 get_current_sound_data:
+	; 04/06/2024
 	; 24/06/2017
 	; 22/06/2017
 	; get current sound (PCM out) data for graphics
@@ -3832,19 +3904,39 @@ get_current_sound_data:
 	; [audio_buff_size]
 
 	;mov	edi, [audio_buff_size]
-	mov	edi, [audio_dmabuff_size]
+	;;; 
+	; 04/06/2024
+	;mov	edi, [audio_dmabuff_size]
+	mov	edi, [audio_buff_size]
+	;;;
 	mov	esi, [audio_dma_buff]
-	cmp	byte [audio_device], 2
-	jb	short sb16_current_sound_data ; = 1
-	shr	edi, 1
+
+	;;;
+	; 04/06/2024
+	;cmp	byte [audio_device], 2
+	;jb	short sb16_current_sound_data ; = 1
+	;shr	edi, 1
+
+	; 04/06/2024
+	cmp	byte [audio_device], 1
+	ja	short gcd_1
+	shl	edi, 1 ; [audio_dmabuff_size] = 2 * edi
+	jmp	short sb16_current_sound_data
+gcd_1:
+	;;;
+
+; 04/06/2024
+%if 0
 	cmp	edi, ecx
 	jnb	short gcd_0
 	mov	ecx, edi
 gcd_0:
+%endif
 	cmp	byte [audio_device], 3
 	jb	short ac97_current_sound_data ; = 2
 	; = 3
 vt8233_current_sound_data:
+	; 04/06/2024 - TRDOS 386 v2.0.8
 	; 06/08/2022 - TRDOS 386 v2.0.5
 	; 22/06/2017
 	; 21/06/2017
@@ -3861,6 +3953,16 @@ vt8233_current_sound_data:
 	;cmp	edi, ecx
 	;jnb	short vt8233_gcd_1
 	;mov	ecx, edi
+
+	;;;
+	; 04/06/2024
+	; edi = [audio_buff_size]
+	and	di, ~1	; word alignment
+	cmp	edi, ecx
+	jnb	short vt8233_gcd_1
+	mov	ecx, edi
+	;;;
+
 vt8233_gcd_1:
 	;mov	edx, VIA_REG_OFFSET_CURR_COUNT
 	; 06/08/2022
@@ -3893,6 +3995,7 @@ vt8233_gcd_5:
 	retn
 
 ac97_current_sound_data:
+	; 04/06/2024 - TRDOS 386 v2.0.8
 	; 23/06/2017
 	; 22/06/2017
 	; get current sound (PCM out) data for graphics
@@ -3908,6 +4011,16 @@ ac97_current_sound_data:
 	;cmp	edi, ecx
 	;jnb	short ac97_gcd_0
 	;mov	ecx, edi
+
+	;;;
+	; 04/06/2024
+	; edi = [audio_buff_size]
+	and	di, ~7	; 8 byte alignment
+	cmp	edi, ecx
+	jnb	short ac97_gcd_0
+	mov	ecx, edi
+	;;;
+
 ac97_gcd_0:
 	mov	dx, PO_CIV_REG ; Position In Current Buff Reg
 	add	dx, [NABMBAR]
@@ -3919,8 +4032,13 @@ ac97_gcd_1:
 	xor	eax, eax
 	mov	dx, PO_PICB_REG ; Position In Current Buff Reg
 	add	dx, [NABMBAR]
-	in	ax, dx ; remain dwords
-	shl	eax, 2 ; remain bytes ; 23/06/2017
+	;in	ax, dx ; remain dwords
+	;shl	eax, 2 ; remain bytes ; 23/06/2017
+	;;;
+	; 04/06/2024
+	in	ax, dx ; remain words
+	shl	eax, 1 ; remain bytes	
+	;;;
 	jmp	short ac97_gcd_2
 ;	cmp	eax, ecx
 ;	jnb	short ac97_gcd_2 
@@ -3937,6 +4055,7 @@ ac97_gcd_1:
 ;	retn
 
 sb16_get_dma_buff_off:
+	; 04/06/2024
 	; 28/10/2017
 	; 24/06/2017
 	; 22/06/2017
@@ -3946,6 +4065,14 @@ sb16_get_dma_buff_off:
 	;mov	ecx, [audio_dmabuff_size]
 	;xor	ebx, ebx
 	;shr	ecx, 1
+	
+	;;;
+	; 04/06/2024
+	; ecx = audio buffer size
+	shl	ecx, 1 ; * 2
+	; ecx = DMA buffer size
+	;;;
+
 sb16_gdmabo_0:
 	; 28/10/2017
 	cmp	byte [audio_bps], 16
@@ -3967,6 +4094,7 @@ sb16_gdmabo_1:
 	jmp	short sb16_gdmabo_2
 
 get_dma_buffer_offset:
+	; 04/06/2024
 	; 24/06/2017
 	; 22/06/2017
 	; get current sound (PCM out) data for graphics
@@ -3975,7 +4103,11 @@ get_dma_buffer_offset:
 	; ecx = Byte count
 	; [audio_buff_size]
 
-	mov	ecx, [audio_dmabuff_size]
+	;mov	ecx, [audio_dmabuff_size]
+	;;;
+	; 04/06/2024
+	mov	ecx, [audio_buff_size]
+	;;;
 	xor	ebx, ebx
 gdmabo_0:
 	cmp	byte [audio_device], 2
@@ -3991,7 +4123,12 @@ vt8233_get_dma_buff_off:
 	
 	;mov	ecx, [audio_dmabuff_size]
 	;xor	ebx, ebx
-	shr	ecx, 1
+	;;;
+	; 04/06/2024
+	;shr	ecx, 1
+	and	cl, ~1
+	; ecx = DMA Half Buffer Size (word aligned)
+	;;;
 vt8233_gdmabo_0:
 	;mov	edx, VIA_REG_OFFSET_CURR_COUNT
 	; 06/08/2022
@@ -4016,6 +4153,7 @@ vt8233_gdmabo_2:
 	retn
 
 ac97_get_dma_buff_off:
+	; 04/06/2024
 	; 24/06/2017
 	; 22/06/2017
 	; get current (PCM OUT DMA buffer) pointer
@@ -4026,7 +4164,12 @@ ac97_get_dma_buff_off:
 	
 	;mov	ecx, [audio_dmabuff_size]
 	;xor	ebx, ebx
-	shr	ecx, 1
+	;;;
+	; 04/06/2024
+	;shr	ecx, 1
+	and	cl, ~7 ; (truncate bytes if out of 8x)
+	; ecx = DMA Half Buffer Size (8 byte aligned)
+	;;;
 ac97_gdmabo_0:
 	mov	dx, PO_CIV_REG ; Position In Current Buff Reg
 	add	dx, [NABMBAR]
@@ -4038,7 +4181,11 @@ ac97_gdmabo_1:
 	xor	eax, eax
 	mov	dx, PO_PICB_REG ; Position In Current Buff Reg
 	add	dx, [NABMBAR]
-	in	ax, dx ; remain dwords
+	in	ax, dx ; remain words
+	;;;
+	; 04/06/2024 (BugFix)
+	shl	eax, 1 ; remain bytes
+	;;;
 	jmp	short ac97_gdmabo_2
 
 ac97_codec_info:

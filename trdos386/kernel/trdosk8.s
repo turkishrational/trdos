@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.8) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 24/05/2024  (Previous: 04/12/2023)
+; Last Update: 04/06/2024  (Previous: 04/12/2023)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1829,6 +1829,7 @@ set_dev_IRQ_service:
 	retn
 
 sysaudio: ; AUDIO FUNCTIONS
+	; 04/06/2024
 	; 23/05/2024 (TRDOS 386 v2.0.8)
  	; 19/11/2023 (TRDOS 386 v2.0.7)
 	; 29/07/2022 (TRDOS 386 v2.0.5)
@@ -2330,6 +2331,7 @@ snd_alloc_2:
  	;mov	[audio_buff_size], ecx
 	; 26/11/2023
 	mov	[audio_buff_size], edx
+	;
 	mov	dl, [u.uno]
 	mov	[audio_user], dl
 	mov	[u.r0], eax
@@ -2350,6 +2352,7 @@ soundc_init:
 	; bl = method (0= s.r.b., 1= callback, 2= auto incr s.r.b.)
 	; cl = signal response byte (initial or fixed) value
 	; edx = signal response byte or callback address
+	; 04/06/2024
 	; 04/12/2023
 	; 02/12/2023
 	; 07/08/2022
@@ -2517,6 +2520,14 @@ sndc_init2:
 	; 21/04/2017
 	mov	ecx, [audio_buff_size] ; audio buffer size
 	shl	ecx, 1 ; *2
+
+	;;;
+	; 04/06/2024
+	add	ecx, 4095  ; PAGE_SIZE - 1
+	and	cx, ~4095  ; ~PAGE_OFF	
+	; ecx = page border aligned DMA buffer size (required)
+	;;;
+
 	mov	eax, [audio_dma_buff]
 	and	eax, eax
 	jz	short sndc_init3
@@ -2535,8 +2546,11 @@ sndc_init2:
 	; ((so deallocation must be done for the rounded up value))
 	;add	ecx, PAGE_SIZE - 1   ; 4095
 	;call	deallocate_memory_block
-	call	deallocate_memory_block_x
-			; deallocate ((ecx+4095)>>12) pages
+	; 04/06/2024
+	;call	deallocate_memory_block_x
+	;		; deallocate ((ecx+4095)>>12) pages
+	call	deallocate_memory_block	
+
 	xchg	edx, ecx
 sndc_init20:
 	xor	eax, eax
@@ -2572,6 +2586,12 @@ sndc_init17:	; 29/07/2022
 	; set dma buffer address and size parameters
 	mov	[audio_dma_buff], eax ; dma buffer address
 	mov	[audio_dmabuff_size], ecx ; dma buffer size
+
+	;;;
+	; 04/06/2024
+	mov	ecx, [audio_buff_size] ; audio buffer size in bytes
+	;;;
+
 ;	; EAX = Beginning (physical) addr of the allocated mem block
 ;	; ECX = Num of allocated bytes (rounded up to page borders)
 ;	cmp	byte [audio_pci], 0 ; AC97 audio controller ?
@@ -2607,12 +2627,37 @@ sndc_init17:	; 29/07/2022
 ;	;mov	[u.r0], eax ; 0 = no error, successful
 ;	retn
 
+	;;;
+	; 04/06/2024 (use truncated buffer size for BDL setup)
+	; NOTE: Round up adds spurious bytes (noise) to the DMA buff;
+	;	so, round down the size is better than the round up.
+	;	((BDL/SGD feature needs word aligned buffer address))
+	;
+	;mov	ecx, [audio_buff_size] ; audio buffer size in bytes
+	and	cl, ~1
+	; ecx = DMA half buffer size as word aligned
+	;	(in fact, half buffer is one of the two DMA buffers)
+	;;;
+
 	jmp	set_vt8233_bdl
 
 sndc_init18:
 	;call	set_ac97_bdl
 	;;jmp	short sndc_init5
 	;retn
+
+	;;;
+	; 04/06/2024 (use truncated buffer size for BDL setup)
+	; NOTE: Round up adds spurious bytes (noise) to the DMA buff;
+	;	so, round down the size is better than the round up.
+	;	((BDL feature needs 8 byte aligned buffer address))
+	;
+	;mov	ecx, [audio_buff_size] ; audio buffer size in bytes
+	and	cl, ~7
+	; ecx = DMA half buffer size as truncated for 8 byte alignment
+	;	(in fact, half buffer is one of the two DMA buffers)
+	;;;
+
 	; 29/07/2022
 	jmp	set_ac97_bdl
 
@@ -2633,6 +2678,7 @@ sound_play:
 	;	to 16 bit samples and mono samples must be
 	;	converted to stereo samples...)
 	 
+	; 04/06/2024
 	; 30/07/2022
 	; 28/07/2020
 	; 27/07/2020
@@ -2689,11 +2735,28 @@ snd_play_5:
 	; 27/07/2020
 	mov	esi, [audio_p_buffer] ; physical address (ring 3)
 	;mov	ecx, [audio_buff_size] ; 15/05/2017
+
+; 04/06/2024
+%if 0
 	mov	ecx, [audio_dmabuff_size] ; 27/07/2020
 	;or	ecx, ecx 
 	;jz	sound_buff_error
 	; 28/07/2020
 	shr	ecx, 1  ; dma half buffer size
+%else
+	; 04/06/2024
+	mov	ecx, [audio_buff_size]
+	mov	al, [audio_device]
+
+	cmp	al, 1 ; Sound Blaster 16
+	je	short snd_play_8
+	and	cl, ~1
+	cmp	al, 3 ; VT8233 (VT8237R)
+	je	short snd_play_8
+	; AC'97
+	and	cl, ~7
+snd_play_8:
+%endif
 
 	xor	byte [audio_flag], 1 ;  0 -> 1, 1 -> 0
 	jnz	short snd_play_0 ; [audio_flag] = 1
@@ -2716,8 +2779,11 @@ snd_play_0:
 	;mov	byte [audio_flag], 1 ; next half (on next time)
 
 	; 24/04/2017
-	mov	al, [audio_device]
-	cmp	al, 3 ; VT8233 (VT8237R) 
+	;mov	al, [audio_device]
+	; 04/06/2024
+	; al = [audio_device]
+
+	cmp	al, 3 ; VT8233 (VT8237R)
 	je	short snd_play_1
 	cmp	al, 1 ; Sound Blaster 16
 	jne	short snd_play_2  ; 28/05/2017
@@ -2755,9 +2821,10 @@ snd_play_2:
 	; 30/07/2022
 	;jmp	hda_start_play
 
-snd_play_6:
-	; 30/07/2022
-	retn
+; 04/06/2024
+;snd_play_6:
+;	; 30/07/2022
+;	retn
 
 sound_pause:
 	; FUNCTION = 5
@@ -3003,6 +3070,7 @@ snd_vol_3:
 soundc_disable:
 	; FUNCTION = 12 
 	; Disable audio device (and unlink DMA memory)
+	; 04/06/2024
 	; 30/07/2022
 	; 28/05/2017
 	; 24/05/2017
@@ -3063,8 +3131,10 @@ snd_disable_2:
 	; ((so deallocation must be done for the rounded up value))
 	;add	ecx, PAGE_SIZE - 1   ; 4095
 	;call	deallocate_memory_block
-	call	deallocate_memory_block_x 
+	; 04/06/2024
+	;call	deallocate_memory_block_x 
 			; deallocate ((ecx+4095)>>12) pages
+	call	deallocate_memory_block
 snd_disable_3:
 	retn
 
@@ -3255,7 +3325,7 @@ sound_data_0:
 	je	short sound_data_4 ; temporary ! (22/06/2017)
 
 	and	ecx, ecx
-	;jnz	short sound_data_1 ; sample tranfer
+	;jnz	short sound_data_1 ; sample transfer
 	
 	; Return only DMA Buffer pointer/offset... 
 	; (If DMA Buffer has been mapped to user's
@@ -3408,7 +3478,20 @@ snd_update_6:
 snd_update_7:
 	mov	esi, [audio_p_buffer] ; physical address (ring 3)
 	mov	ecx, [audio_buff_size]
-	
+
+	;;;
+	; 04/06/2024
+	mov	al, [audio_device]
+	cmp	al, 1
+	je	short snd_update_8 ; SB16
+	and	cl, ~1 ; word alignment
+	cmp	al, 3
+	je	short snd_update_8 ; VIA VT8233
+	; al = 2 ; AC97
+	and	cl, ~7 ; 8 byte alignment
+snd_update_8:
+	;;;
+
 	;movzx	eax, byte [audio_flag]
 	mov	al, [audio_flag]
 
