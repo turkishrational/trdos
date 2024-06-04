@@ -5,7 +5,7 @@
 ;
 ; 27/10/2017
 ;
-; [ Last Modification: 02/06/2024 ]  !!! STEREO MOD PLAYING !!!
+; [ Last Modification: 04/06/2024 ]  !!! STEREO MOD PLAYING !!!
 ;
 ; Derived from 'tmodplay.s' (TMODPLAY.PRG, SB16) source code by Erdogan Tan
 ; (27/10/2017). ((Stereo mod playing with TRDOS 386 audio system calls...))
@@ -299,12 +299,13 @@ MakeOfs:
 	inc	ebx
 	loop	MakeOfs
 	
+	; 04/06/2024
 	; 23/06/2017
 	; Map DMA buffer to user's memory space
-	;sys	_audio, 0D00h, 65536, DMA_Buffer
+	sys	_audio, 0D00h, 65536, DMA_Buffer
 	;;jc	error_exit
 	; 27/11/2023
-	sys	_audio, 0D00h, 131072, DMA_Buffer
+	;sys	_audio, 0D00h, 131072, DMA_Buffer
 	
 	; 24/06/2017
 	; Set Master Volume Level (BL=0 or 80h)
@@ -548,10 +549,11 @@ r_loop:
 	; 23/06/2017
 	mov     esi, DMA_Buffer
 	add     esi, eax	; add offset value
+	; 04/06/2024
 	; 24/06/2017
-	;mov	ecx, DMA_Buffer + (65536 - (256*4))
+	mov	ecx, DMA_Buffer + (65536 - (256*4))
 	; 27/11/2023
-	mov	ecx, DMA_Buffer + (131072 - (256*4))
+	;mov	ecx, DMA_Buffer + (131072 - (256*4))
 	cmp	esi, ecx 
 	jna	short _4
 	mov	esi, ecx
@@ -1910,6 +1912,7 @@ StopPlaying:
 ;	call	wordtohex
 ;	retn
 
+	; 04/06/2024 (BugFix)
 	; 24/06/2017
 	; 19/06/2017
 	; 05/03/2017 (TRDOS 386)
@@ -1920,14 +1923,12 @@ write_audio_dev_info:
 	; DEV/VENDOR
 	;	DDDDDDDDDDDDDDDDVVVVVVVVVVVVVVVV
 
-	mov	esi, [dev_vendor]
-	;mov	ax, si
-	; 27/11/2023
-	;movzx	ebx, al
-	mov	ebx, esi
+	;mov	esi, [dev_vendor]
+	; 04/06/2024
+	mov	eax, [dev_vendor]
+	movzx	ebx, al
 	mov	dl, bl
-	;and	bl, 0Fh
-	and	ebx, 0Fh
+	and	bl, 0Fh
 	mov	al, [ebx+hex_chars]
 	mov	[msgVendorId+3], al
 	mov	bl, dl
@@ -1943,10 +1944,9 @@ write_audio_dev_info:
 	shr	bl, 4
 	mov	al, [ebx+hex_chars]
 	mov	[msgVendorId], al
-	shr	esi, 16
-	;mov	ax, si
-	; 27/11/2023
-	mov	eax, esi
+	;shr	esi, 16
+	; 04/06/2024
+	shr	eax, 16
 	mov	bl, al
 	mov	dl, bl
 	and	bl, 0Fh
@@ -1966,9 +1966,12 @@ write_audio_dev_info:
 	mov	al, [ebx+hex_chars]
 	mov	[msgDevId], al
 
-	mov	esi, [bus_dev_fn]
-	shr	esi, 8
-	mov	ax, si
+	;mov	esi, [bus_dev_fn]
+	;shr	esi, 8
+	;mov	ax, si
+	; 04/06/2024
+	mov	eax, [bus_dev_fn]
+	shr	eax, 8
 	mov	bl, al
 	mov	dl, bl
 	and	bl, 7 ; bit 0,1,2
@@ -2616,6 +2619,7 @@ msg_usage:
 	;db	'27/11/2023',10,13,0
 	db	'04/12/2023',10,13,0
 	db	'02/06/2024',10,13,0
+	db	'04/06/2024',10,13,0
 
 Credits:
 	db	'Tiny MOD Player v0.1b by Carlos Hasan. July 1993.'
