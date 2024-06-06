@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.8) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 02/06/2024 (Previous: 04/12/2023 - Kernel v2.0.7)
+; Last Update: 05/06/2024 (Previous: 04/12/2023 - Kernel v2.0.7)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -721,6 +721,9 @@ audio_p_buffer:	resd 1	; Physical address of user's audio buffer
 audio_buff_size: resd 1 ; user's audio buffer size (half buffer size) 
 audio_dma_buff: resd 1  ; dma buffer address
 audio_dmabuff_size: resd 1 ; dma buffer size (2 * half buffer size)
+; 05/06/2024
+dma_hbuff_size: resd 1 ; dma half buffer size
+;
 audio_flag:	resb 1  ; dma buffer flag (1st half = 0, 2nd half = 1)
 audio_user:	resb 1	; user number of the owner
 audio_cb_mode:	resb 1	; 0 = signal response byte method

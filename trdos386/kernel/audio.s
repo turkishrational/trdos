@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.8 - audio.s
 ; ----------------------------------------------------------------------------
-; Last Update: 04/06/2024  (Previous: 02/12/2023 - Kernel v2.0.7)
+; Last Update: 06/06/2024  (Previous: 02/12/2023 - Kernel v2.0.7)
 ; ----------------------------------------------------------------------------
 ; Beginning: 03/04/2017
 ; ----------------------------------------------------------------------------
@@ -1237,6 +1237,7 @@ codec_config:
 ;	retn
 
 vt8233_int_handler:
+	; 05/06/2024
 	; 04/06/2024 - TRDOS 386 v2.0.8
 	; 27/07/2020
 	; 22/07/2020
@@ -1323,11 +1324,15 @@ vt8233_tuneLoop:
 _ih2: 
 	; 10/10/2017
 	mov	edi, [audio_dma_buff]
+	
+	; 05/06/2024
 	; 04/06/2024
-	;mov	ecx, [audio_dmabuff_size]
-	;shr	ecx, 1 ; dma buff size / 2 = half buffer size
-	mov	ecx, [audio_buff_size]
-	and	cl, ~1 ; word aligned	
+	;;mov	ecx, [audio_dmabuff_size]
+	;;shr	ecx, 1 ; dma buff size / 2 = half buffer size
+	;mov	ecx, [audio_buff_size]
+	;and	cl, ~1 ; word aligned
+	; 05/06/2024
+	mov	ecx, [dma_hbuff_size] ; half buffer size
 
 	; 22/07/2020
 	; 12/10/2017
@@ -1346,8 +1351,11 @@ _ih3:
 	; Update half buffer 1 while playing half buffer 2
 
 	mov	esi, [audio_p_buffer] ; phy addr of audio buff
-	shr	ecx, 2 ; half buff size / 4
-	rep	movsd
+	; 05/06/2024
+	;shr	ecx, 2 ; half buff size / 4
+	;rep	movsd
+	shr	ecx, 1	; word aligned buffer
+	rep	movsw
 
 	; switch flag value ;
 	xor	byte [audio_flag], 1
@@ -2384,6 +2392,10 @@ sb_rst_retn:
 	retn
 
 ac97_codec_config:
+	; 06/06/2024
+	; 04/06/2024
+	; 03/06/2024
+	; 02/06/2024
 	; 01/06/2024 (TRDOS 386 v2.0.8)
 	; 26/11/2023
 	; 21/11/2023
@@ -2533,12 +2545,13 @@ _ac97_codec_ready:
 	;add	dx, 0 ; ac_reg_0 ; reset register
 	out	dx, ax
 
+	; 06/06/2024
 	; 01/06/2024
 	;;;
-	call	delay1_4ms
-	call	delay1_4ms
-	call	delay1_4ms
-	call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
+	;call	delay1_4ms
 	;;;
 
 	; 01/06/2024
@@ -2552,7 +2565,6 @@ _ac97_codec_ready:
 
 	; 01/06/2024
 	;;;
-	; 02/06/2024
 	or	ebp, ebp  ; 21/11/2023
 	jnz	short _ac97_codec_init_ok
 	;;;
@@ -2567,7 +2579,7 @@ _ac97_codec_ready:
 	; wait for 1 second
 	; 01/06/2024
 	; 16/05/2024
-	mov	ecx, 1000 ; 1000*0.25ms = 1s
+	mov	ecx, 1000 ; 1000*0.25ms
 	; 20/11/2023
 	;mov	ecx, 10
 	; 23/05/2024
@@ -2578,9 +2590,10 @@ _ac97_codec_ready:
 _ac97_codec_rloop:
 	; 01/06/2024
 	call	delay1_4ms
-	;call	delay1_4ms
-	;call	delay1_4ms
-	;call	delay1_4ms
+	; 06/06/2024
+	call	delay1_4ms
+	call	delay1_4ms
+	call	delay1_4ms
 	; 01/06/2024
 	; 19/11/2023
 	; 22/11/2023
@@ -2595,11 +2608,9 @@ _ac97_codec_rloop:
 	;;;
 	in	ax, dx
 
-	; 02/06/2024
-	; 01/06/2024
-	; 02/12/2023
-	call	delay1_4ms
-	
+	; 06/06/2024
+	;call	delay1_4ms
+
 	;and	ax, 0Fh
 	; 21/11/2023
 	and	al, 0Fh
@@ -2607,7 +2618,7 @@ _ac97_codec_rloop:
 	je	short _ac97_codec_init_ok
 	; 24/11/2023 - temporary
 	;je	short _ac97_codec_init_ok_
-	
+_ac97_codec_yloop:	
 	loop	_ac97_codec_rloop 
 	; 22/11/2023
 	; cf = 1
@@ -2626,20 +2637,27 @@ init_ac97_codec_err2:
 	;retn
 
 _ac97_codec_init_ok:
+	; 06/06/2024 (temporary)
+	; (this may not be needed)
+	;;;
 	; 24/05/2024
 	; 26/11/2023
 	; 23/11/2023
-	;xor	eax, eax
+	xor	eax, eax
 	; 21/11/2023 - temporary
 	; 19/11/2023
-	;mov	al, 2 ; force set 16-bit 2-channel PCM
-	;mov	dx, GLOB_CNT_REG ; 2Ch
-	;add	dx, [NABMBAR]
-	;out	dx, eax
+	mov	al, 2 ; force set 16-bit 2-channel PCM
+	mov	dx, GLOB_CNT_REG ; 2Ch
+	add	dx, [NABMBAR]
+	out	dx, eax
+	;
+	call	delay1_4ms
+	;;;
 
-	;call	delay1_4ms
 	; 23/11/2023 - temporary
 	;call	delay_100ms
+	; 06/06/2024
+	;call	delay1_4ms
 
 	; 10/06/2017
 	call 	reset_ac97_controller
@@ -2651,7 +2669,7 @@ _ac97_codec_init_ok:
 	; 24/05/2024
 	; 23/05/2024
 	; 21/11/2023 - temporary
-	;call	delay_100ms
+	call	delay_100ms ; 06/06/2024
 
 ;	call 	setup_ac97_codec
 ;
@@ -2659,6 +2677,21 @@ _ac97_codec_init_ok:
 ;	retn
 
 setup_ac97_codec:
+	; 06/06/2024 - TRDOS 386 v2.0.8
+	;;;
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_EXT_AUDIO_CTRL_REG ; 2Ah
+	in	ax, dx
+
+	;and	al, ~BIT1 ; Clear DRA
+	and	al, ~(BIT1+BIT0) ; Clear DRA+VRA
+	;or	al, BIT0  ; Set VRA
+
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_EXT_AUDIO_CTRL_REG ; 2Ah
+	out	dx, ax
+	;;;
+
 	; 24/11/2023
 	; 19/11/2023 - TRDOS 386 v2.0.7
 	mov	byte [VRA], 1
@@ -2668,9 +2701,10 @@ setup_ac97_codec:
 
 	; 23/05/2024
 	; 18/05/2024
-	call	delay1_4ms
+	;call	delay1_4ms ; 06/06/2024
 	;call	delay_100ms
 
+; 06/06/2024
 ; 01/06/2024
 %if 0
 	; 24/05/2024
@@ -2687,14 +2721,15 @@ setup_ac97_codec:
 	;
 	test	al, 1 ; BIT0 ; Variable Rate Audio bit
 	jz	short vra_not_supported
-%endif
+
 	mov	dx, [NAMBAR]
 	add	dx, CODEC_EXT_AUDIO_CTRL_REG ; 2Ah
 	in	ax, dx
 
+	; 06/06/2024
 	; 23/05/2024
 	; 02/12/2023
-	call	delay1_4ms
+	;call	delay1_4ms
 	;call	delay_100ms ; 18/05/2024
 	; 24/05/2024
 	;call	delay1_4ms
@@ -2707,10 +2742,11 @@ setup_ac97_codec:
 	and	al, ~(BIT1+BIT0) ; Clear DRA+VRA
 	;;;
 	; 04/06/2024
-	mov	dx, [NAMBAR]
-	add	dx, CODEC_EXT_AUDIO_CTRL_REG ; 2Ah
+	;mov	dx, [NAMBAR]
+	;add	dx, CODEC_EXT_AUDIO_CTRL_REG ; 2Ah
 	;;;
 	out	dx, ax
+%endif
 
 	; 04/06/2024
 	call	delay1_4ms
@@ -2721,25 +2757,84 @@ setup_ac97_codec:
 	add	dx, CODEC_EXT_AUDIO_REG	; 28h
 	in	ax, dx
 
-	call	delay1_4ms
+	; 06/06/2024
+	;call	delay1_4ms
 	
 	test	al, 1 ; BIT0	; Variable Rate Audio bit
 	jz	short vra_not_supported
+
+	inc	ax ; 0FFh -> 0
+	jnz	short not_alc ; skip ALC850 (and ALC655) checking
+	; ax = -1 -> 0 
+
+	;;;;
+	; 06/06/2024 (temporary!?)
+	; check ALC850
+	; (which does not support VRA but it may not be detected)
+	;
+	call	delay1_4ms
+	;
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_VENDOR_ID1 ; 7Ch
+	in	ax, dx
+	shl	eax, 16 ; *
+	;cmp	ax, 414Ch ; VENDOR_ID - 'AL'
+	;jne	short not_alc
+	mov	dx, [NAMBAR]
+	add	dx, CODEC_VENDOR_ID2 ; 7Eh
+	in	ax, dx
+	;inc	edx
+	;inc	edx
+	;in	ax, dx ; VENDOR ID2
+
+	inc	eax ; 0FFFFFFFFh -> 0 ; 0 -> 1
+	jz	short vra_not_supported
+	dec	eax ; 1 -> 0
+	jz	short vra_not_supported	
+
+	ror	eax, 16
+	cmp	ax, 414Ch ; VENDOR_ID - 'AL'
+	jne	short not_alc
+	rol	eax, 16
+	
+	; ALC850
+	cmp	ah, 47h ; 'G'
+	jne	short not_alc
+	cmp	al, 90h
+	;cmp	ax, 4790h ; VENDOR ID - 'G' ; bit 8-15
+			  ; CHIP ID - 1001b ; bit 4-7
+			  ; Version Number - 0 ; bit 0-3
+	;jne	short not_alc850 ; not_alc
+	je	short vra_not_supported
+	;
+; 06/06/2024
+%if 0
+not_alc850:
+	; ALC655
+	cmp	al, 60h
+	;cmp	ax, 4760h ; VENDOR ID - 'G' ; bit 8-15
+			  ; CHIP ID - 0110b ; bit 4-7
+			  ; Version Number - 0 ; bit 0-3
+	;jne	short not_alc655
+	je	short vra_not_supported
+	;
+not_alc655:
+%endif
+not_alc:
+	; 06/06/2024
 
 	mov	dx, [NAMBAR]
 	add	dx, CODEC_EXT_AUDIO_CTRL_REG  	; 2Ah
 	in	ax, dx
 
 	;and	al, ~BIT1 ; Clear DRA
-	;;;
-	
+
 	or	al, AC97_EA_VRA ; 1 ; 04/11/2023
 	
-	;;;
+	; 06/06/2024
 	; 04/06/2024
-	mov	dx, CODEC_EXT_AUDIO_CTRL_REG  	; 2Ah
-	add	dx, [NAMBAR]
-	;;;
+	;mov	dx, CODEC_EXT_AUDIO_CTRL_REG  	; 2Ah
+	;add	dx, [NAMBAR]
 
 	out	dx, ax		; Enable variable rate audio
 
@@ -3663,6 +3758,7 @@ _ac97_ih3:
 	retn
 
 reset_ac97_controller:
+	; 06/06/2024
 	; 01/06/2024
 	; 27/05/2024
 	; 16/05/2024
@@ -3676,21 +3772,21 @@ reset_ac97_controller:
 	out     dx, al
 
 	; 16/05/2024
-	call	delay1_4ms
+	;call	delay1_4ms
 
         mov     dx, PO_CR_REG
 	add	dx, [NABMBAR]
 	out     dx, al
 
 	; 16/05/2024
-	call	delay1_4ms
+	;call	delay1_4ms
 
         mov     dx, MC_CR_REG
 	add	dx, [NABMBAR]
 	out     dx, al
 
 	; 16/05/2024
-	call	delay1_4ms
+	;call	delay1_4ms
 
         mov     al, RR
         mov     dx, PI_CR_REG
@@ -3698,14 +3794,14 @@ reset_ac97_controller:
 	out     dx, al
 
 	; 16/05/2024
-	call	delay1_4ms
+	;call	delay1_4ms
 
         mov     dx, PO_CR_REG
 	add	dx, [NABMBAR]
 	out     dx, al
 
 	; 16/05/2024
-	call	delay1_4ms
+	;call	delay1_4ms
 
         mov     dx, MC_CR_REG
 	add	dx, [NABMBAR]
@@ -3713,7 +3809,7 @@ reset_ac97_controller:
 
 	; 27/05/2024
 	; 16/05/2024
-	call	delay1_4ms
+	;call	delay1_4ms
 
 	retn
 
@@ -3832,6 +3928,7 @@ _cold_ac97c_rst_ok:
 	retn
 
 sb16_current_sound_data:
+	; 05/06/2024
 	; 04/06/2024 - TRDOS 386 v2.0.8
 	; 06/08/2022 - TRDOS 386 v2.0.5
 	; 20/08/2017
@@ -3894,6 +3991,7 @@ sb16_gcd_1:
 ;	retn
 
 get_current_sound_data:
+	; 05/06/2024
 	; 04/06/2024
 	; 24/06/2017
 	; 22/06/2017
@@ -3907,7 +4005,9 @@ get_current_sound_data:
 	;;; 
 	; 04/06/2024
 	;mov	edi, [audio_dmabuff_size]
-	mov	edi, [audio_buff_size]
+	; 05/06/2024
+	;mov	edi, [audio_buff_size]
+	mov	edi, [dma_hbuff_size]
 	;;;
 	mov	esi, [audio_dma_buff]
 
@@ -3921,6 +4021,8 @@ get_current_sound_data:
 	cmp	byte [audio_device], 1
 	ja	short gcd_1
 	shl	edi, 1 ; [audio_dmabuff_size] = 2 * edi
+	; 05/06/2024
+	; edi = [dma_hbuff_size] * 2
 	jmp	short sb16_current_sound_data
 gcd_1:
 	;;;
@@ -3936,6 +4038,7 @@ gcd_0:
 	jb	short ac97_current_sound_data ; = 2
 	; = 3
 vt8233_current_sound_data:
+	; 05/06/2024
 	; 04/06/2024 - TRDOS 386 v2.0.8
 	; 06/08/2022 - TRDOS 386 v2.0.5
 	; 22/06/2017
@@ -3957,7 +4060,9 @@ vt8233_current_sound_data:
 	;;;
 	; 04/06/2024
 	; edi = [audio_buff_size]
-	and	di, ~1	; word alignment
+	; 05/06/2024
+	;and	di, ~1	; word alignment
+	; edi = [dma_hbuff_size]
 	cmp	edi, ecx
 	jnb	short vt8233_gcd_1
 	mov	ecx, edi
@@ -3995,6 +4100,7 @@ vt8233_gcd_5:
 	retn
 
 ac97_current_sound_data:
+	; 05/06/2024
 	; 04/06/2024 - TRDOS 386 v2.0.8
 	; 23/06/2017
 	; 22/06/2017
@@ -4015,7 +4121,9 @@ ac97_current_sound_data:
 	;;;
 	; 04/06/2024
 	; edi = [audio_buff_size]
-	and	di, ~7	; 8 byte alignment
+	; 05/06/2024
+	;and	di, ~7	; 8 byte alignment
+	; edi = [dma_hbuff_size]
 	cmp	edi, ecx
 	jnb	short ac97_gcd_0
 	mov	ecx, edi
@@ -4055,7 +4163,8 @@ ac97_gcd_1:
 ;	retn
 
 sb16_get_dma_buff_off:
-	; 04/06/2024
+	; 05/06/2024
+	; 04/06/2024 - TRDOS 386 v2.0.8
 	; 28/10/2017
 	; 24/06/2017
 	; 22/06/2017
@@ -4069,6 +4178,8 @@ sb16_get_dma_buff_off:
 	;;;
 	; 04/06/2024
 	; ecx = audio buffer size
+	; 05/06/2024
+	; ecx = DMA half buffer size
 	shl	ecx, 1 ; * 2
 	; ecx = DMA buffer size
 	;;;
@@ -4094,6 +4205,7 @@ sb16_gdmabo_1:
 	jmp	short sb16_gdmabo_2
 
 get_dma_buffer_offset:
+	; 05/06/2024
 	; 04/06/2024
 	; 24/06/2017
 	; 22/06/2017
@@ -4106,7 +4218,9 @@ get_dma_buffer_offset:
 	;mov	ecx, [audio_dmabuff_size]
 	;;;
 	; 04/06/2024
-	mov	ecx, [audio_buff_size]
+	;mov	ecx, [audio_buff_size]
+	; 05/06/2024
+	mov	ecx, [dma_hbuff_size]
 	;;;
 	xor	ebx, ebx
 gdmabo_0:
@@ -4115,6 +4229,8 @@ gdmabo_0:
 	je	short ac97_get_dma_buff_off
 
 vt8233_get_dma_buff_off:
+	; 05/06/2024
+	; 04/06/2024 - TRDOS 386 v2.0.8
 	; 06/08/2022 - TRDOS 386 v2.0.5
 	; 24/06/2017
 	; 22/06/2017
@@ -4126,7 +4242,8 @@ vt8233_get_dma_buff_off:
 	;;;
 	; 04/06/2024
 	;shr	ecx, 1
-	and	cl, ~1
+	; 05/06/2024
+	;and	cl, ~1
 	; ecx = DMA Half Buffer Size (word aligned)
 	;;;
 vt8233_gdmabo_0:
@@ -4153,7 +4270,9 @@ vt8233_gdmabo_2:
 	retn
 
 ac97_get_dma_buff_off:
-	; 04/06/2024
+	; 06/06/2024
+	; 05/06/2024
+	; 04/06/2024 - TRDOS 386 v2.0.8
 	; 24/06/2017
 	; 22/06/2017
 	; get current (PCM OUT DMA buffer) pointer
@@ -4167,7 +4286,8 @@ ac97_get_dma_buff_off:
 	;;;
 	; 04/06/2024
 	;shr	ecx, 1
-	and	cl, ~7 ; (truncate bytes if out of 8x)
+	; 05/06/2024
+	;and	cl, ~7 ; (truncate bytes if out of 8x)
 	; ecx = DMA Half Buffer Size (8 byte aligned)
 	;;;
 ac97_gdmabo_0:
@@ -4181,14 +4301,18 @@ ac97_gdmabo_1:
 	xor	eax, eax
 	mov	dx, PO_PICB_REG ; Position In Current Buff Reg
 	add	dx, [NABMBAR]
-	in	ax, dx ; remain words
+	in	ax, dx ; remain words (samples)
 	;;;
+	; 06/06/2024
+	; audio samples are counted as words
 	; 04/06/2024 (BugFix)
 	shl	eax, 1 ; remain bytes
 	;;;
 	jmp	short ac97_gdmabo_2
 
 ac97_codec_info:
+	; 06/06/2024
+	; 05/06/2024 - TRDOS 386 v2.0.8
 	; 19/11/2023
 	; ENTRY: none
 	; RETURN: 
@@ -4198,21 +4322,25 @@ ac97_codec_info:
 	;	ebx = VENDOR ID 1, VENDOR ID 2 (bx)
 	;	cf = 1 -> error
 
-	mov	dx, [NAMBAR]
-	add	dx, CODEC_POWER_CTRL_REG ; 26h
-	in	ax, dx
-	and	al, 0Fh
+	; 06/06/2024
+	;;;
+	mov	dx, GLOB_STS_REG ; 30h
+	add	dx, [NABMBAR]
+	in	eax, dx
+
+	;cmp	eax, 0FFFFFFFFh ; -1
+	inc	eax
+	jz	short ac97_c_inf_err
+	dec	eax
+
+	and	eax, CTRL_ST_CREADY
 	jnz	short ac97_c_inf_1
-	call	delay_100ms
-	in	ax, dx
-	and	al, 0Fh
-	jnz	short ac97_c_inf_1
-	call	delay_100ms
-	in	ax, dx
-	and	al, 0Fh
-	jnz	short ac97_c_inf_1
+
+ac97_c_inf_err:	
 	stc
 	retn
+	;;;
+
 ac97_c_inf_1:
 	mov	dx, [NAMBAR]
 	add	dx, CODEC_PCM_FRONT_DACRATE_REG 
@@ -4234,6 +4362,24 @@ ac97_c_inf_1:
 	in	ax, dx
 	mov	ebx, eax
 	pop	eax
+	;;;;
+	; 06/06/2024 (temporary!?)
+	; (ALC850 & ALC655 BugFix)
+	cmp	ebx, 0FFFFFFFFh ; -1
+	je	short ac97_c_inf_err ; invalid
+	or	ebx, ebx
+	jz	short ac97_c_inf_err ; invalid
+	cmp	ebx, 414C4790h ; ALC850
+	;je	short ac97_c_inf_2
+	;cmp	ebx, 414C4760h ; ALC655
+	jne	short ac97_c_inf_3	
+	;mov	eax, 0BB8009C6h ; AC655 default (Read only)
+	;retn
+ac97_c_inf_2:
+	; ref: ALC850 & ALC655 data sheet
+	mov	eax, 0BB8009C4h ; AC850 default (Read only)
+ac97_c_inf_3:
+	;;;;
 	retn
 
 ; 19/11/2023

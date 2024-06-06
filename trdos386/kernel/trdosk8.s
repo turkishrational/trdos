@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.8) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 04/06/2024  (Previous: 04/12/2023)
+; Last Update: 05/06/2024  (Previous: 04/12/2023)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1829,6 +1829,7 @@ set_dev_IRQ_service:
 	retn
 
 sysaudio: ; AUDIO FUNCTIONS
+	; 05/06/2024
 	; 04/06/2024
 	; 23/05/2024 (TRDOS 386 v2.0.8)
  	; 19/11/2023 (TRDOS 386 v2.0.7)
@@ -2352,6 +2353,7 @@ soundc_init:
 	; bl = method (0= s.r.b., 1= callback, 2= auto incr s.r.b.)
 	; cl = signal response byte (initial or fixed) value
 	; edx = signal response byte or callback address
+	; 05/06/2024
 	; 04/06/2024
 	; 04/12/2023
 	; 02/12/2023
@@ -2391,7 +2393,7 @@ sndc_init8:
 	jc	short sndc_init11 ; 28/05/2017
 
 	; eax = 0
-	mov	al, 3	; VIA VT8237R (VT3233) Audio Controller
+	mov	al, 3	; VIA VT8237R (VT8233) Audio Controller
 	mov	ah, al
 
 sndc_init12:
@@ -2519,19 +2521,34 @@ sndc_init10:
 sndc_init2:
 	; 21/04/2017
 	mov	ecx, [audio_buff_size] ; audio buffer size
-	shl	ecx, 1 ; *2
-
+	; 05/06/2024	
+	;shl	ecx, 1 ; *2
+	
+	; 05/06/2024
+	mov	al, [audio_device]
+	cmp	al, 1 ; SB16
+	jna	short sndc_init22
+	and	cl, ~1 ; truncated for word alignment
+	cmp	al, 3 ; VT8233  
+	jnb	short sndc_init22
+	; al = 2 ; AC'97 	
+	and	cl, ~7 ; truncated for 8 byte (8x) alignment
+sndc_init22:
+	; 05/06/2024
+	mov	[dma_hbuff_size], ecx  ; DMA half buffer size
+	shl	ecx, 1  ; add ecx, ecx ; * 2
+	
 	;;;
 	; 04/06/2024
 	add	ecx, 4095  ; PAGE_SIZE - 1
 	and	cx, ~4095  ; ~PAGE_OFF	
-	; ecx = page border aligned DMA buffer size (required)
+	; ecx = page border aligned DMA buffer size (required) (*)
 	;;;
 
 	mov	eax, [audio_dma_buff]
 	and	eax, eax
-	jz	short sndc_init3
-
+	jz	short sndc_init3 ; no need to compare dma buff size
+	
 	mov	edx, [audio_dmabuff_size] ; dma buffer size
 	cmp	ecx, edx
 	je	short sndc_init5
@@ -2555,11 +2572,14 @@ sndc_init2:
 sndc_init20:
 	xor	eax, eax
 sndc_init3:
+	; 05/06/2024
+	mov	[audio_dmabuff_size], ecx ; (*)
 	; 12/05/2017
 	cmp	byte [audio_device], 1 ; SB 16
 	jne	short sndc_init4
 	mov	dword [audio_dma_buff], sb16_dma_buffer
-	mov	dword [audio_dmabuff_size], 65536
+	; 05/06/2024
+	;mov	dword [audio_dmabuff_size], 65536
 	;xor	eax, eax
 	;mov	[u.r0], eax ; 0 = no error, successful
 sndc_init5:	; 29/07/2022
@@ -2585,11 +2605,14 @@ sndc_init21:
 sndc_init17:	; 29/07/2022
 	; set dma buffer address and size parameters
 	mov	[audio_dma_buff], eax ; dma buffer address
-	mov	[audio_dmabuff_size], ecx ; dma buffer size
+	; 05/06/2024
+	;mov	[audio_dmabuff_size], ecx ; dma buffer size
 
 	;;;
+	; 05/06/2024
+	mov	ecx, [dma_hbuff_size] ; DMA half (1-2) buffer size
 	; 04/06/2024
-	mov	ecx, [audio_buff_size] ; audio buffer size in bytes
+	;mov	ecx, [audio_buff_size] ; audio buffer size in bytes
 	;;;
 
 ;	; EAX = Beginning (physical) addr of the allocated mem block
@@ -2627,6 +2650,7 @@ sndc_init17:	; 29/07/2022
 ;	;mov	[u.r0], eax ; 0 = no error, successful
 ;	retn
 
+	; 05/06/2024
 	;;;
 	; 04/06/2024 (use truncated buffer size for BDL setup)
 	; NOTE: Round up adds spurious bytes (noise) to the DMA buff;
@@ -2634,7 +2658,9 @@ sndc_init17:	; 29/07/2022
 	;	((BDL/SGD feature needs word aligned buffer address))
 	;
 	;mov	ecx, [audio_buff_size] ; audio buffer size in bytes
-	and	cl, ~1
+	;and	cl, ~1
+	; 05/06/2024
+	;mov	[dma_hbuff_size], ecx
 	; ecx = DMA half buffer size as word aligned
 	;	(in fact, half buffer is one of the two DMA buffers)
 	;;;
@@ -2646,6 +2672,8 @@ sndc_init18:
 	;;jmp	short sndc_init5
 	;retn
 
+	; 05/06/2024
+	;;;
 	;;;
 	; 04/06/2024 (use truncated buffer size for BDL setup)
 	; NOTE: Round up adds spurious bytes (noise) to the DMA buff;
@@ -2653,7 +2681,9 @@ sndc_init18:
 	;	((BDL feature needs 8 byte aligned buffer address))
 	;
 	;mov	ecx, [audio_buff_size] ; audio buffer size in bytes
-	and	cl, ~7
+	;and	cl, ~7
+	; 05/06/2024
+	;mov	[dma_hbuff_size], ecx
 	; ecx = DMA half buffer size as truncated for 8 byte alignment
 	;	(in fact, half buffer is one of the two DMA buffers)
 	;;;
@@ -2678,6 +2708,7 @@ sound_play:
 	;	to 16 bit samples and mono samples must be
 	;	converted to stereo samples...)
 	 
+	; 05/06/2024
 	; 04/06/2024
 	; 30/07/2022
 	; 28/07/2020
@@ -2744,17 +2775,20 @@ snd_play_5:
 	; 28/07/2020
 	shr	ecx, 1  ; dma half buffer size
 %else
-	; 04/06/2024
-	mov	ecx, [audio_buff_size]
-	mov	al, [audio_device]
+	; 05/06/2024
+	mov	ecx, [dma_hbuff_size]  ; DMA half buffer size
 
-	cmp	al, 1 ; Sound Blaster 16
-	je	short snd_play_8
-	and	cl, ~1
-	cmp	al, 3 ; VT8233 (VT8237R)
-	je	short snd_play_8
+	; 04/06/2024
+	;mov	ecx, [audio_buff_size]
+	;mov	al, [audio_device]
+	;
+	;cmp	al, 1 ; Sound Blaster 16
+	;je	short snd_play_8
+	;and	cl, ~1
+	;cmp	al, 3 ; VT8233 (VT8237R)
+	;je	short snd_play_8
 	; AC'97
-	and	cl, ~7
+	;and	cl, ~7
 snd_play_8:
 %endif
 
@@ -2767,9 +2801,11 @@ snd_play_8:
 	add	edi, ecx
 
 snd_play_0:
-	;rep	movsb
-	shr	ecx, 2  ; convert byte count to dword count
-	rep	movsd
+	; 05/06/2024
+	;;rep	movsb
+	;shr	ecx, 2 ; convert byte count to dword count
+	;rep	movsd  ;	
+	rep	movsb  ; SB16, AC97, VT8233
 
 	; here, if [audio_flag] = 0, interrupt handler will update
 				; dma half buffer 2 
@@ -3445,6 +3481,7 @@ sound_update:
 	;      0 = dma half buffer 1 (will be played next)
 	;      1 = dma half buffer 2 (will be played next)
 	
+	; 05/06/2024
 	; 30/07/2022
 	; 10/10/2017
 	; ... device check at first
@@ -3477,20 +3514,24 @@ snd_update_6:
 	jmp	sound_buff_error
 snd_update_7:
 	mov	esi, [audio_p_buffer] ; physical address (ring 3)
-	mov	ecx, [audio_buff_size]
-
+	; 05/06/2024
+	;mov	ecx, [audio_buff_size]
+	;
 	;;;
 	; 04/06/2024
-	mov	al, [audio_device]
-	cmp	al, 1
-	je	short snd_update_8 ; SB16
-	and	cl, ~1 ; word alignment
-	cmp	al, 3
-	je	short snd_update_8 ; VIA VT8233
-	; al = 2 ; AC97
-	and	cl, ~7 ; 8 byte alignment
-snd_update_8:
+	;mov	al, [audio_device]
+	;cmp	al, 1
+	;je	short snd_update_8 ; SB16
+	;and	cl, ~1 ; word alignment
+	;cmp	al, 3
+	;je	short snd_update_8 ; VIA VT8233
+	;; al = 2 ; AC97
+	;and	cl, ~7 ; 8 byte alignment
+;snd_update_8:
 	;;;
+
+	; 05/06/2024
+	mov	ecx, [dma_hbuff_size] ; DMA half buffer size
 
 	;movzx	eax, byte [audio_flag]
 	mov	al, [audio_flag]
@@ -3525,8 +3566,10 @@ snd_update_1:
 	add	edi, ecx
 snd_update_2:
 	;rep	movsb
-	shr	ecx, 2
-	rep	movsd
+	; 05/06/2024
+	;shr	ecx, 2
+	;rep	movsd
+	rep	movsb ; SB16, AC97, VT8233
 snd_update_3:
 	mov	[u.r0], eax
 
