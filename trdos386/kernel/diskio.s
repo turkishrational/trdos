@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.7 - diskio.s
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.8 - diskio.s
 ; ----------------------------------------------------------------------------
-; Last Update: 02/12/2023 (Previous: 11/08/2022 - Kernel v2.0.5)
+; Last Update: 23/06/2024 (Previous: 02/12/2023 - Kernel v2.0.7)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -5115,11 +5115,18 @@ lba_read_write:
 	add	eax, ecx
 	jnc	short su5
 	mov	byte [DISK_STATUS1], ERR_INV_PARAMETER
-	jmp	short su7
+	;jmp	short su7
+	; 20/06/2024
+	pop	eax ; ***
+	mov	al, 0
+	retn
 su5:	
 	cmp	eax, 0FFFFFFFh ; 28 bit limit
 	jna	short su10
 su6:
+
+; 20/06/2024 (TRDOS 386 v2.0.8)
+%if 0
 	; 48 bit LBA r/w
 	mov	al, [hf_m_s]	; (+!+) ; 02/12/2023
 	shl	al, 4
@@ -5172,16 +5179,16 @@ su8:
 	mov	[CMD_BLOCK+1], al
 
 	sub	dl, 3	; hd base port + 2
-	out	dx, al	; sector count lb (bits 0 to 7) = 0
+	out	dx, al	; sector count lb (bits 0 to 7)
 	inc	edx	; hd base port + 3
 	mov	eax, ecx ; LBA disk sector address
 	out	dx, al	; LBA byte 1 (bits 0 to 7)
 	inc	edx	; hd base port + 4
 	shr	eax, 8
-	out	dx, al	; LBA byte 2 (bits 8 to 15) = 0
+	out	dx, al	; LBA byte 2 (bits 8 to 15)
 	inc	edx	; hd base port + 5
 	shr	eax, 8
-	out	dx, al	; LBA byte 3 (bits 16 to 23) = 0
+	out	dx, al	; LBA byte 3 (bits 16 to 23)
 
  	inc     edx	; hd base port + 6
 
@@ -5199,14 +5206,48 @@ su8:
 	;mov	edi, ebx
 	mov	edi, esi ; sector buffer 
 	cmp	ah, 1Ch
-	jne	short su_9
+	jne	short su9
 	mov	al, 34h ; WRITE SECTOR(S) EXT
 	out	dx, al
 	jmp	CMD_WX
-su_9:
-	mov	al, 24h ; READ SECTOR(S) EXT
+su9:
+	mov	al, 24h	; READ SECTOR(S) EXT
 	out	dx, al
 	jmp	CMD_RX
+%else
+	; 20/06/2024
+	pop	eax	; ***
+	mov	byte [CMD_BLOCK], 0
+	mov	[CMD_BLOCK+1], al ; sector count to r/w
+	mov	[CMD_BLOCK+2], ecx ; LBA disk sector address
+	
+	;;;
+	; 23/06/2024
+	mov	byte [LBAMode], 0FFh
+	;
+	mov	al, [hf_m_s]
+	shl	al, 4
+	;add	al, 40h
+	or	al, 40h	
+	; al = 40h (for master), 50h (for slave)
+	mov	[hf_m_s], al	
+	;;;
+
+	cmp	ah, 1Ch
+	jne	short su7
+	; AH = 1Ch ; TRDOS 386 v2 - INT 33h - LBA WRITE
+	; esi = sector buffer
+	; 48 bit LBA write
+	mov	byte [CMD_BLOCK+6], 34h ; WRITE SECTOR(S) EXT
+	jmp	CMD_WX
+su7:
+	; AH = 1Bh ; TRDOS 386 v2 - INT 33h - LBA READ
+	mov	edi, esi ; sector buffer
+	; 48 bit LBA read
+	mov	byte [CMD_BLOCK+6], 24h ; READ SECTOR(S) EXT
+	jmp	CMD_RX
+	
+%endif
 
 ; -----------------------------------------------------
 
@@ -5379,9 +5420,11 @@ COMMANDI:
 
 	;mov	di, bx
 	mov	edi, ebx ; 21/02/2015
+CMD_RX:
+	; 20/06/2024 (48 bit LBA r/w modification)
 	call	COMMAND 		; OUTPUT COMMAND
 	jnz	short CMD_ABORT
-CMD_RX:	; 01/12/2023 (48 bit LBA read)
+;CMD_RX: ; 01/12/2023 (48 bit LBA read)
 CMD_I1:
 	call	_WAIT			; WAIT FOR DATA REQUEST INTERRUPT
 	jnz	short TM_OUT		; TIME OUT
@@ -5466,9 +5509,11 @@ COMMANDO:
 	;jc	short CMD_ABORT
 CMD_OF: 
 	mov	esi, ebx ; 21/02/2015
+CMD_WX:
+	; 20/06/2024 (48 bit LBA r/w modification)
 	call	COMMAND 		; OUTPUT COMMAND
 	jnz	short CMD_ABORT
-CMD_WX:	; 01/12/2023 (48 bit LBA write)
+;CMD_WX:	; 01/12/2023 (48 bit LBA write)
 	call	WAIT_DRQ		; WAIT FOR DATA REQUEST
 	jc	short TM_OUT		; TOO LONG
 CMD_O1: 
@@ -6090,7 +6135,16 @@ DS_EXIT:
 TST_RDY:				; WAIT FOR CONTROLLER
 	call	NOT_BUSY
 	jnz	short TR_EX
+	;;;
+	; 23/06/2024
+	cmp	byte [LBAMode], 0FFh
+	jne	short tst_28bit_rdy
+	mov	al, [hf_m_s]
+	jmp	short tst_48bit_rdy
+tst_28bit_rdy:
+	;;;
 	mov	al, [CMD_BLOCK+5] 	; SELECT DRIVE
+tst_48bit_rdy:
 	mov	dx, [HF_PORT]
 	add	dl, 6
 	out	dx, al
@@ -6166,6 +6220,7 @@ CD_EXIT:
 	mov	[DISK_STATUS1], ah
 	retn
 
+	; 20/06/2024 - TRDOS 386 v2.0.8
 	; 16/07/2022 - TRDOS 386 v2.0.5
 	; 10/07/2022 - Retro UNIX 386 v1.1 (Kernel v0.2.1.5)
 
@@ -6217,12 +6272,28 @@ COMMAND2:
 	;xor	edi, edi		; INDEX THE COMMAND TABLE
 	; 10/07/2022
 	xor	ecx, ecx
+	
 	;mov	dx, HF_PORT+1		; DISK ADDRESS
 	mov	dx, [HF_PORT]
-	inc	dl
+	inc	dl	
+
+	; 20/06/2024
+	;mov	al, [CMD_BLOCK+6]
+	;cmp	al, 24h ; READ SECTOR(S) EXT
+	;je	short COMMAND5
+	;cmp	al, 34h ; WRITE SECTOR(S) EXT
+	;je	short COMMAND5
+	; 23/06/2024
+	cmp	byte [LBAMode], 0FFh
+	je	short COMMAND5	; 48 bit LBA read/write
+
+	; 20/06/2024
+	; dx = hd base port + 1 ; 1F1h or 171h
+
 	test	byte [CONTROL_BYTE], 0C0h ; CHECK FOR RETRY SUPPRESSION
 	jz	short COMMAND3
-	mov	al, [CMD_BLOCK+6] 	; YES-GET OPERATION CODE
+	; 20/06/2024
+	;mov	al, [CMD_BLOCK+6] 	; YES-GET OPERATION CODE
 	and	al, 0F0h 		; GET RID OF MODIFIERS
 	cmp	al, 20h			; 20H-40H IS READ, WRITE, VERIFY
 	jb	short COMMAND3
@@ -6247,6 +6318,55 @@ COMMAND3:
 	jb	short COMMAND3
 	;pop	edi ; 10/07/2022
 	retn				; ZERO FLAG IS SET
+
+	; 20/06/2024
+COMMAND5:
+	; 48 bit LBA r/w
+	mov	al, [CMD_BLOCK] ; 0
+	out	dx, al	; hd base port + 1
+	;
+	add	dl, 5	; hd base port + 6 ; 1F6h or 176h
+	mov	al, [hf_m_s]
+	; 23/06/2024
+	;shl	al, 4
+	;;add	al, 40h
+	;or	al, 40h	
+	;; al = 40h (for master), 50h (for slave)
+	;
+	out	dx, al
+	sub	dl, 4	; hd base port + 2 ; 1F2h or 172h
+	xor	al, al	; 0
+	out	dx, al	; sector count hb (bits 8 to 15) = 0
+	inc	edx	; hd base port + 3
+	mov	eax, [CMD_BLOCK+2]
+	rol	eax, 8
+	out	dx, al	; LBA byte 4 (bits 24 to 31)
+	inc	edx	; hd base port + 4
+	xor	al, al
+	out	dx, al	; LBA byte 5 (bits 32 to 39) = 0
+	inc	edx	; hd base port + 5
+	sub	al, al
+	out	dx, al	; LBA byte 6 (bits 40 to 47) = 0
+	mov	al, [CMD_BLOCK+1] ; sector count
+	sub	dl, 3	; hd base port + 2
+	out	dx, al	; sector count lb (bits 0 to 7)
+	shr	eax, 8
+	inc	edx	; hd base port + 3 ; 1F3h or 173h
+	out	dx, al	; LBA byte 1 (bits 0 to 7)
+	shr	eax, 8
+	inc	edx	; hd base port + 4
+	out	dx, al	; LBA byte 2 (bits 8 to 15)
+	shr	eax, 8
+	inc	edx	; hd base port + 5
+	out	dx, al	; LBA byte 3 (bits 16 to 23
+	inc	edx	; hd base port + 6
+	mov	al, [CMD_BLOCK+6] ; 48 bit read or write command
+	; al = 24h or 34h
+	inc	edx	; hd base port + 7 ; 1F7h or 177h
+	out	dx, al
+	xor	eax, eax ; 0
+	; zf = 1
+	retn
 
 ;CMD_TIMEOUT:
 ;	mov	byte [DISK_STATUS1], BAD_CNTLR
