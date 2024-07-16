@@ -1,0 +1,243 @@
+     1                                  ; 18/10/2023
+     2                                  ; 17/10/2023 - Erdogan Tan
+     3                                  ; MSDOS Test Program (for TRDOS 386 development)
+     4                                  ; Show Video Hardwware State for Video MODE 13h
+     5                                  
+     6                                  [BITS 16]
+     7                                  
+     8                                  start:
+     9                                  	[Org 100h] ; COM file
+    10                                  
+    11 00000000 BE[FF00]                	mov	si, start_msg
+    12 00000003 E8EB00                  	call	print_msg
+    13                                  
+    14 00000006 BE[5201]                	mov	si, press_a_key_msg
+    15 00000009 E8E500                  	call	print_msg
+    16                                  
+    17                                  	; wait a key press just after start message
+    18 0000000C 30E4                    	xor	ah, ah
+    19 0000000E CD16                    	int	16h
+    20                                  
+    21 00000010 3C1B                    	cmp	al, 1Bh  ; ESC key ?
+    22 00000012 7470                    	je	short terminate
+    23                                  
+    24                                  	; check Function 1Ch (Save/restore video state)
+    25                                  	; support at first
+    26                                  
+    27                                  	; check video state function support
+    28 00000014 B8001C                  	mov	ax, 1C00h ; return state buffer size
+    29 00000017 B90100                  	mov	cx, 1 ; video hardware state (only)
+    30 0000001A CD10                    	int	10h
+    31                                  
+    32 0000001C 3C1C                    	cmp	al, 1Ch
+    33 0000001E 7408                    	je	short continue ; function supported
+    34                                  
+    35                                  error:
+    36                                  	; print error message and terminate
+    37 00000020 BE[8C01]                	mov	si, vstate_f_err_msg
+    38 00000023 E8CB00                  	call	print_msg
+    39 00000026 EB5C                    	jmp	short terminate
+    40                                  
+    41                                  continue:
+    42                                  	; Note: BOCHS, QEMU etc emulators return buffer
+    43                                  	; size in bytes not as 64 byte block counts
+    44 00000028 83FB46                  	cmp	bx, 70
+    45 0000002B 7304                    	jnb	short chk_up_limit
+    46                                  	; A real video bios (for example ATI bios)
+    47                                  	; returns buf size as
+    48                                  	; 64 byte blocks (bx must be 2 here)
+    49 0000002D B106                    	mov	cl, 6
+    50 0000002F D3E3                    	shl	bx, cl ; * 64
+    51                                  chk_up_limit:
+    52                                  	; buffer size here bx is 70 for QEMU
+    53                                  	;		    and 128 for real computer
+    54                                  	;cmp	bx, 128
+    55 00000031 81FB0001                	cmp	bx, 256	; NVIDIA vbios buf size = 192 (3*64)
+    56                                  			; ATI vbios buf size = 128 (2*64)
+    57 00000035 77E9                    	ja	short error ; unknown structure
+    58 00000037 89DD                    	mov	bp, bx
+    59                                  setmode_13h:	
+    60                                  	;mov	ah, 0
+    61                                  	;mov	al, 13h	; 300x200x256 graphics mode
+    62 00000039 B81300                  	mov	ax, 13h
+    63 0000003C CD10                    	int	10h
+    64                                  
+    65                                  	; save video state for mode 13h
+    66 0000003E BB[0202]                	mov	bx, vstate_buf
+    67 00000041 B90100                  	mov	cx, 1 ; video hardware state (only)
+    68                                  	;mov	ah, 1Ch
+    69                                  	;mov	al, 1	; save video state
+    70 00000044 B8011C                  	mov	ax, 1C01h
+    71 00000047 CD10                    	int	10h
+    72                                  
+    73                                  	; Return to 80x25 text mode
+    74                                  	;mov	ah, 0
+    75                                  	;mov	al, 3
+    76 00000049 B80300                  	mov	ax, 3
+    77 0000004C CD10                    	int	10h
+    78                                  
+    79                                  	; save video state for mode 03h
+    80 0000004E BB[8202]                	mov	bx, vstate_buf+128
+    81 00000051 B90100                  	mov	cx, 1 ; video hardware state (only)
+    82                                  	;mov	ah, 1Ch
+    83                                  	;mov	al, 1  ; save video state
+    84 00000054 B8011C                  	mov	ax, 1C01h
+    85 00000057 CD10                    	int	10h
+    86                                  
+    87 00000059 BE[C101]                	mov	si, mode_13h_state_msg
+    88 0000005C E89200                  	call	print_msg
+    89                                  
+    90 0000005F BE[0202]                	mov	si, vstate_buf
+    91 00000062 E82700                  	call	print_video_state ; as hex sting
+    92                                  
+    93 00000065 BE[5201]                	mov	si, press_a_key_msg
+    94 00000068 E88600                  	call	print_msg
+    95                                  
+    96                                  	; wait a key press
+    97 0000006B 30E4                    	xor	ah, ah
+    98 0000006D CD16                    	int	16h
+    99                                  
+   100 0000006F 3C1B                    	cmp	al, 1Bh  ; ESC key ?
+   101 00000071 7411                    	je	short terminate
+   102                                  	
+   103 00000073 C606[CE01]30            	mov	byte [mode_num_str], '0'
+   104                                  
+   105 00000078 BE[C101]                	mov	si, mode_03h_state_msg
+   106 0000007B E87300                  	call	print_msg
+   107                                  	
+   108 0000007E BE[8202]                	mov	si, vstate_buf+128
+   109 00000081 E80800                  	call	print_video_state ; as hex sting
+   110                                  
+   111                                  terminate:
+   112 00000084 E83100                  	call	CRLF
+   113                                  
+   114 00000087 CD20                    	int	20h
+   115                                  halt:
+   116 00000089 F4                      	hlt
+   117 0000008A EBFD                    	jmp	short halt
+   118                                  
+   119                                  print_video_state:
+   120                                  	;mov	cx, 70 ; byte count (buffer size)
+   121 0000008C 89E9                    	mov	cx, bp ; buffer size
+   122                                  	;mov	si, vstate_buf
+   123 0000008E 31D2                    	xor	dx, dx ; 0
+   124                                  pvs_1:
+   125 00000090 AC                      	lodsb
+   126 00000091 E84100                  	call	bintohex
+   127 00000094 50                      	push	ax
+   128 00000095 B40E                    	mov	ah, 0Eh
+   129 00000097 BB0700                  	mov	bx, 07h
+   130 0000009A CD10                    	int	10h
+   131 0000009C 58                      	pop	ax
+   132 0000009D 88E0                    	mov	al, ah
+   133 0000009F B40E                    	mov	ah, 0Eh
+   134 000000A1 CD10                    	int	10h		
+   135 000000A3 B068                    	mov	al, 'h'
+   136 000000A5 CD10                    	int	10h
+   137 000000A7 42                      	inc	dx
+   138 000000A8 83FA10                  	cmp	dx, 16
+   139 000000AB 7219                    	jb	short pvs_3
+   140 000000AD 29D2                    	sub	dx, dx ; 0
+   141 000000AF B020                    	mov	al, ' '
+   142 000000B1 CD10                    	int	10h
+   143 000000B3 E80200                  	call	CRLF
+   144                                  pvs_2:
+   145 000000B6 E2D8                    	loop	pvs_1
+   146                                  CRLF:
+   147 000000B8 B40E                    	mov	ah, 0Eh
+   148 000000BA B00D                    	mov	al, 0Dh ; CR
+   149 000000BC BB0700                  	mov	bx, 07h
+   150 000000BF CD10                    	int	10h
+   151 000000C1 B00A                    	mov	al, 0Ah ; LF
+   152 000000C3 CD10                    	int 	10h
+   153 000000C5 C3                      	retn
+   154                                  pvs_3:
+   155 000000C6 83F901                  	cmp	cx, 1
+   156 000000C9 7604                    	jna	short pvs_4
+   157 000000CB B02C                    	mov	al, ','
+   158 000000CD CD10                    	int	10h
+   159                                  pvs_4:
+   160 000000CF B020                    	mov	al, ' '
+   161 000000D1 CD10                    	int	10h
+   162 000000D3 EBE1                    	jmp	short pvs_2
+   163                                  
+   164                                  bintohex:
+   165 000000D5 30E4                    	xor	ah, ah
+   166 000000D7 89C3                    	mov	bx, ax
+   167 000000D9 88C4                    	mov	ah, al
+   168 000000DB D0EB                    	shr	bl, 1
+   169 000000DD D0EB                    	shr	bl, 1
+   170 000000DF D0EB                    	shr	bl, 1
+   171 000000E1 D0EB                    	shr	bl, 1	; 0?h
+   172 000000E3 8A87[F101]              	mov	al, [bx+hex_chars]
+   173 000000E7 80E40F                  	and	ah, 0Fh	; ?0h
+   174 000000EA 88E3                    	mov	bl, ah
+   175 000000EC 8AA7[F101]              	mov	ah, [bx+hex_chars]
+   176                                  	; ax = hex chars ; ??h
+   177                                  pmsg_ret:
+   178 000000F0 C3                      	retn
+   179                                  
+   180                                  print_msg:
+   181 000000F1 B40E                    	mov	ah, 0Eh
+   182 000000F3 BB0700                  	mov	bx, 7
+   183                                  pmsg_nch:
+   184 000000F6 AC                      	lodsb
+   185 000000F7 20C0                    	and	al, al
+   186 000000F9 74F5                    	jz	short pmsg_ret
+   187 000000FB CD10                    	int	10h
+   188 000000FD EBF7                    	jmp	short pmsg_nch
+   189                                  	
+   190                                  start_msg:
+   191 000000FF 0D0A                    	db 0Dh, 0Ah
+   192 00000101 566964656F20537461-     	db 'Video State Test Program (for TRDOS 386 development)'
+   192 0000010A 746520546573742050-
+   192 00000113 726F6772616D202866-
+   192 0000011C 6F72205452444F5320-
+   192 00000125 33383620646576656C-
+   192 0000012E 6F706D656E7429     
+   193 00000135 0D0A                    	db 0Dh, 0Ah
+   194 00000137 4572646F67616E2054-     	db 'Erdogan Tan - 17/10/2023'
+   194 00000140 616E202D2031372F31-
+   194 00000149 302F32303233       
+   195 0000014F 0D0A00                  	db 0Dh, 0Ah, 0
+   196                                  
+   197                                  press_a_key_msg:
+   198 00000152 0D0A                    	db 0Dh, 0Ah
+   199 00000154 507265737320455343-     	db 'Press ESC to CANCEL or press another key to continue.'
+   199 0000015D 20746F2043414E4345-
+   199 00000166 4C206F722070726573-
+   199 0000016F 7320616E6F74686572-
+   199 00000178 206B657920746F2063-
+   199 00000181 6F6E74696E75652E   
+   200 00000189 0D0A00                  	db 0Dh, 0Ah, 0	
+   201                                  
+   202                                  vstate_f_err_msg:
+   203 0000018C 0D0A                    	db 0Dh, 0Ah
+   204 0000018E 4572726F722021          	db 'Error !'
+   205 00000195 0D0A                    	db 0Dh, 0Ah
+   206 00000197 494E54203130682046-     	db 'INT 10h Function 1Ch is not supported !'
+   206 000001A0 756E6374696F6E2031-
+   206 000001A9 4368206973206E6F74-
+   206 000001B2 20737570706F727465-
+   206 000001BB 642021             
+   207 000001BE 0D0A00                  	db 0Dh, 0Ah, 0
+   208                                  
+   209                                  mode_03h_state_msg:
+   210                                  mode_13h_state_msg:
+   211 000001C1 0D0A                    	db 0Dh, 0Ah
+   212 000001C3 566964656F204D4F44-     	db 'Video MODE '
+   212 000001CC 4520               
+   213                                  mode_num_str:
+   214 000001CE 313368                  	db '13h'
+   215 000001D1 0D0A                    	db 0Dh, 0Ah
+   216 000001D3 56474120766964656F-     	db 'VGA video hardware state : '
+   216 000001DC 206861726477617265-
+   216 000001E5 207374617465203A20 
+   217 000001EE 0D0A00                  	db 0Dh, 0Ah, 0
+   218                                  
+   219                                  hex_chars:
+   220 000001F1 303132333435363738-     	db '0123456789ABCDEF',0
+   220 000001FA 3941424344454600   
+   221                                  
+   222                                  vstate_buf:
+   223 00000202 FF                      	db 0FFh
