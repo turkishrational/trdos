@@ -1,0 +1,146 @@
+     1                                  ; ****************************************************************************
+     2                                  ; COPY VIDEO BIOS CODE - Erdogan Tan - 25/11/2018
+     3                                  ; ****************************************************************************
+     4                                  ; 28/11/2018
+     5                                  
+     6                                  [BITS 16]
+     7                                  [ORG 100h]
+     8                                  
+     9                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    10                                  ; Copy video bios to data segment
+    11                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    12                                  
+    13 00000000 8CCD                    	mov	bp, cs
+    14 00000002 81C50010                	add	bp, 1000h
+    15 00000006 06                      	push	es
+    16 00000007 1E                      	push	ds
+    17 00000008 8EC5                    	mov	es, bp
+    18 0000000A 31FF                    	xor	di, di
+    19 0000000C BE00C0                  	mov	si, 0C000h
+    20 0000000F 8EDE                    	mov	ds, si
+    21 00000011 31F6                    	xor	si, si
+    22 00000013 B90080                  	mov	cx, 32768
+    23 00000016 F3A5                    	rep	movsw
+    24 00000018 1F                      	pop	ds
+    25 00000019 07                      	pop	es
+    26                                  
+    27                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    28                                  ; Create video bios image file
+    29                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    30                                  		
+    31 0000001A BA[7F00]                	mov	dx, img_file_name
+    32                                  	;mov	cx, 0 ; File Attributes
+    33 0000001D B43C                    	mov	ah, 3Ch ; MS-DOS Function = Create File
+    34 0000001F CD21                    	int	21h
+    35 00000021 7311                    	jnc	short cvb_2
+    36                                  cvb_0:
+    37 00000023 BE[8C00]                	mov	si, Msg_Error
+    38                                  cvb_1:
+    39 00000026 E84500                  	call	print_msg
+    40                                  
+    41 00000029 BE[B800]                	mov	si, CRLF
+    42 0000002C E83F00                  	call	print_msg
+    43 0000002F B8004C                  	mov	ax, 4C00h		; terminate
+    44 00000032 CD21                    	int	21h
+    45                                  
+    46                                  cvb_2:
+    47 00000034 BE[B800]                	mov	si, CRLF
+    48 00000037 E83400                  	call	print_msg
+    49                                  
+    50                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    51                                  ; Open image file for writing
+    52                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    53                                  
+    54 0000003A B002                    	mov	al, 2 ; open for reading and writing
+    55                                  	;mov	dx, img_file_name
+    56 0000003C B43D                    	mov	ah, 3Dh ; open file
+    57 0000003E CD21                    	int	21h
+    58 00000040 72E1                    	jc	short cvb_0
+    59                                  
+    60 00000042 A3[7D00]                	mov	[img_file_handle], ax
+    61                                  
+    62 00000045 BE[9700]                	mov	si, Msg_Writing_Bios_Image
+    63 00000048 E82300                  	call	print_msg
+    64                                  
+    65 0000004B 1E                      	push	ds
+    66 0000004C 8B1E[7D00]              	mov	bx, [img_file_handle]
+    67 00000050 8EDD                    	mov	ds, bp ; Video bios copy segment
+    68 00000052 31D2                    	xor	dx, dx	
+    69 00000054 B90080                  	mov	cx, 32768
+    70 00000057 B440                    	mov	ah, 40h ; write to file	
+    71 00000059 CD21                    	int	21h
+    72 0000005B 7303                    	jnc	short cvb_4
+    73                                  cvb_3:
+    74 0000005D 1F                      	pop	ds
+    75 0000005E EBC3                    	jmp	short cvb_0
+    76                                  cvb_4:	
+    77                                  	;mov	bx, [cs:img_file_handle]
+    78                                  	;mov	cx, 32768
+    79 00000060 01CA                    	add	dx, cx ; + 32768	
+    80 00000062 B440                    	mov	ah, 40h ; write to file	
+    81 00000064 CD21                    	int	21h
+    82                                  	;pop	ds
+    83                                  	;jc	short cvb_0
+    84 00000066 72F5                    	jc	short cvb_3
+    85                                  
+    86 00000068 1F                      	pop	ds
+    87                                  
+    88 00000069 BE[B300]                	mov	si, Msg_OK
+    89 0000006C EBB8                    	jmp	short cvb_1
+    90                                  
+    91                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    92                                  ; Print messages
+    93                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    94                                  
+    95                                  print_msg:
+    96                                  
+    97                                  print_msg_LOOP:
+    98 0000006E AC                      	lodsb                           ; Load byte at DS:SI to AL
+    99 0000006F 20C0                    	and     al, al            
+   100 00000071 7409                    	jz      short print_msg_OK       
+   101 00000073 B40E                    	mov	ah, 0Eh			
+   102 00000075 BB0700                  	mov     bx, 07h             
+   103 00000078 CD10                    	int	10h			; BIOS Service func ( ah ) = 0Eh
+   104                                  					; Write char as TTY
+   105                                  					; AL-char BH-page BL-color
+   106 0000007A EBF2                    	jmp     short print_msg_LOOP           
+   107                                  
+   108                                  print_msg_OK:
+   109 0000007C C3                      	retn
+   110                                  
+   111                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   112                                  ; Data
+   113                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   114                                  
+   115                                  img_file_handle:
+   116 0000007D 0000                    	dw	0
+   117                                  img_file_name:
+   118 0000007F 5642494F5336344B2E-     	db	'VBIOS64K.BIN'
+   119 00000088 42494E             
+   120 0000008B 00                      	db 	0
+   121                                  
+   122                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   123                                  ; Messages
+   124                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   125                                  
+   126                                  Msg_Error:
+   127 0000008C 0D0A                    	db	0Dh, 0Ah
+   128 0000008E 4572726F72202120        	db	'Error ! '
+   129 00000096 00                      	db	0
+   130                                  
+   131                                  Msg_Writing_Bios_Image:
+   132 00000097 57726974696E672056-     	db	"Writing Video BIOS image...", 0
+   133 000000A0 6964656F2042494F53-
+   134 000000A9 20696D6167652E2E2E-
+   135 000000B2 00                 
+   136                                  Msg_OK:
+   137 000000B3 204F4B2E                	db	' OK.'
+   138 000000B7 00                      	db	0
+   139                                  CRLF:
+   140 000000B8 0D0A                    	db	0Dh, 0Ah
+   141 000000BA 00                      	db	0
+   142                                  Signature:
+   143 000000BB 4572646F67616E2054-     	db	'Erdogan Tan - 28/11/2018'
+   144 000000C4 616E202D2032382F31-
+   145 000000CD 312F32303138       
+   146 000000D3 00                      	db	0
