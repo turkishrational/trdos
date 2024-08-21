@@ -1,0 +1,337 @@
+     1                                  ; ****************************************************************************
+     2                                  ; exittest.s - TRDOS 386 (TRDOS v2.0) Kernel - 'sysexit' exit code test
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ;
+     5                                  ; 20/08/2024
+     6                                  ;
+     7                                  ; [ Last Modification: 20/08/2024 ]
+     8                                  ;
+     9                                  ; Derived from 'TRDOS 386 v2' FORK TEST source code by Erdogan Tan
+    10                                  ; ('forkstest.s', 12/11/2017)
+    11                                  ;
+    12                                  ; ****************************************************************************
+    13                                  ; forktest.s, 17/09/2015 (Retro UNIX 386 v1, NASM 2.11)
+    14                                  
+    15                                  ; 20/08/2024 ; TRDOS 386 v2.0.9 (exit code)
+    16                                  ; 20/08/2017
+    17                                  ; 01/03/2017
+    18                                  ; 16/10/2016
+    19                                  ; 29/04/2016
+    20                                  ; TRDOS 386 system calls (temporary list!)
+    21                                  _ver 	equ 0
+    22                                  _exit 	equ 1
+    23                                  _fork 	equ 2
+    24                                  _read 	equ 3
+    25                                  _write	equ 4
+    26                                  _open	equ 5
+    27                                  _close 	equ 6
+    28                                  _wait 	equ 7
+    29                                  _creat 	equ 8
+    30                                  _link 	equ 9
+    31                                  _unlink	equ 10
+    32                                  _exec	equ 11
+    33                                  _chdir	equ 12
+    34                                  _time 	equ 13
+    35                                  _mkdir 	equ 14
+    36                                  _chmod	equ 15
+    37                                  _chown	equ 16
+    38                                  _break	equ 17
+    39                                  _stat	equ 18
+    40                                  _seek	equ 19
+    41                                  _tell 	equ 20
+    42                                  _mount	equ 21
+    43                                  _umount	equ 22
+    44                                  _setuid	equ 23
+    45                                  _getuid	equ 24
+    46                                  _stime	equ 25
+    47                                  _quit	equ 26	
+    48                                  _intr	equ 27
+    49                                  _fstat	equ 28
+    50                                  _emt 	equ 29
+    51                                  _mdate 	equ 30
+    52                                  _video 	equ 31
+    53                                  _audio	equ 32
+    54                                  _timer	equ 33
+    55                                  _sleep	equ 34
+    56                                  _msg    equ 35
+    57                                  _geterr	equ 36
+    58                                  _fpsave	equ 37
+    59                                  _pri	equ 38
+    60                                  _rele	equ 39
+    61                                  _fff	equ 40
+    62                                  _fnf	equ 41
+    63                                  _alloc	equ 42
+    64                                  _dalloc equ 43
+    65                                  _calbac equ 44
+    66                                  _dma	equ 45
+    67                                  _stdio  equ 46	;  TRDOS 386 v2.0.9
+    68                                  
+    69                                  %macro sys 1-4
+    70                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    71                                      ; 03/09/2015	
+    72                                      ; 13/04/2015
+    73                                      ; Retro UNIX 386 v1 system call.	
+    74                                      %if %0 >= 2   
+    75                                          mov ebx, %2
+    76                                          %if %0 >= 3    
+    77                                              mov ecx, %3
+    78                                              %if %0 = 4
+    79                                                 mov edx, %4   
+    80                                              %endif
+    81                                          %endif
+    82                                      %endif
+    83                                      mov eax, %1
+    84                                      ;int 30h
+    85                                      int 40h ; TRDOS 386 (TRDOS v2.0)	   
+    86                                  %endmacro
+    87                                  
+    88                                  ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
+    89                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    90                                  
+    91                                  ;========================================================================
+    92                                  ; FORK TEST - CODE
+    93                                  ;========================================================================
+    94                                  
+    95                                  [BITS 32] ; 32-bit intructions
+    96                                  
+    97                                  [ORG 0] 
+    98                                  START_CODE:
+    99 00000000 BE[E2000000]            	mov 	esi, sysexit_test
+   100 00000005 E8A3000000              	call 	print_msg
+   101                                  
+   102 0000000A BB[84000000]                  	mov 	ebx, chldr
+   103                                  	sys 	_fork
+    70                              <1> 
+    71                              <1> 
+    72                              <1> 
+    73                              <1> 
+    74                              <1>  %if %0 >= 2
+    75                              <1>  mov ebx, %2
+    76                              <1>  %if %0 >= 3
+    77                              <1>  mov ecx, %3
+    78                              <1>  %if %0 = 4
+    79                              <1>  mov edx, %4
+    80                              <1>  %endif
+    81                              <1>  %endif
+    82                              <1>  %endif
+    83 0000000F B802000000          <1>  mov eax, %1
+    84                              <1> 
+    85 00000014 CD40                <1>  int 40h
+   104 00000016 725B                    	jc 	short error
+   105                                  
+   106 00000018 A3[DE000000]            	mov	[cpid], eax ; child's process ID
+   107                                  
+   108 0000001D E89F000000              	call 	bin_to_decimal_str
+   109 00000022 A3[27010000]            	mov 	[pprocessid], eax
+   110                                  
+   111                                  pwait:
+   112 00000027 BBE7030000              	mov	ebx, 999 ; this must not return
+   113                                  	sys 	_wait
+    70                              <1> 
+    71                              <1> 
+    72                              <1> 
+    73                              <1> 
+    74                              <1>  %if %0 >= 2
+    75                              <1>  mov ebx, %2
+    76                              <1>  %if %0 >= 3
+    77                              <1>  mov ecx, %3
+    78                              <1>  %if %0 = 4
+    79                              <1>  mov edx, %4
+    80                              <1>  %endif
+    81                              <1>  %endif
+    82                              <1>  %endif
+    83 0000002C B807000000          <1>  mov eax, %1
+    84                              <1> 
+    85 00000031 CD40                <1>  int 40h
+   114 00000033 723E                    	jc 	short error
+   115                                  
+   116 00000035 3B05[DE000000]          	cmp 	eax, [cpid]
+   117 0000003B 75EA                    	jne 	short pwait	
+   118                                  
+   119                                  	; EAX = child's process id (AX)
+   120                                  	; EBX = child's exit code (BL) ; must be 209
+   121                                  
+   122 0000003D 53                      	push	ebx  ; exit code
+   123                                  
+   124 0000003E E87E000000              	call 	bin_to_decimal_str
+   125 00000043 A3[42010000]            	mov 	[cprocessid], eax
+   126                                  
+   127 00000048 BE[2E010000]            	mov 	esi, child_pid
+   128 0000004D E85B000000              	call 	print_msg
+   129                                  
+   130 00000052 58                      	pop	eax
+   131                                  
+   132 00000053 E869000000              	call 	bin_to_decimal_str
+   133 00000058 A3[5C010000]            	mov 	[exitcode], eax
+   134                                  
+   135 0000005D BE[49010000]            	mov 	esi, child_exitcode
+   136 00000062 E846000000              	call 	print_msg
+   137                                  _ok:
+   138 00000067 BE[70010000]            	mov 	esi, msg_ok
+   139 0000006C E83C000000              	call 	print_msg
+   140                                  
+   141 00000071 EB0A                    	jmp 	short here
+   142                                  
+   143                                  error:
+   144 00000073 BE[63010000]            	mov 	esi, msg_err
+   145 00000078 E830000000              	call 	print_msg
+   146                                   	;jmp 	short here
+   147                                  here:	
+   148                                  	sys	_exit
+    70                              <1> 
+    71                              <1> 
+    72                              <1> 
+    73                              <1> 
+    74                              <1>  %if %0 >= 2
+    75                              <1>  mov ebx, %2
+    76                              <1>  %if %0 >= 3
+    77                              <1>  mov ecx, %3
+    78                              <1>  %if %0 = 4
+    79                              <1>  mov edx, %4
+    80                              <1>  %endif
+    81                              <1>  %endif
+    82                              <1>  %endif
+    83 0000007D B801000000          <1>  mov eax, %1
+    84                              <1> 
+    85 00000082 CD40                <1>  int 40h
+   149                                  	; hlt
+   150                                  	; jmp 	short here
+   151                                  	
+   152                                  chldr:
+   153                                  	; EAX = parent's process ID
+   154 00000084 E838000000              	call 	bin_to_decimal_str
+   155 00000089 A3[27010000]            	mov 	[pprocessid], eax
+   156                                  
+   157 0000008E BE[12010000]            	mov 	esi, parent_pid
+   158 00000093 E815000000              	call 	print_msg
+   159                                  
+   160                                  	; invalid system call test
+   161                                  	; exit code will be -1 (0FFh) 
+   162                                  
+   163                                  	_invalid equ 255 ; > 46
+   164                                  	sys	_invalid
+    70                              <1> 
+    71                              <1> 
+    72                              <1> 
+    73                              <1> 
+    74                              <1>  %if %0 >= 2
+    75                              <1>  mov ebx, %2
+    76                              <1>  %if %0 >= 3
+    77                              <1>  mov ecx, %3
+    78                              <1>  %if %0 = 4
+    79                              <1>  mov edx, %4
+    80                              <1>  %endif
+    81                              <1>  %endif
+    82                              <1>  %endif
+    83 00000098 B8FF000000          <1>  mov eax, %1
+    84                              <1> 
+    85 0000009D CD40                <1>  int 40h
+   165                                  
+   166 0000009F BBD1000000              	mov	ebx, 209
+   167                                  	sys 	_exit
+    70                              <1> 
+    71                              <1> 
+    72                              <1> 
+    73                              <1> 
+    74                              <1>  %if %0 >= 2
+    75                              <1>  mov ebx, %2
+    76                              <1>  %if %0 >= 3
+    77                              <1>  mov ecx, %3
+    78                              <1>  %if %0 = 4
+    79                              <1>  mov edx, %4
+    80                              <1>  %endif
+    81                              <1>  %endif
+    82                              <1>  %endif
+    83 000000A4 B801000000          <1>  mov eax, %1
+    84                              <1> 
+    85 000000A9 CD40                <1>  int 40h
+   168                                  
+   169 000000AB EBBA                            jmp     short _ok
+   170                                  
+   171                                  print_msg:
+   172                                  	sys 	_msg, esi, 255, 0Fh ; message with white color (max. 255 chars)
+    70                              <1> 
+    71                              <1> 
+    72                              <1> 
+    73                              <1> 
+    74                              <1>  %if %0 >= 2
+    75 000000AD 89F3                <1>  mov ebx, %2
+    76                              <1>  %if %0 >= 3
+    77 000000AF B9FF000000          <1>  mov ecx, %3
+    78                              <1>  %if %0 = 4
+    79 000000B4 BA0F000000          <1>  mov edx, %4
+    80                              <1>  %endif
+    81                              <1>  %endif
+    82                              <1>  %endif
+    83 000000B9 B823000000          <1>  mov eax, %1
+    84                              <1> 
+    85 000000BE CD40                <1>  int 40h
+   173 000000C0 C3                      	retn
+   174                                  
+   175                                  bin_to_decimal_str:
+   176                                  	; eax = binary number
+   177 000000C1 B90A000000              	mov	ecx, 10
+   178 000000C6 89E5                    	mov	ebp, esp
+   179                                  btd_@:
+   180 000000C8 31D2                    	xor	edx, edx
+   181 000000CA F7F1                      	div	ecx
+   182 000000CC 52                      	push	edx
+   183 000000CD 09C0                    	or	eax, eax
+   184 000000CF 75F7                    	jnz	short btd_@
+   185                                  btd_@@:
+   186 000000D1 59                      	pop	ecx
+   187 000000D2 C1E008                  	shl	eax, 8
+   188 000000D5 88C8                    	mov	al, cl
+   189 000000D7 0430                    	add	al, '0'
+   190 000000D9 39E5                    	cmp	ebp, esp
+   191 000000DB 75F4                    	jne	short btd_@@
+   192                                  	; eax = db 'nnn', 0
+   193 000000DD C3                      	retn
+   194                                  
+   195                                  ;-----------------------------------------------------------------
+   196                                  ;  messages
+   197                                  ;-----------------------------------------------------------------
+   198                                  
+   199 000000DE 00000000                cpid:		dd 0
+   200                                  
+   201 000000E2 0D0A                    sysexit_test:	db 0Dh, 0Ah
+   202 000000E4 5452444F5320333836-     		db 'TRDOS 386 - <sysexit> exit code -return- test'
+   202 000000ED 202D203C7379736578-
+   202 000000F6 69743E206578697420-
+   202 000000FF 636F6465202D726574-
+   202 00000108 75726E2D2074657374 
+   203 00000111 00                      		db 0
+   204 00000112 0D0A                    parent_pid:	db 0Dh, 0Ah
+   205 00000114 506172656E74205072-     		db 'Parent Process ID: '
+   205 0000011D 6F636573732049443A-
+   205 00000126 20                 
+   206 00000127 30303030                pprocessid:	dd 30303030h
+   207 0000012B 0D0A                    		db 0Dh, 0Ah
+   208                                  sizeofparentpid equ $ - parent_pid
+   209 0000012D 00                      		db 0
+   210                                  
+   211 0000012E 0D0A                    child_pid:	db 0Dh, 0Ah
+   212 00000130 4368696C642050726F-     		db 'Child Process ID: '
+   212 00000139 636573732049443A20 
+   213 00000142 30303030                cprocessid:	dd 30303030h
+   214 00000146 0D0A                    		db 0Dh, 0Ah
+   215                                  sizeofchildpid equ $ - child_pid
+   216 00000148 00                      		db 0
+   217                                  
+   218 00000149 0D0A                    child_exitcode:	db 0Dh, 0Ah
+   219 0000014B 4368696C6420457869-     		db 'Child Exit Code: '
+   219 00000154 7420436F64653A20   
+   220 0000015C 30303030                exitcode:	dd 30303030h
+   221 00000160 0D0A                    		db 0Dh, 0Ah
+   222                                  sizeofchildexit	equ $ - child_exitcode
+   223 00000162 00                      		db 0
+   224                                  msg_err:
+   225 00000163 0D0A                    		db 0Dh, 0Ah 
+   226 00000165 4572726F72202120                        db 'Error ! '
+   227 0000016D 0D0A00                  		db 0Dh, 0Ah, 0
+   228                                  msg_ok:
+   229 00000170 0D0A                            	db 0Dh, 0Ah
+   230 00000172 4F4B2E20                        	db 'OK. '
+   231 00000176 0D0A                            	db 0Dh, 0Ah
+   232                                  sizeof_ok 	equ $ - msg_ok 
+   233 00000178 00                              	db 0
