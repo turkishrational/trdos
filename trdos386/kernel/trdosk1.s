@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.5) - SYS INIT : trdosk1.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - SYS INIT : trdosk1.s
 ; ----------------------------------------------------------------------------
-; Last Update: 25/07/2022 (Previous: 18/04/2021)
+; Last Update: 21/08/2024 (Previous: 25/07/2022)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -275,6 +275,7 @@ key_to_reboot:
 	jmp	cpu_reset 
 
 ctrlbrk:
+	; 21/08/2024 (TRDOS 386 Kernel v2.0.9)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 12/11/2015
 	; 13/03/2015 (Retro UNIX 386 v1)
@@ -284,10 +285,13 @@ ctrlbrk:
 	;
       	; Retro Unix 8086 v1 feature only!
       	;
-	
+
 	; 25/07/2022
 	push	edx
 	xor	edx, edx
+
+; 21/08/2024 - TRDOS 386 v2.0.9
+%if 0
 	;cmp 	word [u.intr], 0
 	cmp	[u.intr], dx ; 0
 	jna 	short cbrk4
@@ -297,12 +301,17 @@ cbrk0:
 	;cmp 	word [u.quit], 0
 	cmp	[u.quit], dx ; 0 ; 25/07/2022
 	jz	short cbrk4
-	
+%endif
 	; 20/09/2013	
 	;push 	ax
 	push	eax ; 25/07/2022
 	mov	al, [ptty]
-	
+
+; 21/08/2024 - TRDOS 386 v2.0.9
+%if 1
+	cmp	al, [u.ttyn]
+	jne	short cbrk3
+%else	
 	; 12/11/2015
 	;
 	; ctrl+break (EOT, CTRL+D) from serial port
@@ -334,20 +343,24 @@ cbrk1:
 	cmp	al, [u.ttyp]   ; recent open tty (r)
 	je	short cbrk2	
         cmp     al, [u.ttyp+1] ; recent open tty (w)
-	jne	short cbrk3	
+	jne	short cbrk3
 cbrk2:
 	;; 06/12/2013
 	;mov	ax, [u.quit]
 	;and	ax, ax
 	;jz	short cbrk3
-	
+%endif
 	;xor	ax, ax ; 0
 	;dec	ax
 	; 0FFFFh = 'ctrl+brk' keystroke
 	; 25/07/2022
-	xor	eax, eax ; 0
-	dec	eax ; -1 ; 0FFFFFFFFh
-	mov	[u.quit], ax
+	;xor	eax, eax ; 0
+	;dec	eax ; -1 ; 0FFFFFFFFh
+	;mov	[u.quit], ax
+	; 21/08/2024
+	; set CTRL+BREAK flag (even if it is not activated)
+	; (u.intr is it's activation flag, 0 = disabled))	
+	mov	word [u.quit], -1 ; 0FFFFh
 cbrk3:
 	;pop	ax
 	pop	eax ; 25/07/2022

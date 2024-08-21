@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.8) - MAIN PROGRAM : trdosk8.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 05/06/2024  (Previous: 04/12/2023)
+; Last Update: 21/08/2024  (Previous: 05/06/2024)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -183,6 +183,7 @@ srunseq_6:
 
 	jmp	short srunseq_4
 clock:
+	; 21/08/2024 - TRDOS 386 v2.0.9
 	; 23/05/2016
 	; 22/05/2016
 	; 20/05/2016
@@ -190,6 +191,22 @@ clock:
 	; 14/05/2015 - 14/10/2015 (Retro UNIX 386 v1)
 	; 07/12/2013 - 10/04/2014 (Retro UNIX 8086 v1)
 
+	;;;
+	; 21/08/2024
+	;cmp	word [u.quit], 0FFFFh
+	cmp	byte [u.quit], 0FFh
+	jb	short clk_0
+	; CTRL+BRK keys pressed
+	;cmp	word [u.intr], 0
+	cmp	byte [u.intr], 0
+	jna	short clk_0
+	mov	byte [p_change], 0FFh ; -1 ; CTRL+BREAK sign
+	test	byte [u.quant], 0FFh  ; if [u.quant] number > 0
+	jnz	short clk_1 ; decrease [u.quant] number
+	; [u.quant] = 0
+	retn
+	;;;
+clk_0:
 	cmp	byte [u.quant], 0
 	ja	short clk_1
 	;
@@ -201,14 +218,17 @@ clock:
 	cmp     byte [sysflg], 0FFh ; user or system space ?
 	jne	short clk_2 	    ; system space (sysflg <> 0FFh)
 	;
-	cmp	word [u.intr], 0
-	jna	short clk_2
+	; 21/08/2024
+	;cmp	word [u.intr], 0
+	;jna	short clk_2
 	;
 	; 23/05/2016
 	cmp	byte [multi_tasking], 0
 	jna	short clk_2
-	;
-	inc	byte [p_change] ; it is time to change running process
+
+	; 21/08/2024
+	;inc	byte [p_change] ; it is time to change running process
+	mov	byte [p_change], 1
 	retn
 clk_1:
 	dec	byte [u.quant]
@@ -4418,6 +4438,234 @@ gdmi3:
 
 	;retn
 	; 28/08/2017
+	jmp	sysret
+
+sysstdio: ; STDIN/STDOUT/STDERR functions
+	; 20/08/2024 - TRDOS 386 Kernel v2.0.9
+	;
+	; Inputs:
+	;	BL = 0 -> read a character on stdin (wait)
+	;	BL = 1 -> read a character on stdin (no wait)
+	;	BL = 2 -> write a character onto stdout (redirection)
+	;	BL = 3 -> write a character onto stderr (no redirection)
+	;	BL = 4 -> redirect stdin to file (if cl > 0)
+	;	BL = 5 -> redirect stdout to file (if cl > 0)
+	;	BL = 6 -> read character (ascii and scancode) on stdin
+	;				-no redirection, wait-
+	;	BL = 7 -> read character (ascii and scancode) on stdin
+	;				-no redirection, no wait-
+	;	BL = 8 -> write character and color onto stdout
+	;				-no redirection-
+	;	BL = 9 -> ungetchar (put back the ascii code in u.getc)
+	;
+	;	For BL=2,3,8,9
+	;	    CL = character (ascii) code
+	;	For BL=8
+	;	    CH = color (Attribute) -CGA-
+	;	For BL=4,5
+	;	    CL = file descriptor number + 1
+	;	    (File must be open and that number is 'u.fp' index)
+	;		
+	; Outputs:
+	;
+	;	For BL=0,1,2,3,6,7,8,9
+	;	    AL = character (ascii) code
+	;	For BL=6,7
+	;	    AH= scan code
+	;	For BL=4,5
+	;	    AL= file descriptor (CL input - 1)	
+	;
+	;	If CF=1
+	;	   AL (EAX) = error code
+
+	cmp	bl, (end_of_stdiofuncs-stdiofuncs)>>2
+	jb	short sysstdio_0
+	
+	; invalid parameter (invalid sub function number)
+	mov	eax, ERR_INV_PARAMETER
+sysstdio_err:
+	mov	[u.r0], eax
+	mov	[u.error], eax
+	jmp	error
+
+sysstdio_0:
+	xor	eax, eax ; 0
+	mov	[u.error], eax ; clear previous error code	
+	mov	[u.r0], eax ; clear previous return code
+
+	movzx	esi, bl
+	shl	esi, 2
+	jmp	dword [esi+stdiofuncs]
+
+stdiofuncs:
+	dd	readstdinw
+	dd	readstdinnw
+	dd	writestdout
+	dd	writestderr
+	dd	redirstdin
+	dd	redirstdout
+stdinacsc:
+	dd	readstdin2w
+	dd	readstdin2nw
+stdoutcc:
+	dd	writestdoutcc
+	dd	ungetchar
+end_of_stdiofuncs:
+
+redirstdin:
+	; CL = file handle (descriptor/index) + 1
+	or	cl, cl
+	jnz	short redirstdin_0
+	mov	[u.stdin], cl ; 0 ; reset STDIN to keyboard
+	jmp	short redirstdin_3
+redirstdin_0: 
+	mov	al, cl
+	call	getf
+	; eax = first cluster
+	; ebx = system (not user) open file index
+	cmp	byte [ebx+OF_MODE], 1 ; open for read
+	je	short redirstdin_1
+redir_acc_denied:
+	mov	eax, ERR_ACCESS_DENIED
+	jmp	short sysstdio_err
+redirstdin_1:
+	mov	[u.stdin], cl
+redirstdout_2:
+	dec	ecx
+	mov	[u.r0], cl ; return file descriptor
+redirstdin_3:
+redirstdout_3:
+	mov	word [u.ungetc], 0
+		; reset u.ungetc and u.getc
+	jmp	sysret
+
+redirstdout:
+	; CL = file handle (descriptor/index) + 1
+	or	cl, cl
+	jnz	short redirstdout_0
+	mov	[u.stdout], cl ; 0 ; reset STDOUT to keyboard
+	jmp	short redirstdout_3
+redirstdout_0: 
+	mov	al, cl
+	call	getf
+	; eax = first cluster
+	; ebx = system (not user) open file index
+	cmp	byte [ebx+OF_MODE], 2 ; open for write
+	jne	short redir_acc_denied
+redirstdout_1:
+	mov	[u.stdout], cl
+	jmp	short redirstdout_2
+	
+readstdinw:
+readstdinnw:
+	; read a character on stdin (wait)
+	;sub	eax, eax
+	cmp	byte [u.ungetc], al ; 0
+	jna	short readstdinw_0
+	; read the character in u.getc buffer (put by ungetchar)
+	mov	[u.ungetc], al ; 0
+	xchg	al, [u.getc]
+readstdinw_retn:
+	mov	[u.r0], al
+	jmp	sysret
+readstdinw_0:
+	mov	al, [u.stdin]
+	or	al, al
+	jz	short readstdinw_1
+
+	; file
+	mov	ebx, eax ; File handle (descriptor/index)
+	mov	ecx, u.r0 ; buffer address (eax reg)
+	mov	edx, 1  ; 1 character only
+	jmp	sysread ; jump to sysread system call
+
+readstdinw_1:
+	mov	ah, 10h  ; Keyboard, EXTENDED READ
+	and	bl, bl
+	jz	short readstdinw_2 ; wait (int16h, 10h)
+	; no wait (int16h, 11h)
+	inc	ah  ; function 11h ; EXTENDED ASCII STATUS
+readstdinw_2:
+	call	int16h
+	; ah = scan code, al = ascii code
+	jnz	short readstdinw_retn
+	; if zf=1 at here
+	; it means 'no code avaible' for function 11h
+	and	bl, bl	; 0 ?
+	jz	short  short readstdinw_retn ; function 10h
+	; function 11h
+	; [u.r0] = 0 = eax return
+readstdin2w@_retn:
+	jmp	sysret
+
+readstdin2w:
+readstdin2nw:
+	mov	word [u.ungetc], 0
+		; reset u.ungetc and u.getc
+	mov	ah, 10h  ; Keyboard, EXTENDED READ
+	;cmp	bl, 6
+	cmp	bl,(stdinacsc-stdiofuncs)>>2
+	je	short readstdin2w_1 ; wait (int16h, 10h)
+	; no wait (int16h, 11h)
+	inc	ah  ; function 11h ; EXTENDED ASCII STATUS
+readstdin2w_1:
+	call	int16h
+	; ah = scan code, al = ascii code
+	jnz	short readstdin2w_retn
+	; if zf=1 at here
+	; it means 'no code avaible' for function 11h
+	;cmp	bl, 6
+	cmp	bl,(stdinacsc-stdiofuncs)>>2
+	;je	short  short readstdin2w_retn ; function 10h
+	; function 11h
+	; [u.r0] = 0 = eax return
+	;jmp	sysret
+	jne	short readstdin2w@_retn
+readstdin2w_retn:
+	mov	[u.r0], ax
+	jmp	sysret
+
+writestdout:
+writestdoutcc:
+	mov	byte [u.r0], cl
+	mov	al, [u.stdout]
+	and	al, al
+	jz	short writestdout_1
+
+	; file
+	mov	ebx, eax ; File handle (descriptor/index)
+	;mov	byte [u.r0], cl
+	mov	ecx, u.r0 ; buffer
+	mov	edx, 1  ; 1 character only
+	jmp	syswrite ; jump to syswrite system call
+
+writestderr:	; skip redirection
+		; STDERR = STDOUT (as file redirection disabled)
+	mov	al, cl  ; character
+	mov	[u.r0], al
+	mov	ah, 0Eh	; write a character (as tty write)
+	mov	ebx, 07h ; video page 0 (and color/attrib 07h)
+	call	_int10h
+	jmp	sysret	
+	
+writestdout_1:
+	mov	byte [ccolor], 07h ; default color (CGA) 
+			; (black background, light gray character) 
+	mov	esi, u.r0 ; buffer
+	;cmp	bl, 8 ; write char and color
+	cmp	bl, (stdoutcc-stdiofuncs)>>2
+	jne	short readstdout_2
+	mov	byte [ccolor], ch ; color/attribute (CGA)
+readstdout_2:
+	call	print_cmsg
+	; [u.r0] = written character (AL)
+	jmp	sysret
+
+ungetchar:
+	; put a character back in u.getc STDIN buffer
+	mov	byte [u.ungetc], 1 
+	mov	[u.getc], cl
+	mov	[u.r0],cl
 	jmp	sysret
 
 otty:

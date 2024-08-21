@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.5) - UNINITIALIZED USER DATA : ubss.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - UNINITIALIZED USER DATA : ubss.s
 ; ----------------------------------------------------------------------------
-; Last Update: 07/08/2022  (Previous: 28/02/2017)
+; Last Update: 19/08/2024  (Previous: 07/08/2022)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -88,13 +88,16 @@ process:
 	; 06/05/2015 (Retro UNIX 386 v1 feature only !) 
 	p.upage: resd nproc ; Physical address of the process's
 			    ; 'user' structure
-	; 21/05/2016	
+	; 21/05/2016
 	; 19/05/2016 (TRDOS 386 feature only!)
 	p.timer: resb nproc ; number of timer events of the processs
 
 	; 19/12/2016
 	p.tcb:	resd nproc ; timer callback service address (if > 0)
-			  		 			 	  
+
+	; 18/08/2024 (TRDOS 386 v2.0.9)
+	p.exitc: resb nproc ; exit code of the child
+
 P_SIZE	equ $ - process
 
 ; fsp table (original UNIX v1)
@@ -103,57 +106,57 @@ P_SIZE	equ $ - process
 ;          15                                      0
 ;  1     |---|---------------------------------------|
 ;        |r/w|       i-number of open file           |
-;        |---|---------------------------------------| 
+;        |---|---------------------------------------|
 ;        |               device number               |
 ;        |-------------------------------------------|
 ;    (*) | offset pointer, i.e., r/w pointer to file |
-;        |-------------------------------------------| 
+;        |-------------------------------------------|
 ;        |  flag that says    | number of processes  |
 ;        |   file deleted     | that have file open  |
-;        |-------------------------------------------| 
+;        |-------------------------------------------|
 ;  2     |                                           |
-;        |-------------------------------------------| 
-;        |                                           |
 ;        |-------------------------------------------|
 ;        |                                           |
 ;        |-------------------------------------------|
 ;        |                                           |
-;        |-------------------------------------------| 
-;  3     |                                           | 
-;        |                                           |  
+;        |-------------------------------------------|
+;        |                                           |
+;        |-------------------------------------------|
+;  3     |                                           |
+;        |                                           |
 ;
-; (*) Retro UNIX 386 v1 modification: 32 bit offset pointer 
+; (*) Retro UNIX 386 v1 modification: 32 bit offset pointer
 
-; 27/03/2020 - Retro UNIX 386 v2 - FSP (OPEN FILES) TABLE 
+; 27/03/2020 - Retro UNIX 386 v2 - FSP (OPEN FILES) TABLE
 
 ;Entry
 ;         15                    7                   0
 ;  1     |-------------------------------------------|
 ;        |   	     i-number of open file           |
-;        |-------------------------------------------| 
+;        |-------------------------------------------|
 ;        |        high word of 32 bit i-number       |
 ;        |-------------------------------------------|
 ;        | open mode & status  |   device number     |
 ;        |-------------------------------------------|
 ;        |    reserved byte    |     open count      |
-;        |-------------------------------------------| 
+;        |-------------------------------------------|
 ;        | offset pointer, i.e., r/w pointer to file |
 ;        |-------------------------------------------|
-;        |   64 bit file offset pointer (bit 16-31)  | 
+;        |   64 bit file offset pointer (bit 16-31)  |
 ;        |-------------------------------------------|
-;        |   64 bit file offset pointer (bit 32-47)  | 
+;        |   64 bit file offset pointer (bit 32-47)  |
 ;        |-------------------------------------------|
-;        |   64 bit file offset pointer (bit 48-63)  | 
+;        |   64 bit file offset pointer (bit 48-63)  |
 ;        |-------------------------------------------|
 ;  2     |                                           |
-;        |-------------------------------------------| 
+;        |-------------------------------------------|
+;        |                                           |
+;        |-------------------------------------------|
 ;        |                                           |
 ;        |-------------------------------------------|
 ;        |                                           |
 ;        |-------------------------------------------|
 ;        |                                           |
-;        |-------------------------------------------| 
-;        |                                           | 
 
 %if 0
 
@@ -161,7 +164,7 @@ P_SIZE	equ $ - process
 ; 22/11/2021
 ; 21/07/2021 - Retro UNIX 386 v2 open file structure revision
 
-struc file	; open files (fsp) structure ; (*)	
+struc file	; open files (fsp) structure ; (*)
   .inode:  resw 1  ; inode number of open file (32 bit)
   .i32:	   resw 1  ; higher word of inode number (reserved)
   .drive:  resb 1  ; logical drive (disk) number
@@ -169,9 +172,9 @@ struc file	; open files (fsp) structure ; (*)
   .count:  resb 1  ; number of processes that have file open
   ;.rsvd:  resb 1  ; reserved byte (for next versions)
   .mnt:    resb 1  ; mnttab index+1 (0 = not mounted)
-  .offset: resd 1  ; file offset/pointer (64 bit) 
+  .offset: resd 1  ; file offset/pointer (64 bit)
   .o64:	   resd 1  ; higher 32 bit of file offset
- .size:  ; = 16		
+ .size:  ; = 16
 endstruc 
 
 %endif
@@ -206,7 +209,7 @@ mdev:	resb 1 ; mounted device number ; Retro UNIX 8086 v1 feature only!
 
 ; 23/07/2022
 ;; 15/04/2015
-;active: resb 1 
+;active: resb 1
 ;	 resb 1 ; 09/06/2015
 
 ; 23/07/2022
@@ -214,7 +217,7 @@ mdev:	resb 1 ; mounted device number ; Retro UNIX 8086 v1 feature only!
 ; 07/08/2022
 mpid:	 resw 1
 ;rootdir: resw 1
-rootdir: resd 1	
+rootdir: resd 1
 
 ; 21/05/2016 - TRDOS 386 (TRDOS v2.0) - priority levels, 3 run queues 
 runq:
@@ -227,7 +230,7 @@ runq_background: resw 1 ; low priority, 'run on background'         ; 0
 ;smod:	resb 1
 ;mmod:	resb 1
 sysflg:	resb 1
-	resb 1	
+	resb 1
 
 alignb 4
 
@@ -236,9 +239,9 @@ user:
 	; 04/12/2021 - Retro UNIX 386 v1.2
 	; 13/01/2017
 	; 19/12/2016
-	; 21/05/2016 - TRDOS 386 (TRDOS v2.0) 
+	; 21/05/2016 - TRDOS 386 (TRDOS v2.0)
 	; 	       [u.pri] usage method modification
-	; 04/12/2015 
+	; 04/12/2015
 	; 18/10/2015
 	; 12/10/2015
 	; 21/09/2015
@@ -248,7 +251,7 @@ user:
 	; 11/05/2015
 	; 16/04/2015 (Retro UNIX 386 v1 - 32 bit modifications)
 	; 10/10/2013
-	; 11/03/2013. 
+	; 11/03/2013.
 	;Derived from UNIX v1 source code 'user' structure (ux).
 	;u.
 
@@ -258,7 +261,7 @@ user:
 	u.cdir:	  resw 1
 		  resw 1 ; 23/07/2022
 	u.cdrv:	  resb 1 ; 23/07/2022
-		  resb 1				  	
+		  resb 1
 	u.fp:	  resb 10
 	;u.fp:	  resb OPENFILES ; 23/07/202
 	u.fsp:	  ; 23/07/2022
@@ -277,12 +280,12 @@ user:
 	u.ttyn:	  resb 1 ; 28/07/2013 - Retro Unix 8086 v1 feature only !
 	u.mode:   resb 1 ; 23/07/2022
 	;u.resb:  resb 1 ; 10/01/2017 (TRDOS 386, temporary)
-	u.dirbuf: resb 16 ; 04/12/2015 (10 -> 16) 
+	u.dirbuf: resb 16 ; 04/12/2015 (10 -> 16)
 	;u.pri:	  resw 1 ; 14/02/2014
 	u.quant:  resb 1 ; Retro UNIX 8086 v1 Feature only ! (uquant)
 		  resb 1 ; 23/07/2022
 	u.pri:	  resb 1 ; Modification: 21/05/2016 (priority levels: 0, 1, 2)
-		  resb 1 ; 23/07/2022	
+		  resb 1 ; 23/07/2022
 	u.intr:	  resw 1
 	u.quit:	  resw 1
 	;u.emt:	  resw 1 ; 10/10/2013
@@ -304,42 +307,49 @@ user:
 	u.ppgdir: resd 1 ; 06/05/2015 (page dir addr of the parent process)
 	u.pbase:  resd 1 ; 20/05/2015 (physical base/transfer address)
 	u.pcount: resw 1 ; 20/05/2015 (byte -transfer- count for page)
-	;u.pncount: resw 1 
+	;u.pncount: resw 1
 		; 16/06/2015 (byte -transfer- count for page, 'namei', 'mkdir')
-	;u.pnbase:  resd 1 
+	;u.pnbase:  resd 1
 		; 16/06/2015 (physical base/transfer address, 'namei', 'mkdir')
 			 ; 09/06/2015
-	u.kcall:  resb 1 ; The caller is 'namei' (dskr) or 'mkdir' (dskw) sign		
+	u.kcall:  resb 1 ; The caller is 'namei' (dskr) or 'mkdir' (dskw) sign
 	u.brwdev: resb 1 ; Block device number for direct I/O (bread & bwrite)
 			 ; 24/07/2015 - 24/06/2015
 	;u.args:  resd 1 ; arguments list (line) offset from start of [u.upage]
 			 ; (arg list/line is from offset [u.args] to 4096 in [u.upage])
 			 ; ([u.args] points to argument count -argc- address offset)
- 			 ; 24/06/2015	  	
+ 			 ; 24/06/2015
 	;u.core:  resd 1 ; physical start address of user's memory space (for sys exec)
 	;u.ecore: resd 1 ; physical end address of user's memory space (for sys exec)
+	;;;
+	; 19/08/2024	 ; TRDOS 386 v2.0.9 ; STDIN/STDOUT/STDERR 
+	u.stdin:  resb 1 ; 0 is tty-r or > 0 is file (redirection)
+	u.stdout: resb 1 ; 0 is tty-w or > 0 is file (redirection)
+	u.ungetc: resb 1 ; u.getc is valid if u.ungetc > 0	
+	u.getc:	  resb 1 ; last char read on stdin	 	
+	;;;
 	; last error number
 	u.error:  resd 1 ; 28/07/2013 - 09/03/2015 
 		         ; Retro UNIX 8086/386 v1 feature only!
 			 ; 21/09/2015 (debugging - page fault analyze)
 	u.pfcount: resd 1 ; page fault count for (this) process (for sys geterr)
-		; 19/12/2016 (TRDOS 386)	
+		; 19/12/2016 (TRDOS 386)
 	u.tcb:	  resd 1 ; Timer callback address/flag which will be used by timer int
 		; 13/01/2017 (TRDOS 386)
 	u.t_lock: resb 1 ; Timer interrupt (callback) lock (unlocked by 'sysrele')
 	u.t_mode: resb 1 ; running mode during timer interrupt (0= system, 0FFh= user)
 		; 26/02/2017 (TRDOS 386)
 	u.irqc:	  resb 1  ; Count of IRQ callback services (IRQs in use)
-		; 28/02/2017 (TRDOS 386) 
+		; 28/02/2017 (TRDOS 386)
 	u.irqwait: resb 1 ; IRQ waiting for callback service flag (IRQ number, If > 0)
 	u.r_lock: resb 1 ; 'IRQ callback service is in progress' flag (IRQ lock)
 	u.r_mode: resb 1 ; running mode during hadware interrupt
 	; 23/07/2022
 	u.exit:	  resb 1 ; exit code
-	; 27/02/2017 (TRDOS 386) 
+	; 27/02/2017 (TRDOS 386)
 	u.fpsave: resb 1 ; TRDOS 386, 'save/restore FPU registers' flag
 alignb 4
-	; !! wrong sizing in TRDOS 386 v2.0.4 (in 'ubss.s', 28/02/2017) !! 
+	; !! wrong sizing in TRDOS 386 v2.0.4 (in 'ubss.s', 28/02/2017) !!
 	;u.fpregs: resb 94 ; 94 byte area for saving and restoring FPU registers
 	; 23/07/2022
 	u.fpregs: resb 108 ; 108 byte area for saving and restoring FPU registers
@@ -363,7 +373,7 @@ argv:	resd 1	; argument list (recent) address for 'sysexec'
 ; 07/04/2013 - 31/07/2013 - Retro UNIX 8086 v1
 rw:	resb 1 ;; Read/Write sign (iget)
 ; 23/07/2022
-	resb 3	
+	resb 3
 
 alignb 4
 
