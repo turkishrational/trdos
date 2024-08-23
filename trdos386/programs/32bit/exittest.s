@@ -4,7 +4,7 @@
 ;
 ; 20/08/2024
 ;
-; [ Last Modification: 20/08/2024 ]
+; [ Last Modification: 23/08/2024 ]
 ;
 ; Derived from 'TRDOS 386 v2' FORK TEST source code by Erdogan Tan
 ; ('forkstest.s', 12/11/2017)
@@ -105,8 +105,8 @@ START_CODE:
 
 	mov	[cpid], eax ; child's process ID
 
+	mov	edi, pprocessid
 	call 	bin_to_decimal_str
-	mov 	[pprocessid], eax
 
 pwait:
 	mov	ebx, 999 ; this must not return
@@ -121,16 +121,16 @@ pwait:
 
 	push	ebx  ; exit code
 
+	mov	edi, cprocessid
 	call 	bin_to_decimal_str
-	mov 	[cprocessid], eax
 
 	mov 	esi, child_pid
 	call 	print_msg
 
 	pop	eax
 
+	mov	edi, exitcode
 	call 	bin_to_decimal_str
-	mov 	[exitcode], eax
 
 	mov 	esi, child_exitcode
 	call 	print_msg
@@ -151,17 +151,11 @@ here:
 	
 chldr:
 	; EAX = parent's process ID
+	mov	edi, pprocessid
 	call 	bin_to_decimal_str
-	mov 	[pprocessid], eax
 
 	mov 	esi, parent_pid
 	call 	print_msg
-
-	; invalid system call test
-	; exit code will be -1 (0FFh) 
-
-	_invalid equ 255 ; > 46
-	sys	_invalid
 
 	mov	ebx, 209
 	sys 	_exit
@@ -184,12 +178,12 @@ btd_@:
 	jnz	short btd_@
 btd_@@:
 	pop	ecx
-	shl	eax, 8
 	mov	al, cl
 	add	al, '0'
+	stosb
 	cmp	ebp, esp
 	jne	short btd_@@
-	; eax = db 'nnn', 0
+	mov	byte [edi],0
 	retn
 
 ;-----------------------------------------------------------------
