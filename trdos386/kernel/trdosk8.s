@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 21/08/2024  (Previous: 05/06/2024)
+; Last Update: 23/08/2024  (Previous: 05/06/2024)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1849,6 +1849,7 @@ set_dev_IRQ_service:
 	retn
 
 sysaudio: ; AUDIO FUNCTIONS
+	; 23/08/2024 (TRDOS 386 v2.0.9) 
 	; 05/06/2024
 	; 04/06/2024
 	; 23/05/2024 (TRDOS 386 v2.0.8)
@@ -3126,6 +3127,7 @@ snd_vol_3:
 soundc_disable:
 	; FUNCTION = 12 
 	; Disable audio device (and unlink DMA memory)
+	; 23/08/2024
 	; 04/06/2024
 	; 30/07/2022
 	; 28/05/2017
@@ -3171,6 +3173,7 @@ snd_disable_2:
 	mov	byte [audio_device], al
 	mov	byte [audio_intr], al
 	xchg	eax, [audio_dma_buff]
+
 	; 24/05/2017
 	;or	eax, eax
 	;jz	short snd_disable_3
@@ -3179,6 +3182,11 @@ snd_disable_2:
 	cmp	byte [audio_pci], 0 ; AC97 audio controller ?
 	jna	short snd_disable_3
 	mov	byte [audio_pci], 0
+
+	; 23/08/2024 - bugfix
+	cmp	eax, sb16_dma_buffer	; reserved buffer ?
+	je	short snd_disable_3 ; it isn't an allocated mem buff
+
 	;sub	ecx, ecx
 	;xchg	ecx, [audio_dmabuff_size]
 	mov	ecx, [audio_dmabuff_size]
@@ -4441,6 +4449,7 @@ gdmi3:
 	jmp	sysret
 
 sysstdio: ; STDIN/STDOUT/STDERR functions
+	; 23/08/2024
 	; 20/08/2024 - TRDOS 386 Kernel v2.0.9
 	;
 	; Inputs:
@@ -4568,6 +4577,13 @@ readstdinnw:
 readstdinw_retn:
 	mov	[u.r0], al
 	jmp	sysret
+
+readstdinw_3:
+	; 23/08/2024
+	mov	ah, 10h
+	call	int16h
+	jmp	short readstdinw_retn
+
 readstdinw_0:
 	mov	al, [u.stdin]
 	or	al, al
@@ -4588,13 +4604,17 @@ readstdinw_1:
 readstdinw_2:
 	call	int16h
 	; ah = scan code, al = ascii code
-	jnz	short readstdinw_retn
-	; if zf=1 at here
-	; it means 'no code avaible' for function 11h
-	and	bl, bl	; 0 ?
-	jz	short  short readstdinw_retn ; function 10h
-	; function 11h
-	; [u.r0] = 0 = eax return
+	;jnz	short readstdinw_retn
+	; 23/08/2024
+	jnz	short readstdinw_3
+
+; 23/08/2024
+;	; if zf=1 at here
+;	; it means 'no code available' for function 11h
+;	and	bl, bl	; 0 ?
+;	jz	short  short readstdinw_retn ; function 10h
+;	; function 11h
+;	; [u.r0] = 0 = eax return
 readstdin2w@_retn:
 	jmp	sysret
 
@@ -4604,23 +4624,32 @@ readstdin2nw:
 		; reset u.ungetc and u.getc
 	mov	ah, 10h  ; Keyboard, EXTENDED READ
 	;cmp	bl, 6
-	cmp	bl,(stdinacsc-stdiofuncs)>>2
+	cmp	bl, (stdinacsc-stdiofuncs)>>2
 	je	short readstdin2w_1 ; wait (int16h, 10h)
 	; no wait (int16h, 11h)
 	inc	ah  ; function 11h ; EXTENDED ASCII STATUS
 readstdin2w_1:
 	call	int16h
 	; ah = scan code, al = ascii code
-	jnz	short readstdin2w_retn
-	; if zf=1 at here
-	; it means 'no code avaible' for function 11h
-	;cmp	bl, 6
-	cmp	bl,(stdinacsc-stdiofuncs)>>2
-	;je	short  short readstdin2w_retn ; function 10h
-	; function 11h
-	; [u.r0] = 0 = eax return
-	;jmp	sysret
-	jne	short readstdin2w@_retn
+	;jnz	short readstdin2w_retn
+	; 23/08/2024
+	jz	short readstdin2w@_retn
+
+; 23/08/2024
+;	; if zf=1 at here
+;	; it means 'no code available' for function 11h
+;	;cmp	bl, 6
+;	cmp	bl, (stdinacsc-stdiofuncs)>>2
+;	;je	short  short readstdin2w_retn ; function 10h
+;	; function 11h
+;	; [u.r0] = 0 = eax return
+;	;jmp	sysret
+;	jne	short readstdin2w@_retn
+
+	; 23/08/2024
+	mov	ah, 10h
+	call	int16h
+
 readstdin2w_retn:
 	mov	[u.r0], ax
 	jmp	sysret
@@ -4645,6 +4674,8 @@ writestderr:	; skip redirection
 	mov	[u.r0], al
 	mov	ah, 0Eh	; write a character (as tty write)
 	mov	ebx, 07h ; video page 0 (and color/attrib 07h)
+	; 23/08/2024
+	mov	bh, [ptty] ; ACTIVE_PAGE
 	call	_int10h
 	jmp	sysret	
 	

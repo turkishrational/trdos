@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 21/08/2024  (Previous: 29/08/2023)
+; Last Update: 23/08/2024  (Previous: 29/08/2023)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -31,10 +31,10 @@ sysent: ; < enter to system call >
 	; 'unkni' or 'sysent' is sytem entry from various traps. 
 	; The trap type is determined and an indirect jump is made to 
 	; the appropriate system call handler. If there is a trap inside
-	; the system a jump to panic is made. All user registers are saved 
+	; the system a jump to panic is made. All user registers are saved
 	; and u.sp points to the end of the users stack. The sys (trap)
 	; instructor is decoded to get the the system code part (see
-	; trap instruction in the PDP-11 handbook) and from this 
+	; trap instruction in the PDP-11 handbook) and from this
 	; the indirect jump address is calculated. If a bad system call is
 	; made, i.e., the limits of the jump table are exceeded, 'badsys'
 	; is called. If the call is legitimate control passes to the
@@ -43,9 +43,9 @@ sysent: ; < enter to system call >
 	; Calling sequence:
 	;	Through a trap caused by any sys call outside the system.
 	; Arguments:
-	;	Arguments of particular system call.	
+	;	Arguments of particular system call.
 	; ...............................................................
-	;	
+	;
 	; Retro UNIX 8086 v1 modification: 
 	;       System call number is in EAX register.
 	;
@@ -104,7 +104,7 @@ sysent0:
 	jmp	sysrele
 		; mov $s.syst+2,clockp
 		; mov r0,-(sp) / save user registers 
-		; mov sp,u.r0 / pointer to bottom of users stack 
+		; mov sp,u.r0 / pointer to bottom of users stack
 			   ; / in u.r0
 		; mov r1,-(sp)
 		; mov r2,-(sp)
@@ -119,7 +119,7 @@ sysent0:
 		             ; / arithmetic unit
 		; mov sp,u.sp / u.sp points to top of users stack
 		; mov 18.(sp),r0 / store pc in r0
-		; mov -(r0),r0 / sys inst in r0      10400xxx
+		; mov -(r0),r0 / sys inst in r0
 		; sub $sys,r0 / get xxx code
 sysent1:
 	shl	eax, 2
@@ -129,13 +129,13 @@ sysent1:
 	;jnb	short badsys
 		; bhis badsys / yes, bad system call
 	cmc
-	pushf	
+	pushf
 	push	eax
  	mov 	ebp, [u.sp] ; Kernel stack at the beginning of sys call
 	mov	al, 0FEh ; 11111110b
 	adc	al, 0 ; al = al + cf
 	and	[ebp+8], al ; flags (reset carry flag)
-		; bic $341,20.(sp) / set users processor priority to 0 
+		; bic $341,20.(sp) / set users processor priority to 0
 				 ; / and clear carry bit
 	pop	ebp ; eax
 	popf
@@ -179,7 +179,7 @@ badsys:
 	mov	word [int_num_str], SYSCALL_INT_NUM ; 25/12/2016
 
 	mov	esi, ifc_msg ; "invalid function call !" msg (trdosk9.s)
-	
+
 	call	print_msg
 
 ;; 20/08/2024 - temporary
@@ -192,7 +192,7 @@ badsys:
 ;	call	_int10h
 ;	jmp	short p_fc_msg
 ;p_fc_ms_ok:
-	
+
 	;jmp	sysexit
 
 	; 20/08/2024 (exit code)
@@ -215,7 +215,7 @@ syscalls: ; 1:
 	; 21/09/2015
 	; 01/07/2015
 	; 16/04/2015 (32 bit address modification) 
-	dd sysver	; 0 ; Get TRDOS 386 version number (v2.0)	
+	dd sysver	; 0 ; Get TRDOS 386 version number (v2.0)
 	dd sysexit 	; 1
 	dd sysfork 	; 2
 	dd sysread 	; 3
@@ -230,10 +230,10 @@ syscalls: ; 1:
 	dd syschdir 	; 12
 	dd systime 	; 13 ; TRDOS 386, Get Sys Date&Time (30/12/2017)
 	dd sysmkdir 	; 14
-	dd syschmod 	; 15 ; TRDOS 386, Change Attributes (30/12/2017) 
+	dd syschmod 	; 15 ; TRDOS 386, Change Attributes (30/12/2017)
 	dd sysrmdir 	; 16 ; TRDOS 386, Remove Directory (29/12/2017)
 	dd sysbreak 	; 17
-	dd sysdrive 	; 18 ; TRDOS 386, Get/Set Current Drv (30/12/2017) 
+	dd sysdrive 	; 18 ; TRDOS 386, Get/Set Current Drv (30/12/2017)
 	dd sysseek 	; 19
 	dd systell 	; 20
 	dd sysmem 	; 21 ; TRDOS 386, Get Total&Free Mem (31/12/2017)
@@ -243,7 +243,7 @@ syscalls: ; 1:
 	dd sysstime 	; 25 ; TRDOS 386, Set Sys Date&Time (30/12/2017)
 	dd sysquit 	; 26
 	dd sysintr 	; 27
-	dd sysdir 	; 28 ; TRDOS 386, Get Curr Drive&Dir (30/12/2017) 
+	dd sysdir 	; 28 ; TRDOS 386, Get Curr Drive&Dir (30/12/2017)
 	dd sysemt 	; 29
 	dd sysldrvt	; 30 ; TRDOS 386, Get Logical DOS DDT (30/12/2017)
 	dd sysvideo 	; 31 ; TRDOS 386 Video Functions (16/05/2016)
@@ -261,15 +261,15 @@ syscalls: ; 1:
 	dd sysfff	; 40 ; Find First File - TRDOS 386 (15/10/2016)
 	dd sysfnf	; 41 ; Find Next File - TRDOS 386 (15/10/2016)
 	dd sysalloc	; 42 ; Allocate contiguous memory block/pages
-			     ; TRDOS 386 (19/02/2017) DMA buff fuctions		
+			     ; TRDOS 386 (19/02/2017) DMA buff fuctions
 	dd sysdalloc	; 43 ; Deallocate contiguous memory block/pages
 			     ; TRDOS 386 (19/02/2017) DMA buff fuctions
 	dd syscalbac	; 44 ; IRQ Callback and Signal Response Byte
 			     ; service setup - TRDOS 386 (20/02/2017)
-			     ; 28/08/2017 (20/08/2017)	
+			     ; 28/08/2017 (20/08/2017)
 	dd sysdma	; 45 ; TRDOS 386 - (ISA) DMA service
-	dd sysstdio	; 46 ; TRDOS 386 v2.0.9 (STDIN/STDOUT functions) 	
-	
+	dd sysstdio	; 46 ; TRDOS 386 v2.0.9 (STDIN/STDOUT functions)
+
 end_of_syscalls:
 
 sysemt: ; enable (or disable) multi tasking -time sharing-
@@ -280,21 +280,21 @@ sysemt: ; enable (or disable) multi tasking -time sharing-
 	; 14/05/2015 (Retro UNIX 386 v1)
 	; 10/12/2013 - 20/04/2014 (Retro UNIX 8086 v1)
 	;
-	; Retro UNIX 8086 v1 modification: 
-	;	'Enable Multi Tasking'  system call instead 
+	; Retro UNIX 8086 v1 modification:
+	;	'Enable Multi Tasking'  system call instead
 	;	of 'Emulator Trap' in original UNIX v1 for PDP-11.
 	;
 	; Retro UNIX 8086 v1 feature only!
 	;	Using purpose: Kernel will start without time-out
 	;	(internal clock/timer) functionality.
 	;	Then etc/init will enable clock/timer for
-	;	multi tasking. 
+	;	multi tasking.
 	;
 	; INPUT ->
 	;	BL = 0 -> disable multi tasking
-	;	BL > 1 -> enable multi tasking (time sharing) 
+	;	BL > 1 -> enable multi tasking (time sharing)
 	; OUTPUT ->
-	;	none	
+	;	none
 	;
 	;  Note: Multi tasking is disabled during system
 	;	 initialization, it must be enabled by using
@@ -332,7 +332,7 @@ error:
 	; OUTPUTS ->
 	;	processor status - carry (c) bit is set (means error)
 	;
-	; 26/05/2013 (Stack pointer must be reset here! 
+	; 26/05/2013 (Stack pointer must be reset here!
 	; 	      Because, jumps to error procedure
 	;	      disrupts push-pop nesting balance)
 	;
@@ -343,9 +343,9 @@ error:
 		               ; / users stack
 	; 17/09/2015
 	sub	ebp, ESPACE ; 48 ; total size of stack frame ('sysdefs.inc')
-				 ; for saving/restoring user registers	
+				 ; for saving/restoring user registers
 	;cmp	ebp, [u.usp]
-	;je	short err0	
+	;je	short err0
 	mov	[u.usp], ebp
 ;err0:
 	; 01/09/2015
@@ -353,17 +353,18 @@ error:
 				    ; 10/04/2013
 				    ; (If an I/O error occurs during disk I/O,
 				    ; related procedures will jump to 'error'
-				    ; procedure directly without returning to 
+				    ; procedure directly without returning to
 				    ; the caller procedure. So, stack pointer
                                     ; must be restored here.)
 	; 13/05/2016
 	; NOTE: (The last) error code is in 'u.error', it can be retrieved by
-	;	'get last error' system call later. 	
+	;	'get last error' system call later.
 
 	; 03/09/2015 - 09/06/2015 - 07/08/2013
 	mov 	byte [u.kcall], 0 ; namei_r, mkdir_w reset
 
 sysret: ; < return from system call>
+	; 28/08/2024 - TRDOS 386 Kernel v2.0.9
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 01/03/2017
 	; 28/02/2017
@@ -371,32 +372,32 @@ sysret: ; < return from system call>
 	; 16/04/2015 - 10/09/2015 (Retro UNIX 386 v1)
 	; 10/04/2013 - 23/02/2014 (Retro UNIX 8086 v1)
 	;
-	; 'sysret' first checks to see if process is about to be 
+	; 'sysret' first checks to see if process is about to be
 	; terminated (u.bsys). If it is, 'sysexit' is called.
-	; If not, following happens:	 
+	; If not, following happens:
 	; 	1) The user's stack pointer is restored.
 	;	2) r1=0 and 'iget' is called to see if last mentioned
 	;	   i-node has been modified. If it has, it is written out
 	;	   via 'ppoke'.
 	;	3) If the super block has been modified, it is written out
-	;	   via 'ppoke'.				
+	;	   via 'ppoke'.
 	;	4) If the dismountable file system's super block has been
 	;	   modified, it is written out to the specified device
 	;	   via 'ppoke'.
 	;	5) A check is made if user's time quantum (uquant) ran out
 	;	   during his execution. If so, 'tswap' is called to give
 	;	   another user a chance to run.
-	;	6) 'sysret' now goes into 'sysrele'. 
-	;	    (See 'sysrele' for conclusion.)		
+	;	6) 'sysret' now goes into 'sysrele'.
+	;	    (See 'sysrele' for conclusion.)
 	;
 	; Calling sequence:
 	;	jump table or 'br sysret'
 	; Arguments: 
-	;	-	
+	;	-
 	; ...............................................................
-	;	
+	;
 	; ((AX=r1 for 'iget' input))
-	;	
+	;
 	xor	eax, eax ; 28/02/2017
 sysret0: ; 29/07/2015 (eax = 0, jump from sysexec)
 	inc	al ; 04/05/2013
@@ -406,7 +407,9 @@ sysret0: ; 29/07/2015 (eax = 0, jump from sysexec)
 		; bne sysexit / of an error? yes, go to sysexit
 	; 23/07/2022
 	jb	short sysret1
-	jmp	sysexit
+	;jmp	sysexit
+	; 22/08/2024
+	jmp	sysexit_@ ; BL = 0FFh ; -1
 sysret1:	; 23/07/2022
 	;mov	esp, [u.usp] ; 24/05/2013 (that is not needed here)
 		; mov u.sp,sp / no point stack to users stack
@@ -425,7 +428,7 @@ sysret1:	; 23/07/2022
 	; 'sysrele' first calls 'tswap' if the time quantum for a user is
 	;  zero (see 'sysret'). It then restores the user's registers and
 	; turns off the system flag. It then checked to see if there is
-	; an interrupt from the user by calling 'isintr'. If there is, 
+	; an interrupt from the user by calling 'isintr'. If there is,
 	; the output gets flashed (see isintr) and interrupt action is
 	; taken by a branch to 'intract'. If there is no interrupt from
 	; the user, a rti is made.
@@ -433,9 +436,9 @@ sysret1:	; 23/07/2022
 	; Calling sequence:
 	;	Fall through a 'bne' in 'sysret' & ?
 	; Arguments:
-	;	-	
+	;	-
 	; ...............................................................
-	;	
+	;
 	; 23/02/2014 (swapret)
 	; 22/09/2013
 sysrel0: ;1:
@@ -446,7 +449,7 @@ sysrel0: ;1:
 sysrelease: ; 07/12/2013 (jump from 'clock')
 	call	tswap
 		; jsr r0,tswap / yes, swap it out
-	
+
 ; Retro Unix 8086 v1 feature: return from 'swap' to 'swapret' address.
 swapret: ;1:
 	; 10/09/2015
@@ -457,7 +460,7 @@ swapret: ;1:
 	; cli
 	; 24/07/2015
 	;
-	;; 'esp' must be already equal to '[u.usp]' here ! 
+	;; 'esp' must be already equal to '[u.usp]' here !
 	;; mov	esp, [u.usp]
 
 	; 22/09/2013
@@ -502,10 +505,10 @@ sysrel2:
 sysrel8:
 	dec	byte [sysflg]
 		; decb sysflg / turn system flag off
-	
+
 	mov	eax, [u.pgdir]	
 	mov	cr3, eax  ; 1st PDE points to Kernel Page Table 0 (1st 4 MB)
-			  ; (others are different than kernel page tables) 
+			  ; (others are different than kernel page tables)
 	; 10/09/2015
 	popad ; edi, esi, ebp, temp (icrement esp by 4), ebx, edx, ecx, eax
 		; mov (sp)+,sc / restore user registers
@@ -562,7 +565,7 @@ sysrel9:	; 23/07/2022
 	jnz	short sysrel4
 	dec	al
 	mov	[u.r_mode], al ; 0FFh ; not necessary !?
-	jmp	short sysrel6		
+	jmp	short sysrel6
 sysrel3:
 	; 27/02/2017
 	call	sysrel7
@@ -586,7 +589,7 @@ sysrel5:
 sysrel6:
 	; cpu will continue from the interrupted sytem call addr
 	popad		; edi, esi, ebp, esp, ebx, edx, ecx, eax
-	add	esp, 16	; pass segment segisters: ds, es, fs, gs		
+	add	esp, 16	; pass segment segisters: ds, es, fs, gs
 	iretd		; eip, cs, eflags
 
 sysrel7:
@@ -596,7 +599,7 @@ sysrel7:
 	shl	ebx, 2
 	;cmp	[ebx+p.tcb-4], eax ; 0 ; is there callback address ?
 	;jna	short sysrel0 
-	; yes, reset callback address then restore process registers 
+	; yes, reset callback address then restore process registers
 	;mov	[ebx+p.tcb-4], eax ; 0 ; reset
 	mov     eax, [ebx+p.upage-4] ; UPAGE address
 	cli	; disable interrupts till 'iretd'
@@ -614,24 +617,24 @@ intract: ; / interrupt action
 	; input -> 'u.quit' (also value of 'u.intr' > 0)
 	; output -> If value of 'u.quit' = FFFFh ('ctrl+brk' sign)
 	;		'intract' will jump to 'sysexit'.
-	;	    Intract will return to the caller 
-	;		if value of 'u.quit' <> FFFFh. 	 
+	;	    Intract will return to the caller
+	;		if value of 'u.quit' <> FFFFh.
 	; 14/10/2015
 	sti
-	; 07/12/2013	
+	; 07/12/2013
 	inc 	word [u.quit]
 	jz	short intrct0 ; FFFFh -> 0
 	dec	word [u.quit]
 	; 16/04/2015
 	retn
-intrct0:	
+intrct0:
 	pop	eax ; call intract -> retn
 	;
 	; 20/08/2024
 	;xor 	eax, eax
 	;inc	al  ; mov ax, 1
 ;;;
-	; UNIX v1 original 'intract' routine... 
+	; UNIX v1 original 'intract' routine...
 	; / interrupt action
 		;cmp *(sp),$rti / are you in a clock interrupt?
 		; bne 1f / no, 1f
@@ -649,14 +652,14 @@ intrct0:
 		; mov (sp)+,r1 / restore r1
 		; clr u.quit / clear quit flag
 		; bis $20,2(sp) 
-		    	; / set trace for quit (sets t bit of 
+		    	; / set trace for quit (sets t bit of
 			; / ps-trace trap)
 		; rti   ;  / return from interrupt
 	; 1: / interrupt char = del
-		; clrb 6(r1) / clear the interrupt byte 
+		; clrb 6(r1) / clear the interrupt byte
 			   ; / in the buffer
 		; mov (sp)+,r1 / restore r1
-		; cmp u.intr,$core / should control be 
+		; cmp u.intr,$core / should control be
 				; / transferred to loc core?
 		; blo 1f
 		; jmp *u.intr / user to do rti yes, 
@@ -667,13 +670,14 @@ intrct0:
 	; 20/08/2024
 	; ctrl+break -> exit code = -1
 sysexit_0FFh:
-	mov	bl, 0FFh ;  exit code ; -1
-
 	; 20/08/2024
 	xor 	eax, eax
 	inc	eax	; mov eax, 1
+sysexit_@:	; 22/08/2024
+	mov	bl, 0FFh ;  exit code ; -1
 
 sysexit: ; <terminate process>
+	; 22/08/2024
 	; 20/08/2024
 	; 18/08/2024 - TRDOS 386 v2.0.9 
 	; 30/07/2022
@@ -715,7 +719,7 @@ sysexit: ; <terminate process>
 	; Arguments:
 	;	-
 	; ...............................................................
-	;	
+	;
 	; Retro UNIX 8086 v1 modification: 
 	;       System call number (=1) is in EAX register.
 	;
@@ -745,7 +749,7 @@ sysexit_0:
 	; Check and stop/clear timer event(s) of this (dying) process
 	; if there is.
 
-	; 02/01/2017 
+	; 02/01/2017
 	cli	; disable interrupts
 	; 23/01/2017 - reset timer frequency (to 18.2Hz)
 	mov	al, 00110110b ; 36h
@@ -809,13 +813,38 @@ sysexit_13:
 	cmp	al, [u.uno] ; owner = current user ?
 	jne	short sysexit_14
 	mov	byte [esi-1], 0 ; owner = 0 : Free
+
+	;;;
+	; 22/08/2024 - Reset Hardware Interrupt Handler
+	mov	ecx, esi
+	sub	ecx, IRQ.owner
+	; CL = (user configurable) IRQ index + 1 (1 to 9)
+	mov	eax, IRQenum
+sysexit_18:
+	cmp	cl, [eax]
+	je	short sysexit_19
+	cmp	eax, IRQenum+15
+	jnb	short sysexit_20
+	inc	eax
+	jmp	short sysexit_18
+sysexit_19:
+	sub	eax, IRQenum
+	; AL = IRQ number (will be reset to system's IRQ handler)
+	; AH = 0
+	;mov	ah, 0 ; reset
+	call	set_hardware_int_vector
+sysexit_20:
+	;;;
+
 	dec	byte [u.irqc]
 	jz	short sysexit_15
 sysexit_14:
 	cmp	esi, IRQ.owner + 8 ; the last IRQ index number ?
 	jna	short sysexit_13 ; no
 sysexit_15:
-	xor	al, al ; 0
+	;xor	al, al ; 0
+	; 22/08/2024
+	xor	eax, eax
 sysexit_16: ; 2:
 	sti	; enable interrupts
 	;
@@ -828,14 +857,21 @@ sysexit_1: ; 1:
 		; jsr r0,fclose / close all files the process opened
 	;; ignore error return
 		; br .+2 / ignore error return
-	;inc	ax
-	inc	al
+	;;inc	ax
+	;inc	al
+	; 22/08/2024
+	inc	eax
 		; inc r1 / increment file descriptor
 	;cmp	ax, 10
 	cmp	al, 10
 		; cmp r1,$10. / end of u.fp list?
 	jb	short sysexit_1
 		; blt 1b / no, go back
+
+	; 22/08/2024
+	; reset IRQs if owned by the current (dying) process
+	mov	esi, IRQ.owner
+
 	;movzx	ebx, byte [u.uno]
 	mov	bl, [u.uno] ; 02/01/2017
 		; movb	u.uno,r1 / yes, move dying process's number to r1
@@ -862,6 +898,8 @@ sysexit_1: ; 1:
 sysexit_17:
 	;shl	bx, 1
 	shl	bl, 1
+	; 22/08/2024
+	;shl	ebx, 1
 		; asl r1 / use r1 for index into the below tables
 	mov	cx, [ebx+p.pid-2]
 		; mov p.pid-2(r1),r3 / move dying process's name to r3
@@ -1070,7 +1108,8 @@ syswait_1: ; 1:
 	xor	eax, eax
 	mov	al, [esi+p.exitc-1] ; exit code
 	mov	ebp, [u.usp]
-	mov	[ebp+24], eax ; ebx
+	; 22/08/2024
+	mov	[ebp+16], eax ; ebx
 
 	;shl	si, 1
 	; 23/07/2022
@@ -1093,7 +1132,7 @@ syswait_1: ; 1:
 	;
 	; Note: syswait will return with error if there is not a
 	;       zombie or running process to wait.
-	
+
 	;sub	ax, ax
 	; 30/07/2022
 	sub	eax, eax ; 0
@@ -1125,7 +1164,8 @@ syswait_3: ; 3:
 	; 20/08/2024 (ebx = child's exit code)
 	mov	ebp, [u.usp]
 	dec	ecx ; -1 ; 0FFFFFFFFh
-	mov	[ebp+24], ecx ; ebx
+	; 22/08/2024
+	mov	[ebp+16], ecx ; ebx
 
 	jmp	error
 syswait_4:
@@ -1138,6 +1178,13 @@ syswait_4:
 	; 04/11/2013
 	call	swap
 		; jsr r0,swap / swap it out, because it's waiting
+
+	; 23/08/2024 - bugfix
+	; restore [u.usp]
+	; (swap above changes [u.usp] just before wswap)
+	mov	[u.usp], esp
+		; points to user's regs on top ofn system stack
+	
 	jmp	syswait_0
 		; br syswait / wait on next process
 
@@ -1163,11 +1210,11 @@ sysfork: ; < create a new process >
 	;	an error occurs.
 	;    2) when one is found, it becomes the child process number
 	;	and it's status (p.stat) is set to active.
-	;    3) If the parent had a control tty, the interrupt 
+	;    3) If the parent had a control tty, the interrupt
 	;	character in that tty buffer is cleared.
-	;    4) The child process is put on the lowest priority run 
+	;    4) The child process is put on the lowest priority run
 	;	queue via 'putlu'.
-	;    5) A new process name is gotten from 'mpid' (actually 
+	;    5) A new process name is gotten from 'mpid' (actually
 	;	it is a unique number) and is put in the child's unique
 	;	identifier; process id (p.pid).
 	;    6) The process name of the parent is then obtained and
@@ -1175,7 +1222,7 @@ sysfork: ; < create a new process >
 	;	name is then put in 'u.r0'.
 	;    7) The child process is then written out on disk by
 	;	'wswap',i.e., the parent process is copied onto disk
-	;	and the child is born. (The child process is written 
+	;	and the child is born. (The child process is written
 	;	out on disk/drum with 'u.uno' being the child process
 	;	number.)
 	;    8) The parent process number is then restored to 'u.uno'.
@@ -1245,13 +1292,13 @@ sysfork: ; < create a new process >
 	;		mov	bx, offset @f ; routine for child
 	;		int	20h
 	;		jc	error
-	;		
+	;
 	;	; Routine for parent process here (just after 'jc')
 	;		mov	word ptr [pid_of_child], ax
 	;		jmp	next_routine_for_parent	
 	;
 	;	@@: ; routine for child process here
-	;		....	
+	;		....
 	;	NOTE: 'sysfork' returns to specified offset
 	;	       for child process by using BX input.
 	;	      (at first, parent process will return then
@@ -1259,7 +1306,7 @@ sysfork: ; < create a new process >
 	;	      'syswait' is needed in parent process
 	;	      if return from child process will be waited for.)
 	;
-	
+
 ; / create a new process
 	; EBX = return address for child process
 	     ; (Retro UNIX 8086 v1 modification !)
@@ -1388,10 +1435,10 @@ sysfork_3:
 		; mov p.pid-2(r2),r2 / get process name of parent
 				   ; / process
 	mov	[esi+p.ppid-2], ax
-		; mov r2,p.ppid-2(r1) / put parent process name 
+		; mov r2,p.ppid-2(r1) / put parent process name
 			  ; / in parent process slot for child
-	mov	[u.r0], eax	
-		; mov r2,*u.r0 / put parent process name on stack 
+	mov	[u.r0], eax
+		; mov r2,*u.r0 / put parent process name on stack
 			     ; / at location where r0 was saved
 	mov 	ebp, [u.sp] ; points to return address (EIP for IRET)
 	mov	[ebp], edx ; *, CS:EIP -> EIP
@@ -1484,7 +1531,7 @@ syscreat: ; < create file >
 	; 27/10/2016
 	; 25/10/2016 - 26/10/2016
 	; 15/10/2016 - 16/10/2016 - 17/10/2016
-	; 10/10/2016 (TRDOS 386 = TRDOS v2.0) 
+	; 10/10/2016 (TRDOS 386 = TRDOS v2.0)
 	;	     -derived from INT_21H.ASM-
 	;            ("loc_INT21h_create_file")
         ; 	10/07/2011 (12/03/2011)
@@ -12993,6 +13040,7 @@ anyi_3:
 ; Last Modification: 09/12/2015
 
 syssleep:
+	; 28/08/2024 - TRDOS 386 v2.0.9
 	; 24/07/2022 - TRDOS 386 v2.0.5
 	; 29/06/2015 - (Retro UNIX 386 v1)
 	; 11/06/2014 - (Retro UNIX 8086 v1)
@@ -13006,6 +13054,13 @@ syssleep:
 	movzx	ebx, byte [u.uno] ; process number
 	mov	ah, [ebx+p.ttyc-1] ; current/console tty
 	call	sleep
+
+	; 23/08/2024 - restore [u.usp]
+	; swap changes [u.usp] to esp which points to
+	; return of sleep
+	mov	[u.usp], esp
+		; points to user's regs on top ofn system stack
+
 	; 24/07/2022
 	inc	dword [u.r0] ; Temporary !
 	jmp	sysret
@@ -13963,7 +14018,7 @@ swap:
 	; INPUTS ->
 	;    runq table - contains processes to run.
 	;    p.link - contains next process in line to be run.
-	;    u.uno - process number of process in core	
+	;    u.uno - process number of process in core
 	;    s.stack - swap stack used as an internal stack for swapping.
 	; OUTPUTS ->
 	;    (original unix v1 -> present process to its disk block)
@@ -13996,11 +14051,11 @@ swap_0: ; 1: / search runq table for highest priority process
 	lodsw  ; mov ax, [esi], add esi+2
 	;xor	ebx, ebx ; 02/05/2016
 	and 	ax, ax ; are there any processes to run in this Q entry
-	jnz	short swap_2 
+	jnz	short swap_2
 	; 21/05/2026
 	; runq_normal = runq+2, runq_background = runq+4
 	dec	byte [priority] ; 3 -> 3, 2 -> 1, 1-> 0
-	jnz	short swap_0	
+	jnz	short swap_0
 	;cmp	esi, runq+6  ; if zero compare address to end of table
 	;jb	short swap_0 ; if not at end, go back
 swap_1:
@@ -14021,24 +14076,24 @@ swap_2:
 	mov	bl, al
 	cmp	al, ah ; is there only 1 process in the queue to be run
 	je	short swap_3 ; yes
-	mov	ah, [ebx+p.link-1] 
+	mov	ah, [ebx+p.link-1]
        	mov	[esi], ah ; move next process in line into run queue
 	jmp	short swap_4
-swap_3: 
+swap_3:
 	;xor	dx, dx
 	; 20/08/2024
 	xor	edx, edx
 	mov	[esi], dx ; zero the entry; no processes on the Q
-swap_4: 
+swap_4:
 	mov 	ah, [u.uno]
 	cmp	ah, al ; is this process the same as the process in core?
        	je	short swap_8 ; yes, don't have to swap
-	or	ah, ah  ; is the process # = 0
+	or	ah, ah ; is the process # = 0
        	jz	short swap_6 ; 'sysexit'
-	;cmp	ah, al ;is this process the same as the process in core?
+	;cmp	ah, al ; is this process the same as the process in core?
        	;je	short swap_8 ; yes, don't have to swap
-	mov	[u.usp], esp ; return  address for 'syswait' & 'sleep'
-	call	wswap   ; write out core to disk
+	mov	[u.usp], esp ; return address for 'syswait' & 'sleep'
+	call	wswap  ; write out core to disk
 	jmp 	short swap_7
 swap_6:
 	; Deallocate memory pages belong to the process
@@ -14052,11 +14107,12 @@ swap_6:
 	mov	eax, [u.upage] ; 'user' structure page of the process
 	call	deallocate_page
 	pop	ebx
-swap_7: 
-	shl	bl, 2 ; * 4 
+swap_7:
+	shl	bl, 2 ; * 4
+	;;;
 	mov	eax, [ebx+p.upage-4] ; the 'u' page of the new process
 	call	rswap ; read new process into core
-swap_8: 
+swap_8:
 	; Retro UNIX  8086 v1 modification !
 	mov	byte [u.quant], time_count
 	retn
@@ -14221,11 +14277,12 @@ rswap:  ; < swap in, swap from disk >
 	;mov	esp, [u.usp] ; 15/09/2015
 	;sti
 	; 28/02/2017
-	;cmp	byte [multi_tasking], 0  ; Musti tasking mode ?
+	;cmp	byte [multi_tasking], 0  ; Multi tasking mode ?
 	;jna	short rswp_retn
 	cmp	byte [u.fpsave], 0
 	jna	short rswp_retn
 	frstor	[u.fpregs] ; restore floating point regs (94 bytes)
+			; 108 bytes (22/08/2024)	
 rswp_retn:
 	push	eax	; 'rswap' return address
 	retn
