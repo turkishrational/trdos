@@ -37,10 +37,10 @@ disk_read:
 	; 18/04/2010
 	;
 	; INPUT -> EAX = Logical Block Address
-	;	   ESI = Logical Dos Disk Table Offset (DRV)	
-	;	   ECX = Sector Count	
+	;	   ESI = Logical Dos Disk Table Offset (DRV)
+	;	   ECX = Sector Count
 	; 	   EBX = Destination Buffer
-	; OUTPUT -> 
+	; OUTPUT ->
 	;	   cf = 0 or cf = 1
 	; (Modified registers: EAX, EBX, ECX, EDX)
 
@@ -61,9 +61,9 @@ chs_read:
 	;	   ECX = Number of sectors to read
 	; 	   ESI = Logical Dos Disk Table Offset (DRV)
 	; 	   EBX = Destination Buffer
-	; OUTPUT -> 
+	; OUTPUT ->
 	;	   cf = 0 or cf = 1
-	; (Modified registers: EAX; EBX, ECX, EDX)
+	; (Modified registers: EAX, EBX, ECX, EDX)
 
 	; 23/02/2016
 	mov	byte [disk_rw_op], 2 ; CHS read
@@ -75,13 +75,13 @@ chs_rw:
 
 chs_read_next_sector:
 	mov	byte [retry_count], 4
-     
+
 chs_read_retry:
 	;mov	[sector_count], ecx ; 23/02/2016
 
 	push	eax			; Linear sector #
 	push	ecx			; # of FAT/FILE/DIR sectors
-                
+
 	movzx	ecx, word [esi+LD_BPB+SecPerTrack]
 	;movzx	ecx, byte [disk_rw_spt] ; 23/02/2016
 	sub	edx, edx
@@ -112,7 +112,7 @@ chs_read_retry:
 	pop	ecx ; sector number (on track)
 	mov	dl, [esi+LD_PhyDrvNo]
 
-	mov	ch, al			; NOTE: max. 1023 cylinders !                   
+	mov	ch, al			; NOTE: max. 1023 cylinders !
 	ror	ah, 2			; Rotate 2 bits right
 	or	cl, ah
 
@@ -134,14 +134,14 @@ chs_read_retry:
                                         ; CF-flag AH-stat AL-sec read
 	                                ; If CF = 1 then (If AH > 0)
 	mov	[disk_rw_err], ah
-	
+
 	pop	ecx
 	pop	eax
 	jnc	short chs_read_ok
 
 	cmp	byte [disk_rw_err], 09h ; DMA crossed 64K segment boundary
 	je	short chs_read_error_retn
-             
+
 	dec	byte [retry_count]
 	jnz	short chs_read_retry
 
@@ -150,20 +150,20 @@ chs_read_error_retn:
 	;retn
 	jmp	short update_drv_error_byte
 
-;chs_write_sectors: ; read or write 
+;chs_write_sectors: ; read or write
 	;; (# of sectors to read is less than remaining sectors on the track)
 	;mov	[sector_count], al
 	;jmp	short chs_read_sectors
 
 chs_read_ok:
 	;; 23/02/2016
-	;movzx	edx, byte [sector_count] ; sector count (<= spt)	
+	;movzx	edx, byte [sector_count] ; sector count (<= spt)
         ;sub    ecx, edx  ; remaining sector count
-	;jna	short update_drv_error_byte	
+	;jna	short update_drv_error_byte
 	;add	eax, edx ; next disk sector
 	;shl	edx, 9 ; 512 * sector count
-	;add	ebx, edx ; next buffer byte address 
-        ;jmp	chs_read_next_sector        
+	;add	ebx, edx ; next buffer byte address
+        ;jmp	chs_read_next_sector
 	; 25/02/2016
 	inc	eax ; next sector
 	add	ebx, 512
@@ -185,14 +185,14 @@ lba_read:
 	; 10/07/2015 (Retro UNIX 386 v1)
 	;
 	; INPUT -> EAX = Logical Block Address
-	;	   ESI = Logical Dos Disk Table Offset (DRV)	
+	;	   ESI = Logical Dos Disk Table Offset (DRV)
 	;	   ECX = Sector Count	
 	; 	   EBX = Destination Buffer
-	; OUTPUT -> 
+	; OUTPUT ->
 	;	   cf = 0 or cf = 1
 	; (Modified registers: EAX, EBX, ECX, EDX)
 
-	; LBA read/write (with private LBA function) 
+	; LBA read/write (with private LBA function)
 	;((Retro UNIX 386 v1 - DISK I/O code by Erdogan Tan))
 
 	; 23/02/2016
@@ -205,7 +205,7 @@ lba_rw:
 	mov	[sector_count], ecx ; total sector (read) count
 
 	mov	dl, [esi+LD_PhyDrvNo]
-	; dl = physical drive number (0,1, 80h, 81h, 82h, 83h)
+	; dl = physical drive number (0, 1, 80h, 81h, 82h, 83h)
 
 lba_read_next:
 	; 14/07/2022
@@ -264,7 +264,7 @@ udrv_errb0:
         jb      short udrv_errb1
 	sub	bl, 7Eh
 	;cmp	bl, 5
-	;ja	short udrv_errb2	
+	;ja	short udrv_errb2
 udrv_errb1:
         add     ebx, drv.error ; 13/02/2016
 	mov	[ebx], cl ; error code

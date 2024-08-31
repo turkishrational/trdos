@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 23/08/2024  (Previous: 05/06/2024)
+; Last Update: 25/08/2024  (Previous: 05/06/2024)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1113,6 +1113,7 @@ loc_rwp_return:
 		retn
 
 get_file_name:
+		; 25/08/2024 (TRDOS 386 Kernel v2.0.9)
 		; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 		; 15/10/2016 - TRDOS 386 (TRDOS v2.0)
 		; Convert file name 
@@ -1143,14 +1144,21 @@ get_file_name:
 		push	edi
 		push	esi
 		lodsb
+		; 25/08/2024
+		xor	ecx, ecx ; 0
 		cmp	al, 20h
 		jna	short pass_gfn_ext
-		push	esi
+		; 25/08/2024
+		;push	esi
 		stosb
-		;mov	ecx, 7
+		; 25/08/2024
 		; 29/07/2022
-		xor	ecx, ecx
+		;xor	ecx, ecx
+		; ecx <= 128 ; 25/08/2024
 		mov	cl, 7
+		; 25/08/2024
+		add	esi, ecx ; add esi, 7
+		push	esi ; (*)
 loc_gfn_next_char:
 		lodsb
 		cmp	al, 20h
@@ -1158,8 +1166,11 @@ loc_gfn_next_char:
 		stosb
 		loop	loc_gfn_next_char
 pass_gfn_fn:
-		pop	esi
-		add	esi, 7
+		;pop	esi
+		;add	esi, 7
+		; 25/08/2024
+		pop	esi ; (*)
+
 		lodsb
 		cmp	al, 20h
 		jna	short pass_gfn_ext
@@ -1179,6 +1190,8 @@ pass_gfn_ext:
 		stosb
 		pop	esi
 		pop	edi
+		; 25/08/2024
+		; ecx <= 7
 		retn
 
 set_hardware_int_vector:
@@ -4449,6 +4462,7 @@ gdmi3:
 	jmp	sysret
 
 sysstdio: ; STDIN/STDOUT/STDERR functions
+	; 24/08/2024
 	; 23/08/2024
 	; 20/08/2024 - TRDOS 386 Kernel v2.0.9
 	;
@@ -4589,6 +4603,9 @@ readstdinw_0:
 	or	al, al
 	jz	short readstdinw_1
 
+	; 24/08/2024
+	dec	eax
+
 	; file
 	mov	ebx, eax ; File handle (descriptor/index)
 	mov	ecx, u.r0 ; buffer address (eax reg)
@@ -4628,12 +4645,14 @@ readstdin2nw:
 	je	short readstdin2w_1 ; wait (int16h, 10h)
 	; no wait (int16h, 11h)
 	inc	ah  ; function 11h ; EXTENDED ASCII STATUS
-readstdin2w_1:
+
+	; 24/08/2024
 	call	int16h
 	; ah = scan code, al = ascii code
 	;jnz	short readstdin2w_retn
 	; 23/08/2024
 	jz	short readstdin2w@_retn
+readstdin2w_1:
 
 ; 23/08/2024
 ;	; if zf=1 at here
@@ -4660,6 +4679,9 @@ writestdoutcc:
 	mov	al, [u.stdout]
 	and	al, al
 	jz	short writestdout_1
+
+	; 24/08/2024
+	dec	eax
 
 	; file
 	mov	ebx, eax ; File handle (descriptor/index)

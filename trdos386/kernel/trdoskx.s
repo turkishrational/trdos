@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.8) - UNINITIALIZED DATA : trdoskx.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 05/06/2024 (Previous: 04/12/2023 - Kernel v2.0.7)
+; Last Update: 29/08/2024 (Previous: 05/06/2024 - Kernel v2.0.8)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -31,10 +31,10 @@ Current_FATType: resb 1
 Current_Drv: resb 1
 Current_Dir_Drv:   resb 1 ; '?'
                    resb 1 ; ':'
-Current_Dir_Root:  resb 1 ; '/' 
+Current_Dir_Root:  resb 1 ; '/'
 Current_Directory: resb 90
 End_Of_Current_Dir_Str: resb 1
-Current_Dir_StrLen: resb 1   
+Current_Dir_StrLen: resb 1
 
 CursorColumn: 	resb 1
 CmdArgStart:    resb 1
@@ -77,10 +77,10 @@ EP_Counter: resb 1
 LD_Counter: resb 1
 
 ; 30/08/2020
-MBR_EP_StartSector: resd 1 
+MBR_EP_StartSector: resd 1
 		; Extd partition start sector as in MBR
 EP_StartSector: resd 1 ; next extd partition start sector
-	; 15/07/2020	
+	; 15/07/2020
                 ;resd 1
                 ;resd 1
 
@@ -89,7 +89,7 @@ DOSBootSectorBuff: resb 512
 ; 15/07/2020
 ;DOSBootSectorBuff: resb 446 ; 1BEh
 ;MiniPartitionTable: resb 64 ;  40h
-;MiniPartitionMagic: resw  1 ;  02h 		
+;MiniPartitionMagic: resw  1 ;  02h
 
 FAT_BuffDescriptor:
 FAT_CurrentCluster: resd 1
@@ -116,7 +116,7 @@ DirBuff_FATType: resb 1
 DirBuff_ValidData: resb 1
 DirBuff_CurrentEntry: resw 1
 DirBuff_LastEntry: resw 1
-DirBuff_Cluster: resd 1 
+DirBuff_Cluster: resd 1
 DirBuffer_Size: resw 1
 ;DirBuff_EntryCounter: resw 1
 
@@ -138,7 +138,7 @@ Vol_Tot_Sec_Str: 	    resb 10
 Vol_Tot_Sec_Str_End:	    resb 1
 resb 1
 Vol_Free_Sectors_Str_Start: resd 1
-Vol_Free_Sectors_Str:	    resb 10				
+Vol_Free_Sectors_Str:	    resb 10
 Vol_Free_Sectors_Str_End:   resb 1
 
 ; 10/02/2016
@@ -175,7 +175,7 @@ sector_count:	resd 1 ; DISK_IO.ASM ; (Disk_RW_SectorCount)
 FDE_AttrMask:	   resw 1 ; DIR.ASM
 AmbiguousFileName: resw 1 ; DIR.ASM
 PreviousAttr:	   resb 1 ; DIR.ASM
-;	
+;
 LongNameFound:   resb 1	  ; DIR.ASM
 LFN_EntryLength: resb 1   ; DIR.ASM
 LFN_CheckSum:    resb 1   ; DIR.ASM
@@ -214,7 +214,7 @@ FindFile_MatchCounter:	  resw 1
 FindFile_Reserved:	  resw 1 ; 06/03/2016
 
 First_Path_Pos: resd 1	; DIR.ASM ; 09/10/2011
-Last_Slash_Pos: resd 1	; DIR.ASM 
+Last_Slash_Pos: resd 1	; DIR.ASM
 
 ; 10/02/2016
 File_Count:     resw 1 	; DIR.ASM ; 09/10/2011
@@ -252,13 +252,13 @@ mkdir_DirName_Offset: 	resd 1
 mkdir_FFCluster:	resd 1
 mkdir_LastDirCluster:	resd 1
 mkdir_FreeSectors:	resd 1
-mkdir_attrib:		resw 1 
+mkdir_attrib:		resw 1
 mkdir_SecPerClust:	resb 1
 mkdir_add_new_cluster:	resb 1
 mkdir_Name:		resb 13
 resw 1 ; 01/03/2016
 ; 27/02/2016
-RmDir_MultiClusters:	resb 1  
+RmDir_MultiClusters:	resb 1
 RmDir_DirEntryOffset:	resd 1 ; 01/03/2016 (word -> dword)
 RmDir_ParentDirCluster: resd 1
 RmDir_DirLastCluster:   resd 1
@@ -266,7 +266,7 @@ RmDir_PreviousCluster:  resd 1
 ; 22/02/2016
 UPDLMDT_CDirLevel:	resb 1
 UPDLMDT_CDirFCluster:	resd 1
-	
+
 alignb 4
 ; DRV_FAT.ASM ; 21/08/2011
 gffc_next_free_cluster:  resd 1
@@ -278,7 +278,7 @@ Cluster_Index: ; resd 1
 ; 22/02/2016
 ClusterValue:	resd 1
 ; 04/03/2016
-Attributes:	resb 1 
+Attributes:	resb 1
 ;;CFS_error:  resb 1 ;; 01/03/2016
 resb 1
 CFS_OPType: resb 1
@@ -291,7 +291,7 @@ CFS_FAT32FC: resd 1
 ;alignb 4
 glc_prevcluster: resd 1 ; DRV_FAT.ASM (21/08/2011)
 ; 22/10/2016
-glc_index:	 resd 1 ;  Last Cluster Index (22/10/2016)	
+glc_index:	 resd 1 ; Last Cluster Index (22/10/2016)
 
 ; DIR.ASM
 DLN_EntryNumber: resw 1
@@ -404,12 +404,15 @@ csftdf_videopage:     resb 1
 csftdf_cursorpos:     resw 1
 csftdf_sf_drv_dt:     resd 1
 csftdf_df_drv_dt:     resd 1
+; 29/08/2024
+csftdf_df_dclust:     resd 1
+csftdf_df_dindex:     resd 1
 
 ; 21/03/2016
 ; 20/03/2016
 ; FILE.ASM
 createfile_Name_Offset:  resd 1
-createfile_FreeSectors:  resd 1 
+createfile_FreeSectors:  resd 1
 createfile_size:         resd 1
 createfile_FFCluster:    resd 1 ; 11/03/2016
 createfile_LastDirCluster: resd 1
@@ -468,7 +471,7 @@ alignb 4
 Run_CDirFC:	resd 1
 Run_Auto_Path:	resb 1
 Run_Manual_Path: resb 1 ; 0 -> auto path sequence needed
-EXE_ID:		resb 1	
+EXE_ID:		resb 1
 EXE_dot:	resb 1
 
 ; 06/05/2016
@@ -491,7 +494,7 @@ p_change:	resb 1  ; process change status (for timer events)
 multi_tasking:	resb 1   ; Multi Tasking status (0 = disabled, >0 = enabled)
 			; (EBX will return with user buffer addr or disk type)
 ; 07/06/2016
-timer_events:	resb 1  ; number of (active) timer events, <= 16		
+timer_events:	resb 1  ; number of (active) timer events, <= 16
 
 ; 24/06/2016
 w_str_cmd:	resb 1	; WRITE_STRING command (0,1,2,3) ; video.s
@@ -515,15 +518,18 @@ VGA_INT43H:	resd 1	; 0 = default (not configured by user)
 			; 	vgafont14
 
 ; 25/07/2016
-VGA_MTYPE:	resb 1  ; 0=CTEXT,1=MTEXT,2=CGA,3=PLANAR1,4=PLANAR4,5=LINEAR 
+VGA_MTYPE:	resb 1  ; 0=CTEXT,1=MTEXT,2=CGA,3=PLANAR1,4=PLANAR4,5=LINEAR
 
 ; 23/10/2016
-setfmod		resb 1	; update last modification date&time sign (if >0)
+setfmod:	resb 1	; update last modification date&time sign (if >0)
 			; (it is Open File Number + 1, if > 0)
+; 27/08/2024
+setfclust:	resb 1  ; first cluster of file
+			; (is used by update lmdt proc)
 alignb 4
 
 ; 16/10/2016
-FFF_UBuffer:	resd 1  ; User's buffer address for FFF & FNF system calls 
+FFF_UBuffer:	resd 1  ; User's buffer address for FFF & FNF system calls
 ; 15/10/2016
 FFF_Valid:	resb 1  ; Find First File Structure validation byte
 			; 0  = invalid (Find Next File can't use FFF struct)
@@ -536,11 +542,11 @@ FFF_RType:	resb 1  ; FFF return type (0 = Basic, >0 = complete) (HB)
 ; 16/10/2016 - 05/10/2016 (Set Working Path)
 SWP_inv_fname:	resb 1	; Set Working Path - Invalid File Name
 SWP_Mode:	resw 1	; Set Working Path - Mode
-SWP_DRV:	resb 1	; Set Working Path - Drive	
+SWP_DRV:	resb 1	; Set Working Path - Drive
 SWP_DRV_chg:	resb 1	; Set Working Path - Drive Change
 
 ; 27/02/2017
-fpready:	resb 1	; '80387 fpu is ready' flag	
+fpready:	resb 1	; '80387 fpu is ready' flag
 
 ; 17/04/2021
 ; (DEVICE parameters is disabled as temporary)
@@ -554,7 +560,7 @@ alignb 4
 ; 08/10/2016
 ; 07/10/2016
 ; Table of kernel devices (which do not use installable device drivers)
-; has been coded into KERNEL (trdosk9.s) 
+; has been coded into KERNEL (trdosk9.s)
 ; 07/10/2016
 ; 8 installable device drivers available to install (NUMIDEV)
 ;IDEV_PGDIR: resd NUMIDEV
@@ -563,7 +569,7 @@ alignb 4
 			; Note: Virtual start address is always 400000h
 			; (end of the 1st 4MB). [org 400000h]
 			; Segments: KCODE, KDATA
-			; Method: call 400000h (after changing page dir) 	
+			; Method: call 400000h (after changing page dir)
 			; Query code located at the start (400000h).
 			; Query code returns with
 			;   eax = device type and driver version
@@ -576,15 +582,15 @@ alignb 4
 			;   ecx = configuration table address
 			;   edx = description table address
 			;   esi = device (default) name address (ASCIIZ)
-			;	 (name has "/DEV/" prefix)		
+			;	 (name has "/DEV/" prefix)
 			;   edi = dispatch table address
 			;        (for calling kernel-device functions)
 			;   ebp = address table address
 			; Initialization code returns with
 			;   eax = open code address
-			;   ecx = close code address 
+			;   ecx = close code address
 			;   ebx = read code address
-			;   edx = write code address 	
+			;   edx = write code address
 			;   esi = IOCTL code address
 			;   edi = dispatch table address
 			;   ebp = address table address
@@ -601,7 +607,7 @@ alignb 4
 			;    Offset 36 : dispatch table address
 			;          (for calling kernel-device functions)
 
-;IDEV_NAME:  resb 8*NUMIDEV 
+;IDEV_NAME:  resb 8*NUMIDEV
 			  ; 8 byte names of installable device drivers
 
 ;IDEV_TYPE:  resb NUMIDEV ; Driver type of installable device drivers
@@ -612,21 +618,21 @@ alignb 4
 ;IDEV_CADDR: resd NUMIDEV ; close function addr for installable dev driver
 ;IDEV_RADDR: resd NUMIDEV ; read function addr for installable dev driver
 ;IDEV_WADDR: resd NUMIDEV ; write function addr for installable dev driver
-	
-; 08/10/2016	
+
+; 08/10/2016
 ; 07/10/2016
 ; Device Open and Access parameters
 ;DEV_ACCESS:	resb NUMOFDEVICES    ; bit 0 = accessable by normal users
 				     ; bit 1 = read access permission
 				     ; bit 2 = write access permission
 				     ; bit 3 = IOCTL permission to users
-				     ; bit 4 = block device if it is set	
+				     ; bit 4 = block device if it is set
 				     ; bit 5 = 16 bit or 1024 byte data
 				     ; bit 6 = 32 bit or 2048 byte data
 				     ; bit 7 = installable device driver
-;DEV_R_OWNER:	resb NUMOFDEVICES    ; Reading owner no (u.uid) of devices		
-;DEV_R_OPENCOUNT: resb NUMOFDEVICES  ; Reading open count 
-;DEV_W_OWNER:	resb NUMOFDEVICES    ; Writing owner no (u.uid) of devices		
+;DEV_R_OWNER:	resb NUMOFDEVICES    ; Reading owner no (u.uid) of devices
+;DEV_R_OPENCOUNT: resb NUMOFDEVICES  ; Reading open count
+;DEV_W_OWNER:	resb NUMOFDEVICES    ; Writing owner no (u.uid) of devices
 ;DEV_W_OPENCOUNT: resb NUMOFDEVICES  ; Writing open count
 ;DEV_DRIVER:	resb NUMOFDEVICES    ; device driver number (1 to 7Fh)
 				     ; *if bit 7 is set (80 to FFh)
@@ -635,12 +641,12 @@ alignb 4
 				     ; otherwise it is kernel device index
 ;DEV_OPENMODE:	resb NUMOFDEVICES    ; 1 = read mode
 				     ; 2 = write mode
-				     ; 3 = read & write 	  
-				     ; 0 = not open (free)		
+				     ; 3 = read & write
+				     ; 0 = not open (free)
 ;DEV_NAME_PTR:	resd NUMOFDEVICES    ; pointers to name addresses of drivers
-				     ; Address base: KDEV_NAME+		
+				     ; Address base: KDEV_NAME+
 				     ; or IDEV_NAME+
-;DEV_R_POINTER:	resd NUMOFDEVICES    ; reading pointer, writing pointer	
+;DEV_R_POINTER:	resd NUMOFDEVICES    ; reading pointer, writing pointer
 ;DEV_W_POINTER:	resd NUMOFDEVICES    ; sector number if block device
 				     ; character offset if char device
 alignb 4
@@ -648,8 +654,8 @@ alignb 4
 ; 06/10/2016
 ; Open File Parameters
 OF_FCLUSTER:	resd OPENFILES  ; First clusters of open files
-OF_DRIVE:	resb OPENFILES  ; Logical DOS drive numbers of open files 
-OF_MODE:	resb OPENFILES  ; Open mode (1 = read, 2 = write, 3 = r&w) 
+OF_DRIVE:	resb OPENFILES  ; Logical DOS drive numbers of open files
+OF_MODE:	resb OPENFILES  ; Open mode (1 = read, 2 = write, 3 = r&w)
 OF_STATUS:	resb OPENFILES  ; (bit 0 = read, bit 1 = write)
 OF_OPENCOUNT:	resb OPENFILES  ; Open counts of open files
 OF_POINTER:	resd OPENFILES	; File seek/read/write pointer
@@ -660,27 +666,27 @@ OF_VOLUMEID:	resd OPENFILES  ; Vol ID for removable drives of open files
 OF_CCLUSTER:	resd OPENFILES  ; Current clusters of open files
 OF_CCINDEX:	resd OPENFILES  ; Cluster index numbers of current clusters
 ; 24/10/2016
-OF_DIRENTRY:	resw OPENFILES  ; Directory entry index no. in dir cluster 
+OF_DIRENTRY:	resw OPENFILES  ; Directory entry index no. in dir cluster
 				; Sector index = entry index / 16
 ;alignb 2
 
 DTA:		;resd 24	; Find First File data transfer area
-		resb 24		; 29/07/2022		
+		resb 24		; 29/07/2022
 
 ; 19/12/2016
 tcallback:	resb 1		; Timer callback method flag for 'systimer'
 trtc:		resb 1		; Timer interrupt type flag for 'systimer'
 ; 20/02/2017
-no_page_swap:	resb 1		; Swap lock for Signal Response Byte pages 
+no_page_swap:	resb 1		; Swap lock for Signal Response Byte pages
 ;;15/01/2017
 ; 02/01/2017
 ;;intflg:	resb 1		; software interrupt in progress signal
 				; (for timer interrupt)
 alignb 4
 ; 13/04/2017
-;DEV_INTR:	resb NUMOFDEVICES ; Device Interrupt (IRQ) number + 1	
+;DEV_INTR:	resb NUMOFDEVICES ; Device Interrupt (IRQ) number + 1
 				; (0= not available, 1= IRQ 0, 16= IRQ 15)
-DEV_INT_HNDLR:	resd 16		; Device Interrupt Handler addr, if > 0 	
+DEV_INT_HNDLR:	resd 16		; Device Interrupt Handler addr, if > 0
 
 ;alignb 4
 
@@ -718,7 +724,7 @@ audio_stats_cmd: resd 1
 ;
 audio_buffer:	resd 1	; virtual address of user's audio buffer
 audio_p_buffer:	resd 1	; Physical address of user's audio buffer
-audio_buff_size: resd 1 ; user's audio buffer size (half buffer size) 
+audio_buff_size: resd 1 ; user's audio buffer size (half buffer size)
 audio_dma_buff: resd 1  ; dma buffer address
 audio_dmabuff_size: resd 1 ; dma buffer size (2 * half buffer size)
 ; 05/06/2024
@@ -766,7 +772,7 @@ audio_pcmo_volume_r: resb 1 ; PCM out volume right channel
 ;NAMBAR:	resw 1	; Native Audio Mixer Base Address
 ;NABMBAR:	resw 1	; Native Audio Bus Mastering Base Address
 
-; 02/06/2024	
+; 02/06/2024
 alignb 8
 
 ; 21/04/2017
@@ -782,14 +788,14 @@ reset:		resb 1	; AC97 init
 		;resb 1 ;
 dma_user:	resb 1	; user number for sysdma
 dma_channel:	resb 1	; dma channel for sysdma
-dma_mode:	resb 1  ; dma mode for sysdma	
+dma_mode:	resb 1  ; dma mode for sysdma
 dma_addr:	resd 1	; dma buffer physical addr for sysdma
 dma_size:	resd 1  ; dma buffer size (in bytes) for sysdma
 dma_start:	resd 1  ; dma start address for sysdma
 dma_count:	resd 1  ; dma count (in bytes) for sysdma
 
 ; 04/12/2023
-%if 0 
+%if 0
 
 alignb 65536
 ; 09/08/2017

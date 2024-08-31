@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.5) - File System Procedures : trdosk5s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - File System Procedures : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 07/08/2022 (Previous: 23/10/2016)
+; Last Update: 31/08/2024 (Previous: 07/08/2022)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -54,17 +54,17 @@ get_FAT16_next_cluster:
 	mov	ebx, edx ; Byte Offset
 	add	ebx, FAT_Buffer
 	mov	dx, 3
-	mul	edx  
+	mul	edx
 	; EAX = FAT Sector (<= 256)
 	; EDX = 0
 	mov	cl, [esi+LD_Name]
 	;cmp	byte [FAT_BuffValidData], 0
         cmp	[FAT_BuffValidData], dl ; 0
-	jna     short load_FAT_sectors0
+	jna	short load_FAT_sectors0
 	cmp	cl, [FAT_BuffDrvName]
-        jne     short load_FAT_sectors0
+        jne	short load_FAT_sectors0
 	cmp	eax, [FAT_BuffSector]
-        jne     short load_FAT_sectors1
+        jne	short load_FAT_sectors1
 	;movzx	eax, word [ebx]
 	mov	ax, [ebx]
 	; 01/02/2016
@@ -88,7 +88,7 @@ get_FAT12_next_cluster:
 	; 25/07/2022
 	;push	ax
 	push	eax
-	;mov	ax, 3	
+	;mov	ax, 3
 	mov	al, 3
 	;mul	dx    	; Multiply by 3
 	mul	edx
@@ -101,7 +101,7 @@ get_FAT12_next_cluster:
 	;pop	ax
 	;mov	dx, 3
 	mov	dl, 3
-	mul	edx 
+	mul	edx
 	; EAX = FAT Sector (<= 12)
 	; EDX = 0
 	mov	cl, [esi+LD_Name]
@@ -170,10 +170,10 @@ get_FAT32_next_cluster:
 	mov	ebx, edx ; Byte Offset
 	add	ebx, FAT_Buffer
 	mov	dx, 3
-	mul	edx	
+	mul	edx
         ; EAX = FAT Sector (<= 2097152) ; (FFFFFF7h * 4) / 512
 	; 	for 32KB cluster size:
-	;	EAX <= 1024 = (4GB / 32KB) * 4) / 512 	
+	;	EAX <= 1024 = (4GB / 32KB) * 4) / 512
 	; EDX = 0
 	mov	cl, [esi+LD_Name]
 	;cmp	byte [FAT_BuffValidData], 0
@@ -250,7 +250,7 @@ load_FAT_root_directory:
 	;mov	[DirBuff_DRV], bl
 	;mov	[DirBuff_FATType], bh
 	mov	[DirBuff_DRV], bx
-	
+
 	;cmp	bh, 2
 	;ja	short load_FAT32_root_dir0 ; FAT32 root dir
 
@@ -277,7 +277,7 @@ load_FAT_root_dir0: ; 23/10/2016
 	;shl	eax, 5
 	;;dec	dx    ; Last entry number of root dir
 	;dec	edx
-	; cx = Dir Buffer sector count             
+	; cx = Dir Buffer sector count
 	jmp	short lrd_check_dir_buffer
 
 lrd_mov_ecx_32:
@@ -425,7 +425,7 @@ read_cluster:
 	;	ESI = Logical DOS Drive Description Table address
 	;	EBX = Cluster (File R/W) Buffer address (max. 64KB)
 	;	Only for SINGLIX FS:
-	;	EDX = File Number (The 1st FDT address) 
+	;	EDX = File Number (The 1st FDT address)
 	; OUTPUT ->
 	;	cf = 1 -> Cluster can not be loaded at the buffer
 	;	    EAX > 0 -> Error number
@@ -433,7 +433,7 @@ read_cluster:
 	;
 	; (Modified registers: EAX, ECX, EBX, EDX)
 	
-	movzx	ecx, byte [esi+LD_BPB+BPB_SecPerClust] 
+	movzx	ecx, byte [esi+LD_BPB+BPB_SecPerClust]
 	; CL = 1 = [esi+LD_FS_Reserved2] ; SectPerClust for Singlix FS
 
 read_file_sectors: ; 16/03/2016
@@ -452,7 +452,7 @@ read_fat_file_sectors: ; 18/03/2016
 	; ECX = Sector count
 	; EBX = Buffer address
 	; (EDX = 0)
-	; ESI = Logical DOS drive description table address	
+	; ESI = Logical DOS drive description table address
 
 	call	disk_read
 	jnc	short rclust_retn
@@ -469,16 +469,16 @@ read_fs_cluster:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 15/02/2016 (TRDOS 386 = TRDOS v2.0)
 	; Singlix FS
-	
+
 	; EAX = Cluster number is sector index number of the file (eax)
 	
-	; EDX = File number is the first File Descriptor Table address 
+	; EDX = File number is the first File Descriptor Table address
 	;	of the file. (Absolute address of the FDT).
-	
+
 	; eax = sector index (0 for the first sector)
 	; edx = FDT0 address
 		; 64 KB buffer = 128 sectors (limit) 
-	;mov	ecx, 128 ; maximum count of sectors (before eof) 
+	;mov	ecx, 128 ; maximum count of sectors (before eof)
 	; 25/07/2022
 	sub	ecx, ecx
 	mov	cl, 128
@@ -502,10 +502,13 @@ get_first_free_cluster:
 	; OUTPUT ->
 	;	cf = 1 -> Error code in AL (EAX)
 	;	cf = 0 -> 
-	;	  EAX = Cluster number 
+	;	  EAX = Cluster number
 	;	  If EAX = FFFFFFFFh -> no free space
 	;	If the drive has FAT32 fs:
 	;	  EBX = FAT32 FSI sector buffer address (if > 0)
+	;
+	; (Modified registers: eax, ebx, ecx, edx)
+	;
 
 	mov	eax, [esi+LD_Clusters]
 	inc	eax ; add eax, 1
@@ -519,7 +522,7 @@ get_first_free_cluster:
 loc_gffc_get_first_fat32_free_cluster:
 	; 02/03/2016
 	call	get_fat32_fsinfo_sector_parms
-	jc	short loc_gffc_get_first_fat_free_cluster0 
+	jc	short loc_gffc_get_first_fat_free_cluster0
 
 loc_gffc_check_fsinfo_parms:
 	;;mov	ebx, DOSBootSectorBuff
@@ -528,7 +531,7 @@ loc_gffc_check_fsinfo_parms:
 	;cmp	dword [ebx+484], 61417272h
 	;jne	short loc_gffc_fat32_fsinfo_err
 	;mov	eax, [ebx+492] ; FSI_Next_Free
-	;EAX = First free cluster 
+	;EAX = First free cluster
 	;(from FAT32 FSInfo sector)
 	mov	eax, edx ; FSI_Next_Free (First Free Cluster)
 	cmp	eax, 0FFFFFFFFh ; invalid (unknown) !
@@ -543,9 +546,9 @@ loc_gffc_get_first_fat_free_cluster0:
 	;xor	edx, edx
 
 loc_gffc_get_first_fat_free_cluster1:
-	push	ebx ; 02/03/2016 
+	push	ebx ; 02/03/2016
 
-loc_gffc_get_first_fat_free_cluster2:   
+loc_gffc_get_first_fat_free_cluster2:
 	mov	[gffc_first_free_cluster], eax
 	mov	[gffc_next_free_cluster], eax
 
@@ -567,7 +570,7 @@ loc_gffc_get_first_fat_free_cluster4:
 	jnz	short loc_gffc_first_free_fat_cluster_next
 	mov	eax, ecx ; current (previous cluster) value
 	jmp	short loc_gffc_check_for_set
- 
+
 loc_gffc_first_free_fat_cluster_next:
 	mov	eax, [gffc_next_free_cluster]
 	cmp	eax, [gffc_last_free_cluster]
@@ -605,7 +608,7 @@ loc_gffc_retn:
 
 loc_gffc_check_previous_clusters:
 	dec	eax ; sub eax, 1
-	mov	[gffc_last_free_cluster], eax 
+	mov	[gffc_last_free_cluster], eax
 	;mov	eax, 2
 	; 25/07/2022
 	xor	eax, eax
@@ -617,7 +620,7 @@ loc_gffc_check_previous_clusters:
 loc_gffc_set_ffree_fat32_cluster:
 	;call	set_first_free_cluster
 	;retn
-	;jmp	short set_first_free_cluster	
+	;jmp	short set_first_free_cluster
 
 set_first_free_cluster:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -629,7 +632,7 @@ set_first_free_cluster:
 	; 21/02/2016 (TRDOS 386 = TRDOS v2.0)
 	; 21/08/2011 (DRV_FAT.ASM, 'proc_set_first_free_cluster')
 	; 11/07/2010
-	; INPUT -> 
+	; INPUT ->
 	;	ESI = Logical DOS Drive Description Table address
 	;	EAX = First free cluster
 	;	EBX = FSINFO sector buffer address
@@ -640,13 +643,13 @@ set_first_free_cluster:
 	;  	If EBX > 0, it is FSINFO sector buffer address
 	;	EBX = 0, if FSINFO sector could not be loaded
 	; 	CF = 1 -> Error code in AL (EAX)
-	;	CF = 0 -> first free cluster is successfully updated 
+	;	CF = 0 -> first free cluster is successfully updated
 
 	;cmp	byte [esi+LD_FATType], 3
 	;jb	short loc_sffc_invalid_drive
 
 	; Save First Free Cluster value for 'update_cluster'
-	mov	[esi+LD_BPB+BPB_Reserved+4], eax ; First free Cluster	
+	mov	[esi+LD_BPB+BPB_Reserved+4], eax ; First free Cluster
 
 	;or	ebx, ebx
 	;jnz	short loc_sffc_read_fsinfo_sector
@@ -663,7 +666,7 @@ loc_sffc_write_fsinfo_sector:
 	; EBX = FSINFO sector buffer
 	; [CFS_FAT32FSINFOSEC] is set in 'get_fat32_fsinfo_sector_parms'
 	mov	[ebx+492], eax
-	mov	eax, [CFS_FAT32FSINFOSEC] 
+	mov	eax, [CFS_FAT32FSINFOSEC]
 	;mov	ecx, 1
 	; 25/07/2022
 	xor	ecx, ecx
@@ -691,7 +694,7 @@ loc_sffc_read_fsinfo_sector_err1:
 	;mov	eax, 18 ; Drive not ready or write error
 	xor	eax, eax
 	mov	ebx, eax ; 0
-	mov	al, 18	
+	mov	al, 18
 	stc
 loc_sffc_read_fsinfo_sector_err2:
 	pop	edx
@@ -707,12 +710,16 @@ loc_sffc_read_fsinfo_sector:
 	; EDX = First (Next) Free Cluster value from FSINFO sector
 	; EAX = First Free Cluster value from 'get_next_cluster'
 	; (edx = old value)
-	cmp	eax, edx ; First free Cluster (eax = new value) 
+	cmp	eax, edx ; First free Cluster (eax = new value)
 	jne	short loc_sffc_write_fsinfo_sector
 
-	retn	
+	retn
 
 update_cluster:
+	; 31/08/2024
+	; 29/08/2024
+	; 26/08/2024
+	; 24/08/2024 (TRDOS 386 Kernel v2.0.9)
 	; 07/08/2022
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 23/10/2016
@@ -723,7 +730,7 @@ update_cluster:
 	; 27/02/2016
 	; 26/02/2016
 	; 22/02/2016 (TRDOS 386 = TRDOS v2.0)
-	; 11/08/2011  
+	; 11/08/2011
 	; 09/02/2005
 	; INPUT ->
 	;	EAX = Cluster Number
@@ -742,8 +749,8 @@ update_cluster:
 	;
 	;	/// [FAT_ClusterCounter] is updated,
 	;	/// decreased when a free cluster is assigned,
-	;	/// increased if an assigned cluster is freed.	
-	;		
+	;	/// increased if an assigned cluster is freed.
+	;
 	;
 	; (Modified registers: EAX, EBX, -ECX-, EDX)
 	
@@ -771,32 +778,53 @@ loc_update_cluster_check_fat_type:
 	mov	bl, [esi+LD_FATType]
 	cmp	eax, 2
         jb	short update_cluster_inv_data
-	cmp	bl, 2 
+
+	;;;
+	; 24/08/2024
+	; edx = 0 ; 24/08/2024
+	mov	ecx, [esi+LD_Clusters]
+	inc	ecx
+	mov	[LastCluster], ecx
+	;
+	cmp	eax, ecx
+	;ja	short return_uc_fat32_stc ; 25/07/2022
+	; edx = 0 ; (must be -1 or > 0 after here)
+	ja	short return_uc_fat_stc
+	;;;
+
+	cmp	bl, 2
         ;ja	update_fat32_cluster
 	; 25/07/2022
 	jna	short loc_uc_check_fat_type_1
 	jmp	update_fat32_cluster
 
-loc_uc_check_fat_type_1:
-	;cmp	bl, 1
-	;jb	short update_cluster_inv_data
-	mov	ecx, [esi+LD_Clusters]
-	inc	ecx  
-	mov	[LastCluster], ecx
-	cmp	eax, ecx ; dword [LastCluster]
-	;ja	return_uc_fat_stc
-	; 25/07/2022
-	jna	short loc_uc_check_fat_type_2
-	jmp	return_uc_fat_stc
+; 24/08/2024
+;loc_uc_check_fat_type_1:
+;	;cmp	bl, 1
+;	;jb	short update_cluster_inv_data
+;	mov	ecx, [esi+LD_Clusters]
+;	inc	ecx  
+;	mov	[LastCluster], ecx
+;	cmp	eax, ecx ; dword [LastCluster]
+;	;ja	return_uc_fat_stc
+;	; 25/07/2022
+;	jna	short loc_uc_check_fat_type_2
+;	; 24/08/2024
+;	; edx = 0 ; (must be -1 or > 0 after here)
+;	jmp	return_uc_fat_stc
 
 	; 25/07/2022
 update_cluster_inv_data:
-	;mov	eax, 0Dh
-	mov	al, 0Dh  ; Invalid Data
-	retn 
+	;;mov	eax, 0Dh
+	;mov	al, 0Dh  ; Invalid Data
+	; 31/08/2024
+	mov	al, ERR_INV_DATA ; 29 ; Invalid Data
+	retn
 
+	; 24/08/2024
+loc_uc_check_fat_type_1:
 loc_uc_check_fat_type_2:
-	; TRDOS v1 has a FATal bug here ! 
+	; TRDOS v1 has a FATal bug here !
 		; or bl, bl ; cmp bl, 0
 		; jz short update_fat12_cluster
 	; !! It would destroy FAT12 floppy disk fs here !!
@@ -807,15 +835,32 @@ loc_uc_check_fat_type_2:
 	;jna	update_fat12_cluster
 	; 25/07/2022
 	ja	short update_fat16_cluster
-	jmp	update_fat12_cluster	 
+	jmp	update_fat12_cluster
+
+	; 24/08/2024
+;return_uc_fat16_stc:
+	; 25/07/2022
+return_uc_fat_stc:
+	; 24/08/2024
+	; edx = 0
+	dec	edx
+	; edx = -1 ; 0FFFFFFFFh
+	; ecx > 0
+return_uc_fat16_stc:	; 24/08/2024
+loc_fat_buffer_stc_0:	; 24/08/2024
+	; 01/03/2016
+	xor	eax, eax
+	stc
+	jmp	short loc_fat_buffer_stc_1
 
 update_fat16_cluster:
 pass_uc_fat16_errc:
 	;sub	edx, edx
-	mov	ebx, 300h ;768
+	; edx = 0
+	mov	ebx, 300h ; 768
 	div	ebx
 	; EAX = Count of 3 FAT sectors
-	; DX = Cluster offset in FAT buffer
+	; DX = Cluster index in FAT buffer
 	;mov	bx, dx  
 	; 25/07/2022
 	mov	ebx, edx
@@ -823,7 +868,7 @@ pass_uc_fat16_errc:
 	; 25/07/2022
 	shl	ebx, 1
 	mov	dx, 3
-	mul	edx  
+	mul	edx
 	; EAX = FAT Sector
 	; EDX = 0
 	; EBX = Byte offset in FAT buffer
@@ -838,24 +883,24 @@ loc_uc_check_fat16_buff_sector_save:
 	; 07/08/2022
 	je	short loc_update_fat16_cell
 	;jmp	loc_uc_save_fat_buffer
-	
+
 	; 07/08/2022
 loc_uc_save_fat_buffer:
-	; byte [FAT_BuffValidData] = 2 
+	; byte [FAT_BuffValidData] = 2
 	call	save_fat_buffer
-        jc      short loc_fat_sectors_rw_error2
+        jc	short loc_fat_sectors_rw_error2
 	;mov	byte [FAT_BuffValidData], 1
 	mov	eax, [FAT_CurrentCluster]
 	;mov	ecx, [ClusterValue]
 	;jmp	short loc_update_cluster_check_fat_buffer
 	mov	bl, [esi+LD_Name] ; 01/03/2016
-        jmp     loc_uc_reset_fat_buffer_validation
+        jmp	loc_uc_reset_fat_buffer_validation
 
 loc_uc_check_fat16_buff_sector_load:
 	cmp	cl, 1 ; byte [FAT_BuffValidData]
-        jne     short loc_uc_load_fat_sectors
+        jne	short loc_uc_load_fat_sectors
 	cmp	eax, [FAT_BuffSector]
-        jne     short loc_uc_load_fat_sectors
+        jne	short loc_uc_load_fat_sectors
 
 loc_update_fat16_cell:
 loc_update_fat16_buffer:
@@ -929,21 +974,13 @@ load_uc_fat_sectors_zero:
 	mov	ecx, [ClusterValue]
         jmp     loc_update_cluster_check_fat_type
 
-return_uc_fat16_stc:
-	; 25/07/2022
-return_uc_fat_stc:
-	; 01/03/2016
-	xor	eax, eax
-	stc
-	jmp	short loc_fat_buffer_stc_1
-
 update_fat12_cluster:
 pass_uc_fat12_errc:
 	;sub	edx, edx
-	mov	ebx, 400h ;1024
+	mov	ebx, 400h ; 1024
 	div	ebx
 	; EAX = Count of 3 FAT sectors
-	; DX = Cluster offset in FAT buffer
+	; DX = Cluster index in FAT buffer
 	;mov	cx, 3
 	; 25/07/2022
 	sub	ecx, ecx
@@ -960,7 +997,7 @@ pass_uc_fat12_errc:
 	;xchg	bx, ax
 	xchg	ebx, eax
 	; EAX = Count of 3 FAT sectors
-	; EBX = Byte Offset in FAT buffer   
+	; EBX = Byte Offset in FAT buffer
 	;mul	cx  ; 3 * AX
 	mul	ecx ; 3 * EAX
 	; EAX = FAT Beginning Sector
@@ -993,19 +1030,31 @@ loc_update_fat12_cell:
 	add	ebx, FAT_Buffer ; 26/02/2016
 	;mov	cx, [FAT_CurrentCluster]
 	; 25/07/2022
-	mov	ecx, [FAT_CurrentCluster] 
+	mov	ecx, [FAT_CurrentCluster]
 	;shr	cx, 1
 	; 25/07/2022
 	shr	ecx, 1
 	mov	ax, [ebx]
 	;mov	dx, ax
 	mov	edx, eax ; 25/07/2022
+	; 24/08/2024 (*)
+	mov	ecx, [ClusterValue] ; 32 bits
 	jnc	short uc_fat12_nc_even
+
+	; 26/08/2024
+	; ODD cluster number
+	; eax = current value (before updated)
+	; ecx = new value of the cluster
+ 	; of the cluster
+	; low 4 bit of al is high 4 bit
+	; of the previous cluster
+	;	(it must not be overwritten)
 
 	;and	ax, 0Fh
 	; 25/07/2022
 	and	al, 0Fh
-	mov	ecx, [ClusterValue] ; 32 bits
+	; 24/08/2024 (*)
+	;mov	ecx, [ClusterValue] ; 32 bits
 	;shl	cx, 4
 	shl	ecx, 4
 	;or	cx, ax
@@ -1018,6 +1067,10 @@ loc_update_fat12_cell:
 	shr	eax, 4
 
 update_fat12_buffer:
+	;;;
+	; 24/08/2024
+	mov	ecx, [ClusterValue]
+	;;;
 	mov	[FAT_CurrentCluster], eax
 	mov	edx, eax ; 01/03/2016
 	mov	byte [FAT_BuffValidData], 2
@@ -1028,8 +1081,17 @@ update_fat12_buffer:
         jmp     loc_fat_buffer_updated
 
 uc_fat12_nc_even:
+	; 26/08/2024
+	; EVEN cluster number
+	; eax = current value (before updated)
+	; ecx = new value of the cluster
+ 	; of the cluster
+	; high 4 bit of ah is low 4 bit
+	; of the next cluster (it must not be overwritten)
+
 	and	ax, 0F000h
-	mov	ecx, [ClusterValue] ; 32 bits
+	; 24/08/2024 (*)
+	;mov	ecx, [ClusterValue] ; 32 bits
 	and	ch, 0Fh
 	;or	cx, ax
 	; 25/07/2022
@@ -1041,22 +1103,29 @@ uc_fat12_nc_even:
 	jmp	short update_fat12_buffer
 
 update_fat32_cluster:
-	mov	ecx, [esi+LD_Clusters]
-	inc	ecx
-	mov	[LastCluster], ecx
+	; edx = 0 ; 24/08/2024
+	;mov	ecx, [esi+LD_Clusters]
+	;inc	ecx
+	;mov	[LastCluster], ecx
+	; 24/08/2024
+	; ecx = [LastCluster]
 
-	cmp	eax, ecx
-        ja      short return_uc_fat32_stc ; 25/07/2022
+	; 24/08/2024
+	;cmp	eax, ecx
+	;;ja	short return_uc_fat32_stc ; 25/07/2022
+	;; 24/08/2024
+	;; edx = 0 ; (must be -1 or > 0 after here)
+	;ja	short return_uc_fat_stc
 
 pass_uc_fat32_errc:
 	;sub	edx, edx
-	mov	ebx, 180h ;384
+	mov	ebx, 180h ; 384
 	div	ebx
 	; EAX = Count of 3 FAT sectors
-	; DX = Cluster offset in FAT buffer
+	; DX = Cluster index in FAT buffer
 	mov	ebx, edx
 	shl	ebx, 2 ; Multiply by 4
-	;mov	edx, 3	
+	;mov	edx, 3
 	; 25/07/2022
 	;xor	dh, dh
 	;mov	dl, 3
@@ -1079,10 +1148,12 @@ loc_uc_check_fat32_buff_sector_save:
 
 return_uc_fat12_stc:
 return_uc_fat32_stc:
+	; 24/08/2024
+	jmp	loc_fat_buffer_stc_0 ; (*)
 	; 25/07/2022
-	sub	eax, eax
-	stc
-	jmp	loc_fat_buffer_stc_1
+	;sub	eax, eax
+	;stc
+	;jmp	loc_fat_buffer_stc_1 ; (*)
 
 loc_uc_check_fat32_buff_sector_load:
 	cmp	cl, 1 ; byte [FAT_BuffValidData]
@@ -1094,7 +1165,7 @@ loc_uc_check_fat32_buff_sector_load:
 	; 25/07/2022
 	je	short loc_update_fat32_cell
 loc_uc_load_fat_sects:
-	jmp	loc_uc_load_fat_sectors	
+	jmp	loc_uc_load_fat_sectors
 
 loc_update_fat32_cell:
 loc_update_fat32_buffer:
@@ -1106,7 +1177,11 @@ loc_update_fat32_buffer:
 
 	mov 	[FAT_CurrentCluster], eax
 	mov	ecx, [ClusterValue]
-	mov	[ebx], ecx ; 29/02/2016 
+	;;;
+	; 29/08/2024
+	and	ecx, 0FFFFFFFh ; 28 bit cluster value
+	;;; 
+	mov	[ebx], ecx ; 29/02/2016
 
 	mov	byte [FAT_BuffValidData], 2
 
@@ -1130,7 +1205,7 @@ loc_update_fat32_buffer:
 	jmp	short loc_upd_fat32_c2
 
 loc_upd_fat32_c0:
-	inc	dword [esi+LD_BPB+BPB_Reserved+4] ; set it to next cluster		
+	inc	dword [esi+LD_BPB+BPB_Reserved+4] ; set it to next cluster
 	jmp	short loc_upd_fat32_c3
 
 loc_upd_fat32_c1:
@@ -1140,8 +1215,8 @@ loc_upd_fat32_c1:
 	cmp	edx, [esi+LD_BPB+BPB_Reserved+4] ; First free cluster
 	jnb	short loc_upd_fat32_c3
 
-loc_upd_fat32_c2:	
-	mov	[esi+LD_BPB+BPB_Reserved+4], edx			
+loc_upd_fat32_c2:
+	mov	[esi+LD_BPB+BPB_Reserved+4], edx
 
 loc_upd_fat32_c3:
 	mov	edx, eax
@@ -1156,14 +1231,14 @@ pass_uc_fat32_c_zero_check_2:
 	
 	jmp     loc_fat_buffer_updated
 
-
 save_fat_buffer:
+	; 31/08/2024 (TRDOS 386 v2.0.9)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 15/10/2016
 	; 01/03/2016
 	; 22/02/2016 (TRDOS 386 = TRDOS v2.0)
 	; 11/08/2011
-	; 09/02/2005 
+	; 09/02/2005
 	; INPUT ->
 	;	None
 	; OUTPUT ->
@@ -1172,9 +1247,9 @@ save_fat_buffer:
 	;
 	;	EBX = FAT_Buffer address
 	;
-	; (EAX, EDX, ECX will be modified)
+	; (EAX, EDX, ECX, EBX will be modified)
 
-	;cmp	byte [FAT_BuffValidData], 2 
+	;cmp	byte [FAT_BuffValidData], 2
 	;je	short loc_save_fat_buff
 
 ;loc_save_fat_buffer_retn:
@@ -1190,10 +1265,10 @@ loc_save_fat_buff:
 	push	esi ; *
         mov     esi, Logical_DOSDisks
 	add	esi, edx
-	
+
 	mov	dl, [esi+LD_FATType]
 	and	dl, dl
-	jz	short loc_save_fat_buffer_inv_data_pop_retn 
+	jz	short loc_save_fat_buffer_inv_data_pop_retn
 
 	mov	eax, [FAT_BuffSector]
 	cmp	dl, 2
@@ -1205,7 +1280,7 @@ loc_save_fat_12_16_buff:
 	; Correct code: mov dx, word ptr [FAT_BuffSector]+2
 	; (DX:AX in TRDOS v1 -> EAX in TRDOS v2)
 	;
-	movzx	ecx, word [esi+LD_BPB+FATSecs] 
+	movzx	ecx, word [esi+LD_BPB+FATSecs]
 	sub	ecx, eax
 	; TRDOS v1 has a bug here... ('pop esi' was forgotten!)
 	;jna	short loc_save_fat_buffer_inv_data_retn ; wrong addr!
@@ -1228,7 +1303,7 @@ loc_save_fat_buff_continue:
 	call	disk_write
 	pop	ecx
 	jc	short loc_save_FAT_buff_write_err
-	
+
 	cmp	byte [esi+LD_FATType], 2
 	jna	short loc_calc_2nd_fat12_16_addr
 
@@ -1248,7 +1323,9 @@ loc_save_fat_buffer_inv_data_retn:
 	;mov	eax, 0Dh ; Invalid DATA
 	; 25/07/2022
 	sub	eax, eax
-	mov	al, 0Dh  ; Invalid DATA
+	;mov	al, 0Dh  ; Invalid Data
+	; 31/08/2024
+	mov	al, ERR_INV_DATA ; 29 ; Invalid Data
 	stc	; cf = 1
 	retn
 
@@ -1262,7 +1339,7 @@ loc_calc_2nd_fat_addr:
 	; ecx = 1 to 3
 	call	disk_write
 	jc	short loc_save_FAT_buff_write_err
- 	; Valid  buffer (1 = valid but do not save)
+ 	; Valid buffer (1 = valid but do not save)
 	mov	byte [FAT_BuffValidData], 1
 
 loc_save_FAT_buff_write_err:
@@ -1297,15 +1374,18 @@ calculate_fat_freespace:
 	;	ECX = 0 -> valid
 	;	ECX > 0 -> error or invalid
 	;	If EAX = FFFFFFFFh, it is 're-calculation needed'
-	;			          sign due to r/w error   
+	;			          sign due to r/w error
+	;
+	; (Modifed registers: eax, ebx, ecx, edx, esi)
+	;
 
 	mov	[CFS_OPType], bx
 	mov	[CFS_CC], eax
-	
+
 	cmp	bh, 0FFh
 	je	short pass_calculate_freespace_get_drive_dt_offset
 
-loc_calculate_freespace_get_drive_dt_offset:     
+loc_calculate_freespace_get_drive_dt_offset:
 	xor	eax, eax
         mov     ah, bh
 	mov	esi, Logical_DOSDisks
@@ -1314,7 +1394,7 @@ loc_calculate_freespace_get_drive_dt_offset:
 pass_calculate_freespace_get_drive_dt_offset:
 	or	bl, bl
 	jz	short loc_reset_fcc
-	
+
 loc_get_free_sectors:
 	mov	eax, [esi+LD_FreeSectors]
 
@@ -1322,26 +1402,26 @@ loc_get_free_sectors:
 	;dec	ecx ; 0FFFFFFFFh
 	;cmp	eax, ecx ; 29/02/2016
 	;je	short loc_get_free_sectors_retn ; recalculation is needed!
-	
+
 	; 23/03/2016
 	mov	ecx, [esi+LD_TotalSectors]
 	cmp	ecx, eax ; Total sectors must be greater than Free sectors !
 	ja	short loc_get_free_sectors_check_optype
-	
+
 	xor	eax, eax
 	dec	eax ; 0FFFFFFFFh  ; recalculation is needed!
 	mov	[esi+LD_FreeSectors], eax ; reset (for recalculation)
-		
+
 loc_get_free_sectors_retn:
 	retn
-	
+
 loc_get_free_sectors_check_optype:
 	cmp	bl, 3
 	jb	short loc_set_fcc_1 ; 25/07/2022
 
 	sub	ecx, ecx ; 0
 
-	retn	
+	retn
 
 loc_set_fcc_1:
 	cmp	byte [esi+LD_FATType], 2
@@ -1355,10 +1435,10 @@ loc_set_fcc_2:
 	movzx	ecx, byte [esi+LD_BPB+SecPerClust]
 	sub	edx, edx
 	div	ecx
-	;or	dx, dx 
+	;or	dx, dx
 	;	; DX -> Remain sectors < SecPerClust
 	;	; DX > 0 -> invalid free sector count
-	;jnz	short loc_reset_fcc 
+	;jnz	short loc_reset_fcc
 
 ;pass_set_fcc_div32:
 	mov	[FreeClusterCount], eax
@@ -1372,7 +1452,7 @@ loc_reset_fcc:
 	mov	[LastCluster], edx
 
 	cmp	byte [esi+LD_FATType], 2
-	jna	short loc_count_free_fat_clusters_0  
+	jna	short loc_count_free_fat_clusters_0
 
 	dec	eax ; FFFFFFFFh
 	mov	[CFS_FAT32FC], eax
@@ -1380,7 +1460,7 @@ loc_reset_fcc:
 	; 29/02/2016
 	mov	[esi+LD_BPB+BPB_Reserved], eax ; reset
 	mov	[esi+LD_BPB+BPB_Reserved+4], eax ; reset
-	
+
 	;mov 	eax, 2
 	; 25/07/2022
 	inc	eax ; eax = 0
@@ -1404,7 +1484,7 @@ loc_put_fcc_unknown_sign:
 	mov	edx, [CFS_FAT32FC] ; First Free Cluster
 	; Save First Free Cluster value in FAT32 'BPB_Reserved+4' area
 	mov	[esi+LD_BPB+BPB_Reserved+4], edx
-	
+
         jmp     loc_put_fcc_invalid_sign
 
 loc_check_fat32_ff_cluster:
@@ -1507,7 +1587,7 @@ loc_check_fcc_FSINFO_op1:
 	jnb	short loc_put_fcc_invalid_sign
         add     eax, [CFS_CC] ; free cluster count on disk + current count
 	jc	short loc_put_fcc_invalid_sign
-	
+
 	mov	[FreeClusterCount], eax
 	jmp	short loc_cfs_write_FSINFO_sector
 
@@ -1540,7 +1620,7 @@ loc_set_FAT32_free_sectors:
 	;
 loc_set_FAT32_free_sectors_ok:
 	xor	edx, edx ; 0
-        jmp     short loc_cfs_retn_params 
+        jmp     short loc_cfs_retn_params
 	;
 
 get_last_cluster:
@@ -1594,6 +1674,7 @@ loc_glc_stc_retn:
         jmp	short loc_glc_prev_cluster_retn
 
 truncate_cluster_chain:
+	; 31/08/2024 - TRDOS 386 v2.0.9
 	; 01/03/2016
 	; 28/02/2016 (TRDOS 386 = TRDOS v2.0)
 	; 22/01/2011 (DRV_FAT.ASM, 'proc_truncate_cluster_chain')
@@ -1607,12 +1688,32 @@ truncate_cluster_chain:
 	; 	CF = 0 -> EAX = Free sectors
 	; 	CF = 1 -> Error code in EAX (AL)
 
-	; NOTE: This procedure does not update lm date&time ! 
-
+	; NOTE: This procedure does not update lm date&time !
+	 
 loc_truncate_cc:	
 	xor	ecx, ecx ; mov ecx, 0
 	;mov	byte [FAT_BuffValidData], 0
 	mov	[FAT_ClusterCounter], ecx ; 0 ; reset
+
+	;;;
+	; 31/08/2024
+	and	eax, eax ; 0
+	jz	short loc_tcc_unlink_zero_cluster  ; zero
+	;cmp	eax, 0FFFFFF7h
+	cmp	eax, 0FFFFFFFh ; 28 bit cluster number limit (EOF)
+	jb	short loc_tcc_unlink_clusters
+
+	; (possible FAT32) EOF signature...
+	;	not a valid cluster number
+	;	
+	; NOTE: update_cluster returns EOF (if eax > [LastCluster])
+	;	instead of invalid data error
+
+	mov	eax, ERR_INV_DATA  ; invalid cluster number
+	stc
+loc_tcc_unlink_zero_cluster:	; nothing to do
+	retn
+	;;;
 
 loc_tcc_unlink_clusters:
 	call	update_cluster
@@ -1622,6 +1723,8 @@ loc_tcc_unlink_clusters:
 	; Returns count of unlinked clusters in
 	; dword ptr FAT_ClusterCounter
 	jnc	short loc_tcc_unlink_clusters
+
+	; error or EOF (end of cluster chain) ; 31/08/2024
 
 pass_tcc_unlink_clusters:
 	mov	byte [TCC_FATErr], al
@@ -1769,6 +1872,9 @@ loc_read_FAT32_fsinfo_sec_stc_retn:
 	retn
 
 add_new_cluster:
+	; 30/08/2024
+	; 27/08/2024
+	; 25/08/2024 - TRDOS 386 v2.0.9
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 15/10/2016
 	; 16/05/2016
@@ -1790,25 +1896,33 @@ add_new_cluster:
 	;	EDX = 0 (if cf = 0)
 	; NOTE:
 	; This procedure does not update lm date&time !
+	;    ; 30/08/2024	
+	; and doesn't update 1st clust and file size fields !
 	;
 	; (Modified registers: EAX, EBX, ECX, EDX, EDI)
 
 	mov	[FAT_anc_LCluster], eax
-	
+
 	call	get_first_free_cluster
 	jc	short loc_add_new_cluster_retn
 	; EAX >= 2 and EAX < FFFFFFFFh is valid
 
-	mov	edx, eax
+	;mov	edx, eax
+	;
+	;inc	edx
+	;;jnz	short loc_add_new_cluster_check_ffc_eax
+	;jnz	short loc_add_new_cluster_save_fcc
 
-	inc	edx
-	;jnz	short loc_add_new_cluster_check_ffc_eax
+	; 27/08/2024
+	inc	eax ; (*)
 	jnz	short loc_add_new_cluster_save_fcc
 
 loc_add_new_cluster_no_disk_space_retn:
 	;mov	eax, 27h ; MSDOS err => insufficient disk space
+	; 27/08/2024
+	; eax = 0
 	; 25/07/2022
-	xor	eax, eax
+	;xor	eax, eax
 	mov	al, 27h
 loc_add_new_cluster_stc_retn:
 	stc
@@ -1821,11 +1935,12 @@ loc_add_new_cluster_retn:
 	retn
 
 loc_anc_invalid_format_stc_retn:
-	stc
+	; 27/08/2024
+	;stc
 loc_add_new_cluster_invalid_format_retn:
 	; 15/10/2016 (0Bh -> 28)
 	;mov	eax, 28 ; Invalid format
-	;jmp	short loc_add_new_cluster_retn 
+	;jmp	short loc_add_new_cluster_retn
 	; 25/07/2022
 	sub	eax, eax
 	mov	al, 28
@@ -1835,9 +1950,15 @@ loc_add_new_cluster_invalid_format_retn:
 ;	cmp	eax, 2
 ;	jb	short loc_add_new_cluster_invalid_format_retn
 
-loc_add_new_cluster_save_fcc:  
+loc_add_new_cluster_save_fcc:
+	;;;
+	; 27/08/2024
+	dec	eax ; (*)
+	;;;  
 	mov	[FAT_anc_FFCluster], eax
 
+; 27/08/2024 (TRDOS 386 v2.0.9)
+%if 0
 	sub	eax, 2
 	movzx   ebx, byte [esi+LD_BPB+SecPerClust]
 	mul	ebx
@@ -1869,7 +1990,7 @@ loc_add_new_cluster_write_nc_to_disk:
 	;xchg	eax, edx ; edx = 0, eax = sector offset
 	mov	eax, edx
         add     eax, [esi+LD_DATABegin]
-	jc	short loc_add_new_cluster_invalid_format_retn 
+	jc	short loc_add_new_cluster_invalid_format_retn
 		
 	mov	ecx, ebx ; ECX = sectors per cluster (<256)
 	mov	ebx, Cluster_Buffer
@@ -1885,9 +2006,23 @@ loc_add_new_cluster_write_nc_to_disk:
 
 loc_add_new_cluster_update_fat_nlc:
 	mov	eax, [FAT_anc_FFCluster]
-	xor	ecx, ecx
+%endif
+	; 30/08/2024
+	; eax = [FAT_anc_FFCluster] ; first free cluster
+	xor	ecx, ecx ; 0
 	mov	[FAT_ClusterCounter], ecx ; 0 ; reset
-	dec	ecx ; 0FFFFFFFFh
+	dec	ecx ; -1 ; 0FFFFFFFFh
+	test	[FAT_anc_LCluster], ecx	; 0 ?
+	jz	short loc_add_new_cluster_update_fat_fc ; yes
+
+	; 27/08/2024
+	; eax = (first free) cluster to be added as last cluster
+	;;;
+	;xor	ecx, ecx
+
+loc_add_new_cluster_update_fat_nlc: ; 30/08/2024
+	;mov	[FAT_ClusterCounter], ecx ; 0 ; reset
+	;dec	ecx ; 0FFFFFFFFh ; last cluster
 	call	update_cluster
 	jnc	short loc_add_new_cluster_update_fat_plc
 	or	eax, eax ; EAX = 0 -> cluster value is 0 or eocc
@@ -1896,8 +2031,10 @@ loc_add_new_cluster_update_fat_nlc:
 loc_add_new_cluster_update_fat_plc:
 	mov	eax, [FAT_anc_LCluster]
 	mov	ecx, [FAT_anc_FFCluster]
+loc_add_new_cluster_update_fat_fc: ; 30/08/2024
 	call	update_cluster
 	jnc	short loc_add_new_cluster_save_fat_buffer
+
 	or	eax, eax ; EAX = 0 -> cluster value is 0 or eocc
 	jz	short loc_add_new_cluster_save_fat_buffer
 
@@ -1914,7 +2051,7 @@ loc_anc_save_fat_buffer_err_retn:
 
 loc_add_new_cluster_save_fat_buffer:
 	;cmp	byte [FAT_BuffValidData], 2
-	;jne	short loc_add_new_cluster_calc_FAT_freespace 
+	;jne	short loc_add_new_cluster_calc_FAT_freespace
 	;Byte [FAT_BuffValidData] = 2 
 	call	save_fat_buffer
 	jc	short loc_anc_save_fat_buffer_err_retn
@@ -1924,7 +2061,7 @@ loc_add_new_cluster_calc_FAT_freespace:
 	mov	eax, [FAT_ClusterCounter]
 	mov	bx, 0FF01h ; BH = FFh -> ESI -> Dos drv desc. table
 		; BL = 1 -> add cluster(s)
-	mov	bl, 01h
+	;mov	bl, 01h ; 27/08/2024
 	; NOTE: EAX value will be added to Free Cluster Count
 	; (Free Cluster Count is decreased when EAX value is negative)
         call    calculate_fat_freespace
@@ -1946,6 +2083,7 @@ loc_add_new_cluster_return_cluster_number:
         retn
 
 write_cluster:
+	; 31/08/2024 - TRDOS 386 v2.0.9
 	; 15/10/2016
 	; 21/03/2016 (TRDOS 386 = TRDOS v2.0)
 	;
@@ -1969,7 +2107,9 @@ write_file_sectors: ; 16/03/2016
 	cmp	byte [esi+LD_FATType], 0
 	jna	short write_fs_cluster
 
-write_fat_file_sectors: 
+write_fat_file_sectors:
+	; 31/08/2024
+	; ecx = sector count (may be different than sectors per cluster)
 	sub	eax, 2 ; Beginning cluster number is always 2
 	movzx	edx, byte [esi+LD_BPB+BPB_SecPerClust] ; 18/03/2016 
 	mul	edx
