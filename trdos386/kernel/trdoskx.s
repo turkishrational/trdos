@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 29/08/2024 (Previous: 05/06/2024 - Kernel v2.0.8)
+; Last Update: 01/09/2024 (Previous: 05/06/2024 - Kernel v2.0.8)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -404,9 +404,10 @@ csftdf_videopage:     resb 1
 csftdf_cursorpos:     resw 1
 csftdf_sf_drv_dt:     resd 1
 csftdf_df_drv_dt:     resd 1
+; 01/09/2024
 ; 29/08/2024
-csftdf_df_dclust:     resd 1
-csftdf_df_dindex:     resd 1
+;csftdf_df_dclust:    resd 1
+;csftdf_df_dindex:    resd 1
 
 ; 21/03/2016
 ; 20/03/2016

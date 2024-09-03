@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 29/08/2024  (Previous: 29/08/2023)
+; Last Update: 03/09/2024  (Previous: 29/08/2023)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1634,7 +1634,7 @@ syscreat_0:
 syscreat_3:
 	; 16/10/2016
 	cmp	byte [SWP_inv_fname], 0
-	ja	short  syscreat_inv_fname ; invalid file name !
+	ja	short syscreat_inv_fname ; invalid file name !
 
 	; Here, we have a valid path and also a valid file name
 	; (Working dir has been changed if the path
@@ -1699,7 +1699,9 @@ syscreat_3:
 	push	ecx
 	mov	esi, Logical_DOSDisks
 	sub	ecx, ecx
-	mov	ch, [Current_Drv]
+	;mov	ch, [Current_Drv] ; = [FindFile_Drv]
+	; 03/09/2024
+	mov	ch, [FindFile_Drv]
 	add	esi, ecx
 	; ESI = Logical dos drive description table address
 	call	truncate_cluster_chain
@@ -1707,8 +1709,12 @@ syscreat_3:
 	pop	edi
 	jc	short syscreate_truncate_err
 
+	; 03/09/2024
+	mov	word [edi+DirEntry_FstClusHI], 0
+	mov	word [edi+DirEntry_FstClusLO], 0
+
 	; 24/08/2024
-skip_truncate:	
+skip_truncate:
 	; 26/10/2016
 	; EDI = Directory entry address in directory buffer
 	; Update directory entry
@@ -1721,7 +1727,8 @@ skip_truncate:
 	xor	eax, eax ; file size = 0 
 	mov	[edi+DirEntry_FileSize], eax ; 0
 	mov	byte [DirBuff_ValidData], 2 ; data changed sign	
-	mov	esi, FindFile_DirEntry
+	;mov	esi, FindFile_DirEntry
+	; 03/09/2024
 	mov	dl, 1 ; open file for writing
 	jmp	sysopen_2 ; 08/08/2022
 
@@ -1806,6 +1813,7 @@ syscreat_2:
 	jmp	short sysopen_2
 
 sysopen: ;<open file>
+	; 03/09/2024
 	; 19/08/2024 - TRDOS 386 v2.0.9
 	; 23/07/2022 - TRDOS 386 v2.0.5
 	; 17/04/2021 - TRDOS 386 v2.0.4
@@ -1952,8 +1960,10 @@ sysopen_access_err:
 
 sysopen_2:
 	; esi = Directory Entry (FindFile_DirEntry) Location
-	mov	ebx, esi
-        xor     esi, esi ; 0
+	;mov	ebx, esi
+        ; 03/09/2024
+	mov	ebx, edi ; Directory entry in directory buffer
+	xor     esi, esi ; 0
         xor     edi, edi ; 0
 sysopen_3: ; scan the list of entries in fsp table
         cmp     byte [esi+u.fp], 0
@@ -2408,6 +2418,7 @@ sysclose_err:
 	jmp	error
 
 sysread: ; < read from file >
+	; 03/09/2024 (TRDOS v2.0.9)
 	; 11/10/2016 (TRDOS 386 = TRDOS v2.0)
 	;	     -derived from INT_21H.ASM-
 	;            ("loc_INT21h_read_file")
@@ -2471,9 +2482,10 @@ sysread: ; < read from file >
 	jc	short device_read ; read data from device
 	; EAX = First cluster of the file
 
-	call	rw1
+	call	rw1	; 03/09/2024 (major modification)
 	jnc	short sysread_0
 
+sysrw_err:	; 03/09/2024
 	mov	[u.r0], eax ; error code
 	jmp	error
 	 
@@ -2482,6 +2494,7 @@ sysread_0:
 	jmp	short rw0
 
 syswrite: ; < write to file >
+	; 03/09/2024
 	; 25/08/2024 - TRDOS 386 v2.0.9
 	; 23/10/2016
 	; 11/10/2016 (TRDOS 386 = TRDOS v2.0) 
@@ -2541,12 +2554,15 @@ syswrite: ; < write to file >
 	;  
 
 	; EBX = File descriptor
-	call	getf1 
+	call	getf1
 	jc	short device_write ; write data to device
 	; EAX = First cluster of the file
 	; EBX = File number (Open file number) ; 23/10/2016
 
-	call	rw1
+	call	rw1	; 03/09/2024 (major modification)
+	; 03/09/2024
+	jc	short sysrw_err
+
 	; 25/08/2024 (*)
 	;jnc	short syswrite_0
 	;mov	[u.r0], eax ; error code
@@ -2563,6 +2579,7 @@ rw0: ; 1:
 	mov	[u.r0], eax
 	jmp	sysret
 rw1:	
+	; 03/09/2024 (TRDOS 386 v2.0.9)
 	; 17/04/2021 (TRDOS 386 v2.0.4)
 	; 11/10/2016 (TRDOS 386 = TRDOS v2.0) 
 	; 14/05/2015 (Retro UNIX 386 v1)
@@ -2575,24 +2592,54 @@ rw1:
 	;jc	short device_rw ; read/write data from/to device
 	; EAX = First cluster of the file
 
-	cmp 	eax, 2
-	jb	short rw2
-	;
+	; 03/09/2024
+	or	eax, eax
+	jz	short rw7 ; eax = 0 -> empty file (OK for now)
+
+	cmp 	eax, 2	  ; is it valid cluster number ?		
+	;jb	short rw2
+	; 03/09/2024
+	jnb	short rw6 ; yes, check upper limit
+
+	;;;
+	; eax = 1 -> invalid cluster number
+rw5:
+	mov	eax, ERR_CLUSTER ; 35 ; 'cluster not available !'
+	jmp	short rw4 ; cf = 1
+
+rw6:	; 03/09/2024 (check cluster number is valid or not)
+	push	ebx
+	; ebx <= OPENFILES-1 ; 0-31
+	mov	bh, [ebx+OF_DRIVE] ; drive number * 256
+	mov	ebx, [ebx+Logical_DOSDisks+LD_Clusters]
+	inc	ebx ; cluster count + 1 = last cluster number
+	cmp	ebx, eax
+	pop	ebx
+	jb	short rw5
+rw7:
+	;;;
+
 	mov	[u.base], ecx 	; buffer address/offset 
 				;(in the user's virtual memory space)
 	mov	[u.count], edx 
 
         mov	dword [u.error], 0 ; reset the last error code
 	retn
+		
 rw2:
 	mov	eax, ERR_FILE_NOT_OPEN ; file not open !
 	;mov	dword [u.error], eax
 	;retn
+
+	; 03/09/2024
 	; 17/04/2021
-	jmp	short rw4
+	;jmp	short rw4
+
+	; 03/09/2024
 rw3: 
-	mov	eax, ERR_FILE_ACCESS ; permission denied !
-	stc
+;	mov	eax, ERR_FILE_ACCESS ; permission denied !
+;	stc
+
 rw4:	; 17/04/2021
 	mov	dword [u.error], eax
 	retn
@@ -2609,7 +2656,7 @@ device_read:
 	; al = DEV_DRIVER   ; device number (eax)
 
 	; 17/04/2021 (temporary)
-	jmp	short rw2 ; file not open
+	jmp	short rw2 ; file not open ;  cf = 1
 
 ;	test	cl, 1 ; 1 = read, 2 = write, 3 = read&write
 ;	jz	short rw3
@@ -12541,6 +12588,7 @@ fclose_1: ; 1:
 	retn
 
 getf:
+	; 03/09/2024 - TRDOS 386 v2.0.9
 	; 23/07/2022 - TRDOS 386 v2.0.5
 	; 17/04/2021 - TRDOS 386 v2.0.4
 	;	(temporary modifications)
@@ -12563,6 +12611,8 @@ getf1:
 getf2:
 	; 'File not open !' error (ax=0)
 	sub	eax, eax
+	; 03/09/2024
+	stc
 	retn
 getf3:
 	; 23/07/2022
@@ -15123,6 +15173,7 @@ sysfnf_13:
 	jmp	sysfnf_9
 
 writei:
+	; 02/09/2024
 	; 27/08/2024 - TRDOS 386 v2.0.9 
 	; 08/08/2022
 	; 30/07/2022
@@ -15163,6 +15214,8 @@ writei:
 	; 23/07/2022
 	;jna	short dskw_8 ; retn
 writei_1:
+	; 02/09/2024
+	mov	dword [writei.fclust], 0FFFFFFFFh ; -1 ; reset
 dskw:
 	mov	[writei.ofn], bl ; Open file number
 	mov	[setfmod], cl ; 0 ; reset 'update lm date&time' sign
@@ -15303,7 +15356,8 @@ dskw_6:
 	jmp	dskw_0 ; / yes, branch
 
 mget_w:
-	; 27/08/2024
+	; 03/09/2024
+	; 02/09/2024
 	; 25/08/2024 - TRDOS 386 v2.0.9
 	; 08/08/2022
 	; 25/07/2022
@@ -15369,6 +15423,8 @@ mget_w_20:
 	;jna	mget_w_4 ; no
 	; 23/07/2022
 	ja	short mget_w_21
+	; 02/09/2024
+	; ebx  = first cluster (input)
 	jmp	mget_w_4
 mget_w_21:
 	div	ecx
@@ -15378,39 +15434,12 @@ mget_w_21:
 	;shr	dx, 9 ; / 512
 	;mov	[writei.s_index], dl ; sector index in cluster (0 to spc -1)
 
-	; 27/08/2024
-	;;;
-	mov	[setfclust], ebx
-	xor	eax, eax
-	or	ebx, ebx
-	jnz	short mget_w_29
-	; zero file size (new file), first cluster is 0
- 	call	get_first_free_cluster
-	jc	short mget_w_err@
-	; EAX >= 2 and EAX < FFFFFFFFh is valid
-	cmp	eax, 0FFFFFFFFh ; no free space
-	jne	short mget_w_29
-	inc	eax ; 0
-	mov	al, 27h ; insufficient disk space
-mget_w_err@:
-	jmp	mget_w_err
-mget_w_29:
-	; eax = First cluster
-	; 27/08/2024
-	xchg	[setfclust], eax 
-			; if first cluster > 0 then [setfclust] = 0
-			; if first cluster = 0 then
-			;		 [setfclust] = new first cluster
-			; (update lmdt procedure will use [setfclust])
-	;;;
-
 	sub	edx, edx ; 01/11/2016
 	mov 	[writei.sector], edx ; 0
 	mov	[writei.offset], dx  ; byte offset in cluster
 	mov	[writei.s_index], dl ; sector index in cluster (0 to spc -1)
 
-	; 27/08/2024
-	;mov	eax, ebx ; First Cluster
+	mov	eax, ebx ; First Cluster
 
 	; is this the 1st mget_w or a next mget_w call ? (by 'writei')
 	cmp	byte [writei.valid], dl ; 0
@@ -15440,25 +15469,24 @@ mget_w_0:
 	jnz	short mget_w_27 ; no
 
 	; eax = 0 (*)
-	; ((a directy entry with zero file size)) (*)
+	; ((a directory entry with zero file size)) (*)
 	; (*) ((('syswrite' may be used for writing to an empty file.
 	; Before this modification, 'syscreat' and 'syswrite' system calls
 	; did wrong things together... 'writetest.s' file, 24/08/2024.)))
-	
-	; 27/08/2024
-	mov	eax, [setfclust]
-	; eax = new first free cluster
-	; (directory entry does not contain it yet..)
-	; (('update_file_lmdt' procedure will set it))	
 
 	call	add_new_cluster ; (*) 2024 (v2.0.9) modification
 	jc	short mget_w_errj ; eax = error code
 	; eax = (new) first cluster
 	; skip 'get_last_cluster' and set ecx to -1
+	;
+	; 02/09/2024
+	mov	[writei.fclust], eax ; first cluster
+	mov	[writei.cluster], eax
+	; 03/09/2024
+	mov	[setfclust], eax
+	;
 	xor	ecx, ecx
-	mov	[writei.l_index], ecx ; 0
-	dec	ecx ; -1 ; 0FFFFFFFFh
-	jmp	short mget_w_28	
+	jmp	short mget_w_28
 	;;;
 
 mget_w_27:
@@ -15473,8 +15501,8 @@ mget_w_errj:	; 25/08/2024
 mget_w_25:
 	; 25/08/2024
 	mov	ecx, [glc_index] ; last cluster index
+mget_w_28:	; 02/09/2024
 	mov	[writei.l_index], ecx
-mget_w_28:
 	mov	[writei.lclust], eax ; last cluster
 
 	mov	al, [writei.ofn]
@@ -15482,7 +15510,7 @@ mget_w_28:
 	mov	[setfmod], al ; update lm date&time sign
 
 mget_w_1:
-	cmp	ecx, [writei.c_index]  ; last cluster index
+	cmp	ecx, [writei.c_index] ; last cluster index
 	jnb	short mget_w_2 ; 01/11/2016
 
 	mov	eax, [writei.lclust]
@@ -15544,6 +15572,9 @@ mget_w_4: ; 02/11/2016
 	; 23/07/2022
 	shr	edx, 9
 	mov	[writei.s_index], dl ; sector index in cluster (0 to spc -1)
+
+	; 02/09/2024
+	mov	 [writei.fclust], ebx
 
 mget_w_5:
 	and	eax, eax ; 0 = First Cluster's index number
@@ -15751,6 +15782,7 @@ mget_w_19:
 	jmp	mget_w_3
 
 update_file_lmdt: ; & update file size
+	; 03/09/2024
 	; 27/08/2024 - TRDOS 386 v2.0.9
 	; 30/07/2022
 	; 23/07/2022 - TRDOS 386 v2.0.5
@@ -15776,7 +15808,7 @@ update_file_lmdt: ; & update file size
 	;jna	short uflmdt_2 ; nothing to do
 
 	; 27/08/2024
-	; if  [ebx+OF_FCLUSTER] = 0 and [setfclust] > 0
+	; if [ebx+OF_FCLUSTER] = 0 and [setfclust] > 0
 	; [setfclust] will be copied to Directory entry's
 	; first cluster fields (LO/HI).
 	; (and [setfclust] will be cleared.)
@@ -15795,6 +15827,10 @@ update_file_lmdt: ; & update file size
 
 	shr	bl, 1 ; /2
 	movzx	edi, word [ebx+OF_DIRENTRY]
+
+	; 03/09/2024
+	add	ah, 'A'
+	mov	al, [esi+LD_FATType]
 	
 	cmp	byte [DirBuff_ValidData], 1
 	jb	short uflmdt_4
@@ -15802,9 +15838,10 @@ update_file_lmdt: ; & update file size
 	;mov	al, [DirBuff_DRV]
 	;sub	al, 'A'	
 	;cmp	al, ah
+	; 03/09/2024
 	; 27/08/2024
-	add	ah, 'A'
-	mov	al, [esi+LD_FATType]
+	;add	ah, 'A'
+	;mov	al, [esi+LD_FATType]
 	cmp	ah, [DirBuff_DRV]
 	jne	short uflmdt_4 ; different drive
 	;mov	al, [esi+LD_FATType]
@@ -15822,11 +15859,16 @@ uflmdt_1:
 	shl	edi, 5
 	add	esi, edi ; offset
 	;
-	test	byte [esi+DirEntry_Attr], 18h ; Vol & Dir
-	jnz	short uflmdt_2 ; not a valid file !
+	; 03/09/2024
+	;test	byte [esi+DirEntry_Attr], 18h ; Vol & Dir
+	;jnz	short uflmdt_2 ; not a valid file !
 	mov	ax, [esi+DirEntry_FstClusHI]
 	shl	eax, 16
 	mov	ax, [esi+DirEntry_FstClusLO]
+
+	; 03/09/2024 (short jump)
+	test	byte [esi+DirEntry_Attr], 18h ; Vol & Dir
+	jnz	short uflmdt_2 ; not a valid file !
 
 	cmp	eax, ecx ; same first cluster ?
 	;je	short uflmdt_3 ; yes, it is OK !!!
@@ -15834,12 +15876,17 @@ uflmdt_1:
 	jne	short uflmdt_2
 
 	;;;
+	; 03/09/2024
+	shl	bl, 1 ; *2
 	; 27/08/2024 
 	and	eax, eax
 	jnz	short uflmdt_3 ; not empty file
 	xchg	eax, [setfclust]
 	or	eax, eax
 	jz	short uflmdt_3
+	; 03/09/2024
+	mov	[ebx+OF_FCLUSTER], eax
+	;
 	mov	[esi+DirEntry_FstClusLO], ax
 	shr	eax, 16
 	mov	[esi+DirEntry_FstClusHI], ax
@@ -15847,8 +15894,9 @@ uflmdt_1:
 
 uflmdt_3:
 	; Update directory entry
+	; 03/09/2024
 	; 26/10/2016
-	shl	bl, 1 ; *2
+	;shl	bl, 1 ; *2
 	mov	eax, [ebx+OF_SIZE] ; file size
 	mov	[esi+DirEntry_FileSize], eax
 	;
