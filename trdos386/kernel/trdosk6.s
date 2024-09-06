@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/09/2024  (Previous: 29/08/2023)
+; Last Update: 06/09/2024  (Previous: 29/08/2023)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -12702,6 +12702,7 @@ trans_addr_nmk:
 	retn
 
 sysbreak:
+	; 06/09/2024 - TRDOS 386 v2.0.9
 	; 23/07/2022 - TRDOS 386 v2.0.5
 	; 18/10/2015
 	; 07/10/2015
@@ -12722,6 +12723,26 @@ sysbreak:
 	; Inputs: u.break - current breakpoint
 	; Outputs: u.break - new breakpoint 
 	;	area between old u.break and the stack (sp) is cleared.
+	; 
+	; ...............................................................
+	; 06/09/2024 - TRDOS 386 v2.0.9 - Major Modification -
+	;
+	; 	This system call performs "malloc" function as in C.
+	; Input:
+	;    EBX = new u.break address (virtual, user's space)
+	; (Note: Default/Initial u.break address is the start of the BSS
+	;	 section. Or it is file size for PRG -flat image- files.)
+	; If EBX = 0FFFFFFFFh ; -1
+	;    Return current u.break in EAX
+	; Output:
+	;    If EBX input is -1, EAX = current u.break address (virtual)
+	;	otherwise, EAX = new u.break address
+	; Area between the new u.break and the old u.break is cleared.
+	; (Note: If the new break address cross overs user's esp,
+	;	 this area <new break - old break> is not cleared.)  
+	; If CF=1 at return, it means Memory Allocation Error.
+	;		(or "Insufficient Memory" error)
+	;	EAX = 0
 	; ...............................................................
 	;	
 	; Retro UNIX 8086 v1 modification:
@@ -12735,12 +12756,35 @@ sysbreak:
 	; 	'sysbreak' clears extended part (beyond of previous
 	;	'u.break' address) of user's memory for original unix's
 	;	'bss' compatibility with Retro UNIX 8086 v1 (19/11/2013)
-
+	
 		; mov u.break,r1 / move users break point to r1
 		; cmp r1,$core / is it the same or lower than core?
 		; blos 1f / yes, 1f
 	; 23/06/2015
 	mov	ebp, [u.break] ; virtual address (offset)
+	
+	; 06/09/2024
+	xor	eax, eax
+	mov	[u.r0], eax ; 0 ; default ('memory allocation error')
+	dec	eax ; -1
+
+	; 06/09/2024 - TRDOS 386 v2.0.9
+	; get u.break address (for 'malloc' in c compiler)
+	; for PRG files:
+	; default/initial u.break address is file size
+	cmp	ebx, eax ; -1 ; 0FFFFFFFFh
+	jb	short sysbreak_@
+
+sysbreak_4:
+	mov	ebx, ebp
+	;(allocates a new page for user if it is not present)
+	call	get_physical_addr ; get physical address
+	jc	short tr_addr_nm_err
+
+	mov	[u.r0], ebp  ; start of bss space (to be allocated)
+	jmp	sysret
+
+sysbreak_@:
 	;and	ebp, ebp
 	;jz	short sysbreak_3 
 	; Retro UNIX 386 v1 NOTE: u.break points to virtual address !!!
@@ -12748,8 +12792,11 @@ sysbreak:
 	mov	edx, [u.sp] ; kernel stack at the beginning of sys call
 	add	edx, 12 ; EIP -4-> CS -4-> EFLAGS -4-> ESP (user) 
 	; 07/10/2015
-	mov	[u.break], ebx ; virtual address !!!
+	;mov	[u.break], ebx ; virtual address !!!
 	;
+	; 06/09/2024
+	; ebp = old/current u.break
+
 	cmp	ebx, [edx] ; compare new break point with 
 			   ; with top of user's stack (virtual!)
 	jnb	short sysbreak_3
@@ -12758,11 +12805,19 @@ sysbreak:
 		; bhis 1f / yes, 1f
 	mov	esi, ebx
 	sub	esi, ebp ; new break point - old break point
-	jna	short sysbreak_3 
-	;push	ebx
+	;jna	short sysbreak_3 
+	; 06/09/2024
+	ja	short sysbreak_1
+	jz	short sysbreak_4
+	neg	esi ; convert to positive number (big-small)
+	mov	ebp, ebx ; move small number (address) to ebp
+
 sysbreak_1:
+	; 06/09/2024
+	push	ebx
 	mov	ebx, ebp  
 	call	get_physical_addr ; get physical address
+	pop	ebx
 	jc	short tr_addr_nm_err ; 23/07/2022
 	; 18/10/2015
 	mov	edi, eax 
@@ -12777,7 +12832,6 @@ sysbreak_2:
 	rep 	stosb
 	or	esi, esi
 	jnz	short sysbreak_1
-	;
 		; bit $1,r1 / is it an odd address
 		; beq 2f / no, its even
 		; clrb (r1)+ / yes, make it even
@@ -12788,10 +12842,13 @@ sysbreak_2:
 		; br 2b / go back
 	;pop	ebx
 sysbreak_3: ; 1:
-	;mov	[u.break], ebx ; virtual address !!!
+	; 06/09/2024
+	mov	[u.break], ebx ; virtual address !!!
 		; jsr r0,arg; u.break / put the "address" 
 			; / in u.break (set new break point)
 		; br sysret4 / br sysret
+	; 06/09/2024
+	mov	[u.r0], ebx ; return new break point in eax
 	jmp	sysret
 
 sysseek: ; / moves read write pointer in an fsp entry
