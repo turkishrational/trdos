@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 25/08/2024  (Previous: 05/06/2024)
+; Last Update: 07/09/2024  (Previous: 05/06/2024)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -4462,6 +4462,9 @@ gdmi3:
 	jmp	sysret
 
 sysstdio: ; STDIN/STDOUT/STDERR functions
+	; 07/09/2024
+	;	(STDAUX/STDPRN functions, pre-definions)
+	;	(!these functions are not ready!)
 	; 24/08/2024
 	; 23/08/2024
 	; 20/08/2024 - TRDOS 386 Kernel v2.0.9
@@ -4488,18 +4491,95 @@ sysstdio: ; STDIN/STDOUT/STDERR functions
 	;	For BL=4,5
 	;	    CL = file descriptor number + 1
 	;	    (File must be open and that number is 'u.fp' index)
-	;		
+	;
+	;	07/09/2024 (these subfunctions will not be handled
+	;		   by kernel v2.0.9 for now)
+	;	 -I am writing them here for C compiler compatibility,
+	;	  for now. Ref: SCC STDIO.H-
+	;	BL = 10 -> get STDAUX status
+	;	BL = 11 -> get/select STDAUX (COM) port
+	;				(clears redirection)
+	;	BL = 12 -> redirect STDAUX
+	;	BL = 13 -> STDAUX IOCTL (control functions)
+	;	BL = 14 -> read byte/character from STDAUX
+	;	BL = 15 -> write byte/character to STDAUX
+	;	BL = 16 -> get STDPRN status (LPT printer only)
+	;	BL = 17 -> redirect STDPRN
+	;	BL = 18 -> STDPRN IOCTL (init/control functions)
+	;	BL = 19 -> write byte/character to STDPRN
+	;
+	;	For BL = 11
+	;	    If	CL = 0 -> get STDAUX (COM) port number
+	;		CL = 1 -> COM1
+	;		CL = 2 -> COM2
+	;		CL > 4 -> invalid
+	;	For BL = 12
+	;	    If ECX = 0 -> clear redirection
+	;	    If  CH & 7Fh = 0 -> redirect INPUT
+	;	        CH & 7Fh > 0 -> redirect OUTPUT
+	;	    If  CH & 80h = 80h 
+	;		CL = file handle (descriptor index)
+	;	    If  CH & 80h = 0
+	;		CL = console (pseudo) tty number,
+	;		     1 to 8 for tty0 to tty7.
+	;	For BL = 13
+	;	    If CL = 0 -> get control byte
+	;	    If CL > 1 -> set control byte (in CL)
+	;		bit 0 = 1
+	;		bit 1 = data bits (set=8, clear=7)
+	;		bit 2 = stop bit (set=2, clear=1)
+	;		bit 3 = parity bit (set=yes, clear=no)
+	;		bit 4 = parity bit (set=even, clear=odd)
+	;		bit 5-6-7 = data rate
+	;			000 = 9600
+	;		        001 = 19200
+	;			010 = 38400
+	;			011 = 57600
+	;			100 = 115200
+	;	For BL = 15, 19
+	;	    CL = byte/character to r/w
+	;	For BL = 17
+	;	    If ECX = 0 -> clear redirection	
+	;	    If  CH & 80h = 80h 
+	;		CL = file handle (descriptor index)
+	;	    If  CH & 80h = 0
+	;		CL = console (pseudo) tty number,
+	;		     1 to 8 for tty0 to tty7.
+	;	For BL = 18
+	;	    If CL = 0 -> initialize printer (command=0)
+	;	       CL > 0 -> configuration/command byte
+	;			 (reserved, not used)		
+	;
 	; Outputs:
 	;
 	;	For BL=0,1,2,3,6,7,8,9
 	;	    AL = character (ascii) code
 	;	For BL=6,7
-	;	    AH= scan code
+	;	    AH = scan code
 	;	For BL=4,5
-	;	    AL= file descriptor (CL input - 1)	
+	;	    AL = file descriptor (CL input - 1)	
 	;
 	;	If CF=1
 	;	   AL (EAX) = error code
+	;
+	;	07/09/2024
+	;	For BL = 10 to 19
+	;	    IF CF = 1, EAX/AL = error code 		
+	;    .. If CF = 0 ...
+	;	For BL = 10 & 16
+	;	    AL (EAX) = status
+	;	For BL = 11
+	;	    EAX/AL = COM (serial) port (1 to 4)
+	;	For BL = 12, 15, 17, 18, 19
+	;	    EAX/AL = 0
+	;	For BL = 13
+	;	    If CL input = 0
+	;		  EAX/AL = current ctrl/cfg byte
+	;           If CL input > 0
+	;		  EAX/AL = ctrl/cfg byte
+	;	For BL = 14
+	;	    EAX/AL = byte/character
+	;			
 
 	cmp	bl, (end_of_stdiofuncs-stdiofuncs)>>2
 	jb	short sysstdio_0
