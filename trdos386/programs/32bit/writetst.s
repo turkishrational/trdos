@@ -4,7 +4,7 @@
 ;
 ; 24/08/2024
 ;
-; [ Last Modification: 24/08/2024 ]
+; [ Last Modification: 18/09/2024 ]
 ;
 ; ****************************************************************************
 
@@ -40,7 +40,7 @@ _umount	equ 22
 _setuid	equ 23
 _getuid	equ 24
 _stime	equ 25
-_quit	equ 26	
+_quit	equ 26
 _intr	equ 27
 _fstat	equ 28
 _emt 	equ 29
@@ -63,22 +63,22 @@ _dma	equ 45
 _stdio  equ 46	;  TRDOS 386 v2.0.9
 
 %macro sys 1-4
-    ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
-    ; 03/09/2015	
+    ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)
+    ; 03/09/2015
     ; 13/04/2015
-    ; Retro UNIX 386 v1 system call.	
+    ; Retro UNIX 386 v1 system call.
     %if %0 >= 2   
         mov ebx, %2
-        %if %0 >= 3    
+        %if %0 >= 3
             mov ecx, %3
             %if %0 = 4
-               mov edx, %4   
+               mov edx, %4
             %endif
         %endif
     %endif
     mov eax, %1
     ;int 30h
-    int 40h ; TRDOS 386 (TRDOS v2.0)	   
+    int 40h ; TRDOS 386 (TRDOS v2.0) 
 %endmacro
 
 ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
@@ -113,7 +113,7 @@ getchar_@:
 	cmp	al, 1Bh ; ESC key
 	je	short terminate
 
-	call	write_sample_text	
+	call	write_sample_text
 
 terminate:
 	sys	_msg, crlf, 2, 07h
@@ -140,7 +140,7 @@ wst_get_option:
 	sys	_stdio, 6 ; read character (from STDIN)
 	cmp	al, 0Dh ; ENTER
 	je	short wst_create
-	cmp	al, 1Bh ;  ESC
+	cmp	al, 1Bh ; ESC
 	jne	short wst_get_option
 
 	;sys	_delete, sample_file
@@ -191,7 +191,7 @@ program:
 len0	equ $-program
 		db 0
 owner:
-		db "Erdogan Tan - 24/08/2024"	
+		db "Erdogan Tan - 18/09/2024"
 		db 0Dh, 0Ah, 0
 
 msg_written:	
@@ -211,7 +211,7 @@ sample_text:
 		db 0Dh, 0Ah
 		db "On bar duck each team. Why high one why!"
 		db 0Dh, 0Ah, 0
-sample_text_size equ $ - (sample_text+1) ;  except 0 
+sample_text_size equ $ - (sample_text+1) ; except 0
 
 continue_msg:
 		db 0Dh, 0Ah
@@ -237,14 +237,14 @@ write_error:
 write_option_hdr:
 		db 0Dh, 0Ah
 		db "SAMPLE.TXT file exists! Select owerwrite option:"
-		db 0Dh, 0Ah	
+		db 0Dh, 0Ah
 		db 0
 write_option:
 		db 0Dh, 0Ah
 		db "ENTER - Create/Truncate method (SYSCREAT)"
 		db 0Dh, 0Ah
 		db "ESC - Delete/Create method (SYSUNLINK+SYSCREAT)"
-		db 0Dh, 0Ah, 0	
+		db 0Dh, 0Ah, 0
 
 filehandle:	dd 0
 

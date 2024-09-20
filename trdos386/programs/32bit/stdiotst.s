@@ -4,7 +4,7 @@
 ;
 ; 23/08/2024
 ;
-; [ Last Modification: 24/08/2024 ]
+; [ Last Modification: 19/09/2024 ]
 ;
 ; ****************************************************************************
 
@@ -40,7 +40,7 @@ _umount	equ 22
 _setuid	equ 23
 _getuid	equ 24
 _stime	equ 25
-_quit	equ 26	
+_quit	equ 26
 _intr	equ 27
 _fstat	equ 28
 _emt 	equ 29
@@ -63,22 +63,22 @@ _dma	equ 45
 _stdio  equ 46	;  TRDOS 386 v2.0.9
 
 %macro sys 1-4
-    ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
-    ; 03/09/2015	
+    ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)
+    ; 03/09/2015
     ; 13/04/2015
-    ; Retro UNIX 386 v1 system call.	
-    %if %0 >= 2   
+    ; Retro UNIX 386 v1 system call.
+    %if %0 >= 2
         mov ebx, %2
-        %if %0 >= 3    
+        %if %0 >= 3
             mov ecx, %3
             %if %0 = 4
-               mov edx, %4   
+               mov edx, %4
             %endif
         %endif
     %endif
     mov eax, %1
     ;int 30h
-    int 40h ; TRDOS 386 (TRDOS v2.0)	   
+    int 40h ; TRDOS 386 (TRDOS v2.0)
 %endmacro
 
 ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
@@ -122,7 +122,7 @@ getchar_@:
 	;mov	bl, 6	; read character (ascii and scancode) on stdin
 			; -no redirection, wait-
 	sys	_stdio, 6
-	
+
 	cmp	al, 1Bh ; ESC key
 	je	short terminate
 
@@ -178,7 +178,7 @@ F1_function:
 
 	sub	ecx, ecx
 	mov	ch, 0Fh ; color = white
-F1_nextchar:	
+F1_nextchar:
 	sys	_stdio, 6  ; read character (from STDIN)
 	mov	cl, al
 	sys	_stdio, 8  ; write character (to STDOUT)
@@ -209,6 +209,7 @@ F2_nextchar:
 F3_function:
 	sys	_msg, F3_header, 255, 0Ch
 	sys	_msg, F3_text, 255, 0Fh
+F6_continue:
 	sys	_msg, stdio_at_first, 255, 07h
 
 	; create STDIO.TXT or truncate it if it is existing
@@ -219,25 +220,28 @@ F3_error:
 	retn
 
 F3_continue_1:
-	sys	_close, eax 
-		; needed for now (TRDOS 386 v2.0.9 defect/bug)
-	sys	_open, stdio_file, 1 ; open for write
-	jc	short F3_error
-	inc	eax ;  file descriptor + 1 (for SYSSTDIO)
+	; 18/09/2024 (TRDOS 386 v2.0.9)
+	;sys	_close, eax 
+	;	; needed for now (TRDOS 386 v2.0.9 defect/bug)
+	;sys	_open, stdio_file, 1 ; open for write
+	;jc	short F3_error
+	
+	inc	eax ; file descriptor + 1 (for SYSSTDIO)
 	mov	[filehandle], eax
 	sys	_intr, 0 ; CRTL+BRK disabled
 	sys	_msg, redir_option_hdr, 255, 0Eh
 	sys	_msg, redir_option, 255, 0Fh
+
+	; write SAMPLE text
+	; redirect STDOUT to the (open) file
+	sys	_stdio, 5, [filehandle]
+
 F3_continue_2:
 	sys	_stdio, 6 ; read character (from STDIN)
 	cmp	al, 0Dh ; ENTER
 	je	short F3_continue_4
-	cmp	al, 1Bh ;  ESC
+	cmp	al, 1Bh ; ESC
 	jne	short F3_continue_2
-		
-	; write SAMPLE text
-	; redirect STDOUT to the (open) file
-	sys	_stdio, 5, [filehandle]
 
 	sys	_msg, redir_text_hdr, 255, 0Fh
 	
@@ -247,6 +251,11 @@ F3_continue_3:
 	lodsb	; load a character from the sample text
 	; write to redirected STDOUT (STDIO.TXT)
 	sys	_stdio, 2, eax
+	; 18/09/2024
+	; Also write to STDERR 
+	;sys	_stdio, 3 ; ecx = character to be written
+	mov	ch, 0Bh ; color (cyan)
+	sys	_stdio, 8 ; write char and color to STDERR
 	dec	edi
 	jnz	short F3_continue_3
 	jmp	short F3_continue_9
@@ -260,7 +269,10 @@ F3_continue_5:
 	jb	short F3_continue_6
 	; write to redirected STDOUT (STDIO.TXT)
 	sys	_stdio, 2, eax
-	mov	eax, ecx
+	;mov	eax, ecx
+	; echo to STDERR (colored)
+	mov	ah, 0Fh ; white
+	sys	_stdio, 8, eax	 
 F3_continue_6:
 	cmp	al, 0Dh
 	je	short F3_continue_8
@@ -277,7 +289,7 @@ F3_continue_8:
 
 F3_continue_9:
 	; close STDIO.TXT file
-	mov	ebx, [filehandle]  ; file descriptor + 1
+	mov	ebx, [filehandle] ; file descriptor + 1
 	dec	ebx ; file descriptor (0 based)
 	sys	_close
 
@@ -302,7 +314,7 @@ F5_function:
 	cmp	dword [edx+6], 0 ; file size
 	jna	short F5_zf_error
 
-	sys	_open, stdio_file, 1 ; open for write
+	sys	_open, stdio_file, 0 ; open for read
 	jnc	short F5_continue_1
 	; access denied error !?
 F5_error:
@@ -317,7 +329,7 @@ F5_zf_error:
 	retn
 
 F5_continue_1:
-	inc	eax ;  file descriptor + 1 (for SYSSTDIO)
+	inc	eax ; file descriptor + 1 (for SYSSTDIO)
 	mov	[filehandle], eax
 	
 	sys	_intr, 0 ; CRTL+BRK disabled
@@ -325,9 +337,10 @@ F5_continue_1:
 	sys	_stdio, 4, [filehandle]
 F5_continue_2:
 	sys	_stdio, 0 ; read character (from STDIN)
-	jc	short F5_continue_3
+	jc	short F5_continue_3 ; error or EOF
 
-	mov	ah, 0Fh ; character color	
+	; al  = character
+	mov	ah, 0Bh ; character color (cyan)
 	; write character/byte to STDOUT (non redirected)
 	sys	_stdio, 8, eax
 
@@ -343,17 +356,240 @@ F5_continue_3:
 
 	; cancel STDIN redirection
 	sys	_stdio, 4, 0 ; reset stdin
-
+F4_ok:
 	sys	_msg, msg_ok, 255, 07h
 	retn
 
 F4_function:
+	sys	_msg, F4_header, 255, 0Ch
+
+	mov	esi, F4_text_1
+F4_nextchar_1:
+	lodsb
+	or	al, al
+	jz	short F4_function_@	
+	sys	_stdio, 3, eax  ; write character (to STDERR)
+	jmp	short F4_nextchar_1
+
+F4_function_@:
+	cmp	esi, F4_text_1_end
+	jne	short F4_function_@@
+	mov	esi, F4_text_2
+	jmp	short F4_nextchar_1
+
+F4_function_@@:
+	sys	_msg, F4_string, F4_string_len, 0Fh
+F4_nextchar_2:	
+	sys	_stdio, 6 ; read character (from STDIN) -wait-
+	cmp	al, 1Bh  ; ESC
+	je	short F4_ok
+	mov	cl, al
+	sys	_stdio, 3  ; write character (to STDERR)
+	cmp	cl, 0Dh  ; ENTER/CR key
+	jne	short F4_nextchar_2
+	jmp	F4_ok
+
 F6_function:
-F7_function:
-F8_function:
+	; same with F3 (except the caption)
+	sys	_msg, F6_header, 255, 0Ch
+	sys	_msg, F6_text, 255, 0Fh
+	jmp	F6_continue
+
 F9_function:
+	sys	_msg, F9_header, 255, 0Ch
+
+	; select color message
+	sys	_msg, F9_text, 255, 07h
+
+	mov	esi, colortable
+F9_function_@:
+	sys	_stdio, 6 ; read char (from STDIN) -wait-
+	; ah = scan code
+	
+	cmp	al, 1Bh  ; ESC
+	je	short F9_ok
+	cmp	al, 0Dh	 ; ENTER/CR key
+	je	short F9_function_@@
+
+	cmp	al, '0'
+	jb	short F9_function_@
+ 	cmp	al, '9'
+	ja	short F9_function_@
+
+	xor	ah, ah	; clear scan code
+	sub	al, '0'
+	;jz	short F9_string
+	add	esi, eax
+
+F9_function_@@:
+	sys	_msg, F4_string, F4_string_len, 0Fh
+
+F9_nextchar:
+	sys	_stdio, 7 ; read char (from STDIN) -no wait-
+	; ah = scan code
+
+	and	eax, eax
+	jz	short F9_nextchar ; not a character input
+
+	cmp	al, 1Bh  ; ESC
+	je	short F9_ok
+
+	mov	cl, al
+	mov	ch, [esi] ; colortable + index
+	sys	_stdio, 8 ; write char & color (to STDOUT)
+	cmp	cl, 0Dh  ; ENTER/CR key
+	jne	short F9_nextchar
+F9_ok:
+	jmp	F4_ok ; write 'OK' & return back to the menu 
+	
 F10_function:
-	jmp	_ok
+	sys	_msg, F10_header, 255, 0Ch
+	sys	_msg, F10_text_1, 255, 0Fh
+	sys	_msg, F10_text_2, 255, 07h
+
+	xor	esi, esi
+	xor	edx, edx
+F10_nextchar:
+	mov	ch, 0Fh ; white 
+F10_nextchar_@:
+	sys	_stdio, 0 ; read char (from STDIN) -wait-
+
+	cmp	al, 1Bh  ; ESC
+	je	short F10_ok
+
+	or	esi, esi
+	jnz	short F10_nextchar_@@
+
+	mov	esi, eax  ; the 1st char
+F10_nextchar_@@:
+	mov	cl, al
+	sys	_stdio, 8 ; write char & color (to STDOUT)
+	cmp	cl, 0Dh  ; ENTER/CR key
+	je	short F10_ok
+	inc	edx
+	cmp	edx, 4
+	jne	short F10_nextchar
+	mov	ecx, esi
+	sys	_stdio, 9 ; ungetchar (the 1st char) 
+	mov	ch, 0Bh ; cyan
+	jmp	short F10_nextchar_@
+
+F10_ok:
+	jmp	F4_ok
+
+F8_function:
+	sys	_msg, F8_header, 255, 0Ch
+	sys	_msg, F8_text, 255, 07h
+	mov	edi, 7 ; read char (no wait)
+	jmp	short F8_getchar
+
+F7_function:
+	sys	_msg, F7_header, 255, 0Ch
+	sys	_msg, F7_text, 255, 07h
+	mov	edi, 6 ; read char (wait)
+F7_getchar:
+F8_getchar:
+	sys	_stdio, edi ; read character (from STDIN)
+
+	cmp	edi, 6
+	je	short F7_getchar_@ ; (wait)
+
+	and	eax, eax
+	jz	short F8_getchar ; (no wait)
+F7_getchar_@:
+	call	chk_ctrl_char
+
+	push	eax
+	sys	_msg, chartext, 255, 0Fh
+	sys	_msg, char, 255, 0Bh
+	pop	eax
+	
+	mov	ebx, ascii
+	call	write_hex_number  ; ascii code
+	push	eax ; +
+	push	eax
+	sys	_msg, asciitext, 255, 0Fh
+	sys	_msg, ascii, 255, 0Bh
+	pop	eax
+	xchg	ah, al
+	mov	ebx, scanc
+	call	write_hex_number  ; scan code
+	sys	_msg, scanctext, 255, 0Fh
+	sys	_msg, scanc, 255, 0Bh
+	pop	eax ; +
+F7_nextchar:
+F8_nextchar:
+	cmp	al, 1Bh ; ESC
+	je	short F8_ok
+	jmp	F8_getchar
+F8_ok:
+ 	; write 'OK' & return back to the menu
+	jmp	F4_ok
+
+F7_write_char:
+	mov	ah, 0Bh ; cyan
+	sys	_stdio, 8, eax ; write char (to STDOUT)
+	retn
+
+chk_ctrl_char:
+	mov	ecx, 20202020h ; 4 space chars
+	xor	esi, esi
+	cmp	al, 20h
+	jb 	short chk_ctrl_char_@
+	cmp	al, 127 ; DEL
+	je	short chk_ctrl_char_@@@
+	mov	cl, al
+ctrl_char_retn:
+	mov	[char], ecx
+	retn
+chk_ctrl_char_@:
+	inc	esi
+	cmp	al, 1Bh  ; ESC
+	je	short chk_ctrl_char_@@
+	inc	esi
+	cmp	al, 0Dh  ; CR 
+	je	short chk_ctrl_char_@@
+	inc	esi
+	cmp	al, 0Ah  ; LF 
+	je	short chk_ctrl_char_@@
+	inc	esi
+	cmp	al, 09h  ; TAB
+	je	short chk_ctrl_char_@@
+	inc	esi
+	cmp	al, 08h  ; BS
+	je	short chk_ctrl_char_@@
+	inc	esi
+	cmp	al, 07h  ; BEEP
+	jne	short ctrl_char_retn
+chk_ctrl_char_@@:
+	shl	esi, 2 ; *4
+chk_ctrl_char_@@@:
+	add	esi, ctrltable
+	mov	ecx, [esi]
+	jmp	short ctrl_char_retn
+
+write_hex_number:
+	; ebx = hex number (text) address
+	push	eax
+	xor	ah, ah
+	mov	cl, 16
+	div	cl
+	mov	dl, al  ; edx = al
+	mov	al, [edx+hextable]
+	mov	dl, ah  ; edx = ah
+	mov	ah, [edx+hextable]
+	mov	[ebx], ax
+	pop	eax
+	retn
+
+;-----------------------------------------------------------------
+
+ctrltable: db "DEL ESC CR  LF  TAB BS  BEEP"
+
+hextable: db "0123456789ABCDEF"
+
+; CGA
+colortable: db 07h,09h,0Ah,0Bh,0Ch,0Dh,0Eh,0Fh,06h,07h
 
 ;-----------------------------------------------------------------
 ;  messages
@@ -366,7 +602,7 @@ program:
 len0	equ $-program
 		db 0
 owner:
-		db "Erdogan Tan - 23/08/2024"	
+		db "Erdogan Tan - 19/09/2024"
 		db 0Dh, 0Ah, 0
 
 fff_buffer:	times 24 db 0FFh
@@ -382,6 +618,7 @@ functions1:
 		db "F2 - read a character on stdin (no wait)"
 		db 0Dh, 0Ah
 		db "F3 - write a character onto stdout (redirection)"
+F4_header:
 		db 0Dh, 0Ah
 		db "F4 - write a character onto stderr (no redirection)"
 		db 0Dh, 0Ah,0
@@ -391,11 +628,13 @@ functions2:
 		db "F6 - redirect stdout to file (if cl > 0)"
 		db 0Dh, 0Ah
 		db "F7 - read character (ascii & scancode) on stdin (no redir, wait)"
+F8_header:
 		db 0Dh, 0Ah
 		db "F8 - read character (ascii & scancode) on stdin (no redir, no wait)"
 		db 0Dh, 0Ah,0
 functions3:
 		db "F9 - write character and color onto stdout (no redirection)"
+F10_header:
 		db 0Dh, 0Ah
 		db "F10 - ungetchar (put back the ascii code in u.getc)"
 		db 0Dh, 0Ah
@@ -410,8 +649,8 @@ redir_option:
 		db "ESC - Sample Text"
 		db 0Dh, 0Ah
 		db "ENTER - Keyboad (STDIN)"
-		db 0Dh, 0Ah, 0		 
-			
+		db 0Dh, 0Ah, 0
+
 msg_written:	
 		db 0Dh, 0Ah
 		db "written ..."
@@ -419,7 +658,7 @@ msg_written:
 
 redir_text_hdr:
 		db 0Dh, 0Ah
-		db "Sample Text for Redirection Test :"
+		db "Sample Text for Redirection Test:"
 		db 0Dh, 0Ah, 0
 redir_text:
 		db "This is a text for TRDOS 386 v2.0.9 SYSSTDIO system call,"
@@ -454,6 +693,7 @@ F2_text:
 		db "Console Screen is set as STDOUT."
 		db 0Dh, 0Ah
 		db "Pressed keys will be sent to STDOUT."
+F4_text_2:
 		db 0Dh, 0Ah
 		db "(ENTER a character string to display.)"
 		db 0Dh, 0Ah, 0
@@ -490,7 +730,7 @@ F3_enter_msg:
 		db 0Dh, 0Ah
 		db "Pressed keys will be written into STDOUT file."
 		db 0Dh, 0Ah
-		db "Written characters will be echoed to STDERR/screen."		
+		db "Written characters will be echoed to STDERR/screen."
 		db 0Dh, 0Ah
 		db "Then... Press ENTER to stop and close the file."
 		db 0Dh, 0Ah
@@ -505,6 +745,83 @@ F5_text:
 		db 0Dh, 0Ah
 		db "STDIN will be redirected to STDIO.TXT file."
 		db 0Dh, 0Ah, 0
+
+F4_text_1:
+		db 0Dh, 0Ah
+		db "This is STDERR message."
+		db 0
+F4_text_1_end:
+F4_string:	db "String: ",0
+F4_string_len	equ $ - (F4_string+1)
+
+F6_header:
+		db 0Dh, 0Ah
+		db "F6 - redirect stdout to file"
+		db 0Dh, 0Ah, 0
+F6_text:
+		db 0Dh, 0Ah
+		db "STDOUT will be redirected to STDIO.TXT file."
+		db 0Dh, 0Ah, 0
+
+F9_header:
+		db 0Dh, 0Ah
+		db "F9 - write character and color onto stdout"
+		db 0Dh, 0Ah, 0
+
+F9_text:
+		db 0Dh, 0Ah
+		db "Select a color:"
+		db 0Dh, 0Ah
+		db "       1 = BLUE   "
+		db 0Dh, 0Ah
+		db "       2 = GREEN  "
+		db 0Dh, 0Ah
+		db "       3 = CYAN   "
+		db 0Dh, 0Ah
+		db "       4 = RED    "
+		db 0Dh, 0Ah
+		db "       5 = MAGENTA"
+		db 0Dh, 0Ah
+		db "       6 = YELLOW "
+		db 0Dh, 0Ah
+		db "       7 = WHITE  "
+		db 0Dh, 0Ah
+		db "       8 = BROWN  "
+		db 0Dh, 0Ah
+		db "       9 = GRAY   "
+		db 0Dh, 0Ah
+		db "       0 = Default"
+		db 0Dh, 0Ah, 0
+
+F10_text_1:
+		db 0Dh, 0Ah
+		db "ENTER a string to test ungetchar feature..."
+		db 0Dh, 0Ah, 0
+
+F10_text_2:
+		db 0Dh, 0Ah
+		db "The 1st char will be written as 5th char without any keypress."
+		db 0Dh, 0Ah
+		db "(a getchar just after ungetchar works as a virtual keypress)" 
+		db 0Dh, 0Ah, 0
+
+F7_header:
+		db 0Dh, 0Ah
+		db "F7 - read character (ascii & scancode) on stdin (no redir, wait)"
+		db 0Dh, 0Ah, 0
+F7_text:
+F8_text:
+		db 0Dh, 0Ah
+		db "Press any keys to continue or press ESC to cancel."
+		db 0Dh, 0Ah, 0
+
+chartext:	db 0Dh, 0Ah
+		db "Character: ",0
+char:		db "     ",0 
+asciitext:	db "Ascii Code: ",0
+ascii:		db "00h  ",0
+scanctext:	db "Scan Code: ",0
+scanc:		db "00h ",0
 
 filehandle:	dd 0
 
