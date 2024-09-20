@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 07/09/2024  (Previous: 05/06/2024)
+; Last Update: 18/09/2024  (Previous: 05/06/2024)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -4462,6 +4462,7 @@ gdmi3:
 	jmp	sysret
 
 sysstdio: ; STDIN/STDOUT/STDERR functions
+	; 18/09/2024
 	; 07/09/2024
 	;	(STDAUX/STDPRN functions, pre-definions)
 	;	(!these functions are not ready!)
@@ -4561,6 +4562,7 @@ sysstdio: ; STDIN/STDOUT/STDERR functions
 	;
 	;	If CF=1
 	;	   AL (EAX) = error code
+	;	   If EAX = 0 -> EOF ; 18/09/2024
 	;
 	;	07/09/2024
 	;	For BL = 10 to 19
@@ -4683,27 +4685,69 @@ readstdinw_0:
 	or	al, al
 	jz	short readstdinw_1
 
+readstdinf:
 	; 24/08/2024
 	dec	eax
 
 	; file
 	mov	ebx, eax ; File handle (descriptor/index)
-	mov	ecx, u.r0 ; buffer address (eax reg)
+	; 18/09/2024
+	mov	ecx, charbuf ; buffer address
 	mov	edx, 1  ; 1 character only
-	jmp	sysread ; jump to sysread system call
+
+	; 18/09/2024
+	;;;
+	call	getf1
+	jc	short redirect_fno_err
+	
+readstdinf_@:
+	; eax = first cluster
+	; ebx = file descriptor (system, open files)
+
+	call	rw1
+	jc	short redirection_err
+
+	inc	byte [u.kcall]
+	;mov	byte [u.kcall], 1 ; >0 means system buffer
+			      ; (buff addr is not virtual)
+	call	readi
+
+redirected_rw_OK:
+	xor	eax, eax
+	cmp	[u.nread], eax ; 0
+	jna	short readstdinf_EOF
+
+	mov	al, [charbuf]
+;redirected_w_not_OK:
+	mov	[u.r0], eax
+	jmp	sysret
+
+redirect_fno_err:
+	mov 	eax, ERR_FILE_NOT_OPEN ; file not open !
+redirection_err:
+	mov	[u.error], eax
+readstdinf_EOF_@:
+	mov	[u.r0], eax ; error code ; 0 = EOF
+	jmp	error
+
+readstdinf_EOF:
+	; 'end of file !' error 
+	mov	dword [u.error], ERR_FILE_EOF ; 16
+	jmp	short readstdinf_EOF_@
+	;;;
 
 readstdinw_1:
-	mov	ah, 10h  ; Keyboard, EXTENDED READ
+	; 18/09/2024
 	and	bl, bl
-	jz	short readstdinw_2 ; wait (int16h, 10h)
+	jz	short readstdinw_3 ; wait (int16h, 10h)
 	; no wait (int16h, 11h)
-	inc	ah  ; function 11h ; EXTENDED ASCII STATUS
-readstdinw_2:
+	mov	ah,11h	; EXTENDED ASCII STATUS
 	call	int16h
 	; ah = scan code, al = ascii code
 	;jnz	short readstdinw_retn
 	; 23/08/2024
 	jnz	short readstdinw_3
+readstdinw_2:
 
 ; 23/08/2024
 ;	; if zf=1 at here
@@ -4713,6 +4757,51 @@ readstdinw_2:
 ;	; function 11h
 ;	; [u.r0] = 0 = eax return
 readstdin2w@_retn:
+	jmp	sysret
+
+writestdoutf:
+	; 24/08/2024
+	dec	eax
+
+	; file
+	mov	ebx, eax ; File handle (descriptor/index)
+	; 18/09/2024
+	mov	byte [charbuf], cl
+	mov	ecx, charbuf
+	mov	edx, 1  ; 1 character only
+
+	; 18/09/2024
+	;;;
+	call	getf1
+	jc	short redirect_fno_err
+
+writestdoutf_@:
+	; eax = first cluster
+	; ebx = file descriptor (system, open files)
+
+	call	rw1
+	jc	short redirection_err
+
+	inc	byte [u.kcall]
+	;mov	byte [u.kcall], 1 ; >0 means system buffer
+			      ; (buff addr is not virtual)
+	call	writei
+
+	;xor	eax, eax
+	;cmp	[u.nread], eax ; 0
+	;jna	short redirected_w_not_OK
+	jmp	short redirected_rw_OK
+	;;;
+
+writestderr:	; skip redirection
+		; STDERR = STDOUT (as file redirection disabled)
+	mov	al, cl  ; character
+	mov	[u.r0], al
+	mov	ah, 0Eh	; write a character (as tty write)
+	mov	ebx, 07h ; video page 0 (and color/attrib 07h)
+	; 23/08/2024
+	mov	bh, [ptty] ; ACTIVE_PAGE
+	call	_int10h
 	jmp	sysret
 
 readstdin2w:
@@ -4732,14 +4821,14 @@ readstdin2nw:
 	;jnz	short readstdin2w_retn
 	; 23/08/2024
 	jz	short readstdin2w@_retn
-readstdin2w_1:
+;readstdin2w_1:
 
 ; 23/08/2024
 ;	; if zf=1 at here
 ;	; it means 'no code available' for function 11h
 ;	;cmp	bl, 6
 ;	cmp	bl, (stdinacsc-stdiofuncs)>>2
-;	;je	short  short readstdin2w_retn ; function 10h
+;	;je	short readstdin2w_retn ; function 10h
 ;	; function 11h
 ;	; [u.r0] = 0 = eax return
 ;	;jmp	sysret
@@ -4747,6 +4836,7 @@ readstdin2w_1:
 
 	; 23/08/2024
 	mov	ah, 10h
+readstdin2w_1:	; 18/09/2024
 	call	int16h
 
 readstdin2w_retn:
@@ -4754,43 +4844,29 @@ readstdin2w_retn:
 	jmp	sysret
 
 writestdout:
-writestdoutcc:
-	mov	byte [u.r0], cl
+	; 18/09/2024
 	mov	al, [u.stdout]
 	and	al, al
-	jz	short writestdout_1
+	jnz	short writestdoutf ; 18/09/2024
 
-	; 24/08/2024
-	dec	eax
-
-	; file
-	mov	ebx, eax ; File handle (descriptor/index)
-	;mov	byte [u.r0], cl
-	mov	ecx, u.r0 ; buffer
-	mov	edx, 1  ; 1 character only
-	jmp	syswrite ; jump to syswrite system call
-
-writestderr:	; skip redirection
-		; STDERR = STDOUT (as file redirection disabled)
-	mov	al, cl  ; character
-	mov	[u.r0], al
-	mov	ah, 0Eh	; write a character (as tty write)
-	mov	ebx, 07h ; video page 0 (and color/attrib 07h)
-	; 23/08/2024
-	mov	bh, [ptty] ; ACTIVE_PAGE
-	call	_int10h
-	jmp	sysret	
-	
 writestdout_1:
-	mov	byte [ccolor], 07h ; default color (CGA) 
+	;mov	byte [ccolor], 07h ; default color (CGA) 
 			; (black background, light gray character) 
+	; 18/09/2024
+	mov	ch, 07h
+writestdoutcc:	
 	mov	esi, u.r0 ; buffer
-	;cmp	bl, 8 ; write char and color
-	cmp	bl, (stdoutcc-stdiofuncs)>>2
-	jne	short readstdout_2
+	; 18/09/2024
+	mov	[esi], cl ; character
+	;;cmp	bl, 8 ; write char and color
+	;cmp	bl, (stdoutcc-stdiofuncs)>>2
+	;jne	short writestdout_2
 	mov	byte [ccolor], ch ; color/attribute (CGA)
-readstdout_2:
+writestdout_2:
 	call	print_cmsg
+	; 18/09/2024
+	;mov	byte [ccolor], 07h ; set default color again
+
 	; [u.r0] = written character (AL)
 	jmp	sysret
 
@@ -4800,6 +4876,9 @@ ungetchar:
 	mov	[u.getc], cl
 	mov	[u.r0],cl
 	jmp	sysret
+
+	; 18/09/2024
+charbuf: db 0
 
 otty:
 sret:
