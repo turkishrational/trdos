@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 18/09/2024  (Previous: 29/08/2023)
+; Last Update: 27/09/2024  (Previous: 29/08/2023)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2100,9 +2100,10 @@ sysopen_7:
 	mov     [u.r0], esi ; move index to u.fp list
 			    ; into eax on stack
 
-        call 	reset_working_path
+	call 	reset_working_path
 
 	jmp	sysret
+
 
 ; fsp table (original UNIX v1)
 ;
@@ -2418,6 +2419,7 @@ sysclose_err:
 	jmp	error
 
 sysread: ; < read from file >
+	; 27/09/2024
 	; 18/09/2024
 	; 03/09/2024 (TRDOS v2.0.9)
 	; 11/10/2016 (TRDOS 386 = TRDOS v2.0)
@@ -2481,6 +2483,7 @@ sysread: ; < read from file >
 	; EBX = File descriptor
 	call	getf1 
 	jc	short device_read ; read data from device
+
 	; EAX = First cluster of the file
 
 	call	rw1	; 03/09/2024 (major modification)
@@ -2495,6 +2498,7 @@ sysread_0:
 	jmp	short rw0
 
 syswrite: ; < write to file >
+	; 27/09/2024
 	; 18/09/2024
 	; 03/09/2024
 	; 25/08/2024 - TRDOS 386 v2.0.9
@@ -2580,74 +2584,11 @@ rw0: ; 1:
         mov	eax, [u.nread]
 	mov	[u.r0], eax
 	jmp	sysret
-rw1:	
-	; 03/09/2024 (TRDOS 386 v2.0.9)
-	; 17/04/2021 (TRDOS 386 v2.0.4)
-	; 11/10/2016 (TRDOS 386 = TRDOS v2.0)
-	; 14/05/2015 (Retro UNIX 386 v1)
-	; 11/05/2015 (Retro UNIX 386 v1 - Beginning)
-	; 23/05/2013 - 24/05/2013 (Retro UNIX 8086 v1)
-	; System call registers: ebx, ecx, edx (through 'sysenter')
-	;
-	; EBX = File descriptor
-	;call	getf1 ; calling point in 'getf' from 'rw1'
-	;jc	short device_rw ; read/write data from/to device
-	; EAX = First cluster of the file
-
-	; 03/09/2024
-	or	eax, eax
-	jz	short rw7 ; eax = 0 -> empty file (OK for now)
-
-	cmp 	eax, 2	  ; is it valid cluster number ?
-	;jb	short rw2
-	; 03/09/2024
-	jnb	short rw6 ; yes, check upper limit
-
-	;;;
-	; eax = 1 -> invalid cluster number
-rw5:
-	mov	eax, ERR_CLUSTER ; 35 ; 'cluster not available !'
-	jmp	short rw4 ; cf = 1
-
-rw6:	; 03/09/2024 (check cluster number is valid or not)
-	push	ebx
-	; ebx <= OPENFILES-1 ; 0-31
-	mov	bh, [ebx+OF_DRIVE] ; drive number * 256
-	mov	ebx, [ebx+Logical_DOSDisks+LD_Clusters]
-	inc	ebx ; cluster count + 1 = last cluster number
-	cmp	ebx, eax
-	pop	ebx
-	jb	short rw5
-rw7:
-	;;;
-
-	mov	[u.base], ecx 	; buffer address/offset 
-				;(in the user's virtual memory space)
-	mov	[u.count], edx 
-        mov	dword [u.error], 0 ; reset the last error code
-	retn
-
-rw2:
-	mov	eax, ERR_FILE_NOT_OPEN ; file not open !
-	;mov	dword [u.error], eax
-	;retn
-
-	; 03/09/2024
-	; 17/04/2021
-	;jmp	short rw4
-
-	; 03/09/2024
-rw3: 
-;	mov	eax, ERR_FILE_ACCESS ; permission denied !
-;	stc
-
-rw4:	; 17/04/2021
-	mov	dword [u.error], eax
-	retn
 
 	; 17/04/2021 (temporary)
 device_write:
 device_read:
+	; 26/09/2024
 	; 18/09/2024 - TRDOS 386 v2.0.9
 	; 17/04/2021 - TRDOS 386 v2.0.4
 	;	(temporary modifications)
@@ -2658,8 +2599,10 @@ device_read:
 	; al = DEV_DRIVER   ; device number (eax)
 
 	; 18/09/2024 (temporary)
-	call	rw2 ; file not open ;  cf = 1
-	jmp	error
+	call	rw2 ; file not open ; cf = 1
+	;jmp	error
+	; 26/09/2024
+	jmp	short sysrw_err
 
 ;	test	cl, 1 ; 1 = read, 2 = write, 3 = read&write
 ;	jz	short rw3
@@ -2700,6 +2643,73 @@ device_read:
 ;       jmp	dword [ebx+IDEV_WADDR-4]
 ;d_write_2:
 ;	jmp	dword [ebx+KDEV_WADDR-4]
+
+rw1:
+	; 27/09/2024	
+	; 03/09/2024 (TRDOS 386 v2.0.9)
+	; 17/04/2021 (TRDOS 386 v2.0.4)
+	; 11/10/2016 (TRDOS 386 = TRDOS v2.0)
+	; 14/05/2015 (Retro UNIX 386 v1)
+	; 11/05/2015 (Retro UNIX 386 v1 - Beginning)
+	; 23/05/2013 - 24/05/2013 (Retro UNIX 8086 v1)
+	; System call registers: ebx, ecx, edx (through 'sysenter')
+	;
+	; EBX = File descriptor
+	;call	getf1 ; calling point in 'getf' from 'rw1'
+	;jc	short device_rw ; read/write data from/to device
+	; EAX = First cluster of the file
+
+	; 03/09/2024
+	or	eax, eax
+	jz	short rw7 ; eax = 0 -> empty file (OK for now)
+
+	cmp 	eax, 2	  ; is it valid cluster number ?
+	;jb	short rw2
+	; 03/09/2024
+	jnb	short rw6 ; yes, check upper limit
+
+	;;;
+	; eax = 1 -> invalid cluster number
+rw5:
+	mov	eax, ERR_CLUSTER ; 35 ; 'cluster not available !'
+	jmp	short rw4 ; cf = 1
+
+rw6:	; 03/09/2024 (check cluster number is valid or not)
+	push	ebx
+	; ebx <= OPENFILES-1 ; 0-31
+	mov	bh, [ebx+OF_DRIVE] ; drive number * 256
+	sub	bl, bl ; 27/09/2024
+	mov	ebx, [ebx+Logical_DOSDisks+LD_Clusters]
+	inc	ebx ; cluster count + 1 = last cluster number
+	cmp	ebx, eax
+	pop	ebx
+	jb	short rw5
+rw7:
+	;;;
+
+	mov	[u.base], ecx 	; buffer address/offset 
+				;(in the user's virtual memory space)
+	mov	[u.count], edx 
+        mov	dword [u.error], 0 ; reset the last error code
+	retn
+
+rw2:
+	mov	eax, ERR_FILE_NOT_OPEN ; file not open !
+	;mov	dword [u.error], eax
+	;retn
+
+	; 03/09/2024
+	; 17/04/2021
+	;jmp	short rw4
+
+	; 03/09/2024
+rw3: 
+;	mov	eax, ERR_FILE_ACCESS ; permission denied !
+;	stc
+
+rw4:	; 17/04/2021
+	mov	dword [u.error], eax
+	retn
 
 systimer:
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
@@ -16800,6 +16810,7 @@ syschdir_ok:
 
 
 syschmod: ; Get & Change File (or Directory) Attributes
+	; 26/09/2024 - TRDOS 386 v2.0.9
 	; 23/07/2022 - TRDOS 386 v2.0.5
 	; 19/01/2021
 	; 30/12/2017 (TRDOS 386 = TRDOS v2.0) 
@@ -16953,6 +16964,8 @@ syschmod_6:
 syschmod_7:
 	sub	eax, eax
         mov     ah, [DirBuff_DRV]
+	; 26/09/2024 (BugFix)
+	sub	ah, 'A'
 	mov	esi, Logical_DOSDisks
         add     esi, eax
         cmp     byte [esi+LD_FSType], 0A1h
@@ -16969,7 +16982,7 @@ syschmod_8:
 	;jmp	short syschmod_5
 	; 23/07/2022
 	jnc	short syschmod_5
-	jmp	short syschmod_err
+	jmp	syschmod_err ; 26/09/2024 
 
 
 sysdrive: ; Get/Set Current (Working) Drive (for user)

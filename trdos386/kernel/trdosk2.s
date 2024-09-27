@@ -41,7 +41,7 @@ ldrv_init: ; Logical Drive Initialization
 	jnz	short load_hd_partition_tables
 
 	; no any hard disks
-	retn			
+	retn
 
 load_hd_partition_tables:
 	;mov	esi, [HDPM_TBL_VEC] ; primary master disk FDPT
@@ -61,12 +61,12 @@ load_next_hd_partition_table:
 	; 15/07/2020
 	lodsd
 	push	esi ; ** ; next FDPT (+ DPTE) address ptr
-	
+
 	;mov	al, [esi+20] ; DPTE offset 4
 	;and	al, 40h ;  LBA bit (bit 6)
 	;;shr	al, 6
 	;mov 	[HD_LBA_yes], al
-	
+
 	; 15/07/2020
 	mov	cl, [eax+20]
 	and	cl, 40h
@@ -90,7 +90,7 @@ load_mbr_ok:
 	;mov	ecx, 16
 	mov	cl, 16
 	rep 	movsd
-	mov 	esi, ebx 
+	mov 	esi, ebx
 	;mov 	byte [hdc], 4 ; 4 - partition index
 	; 15/07/2020
 	mov	byte [PP_Counter], 4
@@ -110,7 +110,7 @@ loc_validate_hdp_partition:
  	je	short loc_set_ep_counter
 	cmp	al, 0Fh  ; Extended partition LBA
  	jne	short loc_validate_next_hdp_partition0
-	
+
 	;;inc	byte [PP_Counter]
 	; 15/07/2020
 	;inc 	byte [EP_Counter] ; disk has valid partition(s)
@@ -127,9 +127,9 @@ loc_set_ep_counter:
 loc_validate_next_hdp_partition0:
 	xor	edi, edi ; 0  
 	; Input -> ESI = PartitionTable offset
-	; DL = Hard disk drive number 
+	; DL = Hard disk drive number
 	; EDI = 0 -> Primary Partition
-	; EDI > 0 -> Extended Partition's Start Sector   
+	; EDI > 0 -> Extended Partition's Start Sector
 	call 	validate_hd_fat_partition
 	jnc 	short loc_set_valid_hdp_partition_entry
 
@@ -148,7 +148,7 @@ loc_set_valid_hdp_partition_entry:
 	mov	al, [esi+LD_PhyDrvNo] ; Physical drive number
 	;mov	al, [esp] ; ****
 	sub	al, 7Fh
-		; AL = 1 to 4	
+		; AL = 1 to 4
 	shl	al, 2 ; AL = 4 to 16
 
 	mov	dl, [PP_Counter]
@@ -160,8 +160,8 @@ loc_set_valid_hdp_partition_entry:
 	;  0 -> hd 0, Partition Table offset = 0
 	; 15 -> hd 3, Partition Table offset = 3
 
-	;mov	[esi+LD_PartitionEntry], al 
-	
+	;mov	[esi+LD_PartitionEntry], al
+
 	; 15/07/2020
 	mov	ah, 4
 	;sub	ah, [PP_Counter]
@@ -170,7 +170,7 @@ loc_set_valid_hdp_partition_entry:
 	; AH = Primary partition index, 0 to 3 ; pt entry
 	;		(4 to 7 for logical disk partitions)
 
-	;mov 	[esi+LD_DParamEntry], ah 
+	;mov 	[esi+LD_DParamEntry], ah
 	mov 	[esi+LD_PartitionEntry], ax
 
 loc_validate_next_hdp_partition1:
@@ -180,19 +180,19 @@ loc_validate_next_hdp_partition1:
 loc_validate_next_hdp_partition2:
 	; ESI = PartitionTable offset
 	; DL = Hard/Fixed disk drive number
-	
+
 	;dec	byte [hdc] ; 4 - partition index
 	;jz	short pass_pt_this_hard_disk
 	; 15/07/2020
 	dec	byte [PP_Counter] ; 4 - partition index
 	jz	short pass_pt_this_hard_disk
-	
+
 	add	esi, 16 ; 10h
 	jmp	short loc_validate_hdp_partition
 
 loc_not_any_extd_partitions:
 	; 15/07/2020
-	retn	
+	retn
 
 loc_next_hd_partition_table:
 	inc	dl
@@ -248,11 +248,11 @@ next_hd_extd_partition:
 	;mov 	byte [EP_Counter], 0 ; Reset for each physical disk
 	; 13/08/2020
 	;mov	byte [LD_Counter], 0 ; Reset logical drive index
-	mov 	word [EP_Counter], 0 ; Reset EP index and LD index	
+	mov 	word [EP_Counter], 0 ; Reset EP index and LD index
 
 	push	esi ; **** ; PTable_hd? offset
-	
-	mov 	byte [PP_Counter], 4 
+
+	mov 	byte [PP_Counter], 4
 				; set for each extd partition table
 	;;mov	ecx, 4
 	;mov	cl, 4
@@ -337,22 +337,22 @@ loc_validating_hd_partitions_ok:
 	;mov	al, [Last_DOS_DiskNo]
 loc_drv_init_retn:
 	retn
-	
+
 loc_hd_load_ep_05h:
 	; 20/07/2020 ('diskio.s', int13h, cf = 1 -> bugfix)
-	;clc    ; (Bug: int13h would not clear carry flag bit, 
+	;clc    ; (Bug: int13h would not clear carry flag bit,
 	;	; even if there would not be an error)
 	;	; ((Fix: now, int13h procedure clears carry flag
 	;	;  at the entrance of it.. 20/07/2020))
 	; 15/07/2020
-	;push	ecx 
+	;push	ecx
 	mov	dh, [esi+ptBeginHead]
         mov     cx, [esi+ptBeginSector]
 	mov	ax, 0201h ; Read 1 sector
 	;mov	ebx, MasterBootBuff
 	call	int13h ; 20/07/2020
 		       ; 'diskio.s' modification, 'clc'
-	;pop	ecx  
+	;pop	ecx
 	jc	short continue_check_ep_next_disk
 	; 15/07/2020
 	;jmp	short loc_validate_hde_partition
@@ -397,7 +397,7 @@ loc_validate_hde_partition:
 ;	; 13/08/2020
 ;	cmp	esi, PartitionTable+64 
 ;	jnb	short continue_check_ep_next_disk
-;	
+;
 ;	add 	esi, 16 ; 10h
 ;	;jmp	short get_minidisk_partition_entry
 
@@ -414,7 +414,7 @@ loc_validate_minidisk_partition:
 	;push	esi ; *** ; Extended partition table offset
 
 	; 13/08/2020
-	inc	byte [EP_Counter] ; current (sub partition) index 
+	inc	byte [EP_Counter] ; current (sub partition) index
 				  ; in current extended partition
 	mov	edi, EP_StartSector
 
@@ -457,11 +457,11 @@ loc_set_valid_hde_partition_entry:
 	mov	al, [hdc] ; Hard disk drive number (>=80h)
 	mov	dl, al ; mov dl, [hdc]
 	sub	al, 7Fh
-		    ; 1 to 4	
+		    ; 1 to 4
 	shl	al, 2 ; 4 to 16
 	sub	al, [PP_Counter] ; al - (4 - partition index)
 			; (disk number * 4) + partition index
-	
+
 	; AL = Partition entry/index, 0 based
         ;  0 -> hd 0, Partition Table offset = 0
         ; 15 -> hd 3, Partition Table offset = 3
@@ -480,12 +480,12 @@ loc_set_valid_hde_partition_entry:
 	; CX -> AX
 	;; 06/01/2016 (TRDOS v2.0)
 	;; BUGFIX *
-	;;mov	[esi+LD_PartitionEntry], cl 
+	;;mov	[esi+LD_PartitionEntry], cl
 	;;mov	[esi+LD_DParamEntry], ch 
-	;mov	[esi+LD_PartitionEntry], cx 
-	mov	[esi+LD_PartitionEntry], ax 	
+	;mov	[esi+LD_PartitionEntry], cx
+	mov	[esi+LD_PartitionEntry], ax
 
-	mov	cl, [Last_DOS_DiskNo] 
+	mov	cl, [Last_DOS_DiskNo]
 	add	cl, 'A'
 	mov	[esi+LD_Name], cl
 
@@ -501,7 +501,7 @@ loc_set_valid_hde_partition_entry:
 	;; 15/07/2020
 	;inc	byte [EP_Counter]
 	; 13/08/2020
-	inc	byte [LD_Counter]	
+	inc	byte [LD_Counter]
 
 	;mov	dl, [hdc]
 
@@ -524,14 +524,14 @@ validate_next_minidisk_partition:
 	;jnb	continue_check_ep_next_disk
 	; 25/07/2022
 	jb	short validate_next_minidisk_partition_ok
-	jmp	continue_check_ep_next_disk	
+	jmp	continue_check_ep_next_disk
 
 validate_next_minidisk_partition_ok:
 	; 13/08/2020
 	;dec	byte [PP_Counter] ; 4 --> 0
 	;jz	continue_check_ep_next_disk
-	
-	;cmp	esi, PartitionTable+64 
+
+	;cmp	esi, PartitionTable+64
 	;jnb	continue_check_ep_next_disk
 
 	;add	esi, 16
@@ -551,14 +551,14 @@ validate_next_minidisk_partition_ok:
 					; (!Microsoft DOS convention!)
 	; 25/07/2022
 	je	short loc_minidisk_next_ep_lba_chs
-	jmp	continue_check_ep_next_disk	
+	jmp	continue_check_ep_next_disk
 
 loc_minidisk_next_ep_lba_chs:
 	; 17/07/2020
 	mov	ecx, [esi+ptStartSector] ; relative start sector number
 	;add	ecx, [EP_StartSector]
 	; 30/08/2020	
-	add	ecx, [MBR_EP_StartSector] 
+	add	ecx, [MBR_EP_StartSector]
 	; 20/07/2020
 	jmp	loc_validate_hde_partition_next
 
@@ -577,7 +577,7 @@ validate_hd_fat_partition:
 	;   DL = Hard/Fixed Disk Drive Number
 	;   ESI = PartitionTable offset
 	;   EDI = Extend. Part. Start Sector Pointer
-	;   EDI = 0 -> Primary Partition 
+	;   EDI = 0 -> Primary Partition
 	;   byte [Last_DOS_DiskNo]
  	; Output
 	;  cf=0 -> Validated
@@ -585,8 +585,8 @@ validate_hd_fat_partition:
 	;   EBX = FAT boot sector buffer
 	;   byte [Last_DOS_DiskNo]
 	;  cf=1 -> Not a valid FAT partition
-	; EAX, EDX, ECX, EDI -> changed 
-	
+	; EAX, EDX, ECX, EDI -> changed
+
 	;mov 	esi, PartitionTable
 	mov 	ah, [esi+ptFileSystemID]
 	mov	al, 2 ; 27/12/2017
@@ -646,7 +646,7 @@ loc_set_valid_hd_partition_params:
 	;inc 	byte [Last_DOS_DiskNo] ; > 1
 	;
 	xor	ebx, ebx
-	mov	bh, [Last_DOS_DiskNo] ; * 256	
+	mov	bh, [Last_DOS_DiskNo] ; * 256
 	inc	bh ; 15/07/2020
 	add	ebx, Logical_DOSDisks
 	;
@@ -740,7 +740,7 @@ loc_hd_move_FAT_BPB:
 	;mov	esi, ebx ; Boot sector
 	push	edi
 	add	edi, LD_BPB
-	rep	movsw 
+	rep	movsw
 	pop	esi
 	movzx	eax, word [esi+LD_BPB+BPB_RsvdSecCnt]
 	add	eax, [esi+LD_StartSector]
@@ -763,7 +763,7 @@ loc_set_FAT32_data_begin:
 	; 30/07/2022
 	dec	eax ; 2 -> 1
 	dec	eax ; 1 -> 0
-	jz	short short loc_set_32bit_FAT_total_sectors  
+	jz	short short loc_set_32bit_FAT_total_sectors
 	;movzx	ebx, byte [esi+LD_BPB+BPB_SecPerClust]
 	mov	bl, [esi+LD_BPB+BPB_SecPerClust] 
 	mul	ebx
@@ -833,7 +833,7 @@ loc_set_hd_FAT_fs_free_sectors:
 	;add	cl, 'A'
 	;mov	[esi+LD_FS_Name], cl
 
-loc_validate_hd_FAT_partition_retn:         
+loc_validate_hd_FAT_partition_retn:
 	retn
 
 validate_hd_fs_partition:
@@ -865,7 +865,7 @@ loc_set_valid_hd_fs_partition_params:
 	xor	al, al ; mov al, 0
 	;mov	[drv], dl
 	sub	ebx, ebx ; 0
-	mov	bh, [Last_DOS_DiskNo] 
+	mov	bh, [Last_DOS_DiskNo]
 	add	ebx, Logical_DOSDisks
 	mov	byte [ebx+LD_DiskType], 2
 	mov	[ebx+LD_PhyDrvNo], dl
@@ -961,7 +961,7 @@ mread_hd_fs_MAT_sector:
 	; 25/07/2022
 	sub	ecx, ecx
 	inc	cl
-	; ecx = 1	
+	; ecx = 1
 	call	disk_read
 	jc	short loc_validate_hd_fs_partition_retn
 	; EDI will not be changed
@@ -977,7 +977,7 @@ use_hdfs_mat_sector_params:
 	mov	[edi+LD_FS_FirstFreeSector], eax
 	mov	eax, [edi+LD_FS_RootDirD]
 	add	eax, [edi+LD_FS_BeginSector]
-	mov	esi, edi   
+	mov	esi, edi
 read_hd_fs_RDT_sector:
 	mov	ebx, DOSBootSectorBuff
 	;mov	ecx, 1
@@ -1117,7 +1117,7 @@ loc_gfc_loop_get_next_cluster:
 	jnc	short loc_gfc_free_fat_clusters_cont
 	and	eax, eax
 	jz	short loc_gfc_pass_inc_free_cluster_count
- 
+
 retn_from_get_free_fat_clusters:
 	mov	eax, [esi+LD_FreeSectors] ; Free clusters !
 retn_from_get_free_fat32_clusters:
@@ -1155,7 +1155,7 @@ floppy_drv_init:
 	;	BH = drive number
 	;	ESI = Logical DOS drv description table
 	;	EAX = Volume serial number
- 
+
 	mov	esi, fd0_type ; 10/01/2016
 	mov	edi, Logical_DOSDisks
 	or	dl, dl
@@ -1196,7 +1196,7 @@ use_fd_boot_sector_params:
 	;jne	use_fd_fatfs_boot_sector_params
 	; 25/07/2022
 	je	short use_fdfs_boot_sector_params
-	jmp	use_fd_fatfs_boot_sector_params	
+	jmp	use_fd_fatfs_boot_sector_params
 use_fdfs_boot_sector_params:
 	mov	al, [esi+bs_FS_LBA_Ready]
 	mov	[edi+LD_FS_LBAYes], al
@@ -1270,7 +1270,7 @@ use_fdfs_RDT_sector_params:
 	rep	movsd ; 64 bytes
 	pop	esi
 	mov	byte [esi+LD_FATType], 0
-	mov	byte [esi+LD_FSType], 0A1h  
+	mov	byte [esi+LD_FSType], 0A1h
         jmp     loc_cont_use_fd_boot_sector_params
 
 read_fd_RDT_sector_stc_retn:
@@ -1287,12 +1287,12 @@ use_fd_fatfs_boot_sector_params:
 	add	edi, LD_BPB
 	;mov	ecx, 16
 	mov	cl, 16
-	rep	movsd ; 64 bytes 
+	rep	movsd ; 64 bytes
 	pop	esi
 	xor	eax, eax
 	mov	[esi+LD_StartSector], eax ; 0
 	mov	ax, [esi+LD_BPB+BPB_FATSz16]
-	mov	cl, [esi+LD_BPB+BPB_NumFATs] 
+	mov	cl, [esi+LD_BPB+BPB_NumFATs]
   	mul	ecx
 	; edx = 0 !
 	mov	dx, [esi+LD_BPB+BPB_RsvdSecCnt]
@@ -1319,7 +1319,7 @@ use_fd_fatfs_boot_sector_params:
 	mov	[esi+LD_TotalSectors], eax
 	sub	eax, [esi+LD_DATABegin]
   	;movzx	ecx, byte [esi+LD_BPB+BPB_SecPerClust]
-	mov	cl, [esi+LD_BPB+BPB_SecPerClust]  
+	mov	cl, [esi+LD_BPB+BPB_SecPerClust]
 	cmp	cl, 1
 	jna	short save_fd_fatfs_cluster_count
 	; 25/07/2022
@@ -1331,8 +1331,8 @@ save_fd_fatfs_cluster_count:
 	mov	[esi+LD_Clusters], eax
 
       ; Maximum Valid Cluster Number = EAX +1
-      ; with 2 reserved clusters= EAX +2
- 
+      ; with 2 reserved clusters = EAX +2
+
 reset_FAT_buffer_decriptors:
 	sub	eax, eax ; 0  
 	mov	[FAT_BuffValidData], al ; 0
@@ -1349,11 +1349,11 @@ read_fd_FAT_sectors:
 use_fd_FAT_sectors:
 	mov	al, [esi+LD_PhyDrvNo]
 	add	al, 'A' 
-	mov	[FAT_BuffDrvName], al 
+	mov	[FAT_BuffDrvName], al
  	mov	byte [FAT_BuffValidData], 1
 	call	fd_init_calculate_free_clusters
 	jc	short read_fd_FAT_sectors_retn
-  
+
 loc_use_fd_boot_sector_params_FAT:
 	mov	byte [esi+LD_FATType], 1 ; FAT 12
 	mov	byte [esi+LD_FSType], 1
@@ -1370,7 +1370,7 @@ loc_cont_use_fd_boot_sector_params:
 	mov	byte [esi+LD_MediaChanged], 6 ; Volume Name Reset
 
 read_fd_FAT_sectors_retn:
-	retn   
+	retn
 
 fd_init_calculate_free_clusters:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -1401,7 +1401,7 @@ fd_init_free_fat_clusters:
 	; 25/07/2022
 	inc	dword [esi+LD_FreeSectors]
         ;inc	word [esi+LD_FreeSectors]
-    
+
 fd_init_pass_inc_free_cluster_count:
   	; 25/07/2022
 	mov	eax, [FAT_CurrentCluster]
@@ -1464,7 +1464,7 @@ fd_init_get_next_cluster_readnext:
 	mov	eax, ecx
 	;mov	edx, 3
 	mov	dx, 3
-	mul	edx 
+	mul	edx
   	; EAX = FAT Beginning Sector
 	; EDX = 0
 	mov	cl, [esi+LD_Name]
@@ -1503,7 +1503,7 @@ fd_init_load_FAT_sectors1:
 	mov	cx, [esi+LD_BPB+BPB_FATSz16]
 	;sub	cx, [FAT_BuffSector]
         ; 25/07/2022
-	sub	ecx, [FAT_BuffSector] 
+	sub	ecx, [FAT_BuffSector]
 	;sub	edx, edx
 	mov	dl, 3
 	; edx = 3 
@@ -1514,7 +1514,7 @@ fd_init_load_FAT_sectors1:
 	;;mov	ecx, 3
 	;mov	ecx, 3
 	mov	ecx, edx ; 3
-fdinit_pass_fix_sector_count_3:  
+fdinit_pass_fix_sector_count_3:
 	call	chs_read
 	jnc	short fd_init_FAT_sectors_no_load_error
 	mov	byte [FAT_BuffValidData], 0
@@ -1590,7 +1590,7 @@ check_root_volume_name:
 	; 29/08/2023
 ;loc_get_volume_name_retn:
 	;retn
-    
+
 pass_check_root_volume_name:
 	cmp	byte [DirBuff_FATType], 3
 	jb	short loc_get_volume_name_retn_xor
@@ -1604,11 +1604,11 @@ pass_check_root_volume_name:
 	mov	eax, [DirBuff_Cluster]
 	call	get_next_cluster
 	jnc 	short loc_gfvn_load_FAT32_dir_cluster
-  	
+
 	cmp     eax, 1
 	cmc
 	retn
-  
+
 loc_gfvn_load_FAT32_dir_cluster:
 	call	load_FAT_sub_directory
 	jnc	short loc_get_volume_name
@@ -1624,16 +1624,16 @@ get_media_change_status:
 	; INPUT:
 	;     DL = Drive number (physical)
 	; OUTPUT: clc & AH = 6 media changed
-	;     clc & AH = 0 media not changed         
-	;     stc -> Drive not ready or an error 
-  
+	;     clc & AH = 0 media not changed
+	;     stc -> Drive not ready or an error
+
 	mov	ah, 16h
   	call	int13h
 	cmp	ah, 06h
 	je	short loc_gmc_status_retn
 	or	ah, ah
 	jz	short loc_gmc_status_retn
-loc_gmc_status_stc_retn:    
+loc_gmc_status_stc_retn:
 	stc
 loc_gmc_status_retn:
 	retn

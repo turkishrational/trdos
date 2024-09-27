@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - SYS INIT : trdosk1.s
 ; ----------------------------------------------------------------------------
-; Last Update: 21/08/2024 (Previous: 25/07/2022)
+; Last Update: 26/09/2024 (Previous: 25/07/2022)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -14,7 +14,8 @@
 ;
 
 sys_init:
-	; 18/04/2021 (TRDOS 386 v2.0.4) 
+	; 26/09/2024 (TRDOS v2.0.9)
+	; 18/04/2021 (TRDOS 386 v2.0.4)
 	; 20/01/2018  (v2.0.1)
 	; 23/01/2017  (v2.0.0)
 	; 07/05/2016
@@ -33,7 +34,7 @@ sys_init:
 	xor	eax, eax  ; sub	al, al ; 0
 	out	40h, al ; LB
 	out	40h, al ; HB
- 	; 
+ 	;
 	; 30/03/2016
 	; Clear Logical DOS Disk Description Tables Area
 	;xor	eax, eax
@@ -46,18 +47,23 @@ sys_init:
 
 	; Logical DRV INIT (only for hard disks)
 	call 	ldrv_init  ; trdosk2.s
-	
+
 	; When floppy_drv_init call is disabled
 	; media changed sign is needed
 	; for proper drive initialization
-        
+
 	mov 	esi, Logical_DOSDisks
 	mov 	al, 1 ; Initialization sign (invalid_fd_parameter)
 	add 	esi, LD_MediaChanged ; Media Change Status = 1 (init needed)
 	mov 	[esi], al ; A:
+	; Temporary - 26/09/2024
+	;;mov	dword [esi+LD_Clusters], -1 ; *
+	;dec	dword [esi+LD_Clusters]
 	add 	esi, 100h 
-	mov 	[esi], al ; B: 
-           
+	mov 	[esi], al ; B:
+	;;mov	dword [esi+LD_Clusters], -1 ; *
+	;dec	dword [esi+LD_Clusters]
+
 _current_drive_bootdisk:
 	mov 	dl, [boot_drv] ; physical drive number
 	cmp 	dl, 0FFh
@@ -66,7 +72,7 @@ _boot_drive_check:
 	cmp 	dl, 80h
 	jb 	short _current_drive_a
 	sub 	dl, 7Eh ; C = 2 , D = 3
-	jmp 	short _current_drive_a 
+	jmp 	short _current_drive_a
 
 _last_dos_diskno_check:
 	mov 	dl, [Last_DOS_DiskNo]
@@ -103,7 +109,7 @@ _drv_not_ready_error:
 
 _start_mainprog:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
-	; 18/04/2021 (TRDOS 386 v2.0.4 - Beginning) 
+	; 18/04/2021 (TRDOS 386 v2.0.4 - Beginning)
 	; 07/01/2017
 	; 07/05/2016
 	; 02/05/2016
@@ -133,7 +139,7 @@ _start_mainprog:
 	jmp	panic
 
 _start_mainprog_1:
-	mov	[u.upage], eax ; user structure page	
+	mov	[u.upage], eax ; user structure page
 	mov	[p.upage], eax
 	call	clear_page
 	;
@@ -143,7 +149,7 @@ _start_mainprog_1:
 	; 13/04/2016
 	; Clear Environment Variables Page/Area
 	mov	edi, Env_Page ; 93000h
-	mov	ecx, Env_Page_Size / 4	; 512/4  (4096/4)				 	  		 	  
+	mov	ecx, Env_Page_Size / 4	; 512/4  (4096/4)
 	xor	eax, eax
 	rep	stosd
 
@@ -151,7 +157,7 @@ _start_mainprog_1:
  	call	mainprog_startup_configuration
 
         call    dos_prompt
-              
+
 _end_of_mainprog:
         mov     esi, msg_CRLF_temp
 	call 	print_msg
@@ -215,7 +221,7 @@ cls1:
 	;cmp	byte [pmi32], 0
 	; 25/07/2022
 	cmp	[pmi32], bh ; 0
-	ja	short vga_clear 	
+	ja	short vga_clear
 	jmp	set_mode_3
 cls2:
 	mov	bh, bl ; video page (0 to 7)
@@ -272,7 +278,7 @@ key_to_reboot:
 	mov	bl, 07h ; Black background, 
 			; light gray forecolor
 	call 	_write_tty
-	jmp	cpu_reset 
+	jmp	cpu_reset
 
 ctrlbrk:
 	; 21/08/2024 (TRDOS 386 Kernel v2.0.9)
@@ -281,7 +287,7 @@ ctrlbrk:
 	; 13/03/2015 (Retro UNIX 386 v1)
 	; 06/12/2013 (Retro UNIX 8086 v1)
 	;
-	; INT 1Bh (control+break) handler		
+	; INT 1Bh (control+break) handler
 	;
       	; Retro Unix 8086 v1 feature only!
       	;
@@ -302,7 +308,7 @@ cbrk0:
 	cmp	[u.quit], dx ; 0 ; 25/07/2022
 	jz	short cbrk4
 %endif
-	; 20/09/2013	
+	; 20/09/2013
 	;push 	ax
 	push	eax ; 25/07/2022
 	mov	al, [ptty]
@@ -311,24 +317,24 @@ cbrk0:
 %if 1
 	cmp	al, [u.ttyn]
 	jne	short cbrk3
-%else	
+%else
 	; 12/11/2015
 	;
 	; ctrl+break (EOT, CTRL+D) from serial port
 	; or ctrl+break from console (pseudo) tty
 	; (!redirection!)
-	
+
 	cmp	al, 8 ; serial port tty nums > 7
         jb      short cbrk1 ; console (pseudo) tty
-		
+
 	; Serial port interrupt handler sets [ptty]
 	; to the port's tty number (as temporary).
 	;
-	; If active process is using a stdin or 
+	; If active process is using a stdin or
 	; stdout redirection (by the shell),
         ; console tty keyboard must be available
 	; to terminate running process,
-	; in order to prevent a deadlock. 
+	; in order to prevent a deadlock.
 
 	; 25/07/2022
 	;push	edx
@@ -341,7 +347,7 @@ cbrk1:
 	inc 	al  ; [u.ttyp] : 1 based tty number
 	; 06/12/2013
 	cmp	al, [u.ttyp]   ; recent open tty (r)
-	je	short cbrk2	
+	je	short cbrk2
         cmp     al, [u.ttyp+1] ; recent open tty (w)
 	jne	short cbrk3
 cbrk2:
@@ -359,7 +365,7 @@ cbrk2:
 	;mov	[u.quit], ax
 	; 21/08/2024
 	; set CTRL+BREAK flag (even if it is not activated)
-	; (u.intr is it's activation flag, 0 = disabled))	
+	; (u.intr is it's activation flag, 0 = disabled))
 	mov	word [u.quit], -1 ; 0FFFFh
 cbrk3:
 	;pop	ax
@@ -374,7 +380,7 @@ cbrk4:
 %define get_rtc_date RTC_40
 %define get_rtc_time RTC_20
 %define	set_rtc_date RTC_50
-%define set_rtc_time RTC_30	
+%define set_rtc_time RTC_30
 get_rtc_date_time:
 ; Retro UNIX 8086 v1 - UNIX.ASM (01/09/2014)
 ;epoch:
@@ -389,12 +395,12 @@ get_rtc_date_time:
 	; version of "epoch" procedure in "unixproc.asm"
 	; 21/7/2012
 	; 15/7/2012
-	; 14/7/2012		
+	; 14/7/2012
 	; Erdogan Tan - RETRO UNIX v0.1
 	; compute current date and time as UNIX Epoch/Time
 	; UNIX Epoch: seconds since 1/1/1970 00:00:00
 	;
-        ;  ((Modified registers: EAX, EDX, ECX, EBX))  
+        ;  ((Modified registers: EAX, EDX, ECX, EBX))
 	;
 
 	; 18/04/2021
@@ -477,7 +483,7 @@ get_rtc_date_time:
 					; AH = AL / 10h
 					; AL = AL MOD 10h
         aad 	; AX= AH*10+AL
-	;mov 	[month], al	
+	;mov 	[month], al
         ;mov	al, [month+1] ; Day
 	; 18/04/2021
 	xchg	al, [month]   ; [month] = month, al = day
@@ -487,7 +493,7 @@ get_rtc_date_time:
 					; AL = AL MOD 10h
         aad 	; AX= AH*10+AL
         mov     [day], al
-	
+
 	retn	; 30/12/2017
 
 epoch:
@@ -499,7 +505,7 @@ convert_to_epoch:
 	; 15/03/2015 (Retro UNIX 386 v1 - 32 bit modification)
 	; 09/04/2013 (Retro UNIX 8086 v1)
 	;
-	; ((Modified registers: EAX, EDX, EBX)) 
+	; ((Modified registers: EAX, EDX, EBX))
 	;
 	; Derived from DALLAS Semiconductor
 	; Application Note 31 (DS1602/DS1603)
@@ -525,7 +531,7 @@ convert_to_epoch:
 	;shr 	dx, 1
 	;shr 	dx, 1
 	; 25/07/2022
-	shr	edx, 2		
+	shr	edx, 2
 		; (year-1969)/4
 	add 	eax, edx
 			; + leap days since 1/1/1970
@@ -533,7 +539,7 @@ convert_to_epoch:
 	jna 	short cte1
 	mov 	dx, [year]
 	and 	dx, 3 ; year mod 4
-	jnz 	short cte1		
+	jnz 	short cte1
 			; and if leap year
 	;add 	eax, 1 	; add this year's leap day (february 29)
 	; 25/07/2022
@@ -565,10 +571,10 @@ convert_from_epoch:
 	; 30/12/2017 (TRDOS 386 = TRDOS v2.0)
 	; 15/03/2015 (Retro UNIX 386 v1 - 32 bit version)
 	; 20/06/2013 (Retro UNIX 8086 v1)
-	; 'convert_from_epoch' procedure prototype: 
+	; 'convert_from_epoch' procedure prototype:
 	; 	            UNIXCOPY.ASM, 10/03/2013
 	;
-	; ((Modified registers: EAX, EDX, ECX, EBX))	
+	; ((Modified registers: EAX, EDX, ECX, EBX))
 	;
 	; Derived from DALLAS Semiconductor
 	; Application Note 31 (DS1602/DS1603)
@@ -599,7 +605,7 @@ convert_from_epoch:
 			     ; since 1/1/1970
 	mov 	[hour], dx   ; leftover hours
 	add 	eax, 365+366 ; whole day since
-			     ; 1/1/1968 	
+			     ; 1/1/1968
 	;mov 	[iday], ax
 	push 	eax
 	sub	edx, edx
@@ -616,9 +622,9 @@ convert_from_epoch:
 	cmp 	dx, 31+29    ; if past feb 29 then
 	cmc		     ; add this quadyr's leap day
 	adc 	eax, 0	     ; to # of qadyrs (leap days)
-	;mov 	[lday], ax   ; since 1968			  
+	;mov 	[lday], ax   ; since 1968
 	;mov 	cx, [iday]
-	xchg 	ecx, eax     ; ECX = lday, EAX = iday		  
+	xchg 	ecx, eax     ; ECX = lday, EAX = iday
 	sub 	eax, ecx     ; iday - lday
 	;mov 	ecx, 365
 	; 25/07/2022
@@ -639,25 +645,25 @@ convert_from_epoch:
 	;pop 	dx
 	; 18/04/2021
 	pop	edx
-	cmp 	dx, 365	     ; if qday <= 365 and qday >= 60	
+	cmp 	dx, 365	     ; if qday <= 365 and qday >= 60
 	ja 	short cfe1   ; jday = jday +1
 	cmp 	dx, 60       ; if past 2/29 and leap year then
         cmc		     ; add a leap day to the # of whole
 	;adc 	cx, 0        ; days since 1/1 of current year
 	; 25/07/2022
 	adc	ecx, 0
-cfe1:			
+cfe1:
 	;mov 	[jday], cx
 	;mov 	bx, 12       ; estimate month
 	; 18/04/2021
 	sub	ebx, ebx
 	mov	bl, 12
 	mov 	dx, 366      ; mday, max. days since 1/1 is 365
-	and 	ax, 11b      ; year mod 4 (and dx, 3) 
-cfe2:	; Month calculation  ; 0 to 11  (11 to 0)	
+	and 	ax, 11b      ; year mod 4 (and dx, 3)
+cfe2:	; Month calculation  ; 0 to 11  (11 to 0)
 	;cmp 	cx, dx       ; mday = # of days passed from 1/1
 	; 25/07/2022
-	cmp	ecx, edx 
+	cmp	ecx, edx
 	jnb 	short cfe3
 	;dec 	bx           ; month = month - 1
 	;shl 	bx, 1
@@ -683,14 +689,14 @@ cfe3:
 	; 18/04/2021
 	inc	bl
 	mov 	[month], bx
-	;sub 	cx, dx	     ; day = jday - mday + 1	
+	;sub 	cx, dx	     ; day = jday - mday + 1
 	; 25/07/2022
 	sub	ecx, edx
-	;inc 	cx 			  
+	;inc 	cx
 	; 18/04/2021
 	inc	cl
 	;mov 	[day], cx
-	mov	[day], cl	
+	mov	[day], cl
 
 	; eax, ebx, ecx, edx is changed at return
 	; output ->
@@ -708,7 +714,7 @@ set_rtc_date_time:
 	call	set_rtc_date ; RTC_50
 	; Set real-time clock time
 	call	set_time_bcd
-	jmp	set_rtc_time ; RTC_30	
+	jmp	set_rtc_time ; RTC_30
 
 ; 31/12/2017
 set_date_bcd:
@@ -750,7 +756,7 @@ stime1:
 	and	al, 00000001b		; MASK FOR VALID DSE BIT
 	mov	dl, al			; SET [DL] TO ZERO FOR NO DSE BIT
 	; DL = 1 or 0 (day light saving time)
-	;	
+	
 	mov 	al, [hour]
 	aam 	; ah = al / 10, al = al mod 10
 	db 	0D5h,10h     ; Undocumented inst. AAD

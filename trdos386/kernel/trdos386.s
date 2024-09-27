@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.9
 ; ----------------------------------------------------------------------------
-; Last Update: 18/09/2024 (Previous: 23/06/2024)
+; Last Update: 27/09/2024 (Previous: 23/06/2024)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -15,8 +15,8 @@
 ;
 ; Derived from TRDOS Operating System v1.0 (8086) source code by Erdogan Tan
 ; TRDOS2.ASM (09/11/2011)
-; 
-; Derived from 'IBM PC-XT-286' BIOS source code (1986) 
+;
+; Derived from 'IBM PC-XT-286' BIOS source code (1986)
 ; ****************************************************************************
 ; nasm trdos386.s -l trdos386.txt -o TRDOS386.SYS
 
@@ -3773,7 +3773,7 @@ starting_msg:
 	;;;db "Turkish Rational DOS v2.0 [30/08/2023] ...", 0
 	;;db "Turkish Rational DOS v2.0 [07/12/2023] ...", 0
 	;db "Turkish Rational DOS v2.0 [23/06/2024] ...", 0
-	db "Turkish Rational DOS v2.0 [18/09/2024] ...", 0
+	db "Turkish Rational DOS v2.0 [27/09/2024] ...", 0
 
 NextLine:
 	db 0Dh, 0Ah, 0

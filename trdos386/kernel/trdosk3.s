@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/09/2024  (Previous: 02/12/2023, TRDOS 386 v2.0.7)
+; Last Update: 26/09/2024  (Previous: 02/12/2023, TRDOS 386 v2.0.7)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -1478,14 +1478,14 @@ loc_vol_fspace_in_kbytes:
 	xor	edx, edx ; 0
 loc_write_vol_fspace_str:
 	mov	[VolSize_Unit2], ecx
-	;	
+	;
 	mov	edi, Vol_Free_Sectors_Str_End
         ;mov	byte [edi], 0
 	mov	ecx, 10
 loc_write_vol_fspace_chr:
 	div	ecx
 	add	dl, '0'
-	dec	edi	
+	dec	edi
 	mov	[edi], dl
 	test	eax, eax
 	jz	short loc_write_vol_fspace_str_ok
@@ -1584,7 +1584,7 @@ mvn_4:
 	rep	movsb
 	mov	byte [edi], 0
 mvn_5:
-	;mov	[Current_VolSerial], eax  
+	;mov	[Current_VolSerial], eax
 	call	dwordtohex
 	mov	[Vol_Serial1], edx
 	mov	[Vol_Serial2], eax
@@ -2984,7 +2984,7 @@ loc_fff_longname_no:
 
 	mov	eax, [FindFile_DirEntry+28] ; File Size
 
-	mov	bl, [FindFile_DirEntry+11] ; File Attributes 
+	mov	bl, [FindFile_DirEntry+11] ; File Attributes
 	mov	bh, [FindFile_LongNameYes]
 
 	;mov	cx, [DirBuff_EntryCounter]
@@ -3779,8 +3779,8 @@ loc_rmdir_check_dirname_exists:
 	cmp	byte [esi], 20h
 	;jna	loc_cmd_failed
 	; 28/07/2022
-	jna	short lc_del_dir_failed 
-	mov	[DelFile_FNPointer], esi 
+	jna	short lc_del_dir_failed
+	mov	[DelFile_FNPointer], esi
 
 loc_rmdir_drv:
 	mov	dh, [Current_Drv]
@@ -3803,7 +3803,7 @@ loc_rmdir_change_directory:
 
 	inc	byte [Restore_CDIR]
 	mov	esi, FindFile_Directory
-	xor	ah, ah ; CD_COMMAND sign -> 0 
+	xor	ah, ah ; CD_COMMAND sign -> 0
 	call	change_current_directory
 	jc	short loc_rmdir_check_error_code
 
@@ -3839,7 +3839,7 @@ loc_rmdir_directory_found:
 	;jnz	loc_permission_denied
 	; 28/07/2022
 	jz	short loc_rmdir_save_lnel
-	jmp	loc_permission_denied	
+	jmp	loc_permission_denied
 
 loc_rmdir_save_lnel: ; 28/02/2016
        ;mov	bh, [LongName_EntryLength]
@@ -4238,7 +4238,7 @@ loc_rmdir_del_short_name_ld_chk_fclust:
 	; 27/02/2016
 	; TRDOS v1 has a bug here! it does not set
 	; 'DirBuff_ValidData' to 2; as result of this bug,
-	; 'save_directory_buffer' would not save the change ! 
+	; 'save_directory_buffer' would not save the change !
   	mov	byte [DirBuff_ValidData], 2 ; change sign
 	;
 	call	save_directory_buffer
@@ -4434,6 +4434,7 @@ loc_delfile_y_n_escape:
 	jmp	short loc_do_not_delete_file
 
 set_file_attributes:
+	; 26/09/2024 (TRDOS 386 v2.0.9)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 06/03/2016
 	; 04/03/2016 (TRDOS 386 = TRDOS v2.0)
@@ -4641,9 +4642,9 @@ loc_attr_file_change_directory:
 	jna	short loc_attr_file_find
 
 	inc	byte [Restore_CDIR]
-	
+
 	mov	esi, FindFile_Directory
-	xor	ah, ah ; CD_COMMAND sign -> 0 
+	xor	ah, ah ; CD_COMMAND sign -> 0
 	call	change_current_directory
 	;jc	loc_file_rw_cmd_failed
 	; 28/07/2022
@@ -4681,7 +4682,7 @@ loc_attr_file_found:
 	; BL = File (or Directory) Attributes 
 	;	(Note: It was 'CL' in TRDOS v1)
 	; mov	bl, [EDI+0Bh]
-	
+
 	cmp	word [Attr_Chars], 0
 	ja	short loc_attr_file_change_attributes
 	mov	[Attributes], bl
@@ -4718,6 +4719,8 @@ loc_sfa_5:
 loc_attr_file_fs_check:
 	sub	eax, eax
         mov     ah, [DirBuff_DRV]
+	; 26/09/2024 (BugFix)
+	sub	ah, 'A'
 	mov	esi, Logical_DOSDisks
         add     esi, eax
         cmp     byte [esi+LD_FSType], 0A1h
@@ -4735,7 +4738,7 @@ loc_attr_file_change_fs_file_attributes:
 	; 28/07/2022
 	jc	short loc_sfa_5
 
-	mov	[Attributes], bl 
+	mov	[Attributes], bl
 
 loc_print_attr_changed_message:
 	mov	esi, Msg_New
@@ -4883,7 +4886,7 @@ loc_rename_sf_found:
 	jz	short loc_rename_attrb_ok
 	jmp	loc_permission_denied
 
-loc_rename_attrb_ok:	
+loc_rename_attrb_ok:
         mov     esi, FindFile_Drv
         mov     edi, SourceFile_Drv
 	mov	ecx, 32
@@ -4903,7 +4906,7 @@ loc_rename_df_parse_path_name:
 	; directories are not same!)
 	mov	dl, [FindFile_Drv]
 	cmp	dl, dh ; are source and destination drives different ?!
-	jne	short loc_rename_df_cmd_failed ; yes! 
+	jne	short loc_rename_df_cmd_failed ; yes!
 
 rename_df_check_dirname_exists:
 	cmp	byte [FindFile_Directory], 0
@@ -4914,7 +4917,7 @@ loc_rename_df_cmd_failed:
 	mov	eax, 1 ; TRDOS 'Bad command or file name' error
 	stc
 	jmp	loc_file_rw_cmd_failed
-	  
+
 rename_df_check_filename_exists:
 	mov	esi, FindFile_Name
 	call	check_filename
@@ -4974,7 +4977,7 @@ loc_rename_df_find:
 	;jnc	loc_permission_denied
 	; 28/07/2022
 	jc	short loc_rename_df_check_error_code
-	jmp	loc_permission_denied	
+	jmp	loc_permission_denied
 
 loc_rename_df_check_error_code:
 	;cmp	eax, 2
@@ -5273,7 +5276,7 @@ loc_move_ids_err: ; 28/07/2022
 	mov	esi, msg_insufficient_disk_space
 	call	print_msg
 
-loc_move_rw_restore_retn: ; 28/07/2022 
+loc_move_rw_restore_retn: ; 28/07/2022
 	jmp	loc_file_rw_restore_retn
 
 loc_move_y_n_escape:
@@ -5376,7 +5379,7 @@ copy_source_file_to_destination_question:
 
 	; dh = source file attributes
 	; dl > 0 -> destination file found
-	and	dl, dl            
+	and	dl, dl
 	jz	short copy_source_file_to_destination_pass_owrq
 
 loc_copy_ask_for_owr_yes_no:
@@ -5500,7 +5503,7 @@ copy_source_file_to_destination_pass_q:
 	; 31/08/2024
 	popf
 	jnc	short copy_source_file_to_destination_OK
-	
+
 	; 31/08/2024
 	;;or	cl, cl
 	;;or	al, al
@@ -5530,7 +5533,7 @@ copy_source_file_to_destination_OK:
 	jmp	loc_file_rw_restore_retn
 
 ;loc_file_write_check_disk_space_err:
-	;cmp	al, 27h ; Insufficient disk space 
+	;cmp	al, 27h ; Insufficient disk space
 	;je	loc_file_write_insuff_disk_space_msg
         ;jb	loc_file_rw_cmd_failed
 
@@ -5664,19 +5667,19 @@ loc_print_path:
 ;	call	print_msg
 ;	mov	esi, nextline
 ;	;call	print_msg
-;loc_path_retn: 
+;loc_path_retn:
 ;	;retn
 ;	; 25/07/2022
 ;	jmp	print_msg
 
 loc_set_path:
-	push	esi 
+	push	esi
 loc_set_path_find_end:
 	inc	esi
 	cmp	byte [esi], 20h
 	jnb	short loc_set_path_find_end
-	mov	byte [esi], 0 
-loc_set_path_header: 
+	mov	byte [esi], 0
+loc_set_path_header:
 	pop	esi
 set_path_x: ; 31/12/2017 ('syspath')
 	dec	esi
@@ -6097,7 +6100,7 @@ set_env_chk_validation6:
 set_env_chk_validation7:
 	mov	cl, ah
 	add	ecx, esi
-	cmp	ecx, Env_Page + Env_Page_Size - 1 
+	cmp	ecx, Env_Page + Env_Page_Size - 1
 		; 511 (4095) 
 		; strlen + '=' + 0
 	jb	short set_env_chk_validation5
@@ -6132,7 +6135,7 @@ set_env_add_variable:
 	; 25/07/2022
 	mov	esi, ebx
 
-	mov	ecx, Env_Page_Size ; 512 (4096)	
+	mov	ecx, Env_Page_Size ; 512 (4096)
 
 set_env_add_variable_loop:
 	lodsb
@@ -6143,7 +6146,7 @@ set_env_add_variable_loop:
 	; 11/04/2016
 	mov	[esi-1], cl ; 0
 	inc	ecx
-	
+
 set_env_add_variable_chk1:
 	dec	ecx
 	jz	short set_env_add_variable_nspc
@@ -6229,16 +6232,16 @@ set_env_change_variable_calc3:
 	jb	short set_env_change_variable_calc4
 
 	inc	edx ; length of ASCIIZ string (after the '=')
-	
+
 	jmp	short set_env_change_variable_calc3
 	
 set_env_change_variable_calc4:
 	mov	byte [esi-1], 0  ; put ZERO instead of CR
-	
+
 	pop	esi ; ***** ; ASCIIZ string address (after '=')
 
 	; EDI = Old variable's address (after '=')
-	
+
 	; compare the new string with the old string
 	cmp	edx, ecx
 	ja	short set_env_change_variable_calc5 ; longer
@@ -6401,7 +6404,7 @@ set_env_change_variable_calc14:
 	; EDX = Variable length = 0
 
         jmp     set_env_string_allocate_envb_retn ; OK !
-	    
+
 set_env_change_variable_calc15:
 	push	edx ; *****
 	neg	edx
@@ -6461,7 +6464,7 @@ set_env_change_variable_calc21:
 
 	mov	esi, edi ; next variable's address
 	sub	edi, edx ; (displacement)
-	
+
 	rep	movsb
 
 	mov	[edi], cl ; 0 ; 00 ; end of environment variables
