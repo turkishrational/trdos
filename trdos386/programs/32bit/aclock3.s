@@ -756,11 +756,6 @@ getsinus:
 	; Note: absolute (+) values are needed only.
 	; (see 'get_start_offset' procedure)
 
-	cmp	eax, 360
-	jna	short nungec
-
-	hlt
-nungec:
 	cmp	eax, 180
 	jb	short gsin_@
 	sub	eax, 180
@@ -785,14 +780,6 @@ getcosinus:
 
 	; Note: absolute (+) values are needed only.
 	; (see 'get_start_offset' procedure)
-
-
-
-	cmp	eax, 360
-	jna	short nunugec
-
-	hlt
-nunugec:
 
 	cmp	eax, 180
 	jb	short gcos_0
