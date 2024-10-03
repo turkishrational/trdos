@@ -1,0 +1,1774 @@
+     1                                  ; ****************************************************************************
+     2                                  ; aclock5.s - TRDOS 386 (TRDOS v2.0) Kernel - Analog Clock Demo - Mode 105h
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ;
+     5                                  ; Erdogan Tan - 30/09/2024
+     6                                  ;
+     7                                  ; [ Last Modification: 02/10/2024 ]
+     8                                  ;
+     9                                  ; ****************************************************************************
+    10                                  ; Modified from 'aclock4.s'. (Direct Access to Linear Frame Buffer)
+    11                                  
+    12                                  ; (Analog Clock display code without FPU instructions) -VESA VBE Mode 105h-
+    13                                  ; ((Only INT 40h system calls))
+    14                                  ; Drawing lines via SYSVIDEO system call (without using direct LFB access).
+    15                                  
+    16                                  ; 20/08/2024 ; TRDOS 386 v2.0.9 (exit code)
+    17                                  ; TRDOS 386 system calls (temporary list!)
+    18                                  _ver 	equ 0
+    19                                  _exit 	equ 1
+    20                                  _fork 	equ 2
+    21                                  _read 	equ 3
+    22                                  _write	equ 4
+    23                                  _open	equ 5
+    24                                  _close 	equ 6
+    25                                  _wait 	equ 7
+    26                                  _creat 	equ 8
+    27                                  _link 	equ 9
+    28                                  _unlink	equ 10 ; _delete
+    29                                  _exec	equ 11
+    30                                  _chdir	equ 12
+    31                                  _time 	equ 13
+    32                                  _mkdir 	equ 14
+    33                                  _chmod	equ 15
+    34                                  _chown	equ 16
+    35                                  _break	equ 17
+    36                                  _stat	equ 18
+    37                                  _seek	equ 19
+    38                                  _tell 	equ 20
+    39                                  _mount	equ 21
+    40                                  _umount	equ 22
+    41                                  _setuid	equ 23
+    42                                  _getuid	equ 24
+    43                                  _stime	equ 25
+    44                                  _quit	equ 26
+    45                                  _intr	equ 27
+    46                                  _fstat	equ 28
+    47                                  _emt 	equ 29
+    48                                  _mdate 	equ 30
+    49                                  _video 	equ 31
+    50                                  _audio	equ 32
+    51                                  _timer	equ 33
+    52                                  _sleep	equ 34
+    53                                  _msg    equ 35
+    54                                  _geterr	equ 36
+    55                                  _fpsave	equ 37
+    56                                  _pri	equ 38
+    57                                  _rele	equ 39
+    58                                  _fff	equ 40
+    59                                  _fnf	equ 41
+    60                                  _alloc	equ 42
+    61                                  _dalloc equ 43
+    62                                  _calbac equ 44
+    63                                  _dma	equ 45
+    64                                  _stdio  equ 46	;  TRDOS 386 v2.0.9
+    65                                  
+    66                                  %macro sys 1-4
+    67                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)
+    68                                      ; 03/09/2015
+    69                                      ; 13/04/2015
+    70                                      ; Retro UNIX 386 v1 system call.
+    71                                      %if %0 >= 2   
+    72                                          mov ebx, %2
+    73                                          %if %0 >= 3
+    74                                              mov ecx, %3
+    75                                              %if %0 = 4
+    76                                                 mov edx, %4
+    77                                              %endif
+    78                                          %endif
+    79                                      %endif
+    80                                      mov eax, %1
+    81                                      ;int 30h
+    82                                      int 40h ; TRDOS 386 (TRDOS v2.0) 
+    83                                  %endmacro
+    84                                  
+    85                                  ; Retro UNIX 386 v1 and TRDOS 386 v2 system call format:
+    86                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    87                                  ; ----------------------------------------------------------------------------
+    88                                   
+    89                                  	bits 32
+    90                                  start:
+    91                                  	;; clear bss
+    92                                  	;mov	edi, bss_start
+    93                                  	;mov	ecx, (bss_end - bss_start)/4
+    94                                  	;;xor	eax, eax
+    95                                  	;rep	stosd
+    96                                  
+    97                                  	sys	_time, 0 ; get time in unix/epoch format
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1>  %if %0 >= 2
+    72 00000000 BB00000000          <1>  mov ebx, %2
+    73                              <1>  %if %0 >= 3
+    74                              <1>  mov ecx, %3
+    75                              <1>  %if %0 = 4
+    76                              <1>  mov edx, %4
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80 00000005 B80D000000          <1>  mov eax, %1
+    81                              <1> 
+    82 0000000A CD40                <1>  int 40h
+    98 0000000C A3[65010000]            	mov	[ptime], eax ; seconds since unix epoch time
+    99                                  
+   100                                  	; program message
+   101 00000011 BE[DE0B0000]            	mov	esi, program_msg
+   102 00000016 E88C080000              	call	print_msg
+   103                                  
+   104                                  	;;;;
+   105                                  	; Set squares of number from 1 to 90
+   106 0000001B BF[680C0000]            	mov	edi, _squares
+   107                                  	;mov	ecx, 90
+   108 00000020 B9C8000000              	mov	ecx, 200 ; 1 to 200
+   109 00000025 BB01000000              	mov	ebx, 1
+   110                                  _ss_x:
+   111 0000002A 89D8                    	mov	eax, ebx
+   112 0000002C F7E3                    	mul	ebx
+   113 0000002E AB                      	stosd
+   114 0000002F 43                      	inc	ebx
+   115 00000030 E2F8                    	loop	_ss_x
+   116                                  
+   117                                  	; x2+y2 = r2
+   118                                  	; Set Y values for X values from 1 to Radius - 1
+   119 00000032 BF[8C0F0000]            	mov	edi, _fx
+   120                                  	;mov	eax, 90
+   121 00000037 B8C8000000              	mov	eax, 200 ; 1 to 200
+   122 0000003C A3[2C0C0000]            	mov	[radius], eax
+   123 00000041 89C3                    	mov	ebx, eax
+   124 00000043 F7E3                    	mul	ebx
+   125 00000045 89C5                    	mov	ebp, eax ; _r2 (square of the radius)
+   126                                  _yy_x:	
+   127 00000047 4B                      	dec	ebx
+   128 00000048 7410                    	jz	short start_@
+   129 0000004A 89D8                    	mov	eax, ebx
+   130 0000004C F7E0                    	mul	eax
+   131                                  	; eax = square of ebx
+   132 0000004E 89EA                    	mov	edx, ebp ; _r2
+   133 00000050 29C2                    	sub	edx, eax
+   134 00000052 E836050000              	call	get_squareroot
+   135 00000057 AB                      	stosd
+   136 00000058 EBED                    	jmp	short _yy_x
+   137                                  	;;;;
+   138                                  
+   139                                  	; show program message for 1 second
+   140                                  start_@:
+   141                                  	sys	_time, 0 ; get time in unix/epoch format
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1>  %if %0 >= 2
+    72 0000005A BB00000000          <1>  mov ebx, %2
+    73                              <1>  %if %0 >= 3
+    74                              <1>  mov ecx, %3
+    75                              <1>  %if %0 = 4
+    76                              <1>  mov edx, %4
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80 0000005F B80D000000          <1>  mov eax, %1
+    81                              <1> 
+    82 00000064 CD40                <1>  int 40h
+   142 00000066 90                      	nop
+   143 00000067 3B05[65010000]          	cmp	eax, [ptime]
+   144 0000006D 74EB                    	je	short start_@ ; same second
+   145                                  
+   146                                  	; 1 second has been passed
+   147                                  
+   148                                  	;mov	ah, 2	; read the time
+   149                                  	;int	35h	; TRDOS 386 date&time interrupt
+   150                                  	;jnc	short start_@@
+   151                                  	;jmp	terminate
+   152                                  ;start_@@:
+   153                                  	;mov 	ah,11h
+   154                                  	;int	32h
+   155                                  	;jz	short main
+   156                                  	;xor	ah, ah
+   157                                  	;int	32h
+   158                                  start_@@:
+   159                                  	sys	_stdio, 1 ; getchar (no wait)
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1>  %if %0 >= 2
+    72 0000006F BB01000000          <1>  mov ebx, %2
+    73                              <1>  %if %0 >= 3
+    74                              <1>  mov ecx, %3
+    75                              <1>  %if %0 = 4
+    76                              <1>  mov edx, %4
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80 00000074 B82E000000          <1>  mov eax, %1
+    81                              <1> 
+    82 00000079 CD40                <1>  int 40h
+   160                                  	;jc	short main
+   161 0000007B 21C0                    	and	eax, eax
+   162 0000007D 75F0                    	jnz	short start_@@ 
+   163                                  main:
+   164                                  	sys	_time, 4  ; get tick counts
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1>  %if %0 >= 2
+    72 0000007F BB04000000          <1>  mov ebx, %2
+    73                              <1>  %if %0 >= 3
+    74                              <1>  mov ecx, %3
+    75                              <1>  %if %0 = 4
+    76                              <1>  mov edx, %4
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80 00000084 B80D000000          <1>  mov eax, %1
+    81                              <1> 
+    82 00000089 CD40                <1>  int 40h
+   165 0000008B A3[65010000]            	mov	[startticks], eax
+   166                                  
+   167                                  	;mov	bl, -1	; signal response byte
+   168                                  	;mov	bh, 1	; 18.2 ticks per seconds
+   169                                  	;mov	ecx, 9	; approx. 0.5 seconds
+   170                                  	;;mov	bh, 3	; 1 second unit(RTC)
+   171                                  	;;mov	ecx, 1	; 1 second only
+   172                                  	;mov	edx, srb
+   173                                          ;sys	_timer	; start timer
+   174                                  
+   175                                  	;sys	_time, 0 ; get time (seconds) in UNIX format
+   176                                  	;mov	[startticks], eax
+   177                                  
+   178                                  	;sys	_time, 3 ; get time (& date) in MSDOS format
+   179                                  			 ; (eax = time, edx = date)
+   180                                  	sys	_time, 1 ; get time in MSDOS format
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1>  %if %0 >= 2
+    72 00000090 BB01000000          <1>  mov ebx, %2
+    73                              <1>  %if %0 >= 3
+    74                              <1>  mov ecx, %3
+    75                              <1>  %if %0 = 4
+    76                              <1>  mov edx, %4
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80 00000095 B80D000000          <1>  mov eax, %1
+    81                              <1> 
+    82 0000009A CD40                <1>  int 40h
+   181 0000009C A2[580C0000]            	mov	[second], al ; (dl in MSDOS)
+   182 000000A1 8825[570C0000]          	mov	[minute], ah ; (cl in MSDOS)
+   183 000000A7 C1E810                  	shr	eax, 16	; al = hour (ch in MSDOS)
+   184 000000AA A2[560C0000]            	mov	[hour], al
+   185                                  
+   186                                  ; 	; MAP VGA video buffer to user (as 1 to 1)
+   187                                  ;	;xor	ebx, ebx
+   188                                  ;	;mov	bh, 5	; Direct access/map to VGA memory
+   189                                  ;	mov	bh, 6	; Direct access to Linear Frame Buffer
+   190                                  ;	mov	bl, 05h	; Direct access for VESA video mode 105h
+   191                                  ;	sys	_video
+   192                                  ;	; eax = Linear Frame Buffer Address if > 0
+   193                                  ;	or	eax, eax ; VGA memory address
+   194                                  ;	jz	terminate ; error (eax = 0)
+   195                                  ;	mov	[LFB_Address], eax
+   196                                  
+   197                                  	; set video mode to 13h
+   198                                  	;mov	al, 13h ; function 00h, mode 13h
+   199                                  	;int	31h ; TRDOS 386 - Video interrupt
+   200                                  	;sys	_video, 0813h ; set video mode to 13h
+   201                                  
+   202                                  	; set video mode to VESA VBE Mode 105h
+   203                                  	; 1024*768 pixels, 256 colors
+   204                                  	sys	_video, 08FFh, 105h
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1>  %if %0 >= 2
+    72 000000AF BBFF080000          <1>  mov ebx, %2
+    73                              <1>  %if %0 >= 3
+    74 000000B4 B905010000          <1>  mov ecx, %3
+    75                              <1>  %if %0 = 4
+    76                              <1>  mov edx, %4
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80 000000B9 B81F000000          <1>  mov eax, %1
+    81                              <1> 
+    82 000000BE CD40                <1>  int 40h
+   205 000000C0 09C0                    	or	eax, eax
+   206 000000C2 0F848E000000            	jz	terminate
+   207                                  
+   208                                  	; draw clock circle and indicators
+   209 000000C8 E8DC000000              	call	draw_background
+   210                                  
+   211                                  	;;;
+   212                                  	;mov	byte [_x0], 159
+   213                                  	;mov	byte [_y0], 99
+   214 000000CD 66C705[340C0000]FF-     	mov	word [_x0], (1024/2)-1
+   214 000000D5 01                 
+   215 000000D6 66C705[380C0000]7F-     	mov	word [_y0], (768/2)-1
+   215 000000DE 01                 
+   216                                  	;;;
+   217                                  
+   218                                  	; set initial h/m/s parameters
+   219 000000DF E885000000              	call	update_time
+   220 000000E4 A0[560C0000]            	mov	al, [hour]
+   221 000000E9 A2[590C0000]            	mov	[phour], al
+   222 000000EE A0[570C0000]            	mov	al, [minute]
+   223 000000F3 A2[5A0C0000]            	mov	[pminute], al	; previous
+   224 000000F8 A2[5C0C0000]            	mov	[phminute], al  ; previous for akrep
+   225 000000FD A0[580C0000]            	mov	al, [second]
+   226 00000102 A2[5B0C0000]            	mov	[psecond], al	; previous
+   227 00000107 A2[5D0C0000]            	mov	[pmsecond], al  ; previous for yelkovan
+   228 0000010C EB05                    	jmp	short draw_hh_mh_sh
+   229                                  main_loop:
+   230 0000010E E856000000              	call	update_time
+   231                                  	;jc	short skip_draw
+   232                                  draw_hh_mh_sh:
+   233                                  	; draw akrep (hour hand)
+   234 00000113 E88F040000              	call	draw_hour_hand
+   235                                  
+   236                                  	; draw yelkovan (minute hand)
+   237 00000118 E813050000              	call	draw_minute_hand
+   238                                  
+   239                                  	; draw second hand
+   240 0000011D E895050000              	call	draw_second_hand
+   241                                  
+   242                                  	; draw center mark
+   243 00000122 E894070000              	call	draw_centermark
+   244                                  
+   245                                  	; waith for 0.5 second
+   246 00000127 E85D000000              	call	wait_half_second
+   247                                  skip_draw:
+   248                                          ;mov	ah, 01h	; see if key pressed
+   249                                  	;int	32h 	; TRDOS 386 keyboard interrupt
+   250                                          ;jz	short main_loop ; loop if no key pressed
+   251                                          ;xor	ah, ah  ; key pressed so clear it
+   252                                  	;int	32h
+   253                                  	sys	_stdio, 1 ; getchar (no wait)
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1>  %if %0 >= 2
+    72 0000012C BB01000000          <1>  mov ebx, %2
+    73                              <1>  %if %0 >= 3
+    74                              <1>  mov ecx, %3
+    75                              <1>  %if %0 = 4
+    76                              <1>  mov edx, %4
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80 00000131 B82E000000          <1>  mov eax, %1
+    81                              <1> 
+    82 00000136 CD40                <1>  int 40h
+   254 00000138 09C0                    	or	eax, eax
+   255 0000013A 74D2                    	jz	short main_loop	
+   256                                  
+   257                                  	;;; beep option (enabled/disabled by SPACEBAR)
+   258 0000013C 3C20                    	cmp	al, 20h
+   259 0000013E 750A                    	jne	short exit_process
+   260 00000140 8035[49010000]FF        	xor	byte [nobeep], 0FFh
+   261 00000147 EBC5                    	jmp	short main_loop
+   262 00000149 FF                      nobeep:	db	0FFh
+   263                                  	;;;
+   264                                  
+   265                                  	;jmp	short exit_process
+   266                                  
+   267                                  exit_process:
+   268                                  	;mov	ax, 03h ; set video mode to 03h (default)
+   269                                  	;int	31h  ; TRDOS 386 video bios interrupt
+   270                                  	sys	_video, 0803h ; set video mode to 03h
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1>  %if %0 >= 2
+    72 0000014A BB03080000          <1>  mov ebx, %2
+    73                              <1>  %if %0 >= 3
+    74                              <1>  mov ecx, %3
+    75                              <1>  %if %0 = 4
+    76                              <1>  mov edx, %4
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80 0000014F B81F000000          <1>  mov eax, %1
+    81                              <1> 
+    82 00000154 CD40                <1>  int 40h
+   271                                  terminate:
+   272                                  	;sys	_timer, 0  ; stop timer
+   273                                  	sys	_exit, 0 ; return to TRDOS 386 MainProg
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1>  %if %0 >= 2
+    72 00000156 BB00000000          <1>  mov ebx, %2
+    73                              <1>  %if %0 >= 3
+    74                              <1>  mov ecx, %3
+    75                              <1>  %if %0 = 4
+    76                              <1>  mov edx, %4
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80 0000015B B801000000          <1>  mov eax, %1
+    81                              <1> 
+    82 00000160 CD40                <1>  int 40h
+   274                                  
+   275                                  hangemhigh:
+   276                                  	; CPU must not come here !
+   277 00000162 90                      	nop
+   278 00000163 EBFD                    	jmp	short hangemhigh
+   279                                  
+   280                                  ;srb:	db 0
+   281                                  ptime: ;db 0
+   282                                  startticks:
+   283 00000165 00000000                	dd 0
+   284                                  ;LFB_Address:
+   285                                  ;	dd 0 
+   286                                  
+   287                                  ; ------------------------------------------------------------
+   288                                  
+   289                                  update_time:
+   290                                  ;	push	esi
+   291                                  ;	;mov	esi, -1
+   292                                  ;	mov	esi, 10
+   293                                  ;update_time_@:	
+   294                                  ;	mov	ah, 2	; read the time
+   295                                  ;	int	35h	; TRDOS 386 date&time interrupt
+   296                                  ;	;jc	short update_time_retn
+   297                                  ;	jnc	short update_time_@@
+   298                                  ;	; RTC update phase
+   299                                  ;	dec	esi
+   300                                  ;	jnz	short update_time_@
+   301                                  ;	pop	esi
+   302                                  ;	;jmp	exit_process
+   303                                  ;	stc
+   304                                  ;	retn
+   305                                  ;update_time_@@:
+   306                                  ;	pop esi
+   307                                  ;
+   308                                  ;	; ch = hours (bcd)
+   309                                  ;	; cl = minutes (bcd)
+   310                                  ;	; dh = seconds (bcd)
+   311                                  
+   312                                  	sys	_time, 1 ; get time in MSDOS format
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1>  %if %0 >= 2
+    72 00000169 BB01000000          <1>  mov ebx, %2
+    73                              <1>  %if %0 >= 3
+    74                              <1>  mov ecx, %3
+    75                              <1>  %if %0 = 4
+    76                              <1>  mov edx, %4
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80 0000016E B80D000000          <1>  mov eax, %1
+    81                              <1> 
+    82 00000173 CD40                <1>  int 40h
+   313 00000175 A2[580C0000]            	mov	[second], al ; (dl in MSDOS)
+   314 0000017A 8825[570C0000]          	mov	[minute], ah ; (cl in MSDOS)
+   315 00000180 C1E810                  	shr	eax, 16	; al = hour (ch in MSDOS)
+   316 00000183 A2[560C0000]            	mov	[hour], al
+   317 00000188 C3                      	retn
+   318                                  
+   319                                  ;	; wait 1 second (kernel timer setup)
+   320                                  ;	cmp	byte [srb], 0FFh ; check signal response byte
+   321                                  ;	jb	short update_time_ok ; cf = 1
+   322                                  ;
+   323                                  ;	mov	byte [srb], 0 ; reset for next 1 second
+   324                                  ;wait_@:
+   325                                  ;	; get time in UNIX/Epoch format (seconds)
+   326                                  ;	sys	_time, 0
+   327                                  ;	cmp	eax, [startticks] ; is same second ?
+   328                                  ;	jne	short updt_0	; no, 1 second passed
+   329                                  ;	;; wait 0.5 second more
+   330                                  ;	;stc
+   331                                  ;	jmp	short wait_@
+   332                                  ;update_time_ok:
+   333                                  ;	retn
+   334                                  ;
+   335                                  ;updt_0:
+   336                                  ;	mov	[startticks], eax
+   337                                  ;
+   338                                  ;	mov	al, [second]
+   339                                  ;	inc	al
+   340                                  ;	cmp	al, 60
+   341                                  ;	jb	short updt_1
+   342                                  ;	mov	al, 0
+   343                                  ;updt_1:
+   344                                  ;	;mov	al, dh
+   345                                  ;	;call	convert_bcd_to_bin
+   346                                  ;	mov	[second], al
+   347                                  ;
+   348                                  ;	or	al, al
+   349                                  ;	jnz	short update_time_ok
+   350                                  ;
+   351                                  ;	mov	al, [minute]
+   352                                  ;	inc	al
+   353                                  ;	cmp	al, 60
+   354                                  ;	jb	short updt_2
+   355                                  ;	mov	al, 0
+   356                                  ;updt_2:
+   357                                  ;	;mov	al, cl
+   358                                  ;	;call	convert_bcd_to_bin
+   359                                  ;	mov	[minute], al
+   360                                  ;
+   361                                  ;	and	al, al
+   362                                  ;	jnz	short update_time_ok
+   363                                  ;
+   364                                  ;	mov	al, [hour]
+   365                                  ;	inc	al
+   366                                  ;	cmp	al, 24
+   367                                  ;	jb	short updt_3
+   368                                  ;	mov	al, 0
+   369                                  ;updt_3:	
+   370                                  ;	;mov	al, ch
+   371                                  ;	;call	convert_bcd_to_bin
+   372                                  ;	mov	[hour], al
+   373                                  ;	clc
+   374                                  ;;update_time_retn:
+   375                                  ;;update_time_ok:
+   376                                  ;	retn
+   377                                  
+   378                                  ; ------------------------------------------------------------
+   379                                  
+   380                                  wait_half_second:
+   381 00000189 53                      	push	ebx
+   382                                  	sys	_time, 4 ; get tick counts
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1>  %if %0 >= 2
+    72 0000018A BB04000000          <1>  mov ebx, %2
+    73                              <1>  %if %0 >= 3
+    74                              <1>  mov ecx, %3
+    75                              <1>  %if %0 = 4
+    76                              <1>  mov edx, %4
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80 0000018F B80D000000          <1>  mov eax, %1
+    81                              <1> 
+    82 00000194 CD40                <1>  int 40h
+   383 00000196 5B                      	pop	ebx
+   384 00000197 2B05[65010000]          	sub	eax, [startticks]
+   385 0000019D 83F809                  	cmp	eax, 9
+   386 000001A0 72E7                    	jb	short wait_half_second
+   387 000001A2 0105[65010000]          	add	[startticks], eax
+   388                                  
+   389                                  	;nop
+   390                                  	;inc	ecx
+   391                                  	;nop
+   392                                  	;cmp	byte [srb], -1
+   393                                  	;jne	short wait_half_second
+   394                                  
+   395 000001A8 C3                      	retn
+   396                                  
+   397                                  ; ------------------------------------------------------------
+   398                                  
+   399                                  ;convert_bcd_to_bin:
+   400                                  ;	mov	bl, al
+   401                                  ;	and	bl, 0Fh
+   402                                  ;	shr	al, 4
+   403                                  ;	mov	ah, 10
+   404                                  ;	mul	ah
+   405                                  ;	add	al, bl
+   406                                  ;	retn
+   407                                  
+   408                                  ; ------------------------------------------------------------
+   409                                  
+   410                                  draw_background:
+   411                                  	; INPUT:
+   412                                  	;	none
+   413                                  	;
+   414                                  	; Modified registers: esi, edi, eax, ecx, ebx, edx
+   415                                  
+   416                                  	;mov	dword [_x0], 160
+   417                                  	;mov 	dword [_y0], 100
+   418                                  	;mov	dword [radius], 90
+   419 000001A9 C705[340C0000]0002-     	mov	dword [_x0], (1024/2)
+   419 000001B1 0000               
+   420 000001B3 C705[380C0000]8001-     	mov 	dword [_y0], (768/2)
+   420 000001BB 0000               
+   421 000001BD C705[2C0C0000]C800-     	mov	dword [radius], 200
+   421 000001C5 0000               
+   422                                  
+   423 000001C7 C605[300C0000]0B        	mov	byte [color], 0Bh ; cyan
+   424                                  	;mov	byte [color], 0Eh ; yellow
+   425                                  	;mov	byte [color], 0Fh ; white
+   426 000001CE E80B000000              	call	draw_circle ; writes pixels to pixel buffer 
+   427                                  		 ; writes all circle pixels to video buffer
+   428                                  	;call	write_circle 
+   429                                  
+   430                                  	; draw minute indicators
+   431 000001D3 E82D020000              	call	draw_minute_dots
+   432                                  	; draw hour (5 minutes) indicators
+   433 000001D8 E8D0020000              	call	draw_hour_squares
+   434 000001DD C3                      	retn
+   435                                  
+   436                                  ; ------------------------------------------------------------
+   437                                  
+   438                                  draw_circle:
+   439                                  	; INPUT:
+   440                                  	;	[_x0]
+   441                                  	;	[_y0]
+   442                                  	;	[radius]
+   443                                  	;	[color]
+   444                                  	;
+   445                                  	; Modified registers: esi, edi, eax, ecx, ebx, edx, ebp
+   446                                  
+   447                                  	; set pixel pointer position to start of circle buffer
+   448 000001DE B8[B4120000]            	mov	eax, circlebuffer
+   449 000001E3 A3[B0120000]            	mov	[pixelpos], eax	
+   450                                  _dc_ph0:
+   451                                  	; quarter 1	
+   452                                  	; start from y = 0, x = radius
+   453 000001E8 31C0                    	xor	eax, eax
+   454 000001EA A3[400C0000]            	mov	[_y1], eax ; 0
+   455 000001EF A2[550C0000]            	mov	[phase], al ; 0
+   456 000001F4 8B2D[2C0C0000]          	mov	ebp, [radius]
+   457 000001FA 892D[3C0C0000]          	mov	[_x1], ebp ; y = 0, x = r
+   458 00000200 BE[8C0F0000]            	mov	esi, _fx
+   459                                  _dc_ph0_n:
+   460 00000205 FF0D[3C0C0000]          	dec	dword [_x1]
+   461 0000020B AD                      	lodsd
+   462                                  _dc_ph0_x:
+   463 0000020C 8B15[400C0000]          	mov	edx, [_y1]
+   464 00000212 42                      	inc	edx
+   465 00000213 39C2                    	cmp	edx, eax
+   466 00000215 7314                    	jnb	short _dc_ph0_y
+   467 00000217 50                      	push	eax
+   468 00000218 8915[400C0000]          	mov	[_y1], edx
+   469 0000021E E84D010000              	call	get_start_offset
+   470 00000223 E83A010000              	call	write_pixel
+   471 00000228 58                      	pop	eax
+   472 00000229 EBE1                    	jmp	short _dc_ph0_x	
+   473                                  _dc_ph0_y:
+   474 0000022B A3[400C0000]            	mov	[_y1], eax
+   475 00000230 E83B010000              	call	get_start_offset
+   476 00000235 E828010000              	call	write_pixel
+   477 0000023A 4D                      	dec	ebp
+   478 0000023B 75C8                    	jnz	short _dc_ph0_n
+   479                                  _dc_ph1:
+   480                                  	; quarter 2	
+   481                                  	; start from y = radius, x = 0
+   482 0000023D FE05[550C0000]          	inc	byte [phase]
+   483 00000243 31C0                    	xor	eax, eax
+   484 00000245 A3[3C0C0000]            	mov	[_x1], eax ; 0
+   485 0000024A 8B2D[2C0C0000]          	mov	ebp, [radius]
+   486 00000250 892D[400C0000]          	mov	[_y1], ebp ; y = r, x = 0
+   487 00000256 BE[8C0F0000]            	mov	esi, _fx
+   488                                  _dc_ph1_n:
+   489 0000025B FF0D[400C0000]          	dec 	dword [_y1]
+   490 00000261 AD                      	lodsd
+   491                                  _dc_ph1_x:
+   492 00000262 8B15[3C0C0000]          	mov	edx, [_x1]
+   493 00000268 42                      	inc	edx
+   494 00000269 39C2                    	cmp	edx, eax
+   495 0000026B 7314                    	jnb	short _dc_ph1_y
+   496 0000026D 50                      	push	eax
+   497 0000026E 8915[3C0C0000]          	mov	[_x1], edx
+   498 00000274 E8F7000000              	call	get_start_offset
+   499 00000279 E8E4000000              	call	write_pixel
+   500 0000027E 58                      	pop	eax
+   501 0000027F EBE1                    	jmp	short _dc_ph1_x	
+   502                                  _dc_ph1_y:
+   503 00000281 A3[3C0C0000]            	mov	[_x1], eax
+   504 00000286 E8E5000000              	call	get_start_offset
+   505 0000028B E8D2000000              	call	write_pixel
+   506 00000290 4D                      	dec	ebp
+   507 00000291 75C8                    	jnz	short _dc_ph1_n
+   508                                  _dc_ph2:
+   509                                  	; quarter 3	
+   510                                  	; start from y = 0, x = radius
+   511 00000293 FE05[550C0000]          	inc	byte [phase]
+   512 00000299 31C0                    	xor	eax, eax
+   513 0000029B A3[400C0000]            	mov	[_y1], eax ; 0
+   514 000002A0 8B2D[2C0C0000]          	mov	ebp, [radius]
+   515 000002A6 892D[3C0C0000]          	mov	[_x1], ebp ; y = 0, x = r
+   516 000002AC BE[8C0F0000]            	mov	esi, _fx
+   517                                  _dc_ph2_n:
+   518 000002B1 FF0D[3C0C0000]          	dec	dword [_x1]
+   519 000002B7 AD                      	lodsd
+   520                                  _dc_ph2_x:
+   521 000002B8 8B15[400C0000]          	mov	edx, [_y1]
+   522 000002BE 42                      	inc	edx
+   523 000002BF 39C2                    	cmp	edx, eax
+   524 000002C1 7314                    	jnb	short _dc_ph2_y
+   525 000002C3 50                      	push	eax
+   526 000002C4 8915[400C0000]          	mov	[_y1], edx
+   527 000002CA E8A1000000              	call	get_start_offset
+   528 000002CF E88E000000              	call	write_pixel
+   529 000002D4 58                      	pop	eax
+   530 000002D5 EBE1                    	jmp	short _dc_ph2_x	
+   531                                  _dc_ph2_y:
+   532 000002D7 A3[400C0000]            	mov	[_y1], eax
+   533 000002DC E88F000000              	call	get_start_offset
+   534 000002E1 E87C000000              	call	write_pixel
+   535 000002E6 4D                      	dec	ebp
+   536 000002E7 75C8                    	jnz	short _dc_ph2_n
+   537                                  _dc_ph3:
+   538                                  	; quarter 4	
+   539                                  	; start from y = radius, x = 0
+   540 000002E9 FE05[550C0000]          	inc	byte [phase]
+   541 000002EF 31C0                    	xor	eax, eax
+   542 000002F1 A3[3C0C0000]            	mov	[_x1], eax ; 0
+   543 000002F6 8B2D[2C0C0000]          	mov	ebp, [radius]
+   544 000002FC 892D[400C0000]          	mov	[_y1], ebp ; y = r, x = 0
+   545 00000302 BE[8C0F0000]            	mov	esi, _fx
+   546                                  _dc_ph3_n:
+   547 00000307 FF0D[400C0000]          	dec	dword [_y1]
+   548 0000030D AD                      	lodsd
+   549                                  _dc_ph3_x:
+   550 0000030E 8B15[3C0C0000]          	mov	edx, [_x1]
+   551 00000314 42                      	inc	edx
+   552 00000315 39C2                    	cmp	edx, eax
+   553 00000317 7314                    	jnb	short _dc_ph3_y
+   554 00000319 50                      	push	eax
+   555 0000031A 8915[3C0C0000]          	mov	[_x1], edx
+   556 00000320 E84B000000              	call	get_start_offset
+   557 00000325 E838000000              	call	write_pixel
+   558 0000032A 58                      	pop	eax
+   559 0000032B EBE1                    	jmp	short _dc_ph3_x	
+   560                                  _dc_ph3_y:
+   561 0000032D A3[3C0C0000]            	mov	[_x1], eax
+   562 00000332 E839000000              	call	get_start_offset
+   563 00000337 E826000000              	call	write_pixel
+   564 0000033C 4D                      	dec	ebp
+   565 0000033D 75C8                    	jnz	short _dc_ph3_n
+   566                                  _dc_ph4:
+   567                                  	;retn
+   568                                  
+   569                                  ; ------------------------------------------------------------
+   570                                  
+   571                                  write_dots:
+   572                                  write_line:
+   573                                  write_circle:
+   574 0000033F BE[B4120000]            	mov	esi, circlebuffer
+   575                                  ;	;mov	edi, 0A0000h ; VGA video buffer
+   576                                  ;	mov	edi, [LFB_Address]
+   577                                  ;	mov	ecx, [pixelpos]
+   578                                  ;	sub	ecx, esi
+   579                                  ;	shr	ecx, 2
+   580                                  ;	mov	bl, [color]
+   581                                  ;	;ecx = pixel count
+   582                                  ;write_circle_@:
+   583                                  ;	lodsd
+   584                                  ;	mov	[edi+eax], bl ; pixel color
+   585                                  ;	loop	write_circle_@
+   586                                  ;	retn
+   587                                  
+   588 00000344 8B15[B0120000]          	mov	edx, [pixelpos]
+   589 0000034A 29F2                    	sub	edx, esi
+   590 0000034C C1EA02                  	shr	edx, 2
+   591                                  
+   592                                  	; edx = pixel count
+   593                                  	; esi = user's single color pixel buffer address
+   594                                  	sys	_video, 0305h, [color]
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1>  %if %0 >= 2
+    72 0000034F BB05030000          <1>  mov ebx, %2
+    73                              <1>  %if %0 >= 3
+    74 00000354 8B0D[300C0000]      <1>  mov ecx, %3
+    75                              <1>  %if %0 = 4
+    76                              <1>  mov edx, %4
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80 0000035A B81F000000          <1>  mov eax, %1
+    81                              <1> 
+    82 0000035F CD40                <1>  int 40h
+   595 00000361 C3                      	retn
+   596                                  
+   597                                  ; ------------------------------------------------------------
+   598                                  
+   599                                  write_pixel:
+   600                                  	; eax = (screen) pixel position
+   601 00000362 8B3D[B0120000]          	mov	edi, [pixelpos]
+   602 00000368 AB                      	stosd
+   603 00000369 893D[B0120000]          	mov	[pixelpos], edi
+   604 0000036F C3                      	retn
+   605                                  
+   606                                  ; ------------------------------------------------------------
+   607                                  
+   608                                  get_start_offset:
+   609                                  	;mov	eax, 320
+   610 00000370 B800040000              	mov	eax, 1024
+   611 00000375 8B15[380C0000]          	mov	edx, [_y0]
+   612 0000037B 803D[550C0000]00        	cmp	byte [phase], 0
+   613 00000382 7715                    	ja	short gso_1
+   614                                  gso_0:
+   615                                  	; quarter 1
+   616 00000384 2B15[400C0000]          	sub	edx, [_y1] ; y = 0 -> r
+   617 0000038A F7E2                    	mul	edx
+   618 0000038C 0305[340C0000]          	add	eax, [_x0]
+   619 00000392 0305[3C0C0000]          	add	eax, [_x1] ; x = r -> 0
+   620 00000398 C3                      	retn
+   621                                  gso_1:
+   622 00000399 803D[550C0000]01        	cmp	byte [phase], 1
+   623 000003A0 7715                    	ja	short gso_2
+   624                                  	; quarter 2
+   625 000003A2 2B15[400C0000]          	sub	edx, [_y1] ; y = r -> 0
+   626 000003A8 F7E2                    	mul	edx
+   627 000003AA 0305[340C0000]          	add	eax, [_x0]
+   628 000003B0 2B05[3C0C0000]          	sub	eax, [_x1] ; x = 0 -> -r
+   629 000003B6 C3                      	retn
+   630                                  gso_2:
+   631 000003B7 803D[550C0000]02        	cmp	byte [phase], 2
+   632 000003BE 7715                    	ja	short gso_3
+   633                                  	; quarter 3
+   634 000003C0 0315[400C0000]          	add	edx, [_y1] ; y = 0 -> -r 
+   635 000003C6 F7E2                    	mul	edx
+   636 000003C8 0305[340C0000]          	add	eax, [_x0]
+   637 000003CE 2B05[3C0C0000]          	sub	eax, [_x1] ; x = -r -> 0 
+   638 000003D4 C3                      	retn
+   639                                  gso_3:
+   640                                  	; quarter 4
+   641 000003D5 0315[400C0000]          	add	edx, [_y1] ; y = -r -> 0
+   642 000003DB F7E2                    	mul	edx
+   643 000003DD 0305[340C0000]          	add	eax, [_x0]
+   644 000003E3 0305[3C0C0000]          	add	eax, [_x1] ; x = 0 -> r 
+   645 000003E9 C3                      	retn
+   646                                  
+   647                                  ; ------------------------------------------------------------
+   648                                  
+   649                                  ;black_circle:
+   650                                  ;	xor	ah, ah
+   651                                  ;	xchg	[color], ah ; color = 0 
+   652                                  ;	push	eax
+   653                                  ;	call	drawcircle
+   654                                  ;	pop	eax
+   655                                  ;	xchg	[color], ah ; restore color
+   656                                  ;	retn
+   657                                  
+   658                                  ; ------------------------------------------------------------
+   659                                  
+   660                                  beep:
+   661                                  	;;; beep option
+   662 000003EA F605[49010000]FF        	test	byte [nobeep], 0FFh
+   663 000003F1 7511                    	jnz	short beep_retn
+   664                                  	;;;
+   665                                  
+   666                                  	; call beep function (16/64 second, 886Hz)
+   667                                  	sys	_audio, 16, 1331
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1>  %if %0 >= 2
+    72 000003F3 BB10000000          <1>  mov ebx, %2
+    73                              <1>  %if %0 >= 3
+    74 000003F8 B933050000          <1>  mov ecx, %3
+    75                              <1>  %if %0 = 4
+    76                              <1>  mov edx, %4
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80 000003FD B820000000          <1>  mov eax, %1
+    81                              <1> 
+    82 00000402 CD40                <1>  int 40h
+   668                                  	; STDERR beep method is not usable in VESA VBE mode
+   669                                  	;sys	_stdio, 3, 07h ; write beep char to STDERR
+   670                                  beep_retn:
+   671 00000404 C3                      	retn
+   672                                  
+   673                                  ; ------------------------------------------------------------
+   674                                  
+   675                                  draw_minute_dots:
+   676                                  	; INPUT:
+   677                                  	;	none
+   678                                  	;
+   679                                  	; Modified registers: esi, edi, eax, ecx, ebx, edx
+   680                                  
+   681                                  	;mov	dword [angle], 0
+   682                                  	;mov	byte [radius], 85
+   683 00000405 C605[2C0C0000]BC        	mov	byte [radius], 188
+   684                                  	;mov	byte [_x0], 160
+   685                                  	;mov	byte [_y0], 100
+   686 0000040C C705[500C0000]0600-     	mov	dword [step], 6
+   686 00000414 0000               
+   687 00000416 C605[540C0000]3C        	mov	byte [dcount], 60
+   688                                  
+   689 0000041D C705[B0120000]-         	mov	dword [pixelpos], circlebuffer
+   689 00000423 [B4120000]         
+   690                                  			; reset for indicator dots
+   691                                  
+   692 00000427 31C0                    	xor	eax, eax  ; angle = 0
+   693 00000429 E806000000              	call	draw_dots
+   694                                  
+   695                                  	;mov	dword [angle], 0
+   696 0000042E E80CFFFFFF              	call	write_dots
+   697 00000433 C3                      	retn
+   698                                  
+   699                                  ; ------------------------------------------------------------
+   700                                  
+   701                                  draw_dots:
+   702                                  dmd_0:
+   703 00000434 A3[4C0C0000]            	mov	[angle], eax
+   704                                  	; eax = angle	
+   705 00000439 E815010000              	call	getcosinus 
+   706                                  		; get cosine value * 16777216 for angle in AL
+   707                                  	; eax = cos(angle) * 16777216 
+   708 0000043E E840010000              	call	getxy
+   709 00000443 A3[3C0C0000]            	mov	[_x1], eax ; projection of end point on x-axis
+   710 00000448 A1[4C0C0000]            	mov	eax, [angle]
+   711 0000044D E8E2000000              	call	getsinus
+   712                                  		; get sine value * 16777216 for angle in AL
+   713                                  	; eax = sin(angle) * 16777216 
+   714 00000452 E82C010000              	call	getxy
+   715 00000457 A3[400C0000]            	mov	[_y1], eax ; projection of end point on y-axis
+   716                                  
+   717 0000045C C605[550C0000]00        	mov	byte [phase], 0	; quarter 1
+   718 00000463 A1[4C0C0000]            	mov	eax, [angle]
+   719 00000468 83F85A                  	cmp	eax, 90
+   720 0000046B 7620                    	jna	short dmd_1
+   721 0000046D FE05[550C0000]          	inc	byte [phase]	; quarter 2
+   722 00000473 3DB4000000              	cmp	eax, 180
+   723 00000478 7613                    	jna	short dmd_1
+   724 0000047A FE05[550C0000]          	inc	byte [phase]	; quarter 3
+   725 00000480 3D0E010000              	cmp	eax, 270
+   726 00000485 7606                    	jna	short dmd_1
+   727 00000487 FE05[550C0000]          	inc	byte [phase]	; quarter 4
+   728                                  dmd_1:
+   729                                  	; cover coordinates to video buffer offset
+   730 0000048D E8DEFEFFFF              	call	get_start_offset
+   731 00000492 E8CBFEFFFF              	call	write_pixel	; save it to pixel buffer
+   732                                  	
+   733 00000497 FE0D[540C0000]          	dec	byte [dcount]
+   734 0000049D 740D                    	jz	short dmd_2
+   735 0000049F A1[500C0000]            	mov	eax, [step]
+   736 000004A4 0305[4C0C0000]          	add	eax, [angle]
+   737 000004AA EB88                    	jmp	dmd_0
+   738                                  dmd_2:
+   739 000004AC C3                      	retn
+   740                                  
+   741                                  ; ------------------------------------------------------------
+   742                                  
+   743                                  draw_hour_squares:
+   744                                  	; INPUT:
+   745                                  	;	none
+   746                                  	;
+   747                                  	; Modified registers: esi, edi, eax, ecx, ebx, edx
+   748                                  
+   749                                  	;mov	dword [angle], 0
+   750                                  	;mov	byte [radius], 85
+   751 000004AD C605[2C0C0000]BC        	mov	byte [radius], 188
+   752                                  
+   753 000004B4 C705[500C0000]1E00-     	mov	dword [step],30
+   753 000004BC 0000               
+   754                                  
+   755 000004BE C705[B0120000]-         	mov	dword [pixelpos], circlebuffer
+   755 000004C4 [B4120000]         
+   756                                  			; reset for indicator dots
+   757 000004C8 31C0                    	xor	eax, eax
+   758                                  dhs_@:
+   759                                  	;mov	dword [_x0], 159
+   760                                  	;mov	dword [_y0], 99
+   761 000004CA C705[340C0000]FE01-     	mov	dword [_x0], (1024/2)-2
+   761 000004D2 0000               
+   762 000004D4 C705[380C0000]7E01-     	mov	dword [_y0], (768/2)-2
+   762 000004DC 0000               
+   763                                  dhs_0:
+   764 000004DE C605[540C0000]01        	mov	byte [dcount], 1
+   765 000004E5 E84AFFFFFF              	call	draw_dots
+   766 000004EA A1[340C0000]            	mov	eax, [_x0]
+   767                                  	;cmp	eax, 162
+   768 000004EF 3D02020000              	cmp	eax, (1024/2)+2
+   769 000004F4 730D                    	jnb	short dhs_2
+   770 000004F6 40                      	inc	eax
+   771                                  dhs_1:
+   772 000004F7 A3[340C0000]            	mov	[_x0], eax
+   773 000004FC A1[4C0C0000]            	mov	eax, [angle]
+   774 00000501 EBDB                    	jmp	short dhs_0
+   775                                  dhs_2:
+   776 00000503 A1[380C0000]            	mov	eax, [_y0]
+   777                                  	;cmp	eax, 102
+   778 00000508 3D82010000              	cmp	eax, (768/2)+2
+   779 0000050D 730D                    	jnb	short dhs_3
+   780 0000050F 40                      	inc	eax
+   781 00000510 A3[380C0000]            	mov	[_y0], eax
+   782                                  	;mov	al, 159
+   783 00000515 B8FE010000              	mov	eax, (1024/2)-2
+   784 0000051A EBDB                    	jmp	short dhs_1
+   785                                  dhs_3:
+   786 0000051C A1[4C0C0000]            	mov	eax, [angle]
+   787 00000521 0305[500C0000]          	add	eax, [step]
+   788 00000527 3D68010000              	cmp	eax, 360
+   789 0000052C 729C                    	jb	short dhs_@
+   790                                  
+   791                                  	; write all of hour indicator pixels
+   792                                  	; to VGA video buffer 
+   793                                  	;mov	dword [angle], 0
+   794 0000052E E80CFEFFFF              	call	write_dots
+   795 00000533 C3                      	retn
+   796                                  
+   797                                  ; ------------------------------------------------------------
+   798                                  
+   799                                  getsinus:
+   800                                  	; Input:
+   801                                  	;	EAX = angle
+   802                                  	; output:
+   803                                  	;	EAX = sin(angle) * 16777216
+   804                                  	;
+   805                                  	; Modified registers: eax, esi
+   806                                  	;
+   807                                  
+   808                                  	; Note: absolute (+) values are needed only.
+   809                                  	; (see 'get_start_offset' procedure)
+   810                                  
+   811 00000534 3DB4000000              	cmp	eax, 180
+   812 00000539 7205                    	jb	short gsin_@
+   813 0000053B 2DB4000000              	sub	eax, 180
+   814                                  gsin_@:
+   815                                  	;movzx	esi, al
+   816 00000540 89C6                    	mov	esi, eax
+   817 00000542 C1E602                  	shl	esi, 2 ; * 4
+   818 00000545 81C6[0A090000]          	add	esi, sinustable
+   819 0000054B 8B06                    	mov	eax, [esi]
+   820 0000054D A3[600C0000]            	mov	[sin], eax
+   821 00000552 C3                      	retn
+   822                                  
+   823                                  ; ------------------------------------------------------------
+   824                                  
+   825                                  getcosinus:
+   826                                  	; Input:
+   827                                  	;	EAX = angle
+   828                                  	; output:
+   829                                  	;	EAX = cos(angle) * 16777216
+   830                                  	;
+   831                                  	; Modified registers: eax, esi
+   832                                  
+   833                                  	; Note: absolute (+) values are needed only.
+   834                                  	; (see 'get_start_offset' procedure)
+   835                                  
+   836 00000553 3DB4000000              	cmp	eax, 180
+   837 00000558 7205                    	jb	short gcos_0
+   838 0000055A 2DB4000000              	sub	eax, 180
+   839                                  gcos_0:
+   840 0000055F 83C05A                  	add	eax, 90
+   841 00000562 EBD0                    	jmp	short getsinus
+   842                                  
+   843 00000564 3C5A                    	cmp	al, 90 ; 90 degrees
+   844 00000566 7209                    	jb	short gcos_1
+   845 00000568 2C5A                    	sub	al, 90	
+   846 0000056A BE[0A090000]            	mov	esi, cos_90
+   847 0000056F EB05                    	jmp	short gcos_2
+   848                                  gcos_1:	
+   849 00000571 BE[720A0000]            	mov	esi, cos_0
+   850                                  gcos_2:
+   851                                  	;movzx	eax, al
+   852 00000576 C1E002                  	shl	eax, 2 ; * 4
+   853 00000579 01C6                    	add	esi, eax
+   854 0000057B 8B06                    	mov	eax, [esi]
+   855 0000057D A3[640C0000]            	mov	[cos], eax
+   856 00000582 C3                      	retn
+   857                                  
+   858                                  ; ------------------------------------------------------------
+   859                                  
+   860                                  getxy:
+   861                                  	; Input:
+   862                                  	;	EAX = sin or cos value * 16777216
+   863                                  	; output:
+   864                                  	;	EAX = x or y projection
+   865                                  	;
+   866                                  	; Modified registers: eax, edx, (ecx)
+   867                                  	;
+   868                                  
+   869                                  	;mov	edx, [radius]
+   870                                  	;mul	edx
+   871 00000583 F725[2C0C0000]          	mul	dword [radius]  ; [hipotenus]
+   872                                  	;mov	ecx, 16777216
+   873                                  	;div	ecx
+   874 00000589 C1E818                  	shr	eax, 24
+   875 0000058C C3                      	retn
+   876                                  
+   877                                  ; ------------------------------------------------------------
+   878                                  
+   879                                  get_squareroot:
+   880                                  	; input: edx = square of the number (y)
+   881                                  	; output: eax = approx. square root of ebx
+   882 0000058D BE[680C0000]            	mov	esi, _squares
+   883 00000592 53                      	push	ebx
+   884 00000593 31DB                    	xor	ebx, ebx
+   885 00000595 8B0D[2C0C0000]          	mov	ecx, [radius] ; max. value of radius is 89
+   886                                  q_sr_x:	
+   887 0000059B AD                      	lodsd
+   888 0000059C 39D0                    	cmp	eax, edx
+   889 0000059E 7303                    	jnb	short q_sr_ok
+   890 000005A0 43                      	inc	ebx
+   891 000005A1 E2F8                    	loop	q_sr_x
+   892                                  q_sr_ok:
+   893 000005A3 89D8                    	mov	eax, ebx
+   894 000005A5 5B                      	pop	ebx
+   895 000005A6 C3                      	retn
+   896                                  
+   897                                  ; ------------------------------------------------------------
+   898                                  
+   899                                  draw_hour_hand:		; draw akrep
+   900                                  	; INPUT:
+   901                                  	;	[hour]
+   902                                  	;	[phour]
+   903                                  	;	[phminute]
+   904                                  	;
+   905                                  	; Modified registers: esi, edi, eax, ecx, ebx, edx, ebp
+   906                                  
+   907 000005A7 0FB605[590C0000]        	movzx	eax, byte [phour] ; previous hour
+   908                                  
+   909                                  	;;;
+   910 000005AE 8A15[5C0C0000]          	mov	dl, [phminute]
+   911 000005B4 2A15[570C0000]          	sub	dl, [minute] 	; is 2 minutes passed?
+   912 000005BA 7302                    	jnb	short chk_m_pm
+   913 000005BC F6DA                    	neg	dl
+   914                                  chk_m_pm:
+   915 000005BE 80FA02                  	cmp	dl, 2
+   916 000005C1 7308                    	jnb	short skip_mh_chk
+   917                                  	;;;
+   918                                  
+   919                                  	;movzx	eax, byte [phour] ; previous hour
+   920 000005C3 3A05[560C0000]          	cmp	al, [hour]
+   921 000005C9 7422                    	je	short dhh_@	; skip black/erase line stage
+   922                                  
+   923                                  skip_mh_chk:
+   924 000005CB C605[300C0000]00        	mov	byte [color], 0	; black
+   925 000005D2 E81D000000              	call	dhh_@@		; draw black line
+   926                                  				; (erase previous hour hand)
+   927 000005D7 31C0                    	xor	eax, eax
+   928 000005D9 A0[570C0000]            	mov	al, [minute]
+   929 000005DE A2[5C0C0000]            	mov	[phminute], al	; set current minute as prev
+   930 000005E3 A0[560C0000]            	mov	al, [hour]
+   931 000005E8 A2[590C0000]            	mov	[phour], al	; set current hour as previous
+   932                                  dhh_@:
+   933 000005ED C605[300C0000]0F        	mov	byte [color], 0Fh ; draw white line (hour hand)
+   934                                  dhh_@@:
+   935 000005F4 3C0C                    	cmp	al, 12
+   936 000005F6 7202                    	jb	short skip_24hto12h
+   937 000005F8 2C0C                    	sub	al, 12
+   938                                  skip_24hto12h:
+   939 000005FA B91E000000              	mov	ecx, 30		; 30 degrees per hour
+   940 000005FF F7E1                    	mul	ecx
+   941 00000601 8A0D[5C0C0000]          	mov	cl, [phminute]
+   942 00000607 D0E9                    	shr	cl, 1		; 60 minutes -> 30 degrees
+   943                                  	;adc	cl, 0		; round up if half degree
+   944 00000609 01C8                    	add	eax, ecx
+   945                                  	;mov	byte [radius], 65 ; [hipotenus], length
+   946 0000060B C605[2C0C0000]8C        	mov	byte [radius], 140
+   947                                  dmh_@@@:
+   948                                  dsh_@@@:
+   949                                  	; convert clockwise angle to counterclockwise angle
+   950 00000612 F7D8                    	neg	eax	; -x
+   951 00000614 05C2010000              	add	eax, 450 ; 450 - x ; (360+90-x)
+   952 00000619 3D68010000              	cmp	eax, 360
+   953 0000061E 7205                    	jb	short dhh_@@@	; <= 12
+   954 00000620 2D68010000              	sub	eax, 360	; 2nd tour of hourhand
+   955                                  dhh_@@@:
+   956                                  	; convert clockwise angle to counterclockwise angle
+   957 00000625 A3[4C0C0000]            	mov	[angle], eax
+   958                                  	
+   959 0000062A E80E010000              	call	draw_line
+   960                                  
+   961 0000062F C3                      	retn
+   962                                  
+   963                                  ; ------------------------------------------------------------
+   964                                  
+   965                                  draw_minute_hand:		; draw yelkovan
+   966                                  	; INPUT:
+   967                                  	;	[minute]
+   968                                  	;	[pminute]
+   969                                  	;	[pmsecond]
+   970                                  	;
+   971                                  	; Modified registers: esi, edi, eax, ecx, ebx, edx, ebp
+   972                                  
+   973 00000630 0FB605[5A0C0000]        	movzx	eax, byte [pminute] ; previous minute
+   974                                  
+   975                                  	;;;
+   976 00000637 8A15[5D0C0000]          	mov	dl, [pmsecond]
+   977 0000063D 2A15[580C0000]          	sub	dl, [second] 	; is 5 seconds passed?
+   978 00000643 7302                    	jnb	short chk_s_ps
+   979 00000645 F6DA                    	neg	dl
+   980                                  chk_s_ps:
+   981 00000647 80FA05                  	cmp	dl, 5
+   982 0000064A 7308                    	jnb	short skip_sm_chk
+   983                                  	;;;
+   984                                  
+   985                                  	;movzx	eax, byte [pminute] ; previous minute
+   986 0000064C 3A05[570C0000]          	cmp	al, [minute]
+   987 00000652 743A                    	je	short dmh_@	; skip black/erase line stage
+   988                                  
+   989                                  skip_sm_chk:
+   990 00000654 C605[300C0000]00        	mov	byte [color], 0	; black
+   991 0000065B E835000000              	call	dmh_@@		; draw black line
+   992                                  				; (erase previous minute hand)
+   993                                  	;;;
+   994                                  	; redraw houndhand if blanked
+   995 00000660 A0[590C0000]            	mov	al, [phour]
+   996 00000665 B405                    	mov	ah, 5
+   997 00000667 F6E4                    	mul	ah
+   998 00000669 8A25[5A0C0000]          	mov	ah, [pminute]
+   999 0000066F 38E0                    	cmp	al, ah
+  1000 00000671 7505                    	jne	short skip_redraw_hh
+  1001 00000673 E82FFFFFFF              	call	draw_hour_hand
+  1002                                  skip_redraw_hh:
+  1003                                  	;;;
+  1004                                  
+  1005 00000678 31C0                    	xor	eax, eax
+  1006 0000067A A0[580C0000]            	mov	al, [second]
+  1007 0000067F A2[5D0C0000]            	mov	[pmsecond], al	; set current second as prev
+  1008 00000684 A0[570C0000]            	mov	al, [minute]
+  1009 00000689 A2[5A0C0000]            	mov	[pminute], al	; set current minute as prev
+  1010                                  dmh_@:
+  1011 0000068E C605[300C0000]0F        	mov	byte [color], 0Fh ; draw white line (minute hand)
+  1012                                  dmh_@@:
+  1013 00000695 B906000000              	mov	ecx, 6		; 6 degrees per minute
+  1014 0000069A F7E1                    	mul	ecx
+  1015 0000069C 50                      	push	eax
+  1016 0000069D 31C0                    	xor	eax, eax
+  1017 0000069F A0[5D0C0000]            	mov	al, [pmsecond]
+  1018                                  	;xor	edx, edx
+  1019 000006A4 B10A                    	mov	cl, 10
+  1020 000006A6 F7F1                    	div	ecx		; 60 seconds -> 6 degrees
+  1021 000006A8 5A                      	pop	edx
+  1022 000006A9 01D0                    	add	eax, edx
+  1023                                  	;mov	byte [radius], 80 ; [hipotenus], length
+  1024 000006AB C605[2C0C0000]AF        	mov	byte [radius], 175
+  1025                                  	; convert clockwise angle to counterclockwise angle
+  1026 000006B2 E95BFFFFFF              	jmp	dmh_@@@
+  1027                                  	;neg	eax	; -x
+  1028                                  	;add	eax, 450 ; 450 - x
+  1029                                  	;cmp	eax, 360
+  1030                                  	;jb	short dmh_@@@	; <= 12
+  1031                                  	;sub	eax, 360	; 2nd tour of hourhand
+  1032                                  ;dmh_@@@:
+  1033                                  	; convert clockwise angle to counterclockwise angle 
+  1034                                  	;sub	edx, eax
+  1035                                  	;mov	[angle], edx
+  1036                                  	;
+  1037                                  	;call	draw_line
+  1038                                  	;
+  1039                                  	;retn
+  1040                                  
+  1041                                  ; ------------------------------------------------------------
+  1042                                  
+  1043                                  draw_second_hand:		; saniye ibresi
+  1044                                  	; INPUT:
+  1045                                  	;	[second]
+  1046                                  	;	[psecond]
+  1047                                  	;
+  1048                                  	; Modified registers: esi, edi, eax, ecx, ebx, edx, ebp
+  1049                                  
+  1050 000006B7 0FB605[5B0C0000]        	movzx	eax, byte [psecond] ; previous second
+  1051 000006BE 3A05[580C0000]          	cmp	al, [second]
+  1052 000006C4 7449                    	je	short dsh_@	; skip black/erase line stage
+  1053                                  
+  1054                                  	;;;	beep option
+  1055 000006C6 C605[5F0C0000]01        	mov	byte [pbeep], 1
+  1056                                  	;;;
+  1057                                  
+  1058 000006CD C605[300C0000]00        	mov	byte [color], 0	; black
+  1059 000006D4 E83D000000              	call	dsh_@@		; draw black line
+  1060                                  				; (erase previous second hand)
+  1061                                  	;;;
+  1062                                  	; redraw houndhand and minutehand if blanked
+  1063 000006D9 A0[590C0000]            	mov	al, [phour]
+  1064 000006DE B405                    	mov	ah, 5
+  1065 000006E0 F6E4                    	mul	ah
+  1066 000006E2 8A25[5B0C0000]          	mov	ah, [psecond]
+  1067 000006E8 38E0                    	cmp	al, ah
+  1068 000006EA 7505                    	jne	short skip_redraw_shh
+  1069 000006EC E8B6FEFFFF              	call	draw_hour_hand
+  1070                                  skip_redraw_shh:
+  1071 000006F1 A0[5A0C0000]            	mov	al, [pminute]
+  1072 000006F6 3A05[5B0C0000]          	cmp	al, [psecond]
+  1073 000006FC 7505                    	jne	short skip_redraw_smh
+  1074 000006FE E82DFFFFFF              	call	draw_minute_hand
+  1075                                  skip_redraw_smh:
+  1076                                  	;;;
+  1077                                  
+  1078 00000703 31C0                    	xor	eax, eax
+  1079 00000705 A0[580C0000]            	mov	al, [second]
+  1080 0000070A A2[5B0C0000]            	mov	[psecond], al	; set current second as prev
+  1081                                  dsh_@:
+  1082                                  	;mov	byte [color], 0Fh ; draw white line (second hand)
+  1083 0000070F C605[300C0000]0C        	mov	byte [color], 0Ch ; draw red line	
+  1084                                  dsh_@@:
+  1085 00000716 B406                    	mov	ah, 6		; 6 degrees per second
+  1086 00000718 F6E4                    	mul	ah
+  1087                                  	;mov	byte [radius], 75 ; [hipotenus], length
+  1088 0000071A C605[2C0C0000]A5        	mov	byte [radius], 165
+  1089                                  	;jmp	dsh_@@@
+  1090                                  	;;;
+  1091 00000721 E8ECFEFFFF              	call	dsh_@@@
+  1092                                  	;*** beep option (uses sysaudio system call)
+  1093                                  	; do not beep while drawing blank/black line
+  1094 00000726 803D[300C0000]00        	cmp	byte [color], 0
+  1095 0000072D 740D                    	jz	short no_beep
+  1096                                  	; only one beep in same/one second
+  1097 0000072F FE0D[5F0C0000]          	dec	byte [pbeep]
+  1098 00000735 7505                    	jnz	short no_beep
+  1099 00000737 E8AEFCFFFF              	call	beep
+  1100                                  	;***
+  1101                                  no_beep:
+  1102 0000073C C3                      	retn
+  1103                                  	;;;
+  1104                                  	;neg	eax	; - x
+  1105                                  	;add	eax, 450  ; 450 - x
+  1106                                  	;cmp	eax, 360
+  1107                                  	;jb	short dsh_@@@
+  1108                                  	;sub	eax, 360
+  1109                                  ;dsh_@@@:
+  1110                                  	;mov	[angle], eax
+  1111                                  	;
+  1112                                  	;call	draw_line
+  1113                                  	;
+  1114                                  	;retn
+  1115                                  	
+  1116                                  ; ------------------------------------------------------------
+  1117                                  
+  1118                                  draw_line:
+  1119                                  	; INPUT:
+  1120                                  	;	[_x0]
+  1121                                  	;	[_y0]
+  1122                                  	;	[radius] ; [hipotenus]
+  1123                                  	;	[angle]
+  1124                                  	;	[color]
+  1125                                  	;
+  1126                                  	; Modified registers: esi, edi, eax, ecx, ebx, edx, ebp
+  1127                                  
+  1128 0000073D A1[4C0C0000]            	mov	eax, [angle]
+  1129                                  	; eax = angle	
+  1130 00000742 E80CFEFFFF              	call	getcosinus ; get cosine value * 16777216 for angle in AL
+  1131                                  	; eax = cos(angle) * 16777216
+  1132 00000747 A3[640C0000]            	mov	[cos], eax
+  1133 0000074C E832FEFFFF              	call	getxy
+  1134 00000751 A3[3C0C0000]            	mov	[_x1], eax ; projection of end point on x-axis
+  1135 00000756 A1[4C0C0000]            	mov	eax, [angle] 
+  1136 0000075B E8D4FDFFFF              	call	getsinus ; get sine value * 16777216 for angle in AL
+  1137                                  	; eax = sin(angle) * 16777216
+  1138 00000760 A3[600C0000]            	mov	[sin], eax
+  1139 00000765 E819FEFFFF              	call	getxy
+  1140 0000076A A3[400C0000]            	mov	[_y1], eax ; projection of end point on y-axis
+  1141                                  
+  1142                                  _draw_l_0:
+  1143 0000076F 31C9                    	xor	ecx, ecx
+  1144 00000771 890D[440C0000]          	mov	[_x2], ecx ; 0  ; reset
+  1145 00000777 890D[480C0000]          	mov	[_y2], ecx ; 0	; reset
+  1146 0000077D C705[B0120000]-         	mov	dword [pixelpos], circlebuffer ; linebuffer
+  1146 00000783 [B4120000]         
+  1147 00000787 A1[3C0C0000]            	mov	eax, [_x1]
+  1148 0000078C 3B05[400C0000]          	cmp	eax, [_y1]
+  1149 00000792 7302                    	jnb	short _draw_l_x0
+  1150                                  	; base axis is y-axis
+  1151 00000794 EB64                    	jmp	_draw_l_y0
+  1152                                  _draw_l_x0:
+  1153                                  	; base axis is x-axis
+  1154                                  	; draw line from x = 0 to [_x1]
+  1155                                  	; set y by using x*([sin]/[cos])
+  1156                                  	; ecx = 0
+  1157                                  	;mov	[prevy], ecx	; previous Y value
+  1158 00000796 E8B9000000              	call	write_line_pixel
+  1159 0000079B 8B0D[480C0000]          	mov	ecx, [_y2]
+  1160                                  _draw_l_x1:
+  1161 000007A1 A1[440C0000]            	mov	eax, [_x2]
+  1162 000007A6 40                      	inc	eax
+  1163 000007A7 3B05[3C0C0000]          	cmp	eax, [_x1]
+  1164 000007AD 7745                    	ja	short _draw_l_x3
+  1165 000007AF A3[440C0000]            	mov	[_x2], eax
+  1166 000007B4 8B15[600C0000]          	mov	edx, [sin]
+  1167 000007BA F7E2                    	mul	edx
+  1168 000007BC 8B1D[640C0000]          	mov	ebx, [cos]
+  1169 000007C2 F7F3                    	div	ebx
+  1170 000007C4 A3[480C0000]            	mov	[_y2], eax
+  1171 000007C9 89C5                    	mov	ebp, eax
+  1172 000007CB 41                      	inc	ecx
+  1173 000007CC 39E9                    	cmp	ecx, ebp ; previous Y+1 < current Y ?
+  1174 000007CE 73C6                    	jnb	short _draw_l_x0
+  1175                                  	;jmp	short _draw_l_x0
+  1176 000007D0 FF0D[440C0000]          	dec	dword [_x2]
+  1177                                  _draw_l_x2:
+  1178 000007D6 890D[480C0000]          	mov	[_y2], ecx
+  1179 000007DC E873000000              	call	write_line_pixel
+  1180 000007E1 41                      	inc	ecx
+  1181 000007E2 39E9                    	cmp	ecx, ebp ; loop end for [_y2]
+  1182 000007E4 72F0                    	jb	short _draw_l_x2
+  1183 000007E6 892D[480C0000]          	mov	[_y2], ebp
+  1184 000007EC FF05[440C0000]          	inc	dword [_x2]
+  1185 000007F2 EBA2                    	jmp	short _draw_l_x0
+  1186                                  
+  1187                                  _draw_l_x3:
+  1188                                  _draw_l_y3:
+  1189 000007F4 E846FBFFFF              	call	write_line  ; write line pixels to VGA buffer
+  1190 000007F9 C3                      	retn
+  1191                                  
+  1192                                  _draw_l_y0:
+  1193                                  	; base axis is y-axis
+  1194                                  	; draw line from y = 0 to [_y1]
+  1195                                  	; set x by using y*([cos]/[sin])
+  1196                                  	; ecx = 0
+  1197                                  
+  1198                                  	;mov	dword [prevx], ecx ; previous X value
+  1199 000007FA E855000000              	call	write_line_pixel
+  1200 000007FF 8B0D[440C0000]          	mov	ecx, [_x2]
+  1201                                  _draw_l_y1:
+  1202 00000805 A1[480C0000]            	mov	eax, [_y2]
+  1203 0000080A 40                      	inc	eax
+  1204 0000080B 3B05[400C0000]          	cmp	eax, [_y1]
+  1205 00000811 77E1                    	ja	short _draw_l_y3
+  1206 00000813 A3[480C0000]            	mov	[_y2], eax
+  1207                                  	;mov	edx, [cos]
+  1208                                  	;mul	edx
+  1209 00000818 F725[640C0000]          	mul	dword [cos]
+  1210                                  	;mov	ebx, [sin]
+  1211                                  	;div	ebx
+  1212 0000081E F735[600C0000]          	div	dword [sin]
+  1213 00000824 A3[440C0000]            	mov	[_x2], eax
+  1214 00000829 89C5                    	mov	ebp, eax
+  1215 0000082B 41                      	inc	ecx
+  1216 0000082C 39E9                    	cmp	ecx, ebp ; previous X+1 < current X ?
+  1217                                  	;jnb	short _draw_l_y0
+  1218 0000082E EBCA                    	jmp	short _draw_l_y0
+  1219 00000830 FF0D[480C0000]          	dec	dword [_y2]
+  1220                                  _draw_l_y2:
+  1221 00000836 890D[440C0000]          	mov	[_x2], ecx
+  1222 0000083C E813000000              	call	write_line_pixel
+  1223 00000841 41                      	inc	ecx
+  1224 00000842 39E9                    	cmp	ecx, ebp ; loop end for [_y2]
+  1225 00000844 72F0                    	jb	short _draw_l_y2
+  1226 00000846 892D[440C0000]          	mov	[_x2], ebp
+  1227 0000084C FF05[480C0000]          	inc	dword [_y2]
+  1228 00000852 EBA6                    	jmp	short _draw_l_y0
+  1229                                  
+  1230                                  ; ------------------------------------------------------------
+  1231                                  
+  1232                                  write_line_pixel:
+  1233                                  	; write pixel to line buffer
+  1234                                  	; Modified registers: eax, ebx, edx
+  1235 00000854 A1[380C0000]            	mov	eax, [_y0] ; 100 ; 768/2
+  1236 00000859 813D[4C0C0000]B400-     	cmp	dword [angle], 180
+  1236 00000861 0000               
+  1237 00000863 7608                    	jna	short wlp_0
+  1238                                  	; y = -y
+  1239 00000865 0305[480C0000]          	add	eax, [_y2] ; under the start point
+  1240 0000086B EB06                    	jmp	short wlp_1
+  1241                                  wlp_0:
+  1242 0000086D 2B05[480C0000]          	sub	eax, [_y2]
+  1243                                  wlp_1:
+  1244                                  	;mov	edx, 320
+  1245 00000873 BA00040000              	mov	edx, 1024
+  1246 00000878 F7E2                    	mul	edx
+  1247 0000087A 0305[340C0000]          	add	eax, [_x0] ; 160 ; 1024/2
+  1248                                  			; center of the screen
+  1249 00000880 8B15[4C0C0000]          	mov	edx, [angle]
+  1250 00000886 83FA5A                  	cmp	edx, 90
+  1251 00000889 7610                    	jna	short wlp_4 ; quarter/quadrand 1
+  1252 0000088B 81FA0E010000            	cmp	edx, 270
+  1253 00000891 7708                    	ja	short wlp_4 ; quarter/quadrand 4
+  1254                                  wlp_3: 
+  1255                                  	; x = -x
+  1256 00000893 2B05[440C0000]          	sub	eax, [_x2] ; negative direction
+  1257 00000899 EB06                    	jmp	short wlp_5 
+  1258                                  wlp_4:
+  1259                                  	; x = x
+  1260 0000089B 0305[440C0000]          	add	eax, [_x2] ; positive direction	
+  1261                                  wlp_5:
+  1262 000008A1 E8BCFAFFFF              	call	write_pixel
+  1263 000008A6 C3                      	retn
+  1264                                  
+  1265                                  ; ------------------------------------------------------------
+  1266                                  
+  1267                                  ;blackline:
+  1268                                  ;	push	eax
+  1269                                  ;	xor	al, al
+  1270                                  ;	xchg	[color], al ; color = 0
+  1271                                  ;	mov	[pcolor], al
+  1272                                  ;	call	write_line
+  1273                                  ;	mov	al, [pcolor]
+  1274                                  ;	mov	[color], al ; restore color
+  1275                                  ;	pop	eax
+  1276                                  ;	retn
+  1277                                  
+  1278                                  ; ------------------------------------------------------------
+  1279                                  
+  1280                                  ;set_text_mode:
+  1281                                  ;	xor    ah, ah
+  1282                                  ;	mov    al, 3
+  1283                                  ;	;int   10h ; al = 03h text mode, int 10 video
+  1284                                  ;	int    31h ; TRDOS 386 - Video interrupt
+  1285                                  ;	retn
+  1286                                  
+  1287                                  ; ------------------------------------------------------------
+  1288                                  
+  1289                                  print_msg:
+  1290                                  	; INPUT:
+  1291                                  	;   esi = ASCIIZ message address	
+  1292                                  	 
+  1293                                  	;mov	ah, 0Eh
+  1294                                  	;mov	ebx, 7
+  1295                                  	;;mov	bl, 7 ; char attribute & color
+  1296                                  ;p_next_chr:
+  1297                                  	;lodsb
+  1298                                  	;or	al, al
+  1299                                  	;jz	short p_retn ; retn
+  1300                                  	;int	31h
+  1301                                  	;jmp	short p_next_chr
+  1302                                  	
+  1303                                  	; max. char count = 255, cxolor = 07h
+  1304                                  	sys	_msg, esi, 255, 07h
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1>  %if %0 >= 2
+    72 000008A7 89F3                <1>  mov ebx, %2
+    73                              <1>  %if %0 >= 3
+    74 000008A9 B9FF000000          <1>  mov ecx, %3
+    75                              <1>  %if %0 = 4
+    76 000008AE BA07000000          <1>  mov edx, %4
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80 000008B3 B823000000          <1>  mov eax, %1
+    81                              <1> 
+    82 000008B8 CD40                <1>  int 40h
+  1305                                  p_retn:
+  1306 000008BA C3                      	retn
+  1307                                  
+  1308                                  ; ------------------------------------------------------------
+  1309                                  ; VESA VBE Mode 105h - 1024*768 256 pixels color
+  1310                                  
+  1311                                  draw_centermark:
+  1312 000008BB BE[DA080000]            	mov	esi, centermark
+  1313                                  ;	mov	ecx, centermarksize
+  1314                                  ;	shr	ecx, 2
+  1315                                  ;	mov	edi, [LFB_Address]
+  1316                                  ;dcm_@:
+  1317                                  ;	lodsd
+  1318                                  ;	mov	byte [edi+eax], 0Fh  ; white
+  1319                                  ;	loop	dcm_@
+  1320                                  ;	retn
+  1321                                  
+  1322 000008C0 BA30000000              	mov	edx, centermarksize
+  1323 000008C5 C1EA02                  	shr	edx, 2
+  1324                                  
+  1325                                  	; edx = pixel count
+  1326                                  	; esi = user's single color pixel buffer address
+  1327                                  	sys	_video, 0305h, 0Fh
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1>  %if %0 >= 2
+    72 000008C8 BB05030000          <1>  mov ebx, %2
+    73                              <1>  %if %0 >= 3
+    74 000008CD B90F000000          <1>  mov ecx, %3
+    75                              <1>  %if %0 = 4
+    76                              <1>  mov edx, %4
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80 000008D2 B81F000000          <1>  mov eax, %1
+    81                              <1> 
+    82 000008D7 CD40                <1>  int 40h
+  1328 000008D9 C3                      	retn
+  1329                                  
+  1330                                  centermark:
+  1331 000008DA FEF90500FFF90500        	     dd (1024*382)+510,(1024*382)+511
+  1332 000008E2 FDFD0500FEFD0500FF-     dd (1024*383)+509,(1024*383)+510,(1024*383)+511,(1024*383)+512
+  1332 000008EB FD050000FE0500     
+  1333 000008F2 FD010600FE010600FF-     dd (1024*384)+509,(1024*384)+510,(1024*384)+511,(1024*384)+512
+  1333 000008FB 01060000020600     
+  1334 00000902 FE050600FF050600        	     dd (1024*385)+510,(1024*385)+511
+  1335                                  
+  1336                                  centermarksize equ $-centermark
+  1337                                  
+  1338                                  ; ------------------------------------------------------------
+  1339                                  
+  1340                                  sinustable:
+  1341                                  ; from A = 0 degree to 180 degrees (sin(A)*65536*256)
+  1342                                  ; 0º
+  1343                                  cos_90:
+  1344 0000090A 00000000                dd 0
+  1345 0000090E C37704002CEF0800E4-     dd 292803, 585516, 878052, 1170319, 1462231, 1753697, 2044628, 2334937, 2624535, 2913333
+  1345 00000917 650D008FDB1100D74F-
+  1345 00000920 160061C21A00D4321F-
+  1345 00000929 00D9A02300170C2800-
+  1345 00000932 35742C00           
+  1346 00000936 DCD83000B339350064-     dd 3201244, 3488179, 3774052, 4058776, 4342263, 4624427, 4905183, 5184445, 5462127, 5738146
+  1346 0000093F 96390098EE3D00F741-
+  1346 00000948 42002B904600DFD84A-
+  1346 00000951 00BD1B4F006F585300-
+  1346 0000095A A28E5700           
+  1347 0000095E 00BE5B0038E65F00F5-     dd 6012416, 6284856, 6555381, 6823909, 7090358, 7354647, 7616697, 7876426, 8133756
+  1347 00000967 066400E51F6800B630-
+  1347 00000970 6C0017397000B93874-
+  1347 00000979 004A2F78007C1C7C00 
+  1348                                  cos_60:
+  1349                                  ; 30º
+  1350 00000982 0000800089D98300CA-     dd 8388608, 8640905, 8890570, 9137527, 9381700, 9623016, 9861400, 10096781, 10329086, 10558244
+  1350 0000098B A88700776D8B004427-
+  1350 00000994 8F00E8D59200187996-
+  1350 0000099D 008D109A00FE9B9D00-
+  1350 000009A6 241BA100           
+  1351 000009AA BB8DA4007CF3A70025-     dd 10784187, 11006844, 11226149, 11442034, 11654434
+  1351 000009B3 4CAB007297AE0022D5-
+  1351 000009BC B100               
+  1352                                  sin_45:
+  1353                                  cos_45:
+  1354                                  ; 45º
+  1355 000009BE F304B500A726B800FF-     dd 11863283, 12068519, 12270079, 12467901, 12661926, 12852093, 13038346, 13220627, 13398880, 13573053
+  1355 000009C7 39BB00BD3EBE00A634-
+  1355 000009D0 C1007D1BC4000AF3C6-
+  1355 000009D9 0013BBC9006073CC00-
+  1355 000009E2 BD1BCF00           
+  1356 000009E6 F3B3D100CE3BD4001D-     dd 13743091, 13908942, 14070557, 14227886, 14380881
+  1356 000009EF B3D600AE19D900516F-
+  1356 000009F8 DB00               
+  1357                                  cos_30:	; 60º
+  1358 000009FA D7B3DD0014E7DF00DA-     dd 14529495, 14673684, 14813402, 14948609, 15079262, 15205322, 15326749, 15443509, 15555564, 15662880
+  1358 00000A03 08E2000119E4005E17-
+  1358 00000A0C E600CA03E8001DDEE9-
+  1358 00000A15 0035A6EB00EC5BED00-
+  1358 00000A1E 20FFEE00           
+  1359 00000A22 B28FF000810DF20071-     dd 15765426, 15863169, 15956081, 16044131, 16127295, 16205546, 16278861, 16347217, 16410594, 16468971
+  1359 00000A2B 78F30063D0F4003F15-
+  1359 00000A34 F600EA46F7004D65F8-
+  1359 00000A3D 005170F900E267FA00-
+  1359 00000A46 EB4BFB00           
+  1360 00000A4A 5C1CFC0025D9FC0035-     dd 16522332, 16570661, 16613941, 16652161, 16685309, 16713374, 16736348, 16754223, 16766996, 16774661
+  1360 00000A53 82FD008117FE00FD98-
+  1360 00000A5C FE009E06FF005C60FF-
+  1360 00000A65 002FA6FF0014D8FF00-
+  1360 00000A6E 05F6FF00           
+  1361                                  sin_90:
+  1362                                  cos_0:
+  1363                                  ; 90º
+  1364 00000A72 0000000105F6FF0014-     dd 16777216, 16774661, 16766996, 16754223, 16736348, 16713374, 16685309, 16652161, 16613941, 16570661
+  1364 00000A7B D8FF002FA6FF005C60-
+  1364 00000A84 FF009E06FF00FD98FE-
+  1364 00000A8D 008117FE003582FD00-
+  1364 00000A96 25D9FC00           
+  1365 00000A9A 5C1CFC00EB4BFB00E2-     dd 16522332, 16468971, 16410594, 16347217, 16278861, 16205546, 16127295, 16044131, 15956081, 15863169
+  1365 00000AA3 67FA005170F9004D65-
+  1365 00000AAC F800EA46F7003F15F6-
+  1365 00000AB5 0063D0F4007178F300-
+  1365 00000ABE 810DF200           
+  1366 00000AC2 B28FF00020FFEE00EC-     dd 15765426, 15662880, 15555564, 15443509, 15326749, 15205322, 15079262, 14948609, 14813402, 14673684
+  1366 00000ACB 5BED0035A6EB001DDE-
+  1366 00000AD4 E900CA03E8005E17E6-
+  1366 00000ADD 000119E400DA08E200-
+  1366 00000AE6 14E7DF00           
+  1367                                  ; 120º
+  1368 00000AEA D7B3DD00516FDB00AE-     dd 14529495, 14380881, 14227886, 14070557, 13908942, 13743091, 13573053, 13398880, 13220627, 13038346
+  1368 00000AF3 19D9001DB3D600CE3B-
+  1368 00000AFC D400F3B3D100BD1BCF-
+  1368 00000B05 006073CC0013BBC900-
+  1368 00000B0E 0AF3C600           
+  1369 00000B12 7D1BC400A634C100BD-     dd 12852093, 12661926, 12467901, 12270079, 12068519
+  1369 00000B1B 3EBE00FF39BB00A726-
+  1369 00000B24 B800               
+  1370                                  ; 135º
+  1371 00000B26 F304B50022D5B10072-     dd 11863283, 11654434, 11442034, 11226149, 11006844, 10784187, 10558244, 10329086, 10096781, 9861400
+  1371 00000B2F 97AE00254CAB007CF3-
+  1371 00000B38 A700BB8DA400241BA1-
+  1371 00000B41 00FE9B9D008D109A00-
+  1371 00000B4A 18799600           
+  1372 00000B4E E8D5920044278F0077-     dd 9623016, 9381700, 9137527, 8890570, 8640905
+  1372 00000B57 6D8B00CAA8870089D9-
+  1372 00000B60 8300               
+  1373                                  ; 150º
+  1374 00000B62 000080007C1C7C004A-     dd 8388608, 8133756, 7876426, 7616697, 7354647, 7090358, 6823909, 6555381, 6284856, 6012416, 5738146
+  1374 00000B6B 2F7800B93874001739-
+  1374 00000B74 7000B6306C00E51F68-
+  1374 00000B7D 00F506640038E65F00-
+  1374 00000B86 00BE5B00A28E5700   
+  1375 00000B8E 6F585300BD1B4F00DF-     dd 5462127, 5184445, 4905183, 4624427, 4342263, 4058776, 3774052, 3488179, 3201244, 2913333, 2624535
+  1375 00000B97 D84A002B904600F741-
+  1375 00000BA0 420098EE3D00649639-
+  1375 00000BA9 00B3393500DCD83000-
+  1375 00000BB2 35742C00170C2800   
+  1376 00000BBA D9A02300D4321F0061-     dd 2334937, 2044628, 1753697, 1462231, 1170319, 878052, 585516, 292803
+  1376 00000BC3 C21A00D74F16008FDB-
+  1376 00000BCC 1100E4650D002CEF08-
+  1376 00000BD5 00C3770400         
+  1377                                  ; 180º
+  1378 00000BDA 00000000                dd 0
+  1379                                  
+  1380                                  ; ------------------------------------------------------------
+  1381                                  
+  1382                                  program_msg:
+  1383 00000BDE 5452444F5320333836-     	db "TRDOS 386 v2.0.9 - Analog Clock Demo Program"
+  1383 00000BE7 2076322E302E39202D-
+  1383 00000BF0 20416E616C6F672043-
+  1383 00000BF9 6C6F636B2044656D6F-
+  1383 00000C02 2050726F6772616D   
+  1384 00000C0A 0D0A                    	db 0Dh, 0Ah
+  1385 00000C0C 6279204572646F6761-     	db "by Erdogan Tan - 02/10/2024"
+  1385 00000C15 6E2054616E202D2030-
+  1385 00000C1E 322F31302F32303234 
+  1386                                  nextline:
+  1387 00000C27 0D0A00                  	db 0Dh, 0Ah, 0
+  1388                                  
+  1389                                  ; ------------------------------------------------------------
+  1390                                  
+  1391                                  bss:
+  1392                                  
+  1393                                  ABSOLUTE bss
+  1394                                  
+  1395 00000C2A ????                    alignb 4
+  1396                                  
+  1397                                  bss_start:
+  1398                                  hipotenus:
+  1399 00000C2C ????????                radius:	resd 1 ; Current Radius value
+  1400 00000C30 ????????                color:	resd 1
+  1401 00000C34 ????????                _x0:	resd 1
+  1402 00000C38 ????????                _y0:	resd 1
+  1403 00000C3C ????????                _x1:	resd 1
+  1404 00000C40 ????????                _y1:	resd 1
+  1405                                  
+  1406 00000C44 ????????                _x2:	resd 1
+  1407 00000C48 ????????                _y2:	resd 1
+  1408                                  
+  1409 00000C4C ????????                angle:	resd 1
+  1410 00000C50 ????????                step:	resd 1
+  1411 00000C54 ??                      dcount: resb 1
+  1412 00000C55 ??                      phase:	resb 1
+  1413                                  
+  1414 00000C56 ??                      hour:	resb 1
+  1415 00000C57 ??                      minute: resb 1
+  1416 00000C58 ??                      second: resb 1
+  1417 00000C59 ??                      phour:	resb 1
+  1418 00000C5A ??                      pminute: resb 1
+  1419 00000C5B ??                      psecond: resb 1
+  1420 00000C5C ??                      phminute: resb 1
+  1421 00000C5D ??                      pmsecond: resb 1
+  1422                                  
+  1423 00000C5E ??                      pcolor:	resb 1
+  1424 00000C5F ??                      pbeep:	resb 1
+  1425                                  
+  1426 00000C60 ????????                sin:	resd 1 ; sine(angle) * 16777216
+  1427 00000C64 ????????                cos:	resd 1 ; cosine(angle) * 16777216
+  1428                                  
+  1429                                  _squares:
+  1430                                  	;resd 90 ; squares of numbers from 0 to 89
+  1431 00000C68 <res 320h>              	resd 200 ; 0 to 200
+  1432 00000F88 ????????                	resd 1
+  1433                                  _fx:	;resd 90 ; For every X values from 0 to 89
+  1434 00000F8C <res 320h>              	resd 200 ; 0 to 200
+  1435 000012AC ????????                	resd 1
+  1436                                  
+  1437                                  pixelpos:
+  1438 000012B0 ????????                	resd 1
+  1439                                  circlebuffer:
+  1440                                  	;resd 10000 ; 100*100*4 bytes
+  1441 000012B4 <res 27100h>            	resd 40000 ; 200*200*4 bytes	
+  1442                                  
+  1443                                  bss_end:
