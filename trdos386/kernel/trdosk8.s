@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 18/09/2024  (Previous: 05/06/2024)
+; Last Update: 19/12/2024  (Previous: 05/06/2024)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1862,6 +1862,7 @@ set_dev_IRQ_service:
 	retn
 
 sysaudio: ; AUDIO FUNCTIONS
+	; 19/12/2024
 	; 23/08/2024 (TRDOS 386 v2.0.9) 
 	; 05/06/2024
 	; 04/06/2024
@@ -2742,6 +2743,7 @@ sound_play:
 	;	to 16 bit samples and mono samples must be
 	;	converted to stereo samples...)
 	 
+	; 19/12/2024 (BugFix)
 	; 05/06/2024
 	; 04/06/2024
 	; 30/07/2022
@@ -2814,7 +2816,8 @@ snd_play_5:
 
 	; 04/06/2024
 	;mov	ecx, [audio_buff_size]
-	;mov	al, [audio_device]
+	; 19/12/2024 (BugFix)
+	mov	al, [audio_device]
 	;
 	;cmp	al, 1 ; Sound Blaster 16
 	;je	short snd_play_8
