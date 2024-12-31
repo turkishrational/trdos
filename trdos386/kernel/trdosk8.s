@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 19/12/2024  (Previous: 05/06/2024)
+; Last Update: 29/12/2024  (Previous: 05/06/2024)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1862,6 +1862,7 @@ set_dev_IRQ_service:
 	retn
 
 sysaudio: ; AUDIO FUNCTIONS
+	; 29/12/2024
 	; 19/12/2024
 	; 23/08/2024 (TRDOS 386 v2.0.9) 
 	; 05/06/2024
@@ -2121,7 +2122,7 @@ sysaudio: ; AUDIO FUNCTIONS
 	;
 	;	    CL = Left Channel Volume (0 to 31 max)
 	;	    CH = Right Channel Volume (0 to 31 max)
-	;	
+	;
 
 	cmp	bh, AUDIO1L/4
 	jnb	sysret
@@ -2157,6 +2158,9 @@ AUDIO1:	dd	_beep ; 12/02/2021
 	dd	sound_data
 	dd	sound_update
 	dd	sound_getvol ; 24/05/2024
+%if 0
+	dd	sound_dmaclear ; 29/12/2024
+%endif
 	
 AUDIO1L	EQU	$ - AUDIO1
 
@@ -3516,7 +3520,7 @@ snd_dbchk_stc:
 	retn
 
 sound_update:
-	; FUNCTION = 16 
+	; FUNCTION = 16
 	; bl = 
 	;    0 = automatic (sequental) update (with flag switch!)
 	;    1 = update dma half buffer 1 (without flag switch!)
@@ -3524,7 +3528,25 @@ sound_update:
 	;  FFh = get current flag value	
 	;      0 = dma half buffer 1 (will be played next)
 	;      1 = dma half buffer 2 (will be played next)
+	;
+	; 29/12/2024
+	; Note:	Requested half buffer is updated and 
+	;	flag is set to other value for other half buffer
+	;
+	; For example:
+	;     *	if BL input is 1, half buffer 1 is loaded and
+	;	   flag is switched to 1 -half buff 2 is in order-
+	;     (next time half buffer 2 is updated automaticly)
+	;     *	if BL input is 2, half buffer 2 is updated/loaded
+	;	   and flag is switched to 0
+	;
+	; Return value for BL input = 0,1,2
+ 	;     Current flag value (just after switched)
+	;       -flag will have same value-
+	;     If BL input is 1, return value will be 1 (1 xor 0)
+	;     IF BL input is 2, return value will be 0 (1 xor 1)
 	
+	; 28/12/2024
 	; 05/06/2024
 	; 30/07/2022
 	; 10/10/2017
@@ -3579,16 +3601,20 @@ snd_update_7:
 
 	;movzx	eax, byte [audio_flag]
 	mov	al, [audio_flag]
-
 	inc	bl
 	jz	short snd_update_3 ; bl = 0FFh
 	dec	bl 
 	jz	short snd_update_0 ; bl = 0
 
+	; 28/12/2024
 	cmp	bl, 2
-	je	short snd_update_1 ; dma half buffer 2
-	jb	short snd_update_2 ; dma half buffer 1
- 
+	jna	short snd_update_8
+	;cmp	bl, 2
+	;je	short snd_update_1 ; dma half buffer 2
+	;jb	short snd_update_2 ; dma half buffer 1
+	; 28/12/2024
+	;jz	short  snd_update_2
+
 	; invalid parameter !
 ; 30/07/2022
 	;mov	eax, ERR_INV_PARAMETER ; 23
@@ -3596,13 +3622,20 @@ snd_update_7:
 ;	mov	[u.error], eax
 ;	jmp	error
 
+snd_update_err:
 	; 30/07/2022
 	sub	eax, eax
 	mov	al, ERR_INV_PARAMETER ; 23
 	jmp	sysaudio_err
-	
+
+	; 29/12/2024
+snd_update_8:
+	mov	al, bl	; 1 or 2
+	dec	al
+	mov	[audio_flag], al ; 0 or 1
 snd_update_0:
 	xor	byte [audio_flag], 1 ; update flag !!!
+snd_update_9:
 	cmp	al, 1
 	jb	short snd_update_2 ; dma half buffer 1
 snd_update_1:
@@ -3614,6 +3647,8 @@ snd_update_2:
 	;shr	ecx, 2
 	;rep	movsd
 	rep	movsb ; SB16, AC97, VT8233
+	; 29/12/2024
+	mov	al, [audio_flag]
 snd_update_3:
 	mov	[u.r0], eax
 
@@ -3639,6 +3674,47 @@ snd_gvol_0:
 snd_gvol_1:
 	mov	cx, [audio_pcmo_volume]
 	retn
+
+%if 0
+
+sound_dmaclear:
+	; FUNCTION = 18
+	; Clear DMA buffer
+	;	 (may be useful for non-VRA AC97 hardware)
+	; bl = cleaning byte value
+	;      0 or 80h (not a necessary value, 0 is most proper)
+	;
+	; Return value
+	;	eax = DMA half buffer size (DMA buff size / 2)
+	;  If eax = 0
+	;	there is not an active DMA buffer for user)
+	;
+	; 28/12/2024
+	mov	edi, [audio_dma_buff]
+	and	edi, edi
+	jz	short snd_dma_clear_ok
+	mov	ecx, [audio_dmabuff_size]
+	or	ecx, ecx
+	jz	short snd_dma_clear_ok
+	; security (is necessary for multitasking)
+	mov	cl, [audio_user]
+	or	cl, cl
+	jz	short snd_dma_clear_ok
+	cmp	cl, [u.uno]
+	jne 	short snd_dma_clear_ok
+	mov	ecx, [dma_hbuff_size]
+	and	ecx, ecx
+	jz	short snd_dma_clear_ok
+
+	mov	[u.r0], ecx
+	shl	ecx, 1 ; full buffer size in bytes
+	mov	al, bl
+	rep	stosb	
+
+snd_dma_clear_ok:
+	retn
+
+%endif
 
 set_irq_callback_service:
 	; 23/11/2023
