@@ -5,7 +5,7 @@
 ;
 ; 27/10/2017
 ;
-; [ Last Modification: 04/06/2024 ]  !!! STEREO MOD PLAYING !!!
+; [ Last Modification: 27/12/2024 ]  !!! STEREO MOD PLAYING !!!
 ;
 ; Derived from 'tmodplay.s' (TMODPLAY.PRG, SB16) source code by Erdogan Tan
 ; (27/10/2017). ((Stereo mod playing with TRDOS 386 audio system calls...))
@@ -267,7 +267,8 @@ PlayNow:
 	;mov	ebx, BUFFERSIZE
 	mov	ebx, BUFFERSIZE/4  ; 16 bits, stereo sound buffer
 	call	GetSamples
-	jc	error_exit
+	; 27/12/2024
+	;jc	error_exit
 
 ;	;mov	ecx, 128	; Make a lookup table
 ;	mov	cl, 128
@@ -280,8 +281,10 @@ PlayNow:
 ;	add     ebx, 4
 ;	loop    MakeOfs
 
+	; 27/12/2024
+	mov	ecx, 256
 	; 27/10/2017
-	mov	cx, 256
+	;mov	cx, 256
 	xor	ebx, ebx
 	mov	edi, RowOfs
 MakeOfs:
@@ -451,6 +454,7 @@ noDevMsg:
 ;      
 ;=============================================================================
 
+	; 27/12/2024
 PlayMod:
 	; 27/11/2023
 	; 27/10/2017
@@ -534,6 +538,14 @@ dec_volume_level:
 q_return:
 	retn
 r_loop:
+	;;;
+	; 27/12/2024
+	sys	_time, 4 ; get timer ticks (18.2 ticks/second)
+	cmp	eax, [timerticks]
+	je	p_loop
+	mov	[timerticks], eax
+	;;;
+
 	; 27/10/2017
 	; Get Current DMA buffer Pointer 
 	; 23/06/2017 ('modplay6.s')
@@ -2609,14 +2621,16 @@ SinTable:
 	db	0
 msg_usage:
 	db	'Tiny MOD Player for TRDOS 386 by Erdogan Tan. '
-	;;db	'October 2017.',10,13
-	;db	'November 2023.',10,13 ; 27/11/2023
-	db	'June 2024.',10,13	
+	;;;db	'October 2017.',10,13
+	;;db	'November 2023.',10,13 ; 27/11/2023
+	;db	'June 2024.',10,13
+	db	'December 2024',10,13	
 	db	'usage: tmodplay filename.mod', 10,13,0
 	db	'29/10/2017',10,13,0
 	db	'27/11/2023',10,13,0
-	db	'02/06/2024',10,13,0
-	db	'04/06/2024',10,13,0
+	;db	'02/06/2024',10,13,0
+	;db	'04/06/2024',10,13,0
+	db	'27/12/2024',10,13,0
 
 Credits:
 	db	'Tiny MOD Player v0.1b by Carlos Hasan. July 1993.'
@@ -2770,6 +2784,9 @@ NewScope_L:	resw 256
 NewScope_R:	resw 256
 OldScope_L:	resw 256
 OldScope_R:	resw 256
+
+; 27/12/2024
+timerticks:	resd 1
 
 mod_file_name:
 		resb 80

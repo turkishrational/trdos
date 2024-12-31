@@ -5,7 +5,7 @@
 ;
 ; 27/10/2017
 ;
-; [ Last Modification: 02/06/2024 ]  !!! STEREO MOD PLAYING !!!
+; [ Last Modification: 27/12/2024 ]  !!! STEREO MOD PLAYING !!!
 ;
 ; Derived from 'tmodplay.s' (TMODPLAY.PRG, SB16) source code by Erdogan Tan
 ; (27/10/2017). ((Stereo mod playing with TRDOS 386 audio system calls...))
@@ -252,6 +252,18 @@ PlayNow:
 	call	GetSamples
 	jc	error_exit
 
+	; 27/12/2024
+	; bh = 16 : update (current, first) dma half buffer
+	; bl = 0  : then switch to the next (second) half buffer
+	sys	_audio, 1000h
+
+	; 27/12/2024
+        ; load 32768 bytes into audio buffer
+	mov	edi, Audio_Buffer
+	mov	ebx, BUFFERSIZE/4  ; 16 bits, stereo sound buffer
+	call	GetSamples
+	;jc	error_exit
+
 ;	;mov	ecx, 128	; Make a lookup table
 ;	mov	cl, 128
 ;	xor     ebx, ebx	; for fastest pixel
@@ -263,8 +275,10 @@ PlayNow:
 ;	add     ebx, 4
 ;	loop    MakeOfs
 
+	; 27/12/2024
+	mov	ecx, 256
 	; 27/10/2017
-	mov	cx, 256
+	;mov	cx, 256
 	xor	ebx, ebx
 	mov	edi, RowOfs
 MakeOfs:
@@ -297,16 +311,17 @@ MakeOfs:
 
 	;mov	word [MixSpeed], 22050	; Mixing at 22.050 kHz
 	
+	; 27/12/2024
 	; Start	to play
-	mov	al, [bps]
-	shr	al, 4 ; 8 -> 0, 16 -> 1
-	shl	al, 1 ; 16 -> 2, 8 -> 0
-	mov	bl, [stmo]
-	dec	bl
-	or	bl, al
-	mov	cx, [MixSpeed] ; [Sample_Rate] ; Hz 
-	mov	bh, 4 ; start to play	
-	sys	_audio
+	;mov	al, [bps]
+	;shr	al, 4 ; 8 -> 0, 16 -> 1
+	;shl	al, 1 ; 16 -> 2, 8 -> 0
+	;mov	bl, [stmo]
+	;dec	bl
+	;or	bl, al
+	;mov	cx, [MixSpeed] ; [Sample_Rate] ; Hz
+	;mov	bh, 4 ; start to play
+	;sys	_audio
     
 	;; SETUP SIGNAL RESPONSE BYTE
 	;; 06/03/2017
@@ -377,6 +392,18 @@ error_color:
 loadlbm_ok: 
 	; 21/10/2017
 _a4:
+	; 27/12/2024
+	; Start	to play
+	mov	al, [bps]
+	shr	al, 4 ; 8 -> 0, 16 -> 1
+	shl	al, 1 ; 16 -> 2, 8 -> 0
+	mov	bl, [stmo]
+	dec	bl
+	or	bl, al
+	mov	cx, [MixSpeed] ; [Sample_Rate] ; Hz
+	mov	bh, 4 ; start to play
+	sys	_audio
+
 	; 24/06/2017
 	call	PlayMod ; 13/02/2017 (ModPlay)
 
@@ -419,6 +446,7 @@ noDevMsg:
 ;      
 ;=============================================================================
 
+	; 27/12/2024
 PlayMod:
 	; 27/10/2017
 	; 19/10/2017
@@ -497,6 +525,14 @@ dec_volume_level:
 q_return:
 	retn
 r_loop:
+	;;;
+	; 27/12/2024
+	sys	_time, 4 ; get timer ticks (18.2 ticks/second)
+	cmp	eax, [timerticks]
+	je	p_loop
+	mov	[timerticks], eax
+	;;;
+
 	; 27/10/2017
 	; Get Current DMA buffer Pointer 
 	; 23/06/2017 ('modplay6.s')
@@ -1850,6 +1886,8 @@ StopPlaying:
 ;	call	wordtohex
 ;	retn
 
+	; 27/12/2024
+	; 04/06/2024 (BugFix)
 	; 24/06/2017
 	; 19/06/2017
 	; 05/03/2017 (TRDOS 386)
@@ -1860,8 +1898,9 @@ write_audio_dev_info:
 	; DEV/VENDOR
 	;	DDDDDDDDDDDDDDDDVVVVVVVVVVVVVVVV
 
-	mov	esi, [dev_vendor]
-	mov	ax, si
+	;mov	esi, [dev_vendor]
+	; 04/06/2024
+	mov	eax, [dev_vendor]
 	movzx	ebx, al
 	mov	dl, bl
 	and	bl, 0Fh
@@ -1880,8 +1919,9 @@ write_audio_dev_info:
 	shr	bl, 4
 	mov	al, [ebx+hex_chars]
 	mov	[msgVendorId], al
-	shr	esi, 16
-	mov	ax, si
+	;shr	esi, 16
+	; 04/06/2024
+	shr	eax, 16
 	mov	bl, al
 	mov	dl, bl
 	and	bl, 0Fh
@@ -1901,9 +1941,12 @@ write_audio_dev_info:
 	mov	al, [ebx+hex_chars]
 	mov	[msgDevId], al
 
-	mov	esi, [bus_dev_fn]
-	shr	esi, 8
-	mov	ax, si
+	;mov	esi, [bus_dev_fn]
+	;shr	esi, 8
+	;mov	ax, si
+	; 04/06/2024
+	mov	eax, [bus_dev_fn]
+	shr	eax, 8
 	mov	bl, al
 	mov	dl, bl
 	and	bl, 7 ; bit 0,1,2
@@ -2525,11 +2568,13 @@ SinTable:
 	db	0
 msg_usage:
 	db	'Tiny MOD Player for TRDOS 386 by Erdogan Tan. '
-	;db	'October 2017.',10,13
-	db	'June 2024.',10,13
+	;;db	'October 2017.',10,13
+	;db	'June 2024.',10,13
+	db	'December 2024',10,13
 	db	'usage: tmodplay filename.mod', 10,13,0
 	db	'29/10/2017',10,13,0
-	db	'02/06/2024',10,13,0
+	;db	'02/06/2024',10,13,0
+	db	'27/12/2024',10,13,0
 
 Credits:
 	db	'Tiny MOD Player v0.1b by Carlos Hasan. July 1993.'
@@ -2680,6 +2725,9 @@ NewScope_L:	resw 256
 NewScope_R:	resw 256
 OldScope_L:	resw 256
 OldScope_R:	resw 256
+
+; 27/12/2024
+timerticks:	resd 1
 
 mod_file_name:
 		resb 80
