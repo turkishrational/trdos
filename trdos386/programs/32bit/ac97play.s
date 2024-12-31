@@ -5,7 +5,7 @@
 ;
 ; 30/11/2024
 ;
-; [ Last Modification: 18/12/2024 ]
+; [ Last Modification: 29/12/2024 ]
 ;
 ; Modified from AC97PLAY.COM .wav player program by Erdogan Tan, 29/11/2024
 ;
@@ -1704,7 +1704,9 @@ lff_4:
 	xor	eax, eax
 lff_10:
 	; 14/12/2024
-	mov	ecx, [buffersize]
+	mov	ecx, [buffersize] ; samples
+	; 29/12/2024
+	shl	ecx, 1	; bytes
 	jmp	short lff_3
 
 ; entry ds:ax points to last byte in file
@@ -7020,7 +7022,7 @@ tol_fill_c:
 Credits:
 	db	'Tiny WAV Player for TRDOS 386 by Erdogan Tan. '
 	db	'December 2024.',10,13,0
-	db	'18/12/2024', 10,13
+	db	'29/12/2024', 10,13
 ; 15/11/2024
 reset:
 	db	0
