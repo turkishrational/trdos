@@ -5,7 +5,7 @@
 ;
 ; 27/12/2024				- play music from multiple wav files -
 ;
-; [ Last Modification: 31/12/2024 ]
+; [ Last Modification: 01/01/2025 ]
 ;
 ; Modified from VGAPLAY3.PRG .wav player program by Erdogan Tan, 30/12/2024
 ;
@@ -186,7 +186,9 @@ mode_13h_set_ok:
 			; 64 volume levels
 	;mov	[graphstart], eax
 	; 30/12/2024
-	mov	dword [graphstart], 0A0000h+(13*8*320)+(4*320)
+	;mov	dword [graphstart], 0A0000h+(13*8*320)+(4*320)
+	; 01/01/2025
+	mov	dword [graphstart], 0A0000h+(11*8*320)+(4*320)
 
 ; -------------------------------------------------------------
 
@@ -6269,7 +6271,8 @@ lights_on_4:
 	;add	ax, dx
 	add	ah, 80h
 	;;shr	eax, 9	; 128 volume levels
-	;add	eax, edx
+	; 01/01/2024
+	add	eax, edx
 	;;shr	eax, 10	; (L+R/2) & 128 volume levels
 	;shr	eax, 9	; (L+R/2) & 256 volume levels
 	; 30/12/2024
@@ -7341,8 +7344,8 @@ valid_id_count equ (($ - valid_ids)>>2)	; 05/11/2023
 
 Credits:
 	db 'VGA WAV Player for TRDOS 386 by Erdogan Tan. '
-	db 'December 2024.',10,13,0
-	db '31/12/2024', 10,13
+	db 'January 2025.',10,13,0
+	db '01/01/2025', 10,13
 ; 15/11/2024
 reset:
 	db 0
