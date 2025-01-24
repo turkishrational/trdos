@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - MAIN PROGRAM : trdosk8.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 29/12/2024  (Previous: 05/06/2024)
+; Last Update: 15/01/2025  (Previous: 29/12/2024)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1862,15 +1862,16 @@ set_dev_IRQ_service:
 	retn
 
 sysaudio: ; AUDIO FUNCTIONS
+	; 11/01/2025 (TRDOS 386 v2.0.10)
 	; 29/12/2024
 	; 19/12/2024
-	; 23/08/2024 (TRDOS 386 v2.0.9) 
+	; 23/08/2024 (TRDOS 386 v2.0.9)
 	; 05/06/2024
 	; 04/06/2024
 	; 23/05/2024 (TRDOS 386 v2.0.8)
  	; 19/11/2023 (TRDOS 386 v2.0.7)
 	; 29/07/2022 (TRDOS 386 v2.0.5)
-	; 12/02/2021 (TRDOS 386 v2.0.3) 
+	; 12/02/2021 (TRDOS 386 v2.0.3)
 	; 28/07/2020
 	; 27/07/2020
 	; 10/10/2017
@@ -1890,7 +1891,7 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	     CX = Frequency Divisor (1193180/Frequency)
 	;		 (1331 for 886 Hz)
 	;
-	;	01/04/2017	
+	;	01/04/2017
 	;
 	; 	BH = 1 -> DETECT (& ENABLE) AUDIO DEVICE
 	;	     BL = 0 : PC SPEAKER
@@ -1915,7 +1916,7 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	             auto increment of S.R.B. value
 	;			 	if BL = 2
 	;	        EDX = Signal Response (Return) Byte Address
-	;	     	   			
+	;
 	;	     BL = 1 for CallBack Method
 	;	    	EDX = CallBack Service Address (Virtual)
 	;
@@ -1939,12 +1940,12 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	BH = 7 -> STOP
 	;	     BL = Any
 	;
-	;	BH = 8 -> RESET 
+	;	BH = 8 -> RESET
 	;	     BL = Any
 	;
 	;	BH = 9 -> CANCEL (CALLBACK or S.R.B. SERVICE)
-	;	     BL = Any	
-	;	
+	;	     BL = Any
+	;
 	;	BH = 10 -> DEALLOCATE AUDIO BUFFER (for user)
 	;	     BL = Any
 	;
@@ -1954,7 +1955,7 @@ sysaudio: ; AUDIO FUNCTIONS
 	;		  1 = PCM out volume ; 23/05/2024
 	;	     CL = Left Channel Volume (0 to 31 max)
 	;	     CH = Right Channel Volume (0 to 31 max)
-	;	
+	;
 	;	     Note: If BL >= 80h (Bit 7 of BL is set),
 	;	     volume level will be set for next playing
 	;	     (actual volume level will not be changed
@@ -1979,9 +1980,9 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	     BL: 0 = Audio Controller Info
 	;	     ; 19/11/2023
 	;	     BL: 1 = Audio (AC'97) Codec Info
-	;	     BL > 1 = Invalid for now! 
+	;	     BL > 1 = Invalid for now!
 	;
-	;	22/06/2017	
+	;	22/06/2017
 	;	BH = 15 -> GET CURRENT SOUND DATA (for graphics)
 	;	     BL: 0 -> PCM OUT data
 	;	       > 0 -> Invalid for now!
@@ -1990,7 +1991,7 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	     ECX > 0 -> Byte count for buffer (EDX)
 	;	         EDX = Buffer Address (Virtual)
 	;
-	;	10/10/2017	
+	;	10/10/2017
 	;	BH = 16 -> UPDATE DMA BUFFER DATA
 	;		   (by using the Audio Buffer content)
 	;	     BL = 0 : Update dma half buffer in sequence
@@ -2052,7 +2053,7 @@ sysaudio: ; AUDIO FUNCTIONS
 	;
 	;	For BH = 9 -> CANCEL (CALLBACK or S.R.B. SERVICE)
 	;	    none (if CF = 1 -> Error code in EAX)
-	;	
+	;
 	;	For BH = 10 -> DEALLOCATE AUDIO BUFFER (for user)
 	;	    none (if CF = 1 -> Error code in EAX)
 	;
@@ -2069,9 +2070,9 @@ sysaudio: ; AUDIO FUNCTIONS
 	;
 	;    	04/06/2017
 	;	For BH = 14 -> GET AUDIO DEVICE INFO
-	;	(for BL = 0) ; 05/06/2017	
+	;	(for BL = 0) ; 05/06/2017
 	;	    EAX = IRQ Number in AL
-	;		  Audio Device Number in AH 
+	;		  Audio Device Number in AH
 	;	    EBX = DEV/VENDOR ID
 	;		 (DDDDDDDDDDDDDDDDVVVVVVVVVVVVVVVV)
 	;	    ECX = BUS/DEV/FN 
@@ -2090,11 +2091,11 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	                 (ERR_DEV_NOT_RDY = 15)
 	;	    Note: EAX & EBX = 0 (for SB16,VIA,HDA)
  	;
-	;	22/06/2017	
+	;	22/06/2017
 	;	For BH = 15 -> GET CURRENT SOUND DATA
 	;			 (for graphics)
 	;	(for BL = 0)
-	;	 If ECX input is 0 
+	;	 If ECX input is 0
 	;	    EAX = DMA Buffer Current Position (Offset)
 	;	 If ECX input >  0
 	;	    EAX = Actual transfer count
@@ -2103,7 +2104,7 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	     virtual address as EAX bytes.)
 	;	 ((If CF = 1 ->  Error code in EAX))
 	;
-	;	10/10/2017	
+	;	10/10/2017
 	;	For BH = 16 -> UPDATE DMA BUFFER DATA
 	;	    EAX = 0, if the updated (or current)
 	;		     half buffer is DMA half buffer 1
@@ -2127,7 +2128,7 @@ sysaudio: ; AUDIO FUNCTIONS
 	cmp	bh, AUDIO1L/4
 	jnb	sysret
 
-	shl	bh, 2 ; *4	
+	shl	bh, 2 ; *4
 	movzx	esi, bh
 
 	; 22/04/2017
@@ -2166,23 +2167,31 @@ AUDIO1L	EQU	$ - AUDIO1
 
 soundc_detect:
 	; FUNCTION = 1
-	; bl = Audio device type number 
+	; bl = Audio device type number
 	; (0 = pc speaker, 1 = sound blaster 16, 2 = intel ac97
 	;  3 = via vt823x, 4 = intel HDA, 0FFh = any)
 	
 	; 04/06/2017
-	mov	ah, [audio_device]
+	;mov	ah, [audio_device]
+	; 11/01/2025
+	mov	al, [audio_device]
 	cmp	bl, 0FFh ; get current audio device id
 	je	short sysaudio0
 
-	and	ah, ah
+	;and	ah, ah
+	; 11/01/2025
+	and	al, al
 	jz	short soundc_get_dev
 
-	cmp	ah, bl
+	;cmp	ah, bl
+	; 11/01/2025
+	cmp	al, bl
 	jne	short soundc_dev_err
 
 sysaudio0:
-	mov	al, [audio_mode]
+	;mov	al, [audio_mode]
+	; 11/01/2025
+	mov	ah, [audio_mode]
 sysaudio1:
 	mov	[u.r0], eax
 	mov	ebx, [audio_vendor] ; (DEVICE/VENDOR ID)
@@ -2264,9 +2273,11 @@ sound_alloc:
 	; FUNCTION = 2
 	; ecx = audio buffer size (in bytes)
 	; edx = audio buffer address (virtual)
+	; 15/01/2025
+	; 12/01/2025	
 	; 25/11/2023
 	; 27/07/2020
-	; 28/05/2017
+	; 28/05/2027
 	; 01/05/2017, 15/05/2017
 	; 21/04/2017, 24/04/2017
 	cmp	byte [audio_pci], 0
@@ -2288,30 +2299,53 @@ snd_alloc_0:
 	ja	short sound_buff_error
 snd_alloc_6:
 	; 15/05/2017
-	cmp	ecx, 4096 ; PAGE_SIZE
+	;cmp	ecx, 4096 ; PAGE_SIZE
+	;jb	short sound_buff_error
+	; 15/01/2025
+	cmp	ecx, 320
 	jb	short sound_buff_error
+	;
+	; 12/01/2025
+	mov	ebx, edx ; (new) virtual address of audio_buffer
 	;
 	mov	eax, [audio_buffer] ; audio buffer address (current)
 	or	eax, eax
-	jz	short snd_alloc_2
+	;jz	short snd_alloc_2
+	; 12/01/2025
+	jz	short snd_alloc_1 ; first time
 	; audio buffer exists !
 	mov	bl, [u.uno]
 	cmp	bl, [audio_user]
 	;jne	sndc_owner_error ; not owner !
 	; 25/11/2023
-	je	short snd_alloc_7
+	;je	short snd_alloc_7
+	; 12/01/2025
+	je	short snd_alloc_2 
 	jmp	sndc_owner_error ; not owner !
-snd_alloc_7:
-	cmp	eax, edx ; same virtual buffer address ?
-	jne	short snd_alloc_1
-	cmp	ecx, [audio_buff_size]
-	je	short snd_alloc_3 ; Nothing to do !
-				  ; Buffer has been set already!
+
+	; 12/01/2025 - TRDOS 386 v2.0.10
+	; Important modification:
+	;; Always deallocate user's audio_buffer address with
+	;; buffer size and then allocate a new one
+	;; (address range may be used before)
+snd_alloc_2:
+	mov	ecx, [audio_buff_size]
+	mov	ebx, eax ; audio buffer address (current)
+;snd_alloc_7:
+	; 12/01/2025	
+	;cmp	eax, edx ; same virtual buffer address ?
+	;jne	short snd_alloc_1
+	;cmp	ecx, [audio_buff_size]
+	;je	short snd_alloc_3 ; Nothing to do !
+	;			  ; Buffer has been set already!
 snd_alloc_1:
 	push	ecx
 	push	edx
-	mov	ebx, eax ; audio buffer address (current)
-	mov	ecx, [audio_buff_size]
+	; 12/01/2025
+	;mov	ebx, eax ; audio buffer address (current)
+	;mov	ecx, [audio_buff_size]
+	; ebx = audio buffer address (virtual)
+	; ecx = audio buffer size in bytes
 	call	deallocate_user_pages
 	pop	edx
 	pop	ecx
@@ -2320,7 +2354,9 @@ snd_alloc_1:
  	mov	[audio_p_buffer], eax  ; 0
  	mov	[audio_buff_size], eax
 	mov	[audio_user], al ; 0
-snd_alloc_2:
+
+	; 12/01/2025
+;snd_alloc_2:
 	mov	ebx, edx
 	; 01/05/2017
 	;mov	edx, ~PAGE_OFF ; truncating page offsets
@@ -2392,15 +2428,14 @@ soundc_init:
 	; bl = method (0= s.r.b., 1= callback, 2= auto incr s.r.b.)
 	; cl = signal response byte (initial or fixed) value
 	; edx = signal response byte or callback address
+
+	; 11/01/2025
 	; 05/06/2024
 	; 04/06/2024
-	; 04/12/2023
-	; 02/12/2023
-	; 07/08/2022
-	; 29/07/2022
+	; 02/12/2023, 04/12/2022
+	; 29/07/2022, 07/08/2022
 	; 27/07/2020
-	; 28/05/2017
-	; 12/05/2017, 20/05/2017
+	; 12/05/2017, 20/05/2017, 28/05/2027
 	; 22/04/2017, 23/04/2017, 24/04/2017
 	; 13/04/2017, 14/04/2017, 16/04/2017, 21/04/2017
 	; 03/04/2017, 10/04/2017
@@ -2576,7 +2611,7 @@ sndc_init22:
 	; 05/06/2024
 	mov	[dma_hbuff_size], ecx  ; DMA half buffer size
 	shl	ecx, 1  ; add ecx, ecx ; * 2
-	
+
 	;;;
 	; 04/06/2024
 	add	ecx, 4095  ; PAGE_SIZE - 1
@@ -3182,6 +3217,11 @@ snd_disable_1:
 	call	vt8233_stop
 snd_disable_2:
 	mov	al, [audio_intr]
+
+	; 15/01/2025
+	and	al, al
+	jz	short snd_disable_5
+
 	sub	ebx, ebx ; 0 = reset
 	call	set_dev_IRQ_service
 
@@ -3189,10 +3229,15 @@ snd_disable_2:
 	sub	ah, ah ; 0 = reset
 	call	set_hardware_int_vector
 
+snd_disable_5:	; 15/01/2025
 	xor	eax, eax
 	mov	byte [audio_device], al
 	mov	byte [audio_intr], al
 	xchg	eax, [audio_dma_buff]
+
+	; 15/01/2025
+	or	eax, eax
+	jz	short snd_disable_3
 
 	; 24/05/2017
 	;or	eax, eax
@@ -3204,7 +3249,7 @@ snd_disable_2:
 	mov	byte [audio_pci], 0
 
 	; 23/08/2024 - bugfix
-	cmp	eax, sb16_dma_buffer	; reserved buffer ?
+	cmp	eax, sb16_dma_buffer ; reserved buffer ?
 	je	short snd_disable_3 ; it isn't an allocated mem buff
 
 	;sub	ecx, ecx
