@@ -1,20 +1,22 @@
 ; ****************************************************************************
-; vgaplay.s - TRDOS 386 (TRDOS v2.0.9) WAV PLAYER - VESA VBE Video Mode 101h
+; dplaywav2.s - TRDOS 386 (TRDOS v2.0.9) WAV PLAYER - VESA VBE Video Mode 101h
 ; ----------------------------------------------------------------------------
-; VGAPLAY.PRG ! AC'97 (ICH) .WAV PLAYER program by Erdogan TAN
+; DPLAYWAV2.PRG ! AC'97 (ICH) .WAV PLAYER program by Erdogan TAN
 ;
-; 25/12/2024				- play music from multiple wav files -
+; 28/12/2024
 ;
 ; [ Last Modification: 18/01/2025 ]
 ;
-; Modified from DPLAYWAV.PRG .wav player program by Erdogan Tan, 25/12/2024
-;	    and AC97PLAY.PRG, 18/12/2024	
+; Modified from DPLAYWAV.PRG .wav player program by Erdogan Tan, 26/12/2024
 ;
 ; ****************************************************************************
-; nasm vgaplay.s -l vgaplay.txt -o VGAPLAY.PRG -Z error.txt
+; nasm dplayw2.s -l dplayw2.txt -o DPLAYW2.PRG -Z error.txt
 
-; dplayvga.s (25/12/2024) - play music from single wav file -
-; ac97play.s (18/12/2024) - play music from multiple wav files -
+; 28/12/2024
+; dplayw2.s : DMA buffer tracking (instead of user's audio buffer)
+
+; Draw graphics by using 'sysvideo' bx=0305h
+; and display text by using bx=010Fh
 
 ; 07/12/2024 - playwav9.s - interrupt (srb) + tuneloop version
 ; ------------------------------------------------------------
@@ -183,9 +185,8 @@ set_vesa_mode_101h_ok:
 
 ; -------------------------------------------------------------
 
-	; 25/12/2024
-	; 28/11/2024
-Player_InitalizePSP:
+	; 07/12/2024
+GetFileName_@:
 	; 30/11/2024
 	; (TRDOS 386 -Retro UNIX 386- argument transfer method)
 	; (stack: argc,argv0addr,argv1addr,argv2addr ..
@@ -196,111 +197,16 @@ Player_InitalizePSP:
 	cmp	eax, 2 ; two arguments 
 		; (program file name & mod file name)
 	jb	pmsg_usage ; nothing to do
-	;mov	[argc], al
-	shl	eax, 2 ; *4
-	add	eax, esp
-	; eax = last argument's address pointer
-	mov	[argvl], eax ; last wav file (argument)
-	mov	[argv], esi ; current argument (PRG file name)
+	; 07/12/2024
 	lodsd	; skip program (PRG) file name
-	mov	[argvf], esi ; 1st wav file (argument)
 
-	; 25/12/2024
-Player_ParseParameters:
-	; 30/11/2024
-	; 29/11/2024
-	; 18/12/2024
-	;mov	edx, wav_file_name
-	
-	; 26/12/2024
-	;cmp	byte [IsInSplash], 0
-	;jna	short check_p_command
-
-	mov	edx, SplashFileName
-	jmp	short _1
-
-	; 25/12/2024
-check_p_command:
-	; 07/12/2024
-	mov	esi, [argv]
-	;
-  	cmp	byte [command], 'P'
-	je	short Player_ParsePreviousParameter
-    
-	; 07/12/2024
-	; 30/11/2024
-	;mov	esi, [argv] ; current argument (wav file) ptr
-	add	esi, 4
-	cmp	esi, [argvl] ; last argument (wav file) ptr
-	jna	short Player_ParseNextParameter
-jmp_Player_Quit:
-	jmp	Player_Quit
-
-Player_ParsePreviousParameter:
-	; 29/11/2024
-	;mov	byte [command], 0
-	; 30/11/2024
-	;mov	esi, [argv] ; 07/12/2024	
-	cmp	esi, [argvf] ; first argument (wav file) ptr
-	jna	short Player_ParseNextParameter
-	sub	esi, 4
-Player_ParseNextParameter:
-	; 30/11/2024
-	mov	[argv], esi  ; set as current argument
-	; 01/12/2024
-	mov	esi, [esi]
-	; 07/12/2024
-	;mov	ecx, esi
-	;mov	esi, [ecx]
-
-	; 29/11/2024
-	call	GetFileName
-	;jcxz	jmp_Player_Quit
-	jecxz	jmp_Player_Quit ; 30/11/2024
-
-	; 30/11/2024
-	; 28/11/2024
-	mov	edx, wav_file_name
-	;;;
-_1:
-
-; open the file
-        ; open existing file
-	; 28/11/2024
-	;mov	edx, wav_file_name
-        call	openFile ; no error? ok.
-        jnc	getwavparms	; 14/11/2024
-
-	; 28/11/2024
-	cmp	byte [IsInSplash], 0
-	ja	Player_SplashScreen
-
-	; 29/11/2024
-	cmp	byte [filecount], 0
-	ja	short check_p_command
-
-	; 25/12/2024
-	; 21/12/2024
-	call	set_text_mode
-	; file not found!
-	; 30/11/2024
-	sys	_msg, noFileErrMsg, 255, 0Ch
-        jmp     Exit
-
-_exit_:
-	jmp	terminate
-
-; -------------------------------------------------------------
-
-	; 26/12/2024
-	; 25/12/2024
 	; 30/11/2024 (32bit)
 	; 29/11/2024
 	; 30/05/2024
 GetFileName:
 	mov	edi, wav_file_name 
-	; 30/11/2024
-	;mov	esi, [argv]
+	; 07/12/2024
+	mov	esi, [esi]
 	xor	ecx, ecx ; 0
 ScanName:
 	lodsb
@@ -366,8 +272,22 @@ SetExt:
 	add	edi, 4
 a_4:	
 	mov	byte [edi], 0
+
+        ; open existing file
+	; 28/11/2024
+	;mov	edx, wav_file_name
+        call    openFile ; no error? ok.
+        jnc     short getwavparms
+
+	; 21/12/2024
+	call	set_text_mode
+	; file not found!
 	; 30/11/2024
-	retn
+	sys	_msg, noFileErrMsg, 255, 0Ch
+        jmp     Exit
+
+_exit_:
+	jmp	terminate
 
 ; -------------------------------------------------------------
 
@@ -392,18 +312,11 @@ getwavparms:
 
 ; -------------------------------------------------------------
 
-	; 25/12/2024
-	cmp 	byte [IsInSplash], 0
-	;jna	short StartPlay
-	; 27/12/2024
-	jna	short StartPlay@
-
-; -------------------------------------------------------------
-
 	; 26/12/2024
-Player_SplashScreen:
 	; 21/12/2024
 	;mov	byte [tcolor], 15
+
+Player_SplashScreen:
 _0:
 	call	drawsplashscreen
 
@@ -429,11 +342,6 @@ wleds_sa_2:
 	jnz	short wleds_sa_1
 	;;;
 
-	; 25/12/5024
-	; 28/11/2024 
-	cmp	dword [filehandle], -1
-	jne	short StartPlay
-
 	; 24/12/2024
 	; 07/12/2024
 	;;; wait for 3 seconds
@@ -446,34 +354,6 @@ _wait_3s:
 	cmp	eax, ecx
 	jb	short _wait_3s
 	;;;
-
-	; 25/12/2024
-	; 28/11/2024
-	mov	byte [IsInSplash], 0
-	;mov	edx, wav_file_name
-	; 30/11/2024
-	mov	esi, [argvf]
-	; 29/11/2024
-	jmp	Player_ParseNextParameter
-
-; -------------------------------------------------------------
-
-	; 27/12/2024
-StartPlay@:
-
-	; 27/12/2024 (Detect & Enable AC97 hardware again)
-	; (this is needed after disabling audio system)
-	; Detect (BH=1) AC'97 (BL=2) Audio Device
-        sys	_audio, 0102h
-	; ignore error at this stage
-	;jc	short ac97_not_detected
-
-; -------------------------------------------------------------
-
-	; 25/12/2024
-StartPlay:
-	inc	byte [filecount]
-	mov	byte [command], 0
 
 ; -------------------------------------------------------------
 
@@ -727,21 +607,6 @@ s_2:
 ; -------------------------------------------------------------
 
 Player_Template:
-
-	; 26/12/2024
-	cmp 	byte [IsInSplash], 0
-	jna	short Player_Template_@
-
-	; 24/12/2024 (setting for wave lighting points)
-	mov	eax, [LFB_ADDR]
-	;add	eax, 228*640 ; wave graphics start (top) line/row
-	add	eax, 164*640 ; 256 volume levels ; 24/12/2024
-	mov	[graphstart], eax
-
-	; 26/12/2024
-	jmp	short PlayNow
-
-Player_Template_@:
 	; 21/12/2024
 	call	clearscreen
 	call	drawplayingscreen
@@ -752,6 +617,7 @@ Player_Template_@:
 
 ; -------------------------------------------------------------
 
+StartPlay:
 	; 21/12/2024 (VGA/LFB modifications)
 	; (Direct access/map to the LFB is already done here)
 	; ((this program is in VESA/VBE graphics mode here))
@@ -766,33 +632,31 @@ PlayNow:
 	;jc	short error_exit
 	jc	init_err ; return to text mode and print err msg
 
-	; 30/05/2024
+	;;;
+	; 14/11/2024
+	mov	al, 3	; 0 = max, 31 = min
+	; 15/11/2024
+	call	SetMasterVolume
+	; 07/12/2024
+	;call	SetPCMOutVolume
+	call	UpdateVolume
+	;;;
+	;
+	; 14/11/2024
+	call	UpdateProgressBar
+	;;;
+
+ 	; 30/05/2024
 	; playwav4.asm
 ;_2:	; 24/12/2024
 	;call	check4keyboardstop	; flush keyboard buffer
 	;jc	short _2		; 07/11/2023
 
-	;;;
-	; 26/12/2024
-	; 14/11/2024
-	;mov	al, 3	; 0 = max, 31 = min
-	; 15/11/2024
-	call	SetMasterVolume
-
-	; 26/12/2024
-	cmp 	byte [IsInSplash], 0
-	ja	short _2
-
-	; 07/12/2024
-	;call	SetPCMOutVolume
-	call	UpdateVolume
-	;;;
-	; 14/11/2024
-	call	UpdateProgressBar
-	;;;
-
-	; 26/12/2024
-_2:
+	; 24/12/2024 (setting for wave lighting points)
+	mov	eax, [LFB_ADDR]
+	;add	eax, 228*640 ; wave graphics start (top) line/row
+	add	eax, 164*640 ; 256 volume levels ; 24/12/2024
+	mov	[graphstart], eax
 
 ; play the .wav file. Most of the good stuff is in here.
 	
@@ -801,34 +665,6 @@ _2:
 
 ; close the .wav file and exit.
 
-	; 25/12/2024
-	call	closeFile
-
-	; 25/12/2024
-	;;;
-	; reset file loading and EOF parameters
-	; 18/12/2024
-	mov	dword [count], 0
-	mov	dword [LoadedDataBytes], 0
-	mov	byte [flags], 0
-	mov	byte [stopped], 0
-	; 26/12/2024
-	mov	byte [pbuf_s], 0FFh
-	;;;
-
-;	cmp	byte [IsInSplash], 0
-;	jna	short _6
-;	mov	byte [IsInSplash], 0
-;	mov	esi, [argvf]
-;	jmp	Player_ParseNextParameter
-;
-;	; 29/11/2024
-;_6:
-;	cmp	byte [command], 'Q'
-;	je	short _7	; 25/12/2024
-;	jmp	check_p_command
-;
-;_7:
 	; 07/12/2024
 	;;;
 	; Stop Playing
@@ -841,17 +677,8 @@ _2:
 	sys	_audio, 0C00h
 	;;;
 
-	; 27/12/2024
-	; 26/12/2024
-	cmp	byte [IsInSplash], 0
-	jna	short _6
-	mov	byte [IsInSplash], 0
-	mov	esi, [argvf]
-	jmp	Player_ParseNextParameter
-_6:
-	cmp	byte [command], 'Q'
-	je	short terminate
-	jmp	check_p_command
+	; 25/12/2024
+	call	closeFile
 
 terminate:
 	call	set_text_mode
@@ -931,7 +758,6 @@ clearscreen:
 
 ; -------------------------------------------------------------
 
-	; 26/12/2024
 	; 21/12/2024
 drawsplashscreen:
 	mov	ebp, SplashScreen
@@ -1076,46 +902,6 @@ _5:
 	mov	bh, 4	; start to play
 	sys	_audio
 
-	;;;
-	; 26/12/2024
-SplashLoop:
-	cmp	byte [IsInSplash], 0
-	jna	short _10
-	;; skip 1st signal without sound data loading
-	;nop
-	;nop
-	;nop
-	;cmp	byte [SRB], 0
-	;jna	short SplashLoop
-	;mov	byte [SRB], 0
-_8:
-	test    byte [flags], ENDOFFILE  ; end of file
-	jnz	ac97_stop ; yes
-
-	; bh = 16 : update (current, first) dma half buffer
-	; bl = 0  : then switch to the next (second) half buffer
-	sys	_audio, 1000h
-
-	cmp	byte [SRB], 0
-	jna	short _9
-	mov	byte [SRB], 0
-	mov	edi, audio_buffer
-	call	dword [loadfromwavfile]
-	jnc	short _9
-	; end of file
-	;call	ac97_stop
-	;retn
-	jmp	ac97_stop
-_9:
-	call	check4keyboardstop
-	jc	_exitt_
-	jmp	short _8
-_10:
-	; 26/12/2024
-	cmp	byte [p_mode], 0
-	ja	short tuneLoop
-	;;;
-
 ; -------------------------------------------
 
 	; 22/12/2024
@@ -1139,22 +925,8 @@ tLWait:
 	jna	short tL1
 
 tLWait@:	; 21/11/2024
-	;;;
-	; 25/12/2024
-	; 09/12/2024
-	cmp	byte [stopped], 3
-	jnb	_exitt_
-	;;;
 	call	checkUpdateEvents
 	jc	_exitt_
-	;;;
-	; 25/12/2024
-	; 29/11/2024
-	cmp	byte [command], 'N'
-	je	_exitt_
-	cmp	byte [command], 'P'
-	je	_exitt_
-	;;;
 	cmp	byte [tLO], '0'
 	je	short tLWait
 	call	tLZ
@@ -1276,12 +1048,11 @@ tL0_4:
 
 ; -------------------------------------------
 
-	; 26/12/2024
 	; 07/12/2024
 SetMasterVolume:
-	mov	al, [volume]
-	; 26/12/2024
-	;mov	[volume], al  ; max = 0, min = 31
+	;cmp	al, 31
+	;ja	short setvolume_ok
+	mov	[volume], al  ; max = 0, min = 31
 
 	mov	ah, 31
 	sub	ah, al
@@ -1352,18 +1123,18 @@ d_ac97_@:
 
 ; ----------------------------------
 	
-	; 26/12/2024
-	; 07/12/2024
 	; 01/12/2024
 	; 14/11/2024
 	; INPUT: ds:dx = file name address
 	; OUTPUT: [filehandle] = ; -1 = not open
 openFile:
-	; 26/12/2024
-	; 01/12/2024
-	sys	_open, edx, 0
+	;mov	ax, 3D00h	; open File for read
+	;int	21h
+	;jnc	short _of1
+	; 01/12/2024 (TRDOS 386)
+	;sys	_open, edx, 0
 	; 07/12/2024
-	;sys	_open, wav_file_name, 0
+	sys	_open, wav_file_name, 0
 	jnc	short _of1
 
 	mov	eax, -1
@@ -1383,6 +1154,9 @@ _of1:
 closeFile:
 	cmp	dword [filehandle], -1
 	jz	short _cf1
+	;mov	bx, [filehandle]  
+	;mov	ax, 3E00h
+        ;int	21h              ; close file
 	; 01/12/2024
 	sys	_close, [filehandle]
 	;mov 	dword [filehandle], -1
@@ -5103,32 +4877,15 @@ c4ue_chk_fb:
 	cmp	al, 'F'
 	jne	short c4ue_chk_b
 	call 	Player_ProcessKey_Forwards
-	jmp	c4ue_cpt
+	jmp	short c4ue_cpt
 
 c4ue_chk_b:
 	cmp	al, 'B'
 	;;jne	short c4ue_cpt
 	; 19/11/2024
-	;jne	short c4ue_chk_h
-	; 25/12/2024
-	; 29/11/2024
-	jne	short c4ue_chk_n
+	jne	short c4ue_chk_h
 	call 	Player_ProcessKey_Backwards
 	jmp	short c4ue_cpt
-
-	;;;
-	; 25/12/2024
-	; 29/11/2024
-c4ue_chk_n:
-	cmp	al, 'N'
-	je	short c4ue_nps
-c4ue_chk_p:
-	cmp	al, 'P'
-	jne	short c4ue_chk_h
-c4ue_nps:
-	mov	byte [stopped], 3
-	jmp	short c4ue_cpt
-	;;;
 
 c4ue_chk_h:
 	; 19/11/2024
@@ -5151,17 +4908,7 @@ c4ue_chk_cr:
 	mov	ah, [wleds]
 	cmp	al, 'G'
 	je	short c4ue_g
-;	;;;
-;	; 26/12/2024
-;	cmp	al, 'T'
-;	jne	short c4ue_chk_cr_@
-;	inc	byte [tcolor]
-;	and 	byte [tcolor], 0Fh
-;	jnz	short c4ue_cpt
-;	inc	byte [tcolor]
-;	jmp	short c4ue_cpt
-;c4ue_chk_cr_@:
-;	;;;
+	;;;
 	; 19/11/2024
 	cmp	al, 0Dh ; ENTER/CR key
 	jne	short c4ue_cpt
@@ -5275,6 +5022,8 @@ c4ue_uwp:
 ; 24/12/2024 - Erdogan Tan
 ; --------------------------------------------------------
 
+	; 28/12/2024 (dplayw2.s)
+	; 27/12/2024 (DMA Buffer Tracking) (vgaplay2.s)
 	; 26/12/2024
 	; 24/12/2024
 UpdateWavePoints:
@@ -5286,30 +5035,33 @@ light_off:
 	lodsd
 	; eax = wave point (lighting point) address
 	mov	byte [eax], 0 ; black point (light off)
-	loop	light_off	
-lights_off_ok:
-	mov	dl, [half_buffer]
-	cmp	[pbuf_s], dl
-	jne	short lights_on_2
-	mov	ebx, [wpoints_dif]
-	mov	esi, [pbuf_o]
-	mov	ecx, [buffersize] ; bytes
-	sub	ecx, ebx ; sub ecx, [wpoints_dif]
-	add	esi, ebx
-	jc	short lights_on_1
-	cmp	esi, ecx
-	jna	short lights_on_3
-lights_on_1:
-	mov	esi, ecx
-	jmp	short lights_on_3
+	loop	light_off
 
-lights_on_2:
-	mov	[pbuf_s], dl
-	xor	esi, esi ; 0
-lights_on_3:
-	mov	[pbuf_o], esi
-	;
-	add	esi, audio_buffer
+lights_off_ok:
+	; 27/12/2024
+	; ref: modplay8.s (02/06/2024)
+	; ----------------------------
+	; Get Current Sound Data (in DMA buffer) ((320 bytes))
+	; 23/06/2017
+	; 22/06/2017
+	; bh = 15, get current sound data/samples
+	; bl = 0, for PCM OUT
+	; ecx = count of sample/data bytes (1 to 4096)
+	; edx = destination buffer address
+	;	(page aligned address is better)
+
+	mov	esi, g_buff
+
+	sys	_audio, 0F00h, 640*4, esi ; 27/12/2024
+	;jnc	short lgbuff_ok
+	; clear g_buff content
+	;mov	edi, esi
+	;sub	eax, eax
+	;shr	ecx, 2
+	;rep	stosd
+	;mov	ecx, 640
+;lgbuff_ok:
+
 	mov	ecx, 640
 	mov	ebp, ecx
 	; 26/12/2024
@@ -5340,7 +5092,6 @@ lights_on_4:
 ; 19/05/2024 - (playwav4.asm) ich_wav4.asm
 ; --------------------------------------------------------
 
-	; 25/12/2024
 	; 07/12/2024
 	; 01/12/2024 (TRDOS 386)
 	; 29/11/2024
@@ -5359,10 +5110,6 @@ check4keyboardstop:
 	;int	16h
 	; 01/12/2024 (TRDOS 386 keyboard interrupt)
 	int	32h
-
-	; 25/12/2024
-	; 29/11/2024
-	;mov	[command], al
 
 	;;;
 	; 19/05/2024 (change PCM out volume)
@@ -5427,19 +5174,9 @@ p_4:
 
 	and	al, 0DFh
 
-	; 25/12/2024
-	; 29/11/2024
-	mov	[command], al
-
 	;cmp	al, 'B'
 	;je	short p_r
 	;cmp	al, 'F'
-	;je	short p_r
-
-	; 29/11/2024
-	;cmp	al, 'N'
-	;je	short p_r
-	;cmp	al, 'P'
 	;je	short p_r
 
 	cmp	al, 'Q'
@@ -5452,8 +5189,6 @@ p_4:
 	;;;
 ;_cskr:	
 p_q:
-	; 27/12/2024
-	mov	byte [command], 'Q'
 p_quit:
 	stc
 p_r:
@@ -5461,10 +5196,7 @@ p_r:
 
 ; 29/05/2024
 ; 19/05/2024
-volume: 
-	;db	02h
-; 26/12/2024
-	db	03h
+volume: db	02h
 
 ; --------------------------------------------------------
 
@@ -5709,6 +5441,7 @@ chg_fpos:
 	jmp	short chk4_nxt_sep
 chg_fpos_ok:
 	mov	esi, ebx ; file name (without its path/directory)
+
 	;;;
 _fnl_chk:
 	; 26/12/2024 (file name length limit -display-)
@@ -5836,8 +5569,6 @@ printstr_ok:
 	; 22/12/2024
 write_character_white:
 	mov	ecx, 0Fh
-	; 26/12/2024
-	;movzx	ecx, byte [tcolor]
 write_character:
 	; esi = pixel position (hw = row, si = column)
 	; eax = al = character
@@ -6422,7 +6153,7 @@ Credits:
 	db 'VGA WAV Player for TRDOS 386 by Erdogan Tan. '
 	;db 'December 2024.', 10,13,0
 	db 'January 2025.', 10,13,0
-	;db '27/12/2024', 10,13
+	;db '28/12/2024', 10,13
 	db '18/01/2025', 10,13
 ; 15/11/2024
 reset:
@@ -6431,9 +6162,9 @@ reset:
 msgAudioCardInfo:
 	db 'for Intel AC97 (ICH) Audio Controller.', 10,13,0
 
-	; 25/12/2024
+	; 21/12/2024
 msg_usage:
-	db 'usage: VGAPLAY <FileName1> <FileName2> <...>',10,13,0
+	db 'usage: dplaywav filename.wav',10,13,0
 
 noDevMsg:
 	db 'Error: Unable to find AC97 audio device!'
@@ -6543,12 +6274,14 @@ SplashScreen:
 
 ; -------------------------------------------------------------
 
-	; 25/12/2024
+	; 22/12/2024
+	; 21/12/2024
 PlayingScreen:
 	db  34 dup(219), " DOS Player ", 34 dup(219)
 	db  201, 78 dup(205), 187
 	db  186, 33 dup(32), " User Guide ", 33 dup(32), 186
-	db  186, 6  dup(32), "<Space>         Play/Pause    ", 4 dup(32), "<N>/<P>         Next/Previous", 9 dup(32), 186
+	db  186, 6  dup(32), "<Space>         Play/Pause    ", 4 dup(32), "<H>             Hardware Info", 9 dup(32), 186
+	; 25/12/2024
 	db  186, 6  dup(32), "<S>             Stop          ", 4 dup(32), "<Enter>/<G>     Wave Lighting", 9 dup(32), 186
 	db  186, 6  dup(32), "<F>             Forwards      ", 4 dup(32), "<+>/<->         Inc/Dec Volume", 8 dup(32), 186
 	db  186, 6  dup(32), "<B>             Backwards     ", 4 dup(32), "<Q>             Quit Program ", 9 dup(32), 186
@@ -6581,14 +6314,6 @@ read_error_txt:
 	db  80 dup(32)
 	db  33 dup(32), "00:00 ", 174, 175, " 00:00", 24 dup(32), "VOL 000%"
 	db 0
-
-; 25/12/2024
-; 28/11/2024
-IsInSplash:
-	db 1
-
-SplashFileName:
-	db "SPLASH.WAV", 0
 
 ; -------------------------------------------------------------
 
@@ -6680,13 +6405,6 @@ VRA:	resb 1	; Variable Rate Audio Support Status
 ; 24/12/2024
 p_mode: resb 1	; point mode (as alternative to LED mode)
 
-; 25/12/2024
-; 29/11/2024
-command:
-	resb 1
-filecount:
-	resb 1
-
 ; 30/11/2024
 alignb 4
 
@@ -6735,8 +6453,9 @@ DATA_SubchunkSize:
         	; Number of bytes in the data.
 ;;;;;;;;;;;;;;
 
+; 28/12/2024
 ; 15/11/2024
-cursortype:
+;cursortype:
 	resw 1
 flags:	resb 1
 ; 06/11/2023
@@ -6744,13 +6463,6 @@ ac97_int_ln_reg:
 	resb 1
 filehandle:
 	resd 1
-
-; 25/12/2024
-; 30/11/2024
-;argc:	resb 1	; argument count
-argv:	resd 1	; current argument (wav file) ptr
-argvf:	resd 1	; 1st argument (wav file) ptr
-argvl:	resd 1	; last argument (wav file) ptr
 
 ; 30/05/2024
 wav_file_name:
@@ -6814,3 +6526,7 @@ audio_buffer:
 ; 26/11/2023
 temp_buffer:
 	resb 65536  ;  rb BUFFERSIZE
+
+; 28/12/2024
+alignb 4096
+g_buff:	resb 640*4

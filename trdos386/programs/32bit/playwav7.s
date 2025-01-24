@@ -5,7 +5,7 @@
 ;
 ; 29/05/2024
 ;
-; [ Last Modification: 08/12/2024 ]
+; [ Last Modification: 17/01/2025 ]
 ;
 ; Modified from PLAYWAV6.PRG .wav player program by Erdogan Tan, 27/11/2023
 ; Modified from PLAYWAV4.COM .wav player program by Erdogan Tan, 19/05/2024
@@ -942,8 +942,10 @@ lff_2:
 	; 26/11/2023
 	; load file into memory
 	sys 	_read, [FileHandle], esi
-	mov	ecx, edx
-	jc	short padfill ; error !
+	mov	ecx, [buffersize]
+	;jc	short padfill ; error !
+	; 14/12/2024
+	jc	short lff_10
 
 	and	eax, eax
 	jz	short padfill
@@ -953,8 +955,11 @@ lff_3:
 	and	bl, bl
 	jz	short lff_11
 
-	sub	ecx, eax
-	mov	ebp, ecx
+	; 14/12/2024
+	;sub	ecx, eax
+	;mov	ebp, ecx
+	; 14/12/2024
+	sub	edx, eax
 
 	;mov	esi, temp_buffer
 	;mov	edi, audio_buffer
@@ -992,26 +997,27 @@ lff_7:
 lff_8:
 	; 27/11/2023
 	clc
-	mov	ecx, ebp
-	jecxz	endLFF_retn
+	; 14/12/2024
+	;mov	ecx, ebp
+	;jecxz	endLFF_retn
+	or	edx, edx
+	jz	short endLFF_retn
 	
+	; 14/12/2024
+	mov	ecx, audio_buffer
+	add	ecx, [buffersize]
+	sub	ecx, edi
+
+	; 14/12/2024
+lff_10:
+	xor	eax, eax ; silence
 padfill:
-	cmp 	byte [bps], 16
-	je	short lff_10
-	; Minimum Value = 0
-        xor     al, al
-	rep	stosb
+	shr	ecx, 1 
+	rep	stosw
 lff_9:
         or	byte [flags], ENDOFFILE	; end of file flag
 endLFF_retn:
         retn
-lff_10:
-	xor	eax, eax
-	; Minimum value = 8000h (-32768)
-	shr	ecx, 1 
-	mov	ah, 80h ; ax = -32768
-	rep	stosw
-	jmp	short lff_9
 
 lff_11:
 	; 16 bit stereo
@@ -1200,7 +1206,9 @@ change_volume_level:
 dec_volume_level:
 	mov	cl, [volume_level]
 	cmp	cl, 1 ; 1
-	jna	short p_loop
+	;jna	short p_loop
+	; 14/12/2024
+	jna	short q_loop
 	dec	cl
 	jmp	short change_volume_level
 %endif
@@ -3354,6 +3362,7 @@ lff11s2_7:
 	jmp	lff11_5  ; error
 
 load_11khz_stereo_16_bit:
+	; 17/01/2025
 	; 18/11/2023
         test    byte [flags], ENDOFFILE	; have we already read the
 					; last of the file?
@@ -3395,20 +3404,25 @@ lff11s2_1:
 	mov	ebx, eax
 	lodsw
 	mov	edx, [esi]
-	mov	[next_val_l], edx
+	; 17/01/2025
+	;mov	[next_val_l], edx
 	; 26/11/2023
-	shr	edx, 16
+	;shr	edx, 16
 	;mov	[next_val_r], dx
 	dec	ecx
 	jnz	short lff11s2_2_1
 	xor	edx, edx ; 0
-	mov	[next_val_l], dx
+	;mov	[next_val_l], dx
 	;mov	[next_val_r], dx
 lff11s2_2_1:
 	; bx = [previous_val_l]
 	; ax = [previous_val_r]
 	; [next_val_l]
 	; dx = [next_val_r]
+	;;;
+	; 17/01/2025 (BugFix)
+	mov	[next_val_l], edx
+	;;;
 	call	interpolating_5_16bit_stereo
 	jecxz	lff11s2_3
 lff11s2_2_2:
@@ -3416,17 +3430,22 @@ lff11s2_2_2:
 	mov	ebx, eax
 	lodsw
 	mov	edx, [esi]
-	mov	[next_val_l], dx
+	; 17/01/2025
+	;mov	[next_val_l], dx
 	; 26/11/2023
-	shr	edx, 16
+	;shr	edx, 16
 	;mov	[next_val_r], dx
 	dec	ecx
 	jnz	short lff11s2_2_3
 	xor	edx, edx ; 0
-	mov	[next_val_l], dx
+	;mov	[next_val_l], dx
 	;mov	[next_val_r], dx
 lff11s2_2_3:
- 	call	interpolating_4_16bit_stereo
+	;;;
+	; 17/01/2025 (BugFix)
+	mov	[next_val_l], edx
+	;;;
+	call	interpolating_4_16bit_stereo
 	jecxz	lff11s2_3
 	
 	dec	ebp
@@ -3436,16 +3455,21 @@ lff11s2_2_3:
 	mov	ebx, eax
 	lodsw
 	mov	edx, [esi]
-	mov	[next_val_l], dx
+	; 17/01/2025
+	;mov	[next_val_l], dx
 	; 26/11/2023
-	shr	edx, 16
+	;shr	edx, 16
 	;mov	[next_val_r], dx
 	dec	ecx
 	jnz	short lff11s2_2_4
 	xor	edx, edx ; 0
-	mov	[next_val_l], dx
+	;mov	[next_val_l], dx
 	;mov	[next_val_r], dx
 lff11s2_2_4:
+	;;;
+	; 17/01/2025 (BugFix)
+	mov	[next_val_l], edx
+	;;;
  	call	interpolating_4_16bit_stereo
 	jecxz	lff11s2_3
 	jmp	short lff11s2_1
@@ -3946,6 +3970,7 @@ interpolating_2_16bit_mono:
 	retn
 
 interpolating_2_16bit_stereo:
+	; 17/01/2025
 	; 16/11/2023
 	; bx = [previous_val_l]
 	; ax = [previous_val_r]
@@ -3961,17 +3986,24 @@ interpolating_2_16bit_stereo:
 	add	dh, 80h
 	add	ax, dx	; [previous_val_r] + [next_val_r]
 	rcr	ax, 1	; / 2
-	push	eax ; *	; interpolated sample (R)
+	; 17/01/2025
+	sub	ah, 80h	; -32768 to +32767 format again
+	;push	eax ; *	; interpolated sample (R)
+	; 17/01/2025
+	shl	eax, 16
 	mov	ax, [next_val_l]
 	add	ah, 80h
 	add	bh, 80h
 	add	ax, bx	; [next_val_l] + [previous_val_l]
-	rcr	ax, 1	; / 2		
+	rcr	ax, 1	; / 2
 	sub	ah, 80h	; -32768 to +32767 format again
-	stosw 		; interpolated sample (L)
-	pop	eax ; *	
-	sub	ah, 80h	; -32768 to +32767 format again
-	stosw 		; interpolated sample (R)
+	; 17/01/2025
+	;stosw 		; interpolated sample (L)
+	;pop	eax ; *	
+	;sub	ah, 80h	; -32768 to +32767 format again
+	;stosw 		; interpolated sample (R)
+	; 17/01/2025
+	stosd
 	retn
 
 interpolating_5_8bit_mono:
@@ -5412,14 +5444,16 @@ reset:	db	0
 
 Credits:
 	db	'Tiny WAV Player for TRDOS 386 by Erdogan Tan. '
-	;;db	'August 2020.',10,13,0
-	;db	'May 2024.',10,13,0
-	db	'December 2024',10,13,0
+	;;;db	'August 2020.',10,13,0
+	;;db	'May 2024.',10,13,0
+	;db	'December 2024.', 10,13,0
+	db	'January 2025.', 10,13,0
 	db	'17/06/2017', 10,13,0
 	db	'18/08/2020', 10,13,0
 	db	'27/11/2023', 10,13,0
 	db	'29/05/2024', 10,13,0
-	db	'08/12/2024', 10,13,0
+	db	'14/12/2024', 10,13,0
+	db	'17/01/2025', 10,13,0
 
 msgAudioCardInfo:
 	db 	'for Intel AC97 (ICH) Audio Controller.', 10,13,0
