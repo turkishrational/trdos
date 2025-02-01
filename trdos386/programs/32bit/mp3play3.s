@@ -7,7 +7,7 @@
 ; FASM Source Code: Erdogan Tan - 19/10/2024 - 22/10/2024
 ; NASM Source Code: Erdogan Tan - 09/01/2025
 ;
-; [ Last Modification: 15/01/2025 ]
+; [ Last Modification: 01/02/2025 ]
 ;
 ; ----------------------------------------------------------------------------
 ; Modified from on MP3PLAY.ASM (for Windows console) source code - 17/10/2024
@@ -10608,6 +10608,7 @@ teab_enqueue_done:
 
 ; =============== S U B R O U T I N E =======================================
 		
+		; 30/01/2025
 		; 15/01/2025
 		; 14/01/2025
 		; 13/01/2025
@@ -10674,22 +10675,31 @@ audio_system_init_x:
 .chk_44khz:
 		cmp	eax, 44100
 		jne	short .chk_32khz
+		; 30/01/2025
+		mov	eax, 25 ; *
 		cmp	byte [mp3_bytes_per_sample], 1
 		jna	short .chk_44khz_1
 		mov	ebx, load_44khz_stereo_16_bit
 		cmp	byte [mp3_output_num_channels], 1
 		jne	short .chk_44khz_2
 		mov	ebx, load_44khz_mono_16_bit
-		jmp	short .chk_44khz_2
+		;jmp	short .chk_44khz_2
+		; 30/01/2025
+		jmp	short .chk_44khz_3
 .chk_44khz_1:
+		; 30/01/2025
+		shl	eax, 1
 		mov	ebx, load_44khz_stereo_8_bit
 		cmp	byte [mp3_output_num_channels], 1
 		jne	short .chk_44khz_2
 		mov	ebx, load_44khz_mono_8_bit
+.chk_44khz_3:
+		; 30/01/2025
+		shl	eax, 1
 .chk_44khz_2:
 		; 48000/44100 == 25/23
 		mov	ebp, 23
-		mov	eax, 25
+		;mov	eax, 25 ; *
 		mul	ecx  ; load (decoding buffer) size
 		div	ebp
 		;; eax = wav output buffer size
@@ -10716,22 +10726,31 @@ audio_system_init_x:
 .chk_32khz:
 		cmp	eax, 32000
 		jne	short .chk_24khz
+		; 30/01/2025
+		mov	eax, 3 ; *
 		cmp	byte [mp3_bytes_per_sample], 1
 		jna	short .chk_32khz_1
 		mov	ebx, load_32khz_stereo_16_bit
 		cmp	byte [mp3_output_num_channels], 1
 		jne	short .chk_32khz_2
 		mov	ebx, load_32khz_mono_16_bit
-		jmp	short .chk_32khz_2
+		;jmp	short .chk_32khz_2
+		; 30/01/2025
+		jmp	short .chk_32khz_3
 .chk_32khz_1:
+		; 30/01/2025
+		shl	eax, 1
 		mov	ebx, load_32khz_stereo_8_bit
 		cmp	byte [mp3_output_num_channels], 1
 		jne	short .chk_32khz_2
 		mov	ebx, load_32khz_mono_8_bit
+.chk_32khz_3:
+		; 30/01/2025
+		shl	eax, 1
 .chk_32khz_2:
 		; 48000/32000 = 3/2
-		mov	eax, 3
-		mul	ecx	; *3
+		;mov	eax, 3 ; *
+		mul	ecx 	; *3
 		;mov	eax, ecx
 		;add	eax, eax
 		;add	eax, ecx
@@ -10740,6 +10759,8 @@ audio_system_init_x:
 .chk_24khz:
 		cmp	eax, 24000
 		jne	short .chk_22khz
+		; 30/01/2025
+		mov	eax, ecx ; *
 		cmp	byte [mp3_bytes_per_sample], 1
 		jna	short .chk_24khz_1
 		; 14/01/2025 
@@ -10749,36 +10770,52 @@ audio_system_init_x:
 		cmp	byte [mp3_output_num_channels], 1
 		jne	short .chk_24khz_2
 		mov	ebx, load_24khz_mono_16_bit
-		jmp	short .chk_24khz_2
+		;jmp	short .chk_24khz_2
+		; 30/01/2025
+		jmp	short .chk_24khz_3
 .chk_24khz_1:
+		; 30/01/2025
+		shl	eax, 1
 		mov	ebx, load_24khz_stereo_8_bit
 		cmp	byte [mp3_output_num_channels], 1
 		jne	short .chk_24khz_2
 		mov	ebx, load_24khz_mono_8_bit
+.chk_24khz_3:
+		; 30/01/2025
+		shl	eax, 1
 .chk_24khz_2:
 		; 48000/24000 = 2/1
-		mov	eax, ecx
+		;mov	eax, ecx ; *
 		shl	eax, 1
 		jmp	.set_sizes_@
 .chk_22khz:
 		cmp	eax, 22050
 		jne	short .chk_16khz
+		; 30/01/2025
+		mov	eax, 37 ; *
 		cmp	byte [mp3_bytes_per_sample], 1
 		jna	short .chk_22khz_1
 		mov	ebx, load_22khz_stereo_16_bit
 		cmp	byte [mp3_output_num_channels], 1
 		jne	short .chk_22khz_2
 		mov	ebx, load_22khz_mono_16_bit
-		jmp	short .chk_22khz_2
+		;jmp	short .chk_22khz_2
+		; 30/01/2025
+		jmp	short .chk_22khz_3
 .chk_22khz_1:
+		; 30/01/2025
+		shl	eax, 1
 		mov	ebx, load_22khz_stereo_8_bit
 		cmp	byte [mp3_output_num_channels], 1
 		jne	short .chk_22khz_2
 		mov	ebx, load_22khz_mono_8_bit
+.chk_22khz_3:
+		; 30/01/2025
+		shl	eax, 1
 .chk_22khz_2:
 		; 48000/22050 == 37/17
 		mov	ebp, 17
-		mov	eax, 37
+		;mov	eax, 37 ; *
 		mul	ecx  ; load (decoding buffer) size
 		div	ebp
 		;; eax = wav output buffer size
@@ -10788,47 +10825,67 @@ audio_system_init_x:
 .chk_16khz:
 		cmp	eax, 16000
 		jne	short .chk_11khz
+		; 30/01/2025
+		mov	eax, ecx ; *
+		shl	eax, 1
+		add	eax, ecx
 		cmp	byte [mp3_bytes_per_sample], 1
 		jna	short .chk_16khz_1
 		mov	ebx, load_16khz_stereo_16_bit
 		cmp	byte [mp3_output_num_channels], 1
 		jne	short .chk_16khz_2
 		mov	ebx, load_16khz_mono_16_bit
-		jmp	short .chk_16khz_2
+		;jmp	short .chk_16khz_2
+		; 30/01/2025
+		jmp	short .chk_16khz_3
 .chk_16khz_1:
+		; 30/01/2025
+		shl	eax, 1
 		mov	ebx, load_16khz_stereo_8_bit
 		cmp	byte [mp3_output_num_channels], 1
 		jne	short .chk_16khz_2
 		mov	ebx, load_16khz_mono_8_bit
+.chk_16khz_3:
+		; 30/01/2025
+		shl	eax, 1
 .chk_16khz_2:
 		; 48000/16000 = 3/1
-		mov	eax, ecx
-		shl	eax, 1
-		;add	eax, eax
-		add	eax, ecx
+		;mov	eax, ecx ; *
+		;shl	eax, 1
+		;;add	eax, eax
+		;add	eax, ecx
 		jmp	.set_sizes_@
 .chk_11khz:
 		cmp	eax, 11025
 		jne	short .chk_8khz
+		; 30/01/2025
+		mov	eax, 74
 		cmp	byte [mp3_bytes_per_sample], 1
 		jna	short .chk_11khz_1
 		mov	ebx, load_11khz_stereo_16_bit
 		cmp	byte [mp3_output_num_channels], 1
 		jne	short .chk_11khz_2
 		mov	ebx, load_11khz_mono_16_bit
-		jmp	short .chk_11khz_2
+		;jmp	short .chk_11khz_2
+		; 30/01/2025
+		jmp	short .chk_11khz_3
 .chk_11khz_1:
+		; 30/01/2025
+		shl	eax, 1
 		mov	ebx, load_11khz_stereo_8_bit
 		cmp	byte [mp3_output_num_channels], 1
 		jne	short .chk_11khz_2
 		mov	ebx, load_11khz_mono_8_bit
+.chk_11khz_3:
+		; 30/01/2025
+		shl	eax, 1
 .chk_11khz_2:
 		; 48000/11025 == 74/17
 		; 14/01/2025
 		;shr	ecx, 1	; 4 blocks
 		;shr	byte [blocks], 1
 		mov	ebp, 17
-		mov	eax, 74
+		;mov	eax, 74 ; *
 		mul	ecx  ; load (decoding buffer) size
 		div	ebp
 		;; eax = wav output buffer size
@@ -10838,22 +10895,32 @@ audio_system_init_x:
 .chk_8khz:
 		cmp	eax, 8000
 		jne	short .vra_needed
+		; 30/01/2025
+		mov	eax, 6 ; *
 		cmp	byte [mp3_bytes_per_sample], 1
 		jna	short .chk_8khz_1
 		mov	ebx, load_8khz_stereo_16_bit
 		cmp	byte [mp3_output_num_channels], 1
 		jne	short .chk_8khz_2
 		mov	ebx, load_8khz_mono_16_bit
-		jmp	short .chk_8khz_2
+		;jmp	short .chk_8khz_2
+		; 30/01/2025
+		jmp	short .chk_8khz_3
 .chk_8khz_1:
+		; 30/01/2025
+		shl	eax, 1
 		mov	ebx, load_8khz_stereo_8_bit
 		cmp	byte [mp3_output_num_channels], 1
 		jne	short .chk_8khz_2
 		mov	ebx, load_8khz_mono_8_bit
+.chk_8khz_3:
+		; 30/01/2025
+		shl	eax, 1
 .chk_8khz_2:
-		mov	eax, 6
+		;mov	eax, 6 ; *
 		mul	ecx
 		jmp	.set_sizes_@
+
 .vra_needed:
 		pop	eax ; discard return address to the caller
 .vra_err:
@@ -11818,6 +11885,7 @@ lff24s_2:
 ; --------------------------------------------------------
 
 load_24khz_mono_16_bit:
+	; 30/01/2025
 	; 13/01/2025 (mp3play3.s)
 	mov	esi, decoding_buffer ; (contains 8bit stereo samples)
 	mov	edi, sample_buffer ; wav output buffer
@@ -11838,7 +11906,9 @@ lff24m2_1:
 	;mov	ax, [esi]
 	mov	bx, [esi]
 lff24m2_2:
-	;add	ah, 80h ; convert sound level 0 to 65535 format
+	; 30/01/2025
+	add	bh, 80h ; convert sound level 0 to 65535 format
+	;add	ah, 80h
 	;mov	ebp, eax	; [next_val]
 	;add	ax, [previous_val]
 	; ax = [previous_val]
@@ -12768,6 +12838,7 @@ lff44s2_2_2:
 ; --------------------------------------------------------
 
 interpolating_3_8bit_mono:
+	; 01/02/2025
 	; 16/11/2023
 	; al = [previous_val]
 	; dl = [next_val]
@@ -12790,12 +12861,15 @@ interpolating_3_8bit_mono:
 	mov	al, bh
 	add	al, dl	; [next_val]
 	rcr	al, 1
+	; 01/02/2025
+	sub	al, 80h
 	shl	ax, 8	; convert 8 bit sample to 16 bit sample
 	stosw		; interpolated sample 2 (L)
 	stosw		; interpolated sample 2 (R)
 	retn
 
 interpolating_3_8bit_stereo:
+	; 01/02/2025
 	; 16/11/2023
 	; al = [previous_val_l]
 	; ah = [previous_val_r]
@@ -12832,11 +12906,15 @@ interpolating_3_8bit_stereo:
 	pop	eax ; *
 	add	al, dl	; [next_val_l]
 	rcr	al, 1
+	; 01/02/2025
+	sub	al, 80h
 	shl	ax, 8	; convert 8 bit sample to 16 bit sample
 	stosw		; interpolated sample 2 (L)
 	mov	al, bl
 	add	al, dh	; [next_val_r]
 	rcr	al, 1
+	; 01/02/2025
+	sub	al, 80h
 	shl	ax, 8	; convert 8 bit sample to 16 bit sample
 	stosw		; interpolated sample 2 (R)
 	retn
@@ -14443,7 +14521,7 @@ txt_ctrlc_size equ $ - txt_ctrlc
 txt_about       db 13,10
                 ;db '----------------------------------',13,10
                 db '-----------------------------------',13,10
-                db 'Erdogan Tan - 15/01/2025 (Assembler: NASM)', 13,10
+                db 'Erdogan Tan - 01/02/2025 (Assembler: NASM)', 13,10
                 db 'Original code: MP3PLAYER.EXE v1.4 (20/09/2024)', 13,10
                 db '               by Martin Korth (TASM source code)'
                 db 13,10,13,10,0

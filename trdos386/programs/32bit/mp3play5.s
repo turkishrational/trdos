@@ -1,12 +1,14 @@
 ; ****************************************************************************
-; MP3PLAY4.PRG - MP3 DECODER/PLAYER 1.0 for TRDOS 386 Operating System
+; MP3PLAY5.PRG - MP3 DECODER/PLAYER 1.0 for TRDOS 386 Operating System
 ; ----------------------------------------------------------------------------
 ; Based on 
 ; NOCASH MP3PLAY.EXE 1.4 (Windows) ASM source code (Martin Korth, 20/09/2024)
 ;
-; 21/01/2025
+; 25/01/2025
 ;
 ; [ Last Modification: 01/02/2025 ]
+;
+; Modified from 'mp3play4.s' (24/01/2025) and 'vgaplay2.s' (18/01/2025)
 ;
 ; ----------------------------------------------------------------------------
 ; Modified from on MP3PLAY.ASM (for Windows console) source code - 17/10/2024
@@ -29,9 +31,9 @@
 ; ---------------
 ; fasm mp3play.s MP3PLAY.PRG
 
-; 21/01/2025
-; Wave LED/Lighting Code Reference:
-; playwav9.s - 17/01/2025
+; 25/01/2025
+; Wave Lighting Graphics Code Reference:
+; vgaplay2.s - 18/01/2025
 
 ; 13/01/2025 (mp3play3.s)
 ; Interpolated sample rate playing method for non-VRA AC97 codecs.
@@ -161,31 +163,41 @@ start:
 		call	set_break	; set and clear bss section
 					; also set stream_start position
 
-                ;mov    edx, txt_hello  ; "nocash mp3 decoder v1.4, 2024" ...
-                ;call   wrstr_edx
+                ;mov	edx, txt_hello  ; "nocash mp3 decoder v1.4, 2024" ...
+                ;call	wrstr_edx
 		mov	ebx, txt_hello
 		call	print_msg
 
-                call    get_commandline
-                jc      .exit
+		call	get_commandline
+		;jc	.exit
+		; 26/01/2025
+		jc	ExitP@
 
 		;;;
 		; 11/01/2025
 		call	detect_enable_audio_device
-		jc	.exit
+		;jc	.exit
+		; 26/01/2025
+		jc	ExitP@
 		;;;
 
                 xor     ebp, ebp
                 call    mp3_init
                 call    open_and_mmap_the_file
-                jc      .exit
+                ;jc     .exit
+		; 26/01/2025
+		jc      ExitP@
+
                 call    detect_cpu_386_and_up
                 call    GetTickCount
                 neg     eax
                 mov     [millisecond_count], eax
 
-                call    mp3_check_1st_frame
-                jc      .exit
+		call	mp3_check_1st_frame
+		;jc	.exit
+		; 26/01/2025
+		jc      ExitP@
+
                 cmp     byte [option_test], 0
                 jz      short .no_benchmark_test
                 call    mp3_plain_test_without_output
@@ -195,7 +207,9 @@ start:
                 cmp     dword [mp3_pcm_fname], 0
                 jz      short .no_pcm_verify
                 call    mp3_verify_pcm_file
-                jmp     .exit
+                ;jmp    .exit
+		; 26/01/2025
+		jmp     ExitP@
 
 .no_pcm_verify:
                 cmp     dword [mp3_dst_fname], 0
@@ -204,55 +218,85 @@ start:
                 jmp     .decode_done
 
 .no_wav_output:
-		; 15/01/2025
-		; 10/01/2025 (Video memory access for buffer change indicator)
-		; DIRECT CGA (TEXT MODE) MEMORY ACCESS
-		; bl = 0, bh = 4
-		; Direct access/map to CGA (Text) memory (0B8000h)
-		sys	_video, 0400h
-		cmp	eax, 0B8000h
-		jne	.exit	; 15/01/2025
+		; ---------------------------------------------------
+		
+		; 25/01/2025 (mp3play5.s)
+		; 21/12/2024 (vgaplay.s)
+		;;;
+		; Read (copy) 8x14 system fonts
+		mov	esi, fontbuff1
+		sys	_video, 0C03h, 256, 0
+
+		; convert 8x14 fonts to 8x16 fonts
+		; by inserting 2 empty rows to each characters
+		;mov	esi, fontbuff1
+		mov	edi, fontbuff2
+.fontconvert:
+		push	ecx
+		mov	ecx, 14 ; 26/01/2025
+		rep	movsb
+		sub	al, al
+		stosb
+		stosb
+		pop	ecx
+		loop	.fontconvert
 		;;;
 
-; 23/01/2025
-if 0
-		; 22/01/2025
-		; set timer event, srb (tsb)
-		; bh = 1 -> 18.2 ticks per second
-		; bl = signal response byte value
-		; ecx = tick count
-		; edx = srb address
-		sys	_timer, 01FFh, 1, tsb
-		jc	.exit
-		mov	[tnumber], al
-end if
+		; 25/01/2025
+		; 21/12/2024
+		; Set Video Mode to 101h ; 640x480, 256 colors
+		sys	_video, 08FFh, 101h
+		or	eax, eax
+		;jz	.exit	; nothing to do	
+		; 26/01/2025
+		jz	ExitP@			
 
-		; 21/01/2025
-		;;;; ==========================
-		
+.set_vesa_mode_101h_ok:
+		; linear frame buffer access
+		sys	_video, 06FFh
+		and	eax, eax
+		jz	error_exit ; set text mode and write err msg
+		mov	[LFB_ADDR], eax
+
+		; 25/01/2025
+		; 21/12/2024
+		;;;
 		; set wave volume led addresses
-		mov	ebx, 0B8000h + 13*80*2
+		mov	ebx, [LFB_ADDR]
+		;add	ebx, (13*80*8*14)
+		; 16/01/2025
+		add	ebx, (14*80*8*14)
 		mov	ebp, 80
 		mov	edi, wleds_addr
 .wleds_sa_1:
-		mov	ecx, 7
+		mov	ecx, 15
 .wleds_sa_2:
-		mov	eax, 80*2
+		mov	eax, 80*8*14 ; 640*14 pixels (next row)
 		mul	ecx
 		add	eax, ebx
 		stosd
 		loop	.wleds_sa_2
 		mov	eax, ebx
 		stosd
-		inc	ebx
-		inc	ebx
+		add	ebx, 8
 		dec	ebp
 		jnz	short .wleds_sa_1
-		;;;;
+
+		; 25/01/2025
+		; 24/12/2024 (setting for wave lighting points)
+		mov	eax, [LFB_ADDR]
+		;add	eax, 164*640 ; 256 volume levels
+		; 26/01/2025
+		add	eax, 178*640
+		; eax = wave graphics start (top) line/row
+		mov	[graphstart], eax
+
+		; ---------------------------------------------------
 
 		; 26/01/2025
+		; 25/01/2025 (mp3play5.s) -graphics mode-
 .p_template:
-		; 22/01/2025
+		; 22/01/2025 (mp3play4.s) -text mode-
 		;;;;
 		mov	dl, 1
 		cmp	byte [audio_hardware], dl ; 1
@@ -266,14 +310,14 @@ end if
 .stolp_m8:
 		mov	dword [turn_on_leds], turn_on_leds_mono_8bit
 		;mov	byte [sd_count], 80
-		; 26/01/2025
-		mov	word [sd_count], 80*8
+		mov	word [sd_count], 640
+		mov	dword [draw_wave_points], UpdateWavePoints_8m
 		jmp	short .stolp_ok
 .stolp_m16:
 		mov	dword [turn_on_leds], turn_on_leds_mono_16bit
 		;mov	byte [sd_count], 80*2
-		; 26/01/2025
-		mov	word [sd_count], 80*8*2
+		mov	word [sd_count], 640*2
+		mov	dword [draw_wave_points], UpdateWavePoints_16m
 		jmp	short .stolp_ok
 .stolp_s:
 		cmp	byte [mp3_bytes_per_sample], dl ; 1
@@ -281,14 +325,14 @@ end if
 .stolp_s8:
 		mov	dword [turn_on_leds], turn_on_leds_stereo_8bit
 		;mov	byte [sd_count], 80*2
-		; 26/01/2025
-		mov	word [sd_count], 80*8*2
+		mov	word [sd_count], 640*2
+		mov	dword [draw_wave_points], UpdateWavePoints_8s
 		jmp	short .stolp_ok
 .stolp_s16:
 		mov	dword [turn_on_leds], turn_on_leds_stereo_16bit
 		;mov	word [sd_count], 80*4
-		; 26/01/2025
-		mov	word [sd_count], 80*8*4
+		mov	word [sd_count], 640*4
+		mov	dword [draw_wave_points], UpdateWavePoints_16s
 .stolp_ok:
 		;;;;
 
@@ -301,29 +345,13 @@ end if
 
 		mov	byte [wleds], 1
 
-		; Get the cursor type
-		mov	ah, 03h
-		int	31h
-		mov	[cursortype], cx ; save
+		; 25/01/2025
+		; 21/12/2024
+		;;; ---------------------------
+		;call	clearscreen
+		call	drawplayingscreen
+		;;; ---------------------------
 
-		;; Set the cursor to invisible
-		mov	ah, 01h
-		mov	ecx, 2607h
-		int	31h
-
-		xor	edx, edx
-		call	setCursorPosition
-
-		; Print the splash screen in white
-		mov	eax, 1300h
-		mov	ebx, 000Fh
-		mov	ecx, 1999
-		; edx = 0
-		;mov	edx, 0
-    
-		mov	ebp, Template
-		int	31h
-		
 		call	SetTotalTime
 		call	UpdateFileInfo
 
@@ -334,6 +362,15 @@ end if
 
 		call	UpdateProgressBar
 
+		;;; ---------------------------
+
+		; 26/01/2025
+		cmp	byte [p_mode], 0
+		ja	short .skip_rwl
+		; 22/12/2024
+ 		; prepare all leds as turned off
+		call	reset_wave_leds
+.skip_rwl:
 		;;;; ==========================
 
 
@@ -390,7 +427,9 @@ end if
 .exit@:
 		; Disable audio device
 		sys	_audio, 0C00h
-		jmp	ExitProcess
+		;jmp	ExitProcess
+		; 27/01/2025
+		jmp	ExitProcess@
 
 .indirect:
 		call	audio_system_init_x
@@ -401,9 +440,10 @@ end if
 		; 22/01/2025
 .decode_done@:
 		; set video mode to 03h again (clear screen)
-		mov	ax, 03h
-		int	31h ; TRDOS 386 - Video interrupt
-
+		;mov	ax, 03h
+		;int	31h ; TRDOS 386 - Video interrupt
+		; 25/01/2025
+		call	set_text_mode
 .decode_done:
                 call    GetTickCount
                 add     [millisecond_count], eax
@@ -454,7 +494,17 @@ end if
 .exit:
 		;push   0               ; uExitCode
                 ;call   ExitProcess
-		jmp	ExitProcess
+		;jmp	ExitProcess
+		; 27/01/2025
+		jmp	ExitProcess@
+
+		; 25/01/2025
+error_exit:
+		call	set_text_mode
+trdos386_error:
+		sys	_msg, trdos386_err_msg, 255, 0Eh
+		mov	ebx, -1	; (not necessary) -error exit example-
+		jmp	ExitProcess@
 
 
 ; =============== S U B R O U T I N E =======================================
@@ -9924,6 +9974,7 @@ get_commandline:
 
 ; =============== S U B R O U T I N E =======================================
 
+		; 26/01/2025
 		; 21/10/2024
 set_break:
 		; set [u.break] -end of bss- address to
@@ -9935,11 +9986,12 @@ set_break:
 		; TRDOS 386 system call
 		; Set break address
 		; ebx = new [u.break]
-		;sys	_break, end_of_bss
+		; 26/01/2025
+		sys	_break, end_of_bss
 		; eax = new break address (dword aligned)
 
 		; 10/01/2025
-		sys	_break, 100000h ; end of 1st 1MB
+		;sys	_break, 100000h ; end of 1st 1MB
 
                 mov	[stream_start], eax
                 mov	[stream_pos], eax
@@ -9949,6 +10001,7 @@ set_break:
 
 ; =============== S U B R O U T I N E =======================================
 
+		; 26/01/2025
 		; 20/10/2024
 
 open_and_mmap_the_file:
@@ -10004,9 +10057,10 @@ open_and_mmap_the_file:
 		; (not necessary for TRDOS 386 PRG files)
 		; (this system call will allocate user memory pages
 		;  before sysread system call.. early)
-		;add	eax, end_of_bss
+		; 26/01/2025
+		add	eax, end_of_bss
 		; 13/01/2025
-		add	eax, 100000h ; + end of 1st 1MB
+		;add	eax, 100000h ; + end of 1st 1MB
 		; TRDOS 386 system call
 		; Set break address
 		; ebx = new [u.break]
@@ -10084,18 +10138,11 @@ GetTickCount:
 
 ; =============== E X I T ===================================================
 
+		; 25/01/2025
 		; 20/10/2024
 ExitProcess:
-		; 22/01/2025
-		;;;;
-		mov	cx, [cursortype]	
-		cmp	cx, 0
-		jz	short ExitP@
-		mov	ah, 01h
-		int	31h
-ExitP@:	
-		;;;;
-
+		call	set_text_mode
+ExitP@:
 		xor	ebx, ebx  ; mov ebx, 0  ; exit code
 ExitProcess@:	; 13/01/2025
 		sys	_exit
@@ -10369,17 +10416,33 @@ MP3_MAX_OUTPUT_SIZE equ 2*2*18*32*2
 
 ; =============== S U B R O U T I N E =======================================
 
-
+		; 29/01/2025
+		; 28/01/2025
+		; 27/01/2025
 		; 12/01/2025
 audio_system_init:
+		; 28/01/2025
+		mov	eax, [mp3_samples_output_size]
+; 29/01/2025
+if 1
+		; 29/01/2025
+		mov	byte [blocks], 1
+		;
+		cmp	byte [audio_hardware], 1
+		jne	short .bufaloc
+
 		;mov	eax, sample_buffer_size
 		; 10/01/2025
 		;mov	byte [blocks], 16
 		; 12/01/2025
-		mov	byte [blocks], 8
-		mov	eax, [mp3_samples_output_size]
-		shl	eax, 3 ; * 8
-		;shl	eax, 4 ; * 16
+		;mov	byte [blocks], 8
+		;;mov	eax, [mp3_samples_output_size]
+		;shl	eax, 3 ; * 8
+		;;shl	eax, 4 ; * 16
+		
+		; 29/01/2025
+		shl	byte [blocks], 2 ; 4
+		shl	eax, 2 ; * 4
 .asi@:		
 		; 12/01/2025
 		;cmp	eax, 65536
@@ -10395,26 +10458,32 @@ audio_system_init:
 		;;;
 		;jmp	short .asi@
 .asi@@:
-		cmp	byte [audio_hardware], 1 ; SB16
-		jne	short .bufaloc
+		; 29/01/2025
+		;cmp	byte [audio_hardware], 1 ; SB16
+		;jne	short .bufaloc
 .asi@@@:
-		; 10/01/2025
-		cmp	eax, 32768
-		jna	short .bufaloc
-		; sample_buffer_size = 36864 bytes ; 8 blocks
-		;sub	eax, MP3_MAX_OUTPUT_SIZE
-		; eax = 32256 ; 7 blocks
-		; 10/01/2025
-		sub	eax, [mp3_samples_output_size]
-		dec	byte [blocks]
-		;;;
-		; 11/01/2025
-		;test	byte [blocks], 1
-		;jz	short .asi@@@
-		;dec	byte [blocks] ; even number
-		;sub	eax, [mp3_samples_output_size]
-		;;;
-		jmp	short .asi@@@
+; 29/01/2025
+;if 0
+;		; 10/01/2025
+;		cmp	eax, 32768
+;		jna	short .bufaloc
+;		; sample_buffer_size = 36864 bytes ; 8 blocks
+;		;sub	eax, MP3_MAX_OUTPUT_SIZE
+;		; eax = 32256 ; 7 blocks
+;		; 10/01/2025
+;		sub	eax, [mp3_samples_output_size]
+;		dec	byte [blocks]
+;		;;;
+;		; 11/01/2025
+;		;test	byte [blocks], 1
+;		;jz	short .asi@@@
+;		;dec	byte [blocks] ; even number
+;		;sub	eax, [mp3_samples_output_size]
+;		;;;
+;		jmp	short .asi@@@
+;end if
+end if
+
 .bufaloc:
 		; TRDOS 386 system call
 		; sysaudio
@@ -10425,7 +10494,7 @@ audio_system_init:
 		mov	[buffer_size], eax
 		sys	_audio, 0200h, eax, sample_buffer
 		jc	short .init_err
-
+		
 		; 12/01/2025
 		; clear audio buffer (before playback)
 		mov	edi, sample_buffer
@@ -10449,16 +10518,36 @@ audio_system_init:
 		; edx = SRB address -one byte data-
 		;sys	_audio, 0300h, 1, srb	
 		
-		;jc	short .init_err
+		jc	short .init_err
+
 		; 24/01/2025
 		;retn
+
+; 27/01/2025
+;		;;;; 26/01/2025
+;		cmp	byte [audio_hardware], 1 ; SB16 ?
+;		jne	short .smvol ; no
+;
+;		; 26/01/2025
+;		; Map system DMA buffer to user's memory space
+;		; (for -fast- sound data graphics display)
+;		mov	eax, [buffer_size]
+;		shl	eax, 1 ; dma buff size is 2 * user's buff size
+;		sys	_audio, 0D00h, eax, dmabuffer
+;.smvol:
+;		;;;;
+
 		mov	al, [volume_level]
 		;call	SetMasterVolume@
 		;retn
 		jmp	SetMasterVolume@
 
 .init_err:
-init_error:	; 13/01/2025
+init_error:	
+		; 27/01/2025
+		call	set_text_mode
+
+		; 13/01/2025
 		mov	edx, txt_audio_init_err
                 call    wrstr_edx
                 stc
@@ -10482,7 +10571,7 @@ audio_callback:
 
 		; 12/01/2025
                 call	try_enqueue_all_blocks
-
+.skip:
 		sys	_rele ; return from callback service 
 		
 		; we must not come here !
@@ -10545,6 +10634,7 @@ setvolume_ok:
 
 ; =============== S U B R O U T I N E =======================================
 
+		; 26/01/2025
 		; 23/01/2025
 		; 22/01/2025
 		; 13/01/2025
@@ -10643,8 +10733,12 @@ end if
 		jna	short .pb_l_@
 		call	checkUpdateEvents
 		jc	short .playback_end
-		mov	ax, 4E30h
-		mov	[0B8000h], ax
+
+		;mov	ax, 4E30h
+		;mov	[0B8000h], ax
+		; 26/01/2025
+		mov	bx, 0C30h
+		call	display_indicator
 		jmp	short .playback_lop
 .pb_l_@:
 		;;;; ---------------------
@@ -10664,33 +10758,62 @@ end if
 
 		;mov	byte [srb], 0	; reset
 		mov	[srb], al ; 0
+
 		; 12/01/2025
 		;call	try_enqueue_all_blocks
-		; 15/01/2025
-		cmp	byte [blocks], 0 ; interpolation ?
-		jna	short .interpolated ; yes
+
+		; 28/01/2025
+		mov	bl, [counter]
+		inc	byte [counter]
+		and	bl, 7
+		jnz	short .playback_lop
 
 		; 15/01/2025
-		mov	ah, 4Eh ; red backgroud, yellow font 
+		;cmp	byte [blocks], 0 ; interpolation ?
+		;jna	short .interpolated ; yes
+		; 27/01/2025
+		cmp	byte [interpolation], 0
+		ja	short .interpolated
+
+		; 15/01/2025
+		;mov	ah, 4Eh ; red background, yellow font
+		; 26/01/2025
+		mov	bh, 0Ch ; red background
 .indicator:
 		;;; 10/01/2025
-		mov	al, [half_buffer]
+		;mov	al, [half_buffer]
+		;xor	byte [half_buffer], 1
+		;;mov	ah, 4Eh
+		;add	al, '1'
+		;mov	[0B8000h], ax
+		; 26/01/2025
+		mov	bl, [half_buffer]
 		xor	byte [half_buffer], 1
-		;mov	ah, 4Eh
-		add	al, '1'
-		mov	[0B8000h], ax
-		;;;	
+		add	bl, '1'
+		; bh = color, bl = character (1,2)
+		call	display_indicator
+		;;;
 		jmp	short .playback_lop
 
 .interpolated:
 		; 15/01/2025
 		; (a solution for very fast indicator digit change)
 		; (8 to 1)
-		inc	byte [counter]
-		mov	al, [counter]
-		and	al, 7
-		jnz	short .playback_lop
-		mov	ah, 1Eh ; blue backgroud, yellow font
+		;inc	byte [counter]
+		;mov	al, [counter]
+		;and	al, 7
+		
+		; 28/01/2025
+		; 26/01/2025
+		;mov	bl, [counter]
+		;inc	byte [counter]
+		;and	bl, 7
+		;jnz	short .playback_lop
+
+		;mov	ah, 1Eh ; blue background, yellow font
+		; 27/01/2025
+		;mov	bh, 09h ; blue background
+		mov	bh, 01h ; dark blue background
 		jmp	short .indicator
 
 		; 21/01/2025
@@ -10703,8 +10826,11 @@ end if
 
 .playback_end:
 		;;; 10/01/2025
-		mov	ax, 4E30h
-		mov	[0B8000h], ax 
+		;mov	ax, 4E30h
+		;mov	[0B8000h], ax
+		; 26/01/2025
+		mov	bx, 0C30h
+		call	display_indicator
 		;;;
 
 ; 23/01/2025
@@ -10792,12 +10918,60 @@ if 0
 		; 12/01/2025
 .b_info:
 		call	write_buffer_size
+
 		jmp	.playback_next
 end if
 
 
 ; =============== S U B R O U T I N E =======================================
 
+		; 26/01/2025 (mp3play5.s)
+		; Display buffer swap/switch (interrupt) indicator
+		; on top left of the screen/window
+display_indicator:
+		; 26/01/2025
+		; bl = buffer indicator ('1', '2' or '0' -stop- )
+		; bh = color
+		;
+		; (640*480, 256 colors)
+;tl0:		;
+		; 22/12/2024 (vgaplay.s)
+		;;;
+		;mov	ebp, 16
+		mov	ebp, 14
+		mov	edi, [LFB_ADDR]
+		;movzx	esi, al
+		; 26/01/2025
+		movzx	esi, bl	; character
+		shl	esi, 4 ; * 16
+		add	esi, fontbuff2
+.tL0_1:
+		mov	edx, 8 ; 8 pixels (8*16 pixel font)
+		mov	ah, [esi]
+.tL0_2:
+		;mov	al, 0Ch ; red
+		; 26/01/2025
+		mov	al, bh	; background color
+		shl	ah, 1
+		jnc	short .tL0_3
+		mov	al, 0Eh ; yellow
+.tL0_3:
+		stosb
+		dec	edx
+		jnz	short .tL0_2
+		dec	ebp
+		jz	short .tL0_4
+		add	edi, 640-8 ; next line
+		inc	esi
+		jmp	short .tL0_1
+.tL0_4:
+		;;;
+		retn
+
+
+; =============== S U B R O U T I N E =======================================
+
+		; 29/01/2025
 		; 23/01/2025
 		; 13/01/2025
 		; 12/01/2025
@@ -10847,6 +11021,7 @@ try_enqueue_all_blocks_@:
 		jz	short teab_next_block
 ;.no_error:
 		inc	byte [num_enqueued_frames]
+		;
 		mov	al, [num_enqueued_frames]
 		cmp	al, [blocks]
 		;jb	short .next_block
@@ -10872,6 +11047,8 @@ teab_enqueue_done:
 ; =============== S U B R O U T I N E =======================================
 		
 		; 30/01/2025
+		; 27/01/2025
+		; 26/01/2025
 		; 15/01/2025
 		; 14/01/2025
 		; 13/01/2025
@@ -10926,7 +11103,6 @@ audio_system_init_x:
 		;and	al, ~3
 		mov	[buffer_size], eax
 		jmp	.asix_@
-
 		; 13/01/2025
 		; ----------------------------
 		; ref: playwav9.s - 18/12/2024
@@ -11187,8 +11363,13 @@ audio_system_init_x:
 .vra_needed:
 		pop	eax ; discard return address to the caller
 .vra_err:
+		; 27/01/2025
+		call	set_text_mode
+		;
 		sys	_msg, msg_no_vra, 255, 0Fh
-		jmp	ExitProcess
+		;jmp	ExitProcess
+		; 27/01/2025
+		jmp	ExitProcess@
 
 .asix_@:
 		; TRDOS 386 system call
@@ -11225,6 +11406,14 @@ audio_system_init_x:
 		; edx = SRB address -one byte data-
 		;sys	_audio, 0300h, 1, srb	
 		jc	short .init_err
+
+; 27/01/2025
+;		; 26/01/2025
+;		; Map system DMA buffer to user's memory space
+;		; (for -fast- sound data graphics display)
+;		mov	eax, [buffer_size]
+;		shl	eax, 1 ; dma buff size is 2 * user's buff size
+;		sys	_audio, 0D00h, eax, dmabuffer
 
 		; 24/01/2025
 		;retn
@@ -11268,7 +11457,7 @@ end if
 
 
 ; =============== S U B R O U T I N E =======================================
-
+		
 		; 23/01/2025
 		; 15/01/2025
 		; 13/01/2025
@@ -11354,6 +11543,7 @@ audio_callback_x:
 ; ---------------------------------------------------------------------------
 ; ref: playwav9.s - 18/12/2025
 
+; =============== S U B R O U T I N E =======================================
 
 ; 13/01/2025
 ; --------------------------------------------------------
@@ -11423,6 +11613,8 @@ cts16b_1:
 	jmp	short cts_2
 
 ; /////
+
+; =============== S U B R O U T I N E =======================================
 
 ; --------------------------------------------------------
 ; 13/01/2025
@@ -11569,7 +11761,7 @@ lff8m_4:
 	;clc
 	retn
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_8khz_stereo_8_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -11680,7 +11872,7 @@ lff8s_2:
 lff8s_6:
 	jmp	lff8s_3
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_8khz_mono_16_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -11743,7 +11935,7 @@ lff8m2_2:
 	jnz	lff8m2_1
 	jmp	lff8m2_3
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_8khz_stereo_16_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -11843,7 +12035,7 @@ lff8s2_2:
 lff8_s2_9:
 	jmp	lff8s2_3
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_16khz_mono_8_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -11893,7 +12085,7 @@ lff16m_2:
 	jnz	short lff16m_1
 	jmp	lff16m_3
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_16khz_stereo_8_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -11959,7 +12151,7 @@ lff16s_2:
 	jnz	short lff16s_1
 	jmp	lff16s_3
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_16khz_mono_16_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -12003,7 +12195,7 @@ lff16m2_2:
 	jnz	short lff16m2_1
 	jmp	lff16m2_3
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_16khz_stereo_16_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -12066,7 +12258,7 @@ lff16s2_2:
 	jnz	lff16s2_1
 	jmp	lff16s2_3
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_24khz_mono_8_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -12103,7 +12295,7 @@ lff24m_2:
 	jnz	short lff24m_1
 	jmp	lff24_3
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_24khz_stereo_8_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -12154,7 +12346,7 @@ lff24s_2:
 	jnz	short lff24s_1
 	jmp	lff24_3
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_24khz_mono_16_bit:
 	; 30/01/2025
@@ -12195,7 +12387,7 @@ lff24m2_2:
 	jnz	short lff24m2_1
 	jmp	lff24_3
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_24khz_stereo_16_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -12244,7 +12436,7 @@ lff24s2_2:
 	jnz	short lff24s2_1
 	jmp	lff24_3
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_32khz_mono_8_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -12292,7 +12484,7 @@ lff32m_2:
 lff32m_3:
 	jmp	lff32_3
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_32khz_stereo_8_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -12358,7 +12550,7 @@ lff32s_2:
 lff32s_3:
 	jmp	lff32_3
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_32khz_mono_16_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -12406,7 +12598,7 @@ lff32m2_2:
 lff32m2_3:
 	jmp	lff32_3
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_32khz_stereo_16_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -12465,7 +12657,7 @@ lff32s2_2:
 lff32s2_3:
 	jmp	lff32_3
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_22khz_mono_8_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -12483,7 +12675,7 @@ lff22m_1:
 	dec	ecx
 	jz	short lff22m_2_1
 	mov	dl, [esi]
-lff22m_2_1:	
+lff22m_2_1:
 	; al = [previous_val]
 	; dl = [next_val]
 	call	interpolating_3_8bit_mono ; 1 of 17
@@ -12515,7 +12707,7 @@ lff22s_3:
 	jmp	lff22_3	; padfill
 		; (put zeros in the remain words of the buffer)
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_22khz_stereo_8_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -12563,7 +12755,7 @@ lff22s_2_3:
 	inc	ebp ; 5
 	jmp	short lff22s_1 ; 3:2:2:2:2:2 ; 12-17 of 17
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_22khz_mono_16_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -12614,7 +12806,7 @@ lff22s2_3:
 	jmp	lff22_3	; padfill
 		; (put zeros in the remain words of the buffer)
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_22khz_stereo_16_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -12679,7 +12871,7 @@ lff22s2_2_4:
 	; 26/11/2023
 	jmp	lff22_3	; padfill
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_11khz_mono_8_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -12724,7 +12916,7 @@ lff11m_2_4:
 	jecxz	lff11m_3
 	jmp	short lff11m_1
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_11khz_stereo_8_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -12777,7 +12969,7 @@ lff11s_3:
 	jmp	lff11_3	; padfill
 		; (put zeros in the remain words of the buffer)
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_11khz_mono_16_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -12827,7 +13019,7 @@ lff11m2_3:
 	jmp	lff11_3	; padfill
 		; (put zeros in the remain words of the buffer)
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_11khz_stereo_16_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -12918,7 +13110,7 @@ lff11s2_3:
 	jmp	lff11_3	; padfill
 		; (put zeros in the remain words of the buffer)
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_44khz_mono_8_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -12964,7 +13156,7 @@ lff44s_3:
 	jmp	lff44_3	; padfill
 		; (put zeros in the remain words of the buffer)
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_44khz_stereo_8_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -13011,7 +13203,7 @@ lff44s_2_2:
 	mov	ebp, 11
 	jmp	short lff44s_1
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_44khz_mono_16_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -13056,7 +13248,7 @@ lff44s2_3:
 	jmp	lff44_3	; padfill
 		; (put zeros in the remain words of the buffer)
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 load_44khz_stereo_16_bit:
 	; 13/01/2025 (mp3play3.s)
@@ -13107,7 +13299,7 @@ lff44s2_2_2:
 	mov	ebp, 11
 	jmp	short lff44s2_1
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 interpolating_3_8bit_mono:
 	; 01/02/2025
@@ -13139,6 +13331,8 @@ interpolating_3_8bit_mono:
 	stosw		; interpolated sample 2 (L)
 	stosw		; interpolated sample 2 (R)
 	retn
+
+; =============== S U B R O U T I N E =======================================
 
 interpolating_3_8bit_stereo:
 	; 01/02/2025
@@ -13191,6 +13385,8 @@ interpolating_3_8bit_stereo:
 	stosw		; interpolated sample 2 (R)
 	retn
 
+; =============== S U B R O U T I N E =======================================
+
 interpolating_2_8bit_mono:
 	; 16/11/2023
 	; al = [previous_val]
@@ -13209,6 +13405,8 @@ interpolating_2_8bit_mono:
 	stosw		; interpolated sample (L)
 	stosw		; interpolated sample (R)
 	retn
+
+; =============== S U B R O U T I N E =======================================
 
 interpolating_2_8bit_stereo:
 	; 16/11/2023
@@ -13239,6 +13437,8 @@ interpolating_2_8bit_stereo:
 	stosw		; interpolated sample (R)
 	retn
 
+; =============== S U B R O U T I N E =======================================
+
 interpolating_3_16bit_mono:
 	; 16/11/2023
 	; ax = [previous_val]
@@ -13266,6 +13466,8 @@ interpolating_3_16bit_mono:
 	stosw		; interpolated sample 2 (L)
 	stosw		; interpolated sample 2 (R)
 	retn
+
+; =============== S U B R O U T I N E =======================================
 
 interpolating_3_16bit_stereo:
 	; 16/11/2023
@@ -13315,6 +13517,8 @@ interpolating_3_16bit_stereo:
 	stosw 		; interpolated sample 2 (L)
 	retn
 
+; =============== S U B R O U T I N E =======================================
+
 interpolating_2_16bit_mono:
 	; 16/11/2023
 	; ax = [previous_val]
@@ -13331,6 +13535,8 @@ interpolating_2_16bit_mono:
 	stosw		; interpolated sample (L)
 	stosw		; interpolated sample (R)
 	retn
+
+; =============== S U B R O U T I N E =======================================
 
 interpolating_2_16bit_stereo:
 	; 16/11/2023
@@ -13367,6 +13573,8 @@ interpolating_2_16bit_stereo:
 	; 14/01/2025
 	stosd
 	retn
+
+; =============== S U B R O U T I N E =======================================
 
 interpolating_5_8bit_mono:
 	; 17/11/2023
@@ -13416,6 +13624,8 @@ interpolating_5_8bit_mono:
 	stosw		; interpolated sample 4 (L)
 	stosw		; interpolated sample 4 (R)
 	retn
+
+; =============== S U B R O U T I N E =======================================
 
 interpolating_5_8bit_stereo:
 	; 17/11/2023
@@ -13505,6 +13715,8 @@ interpolating_5_8bit_stereo:
 	stosw		; interpolated sample 4 (R)
 	retn
 
+; =============== S U B R O U T I N E =======================================
+
 interpolating_4_8bit_mono:
 	; 17/11/2023
 	; al = [previous_val]
@@ -13538,6 +13750,8 @@ interpolating_4_8bit_mono:
 	stosw		; interpolated sample 3 (L)
 	stosw		; interpolated sample 3 (R)
 	retn
+
+; =============== S U B R O U T I N E =======================================
 
 interpolating_4_8bit_stereo:
 	; 17/11/2023
@@ -13594,6 +13808,8 @@ interpolating_4_8bit_stereo:
 	stosw		; interpolated sample 3 (R)
 	retn
 
+; =============== S U B R O U T I N E =======================================
+
 interpolating_5_16bit_mono:
 	; 18/11/2023
 	; ax = [previous_val]
@@ -13638,6 +13854,8 @@ interpolating_5_16bit_mono:
 	stosw		; interpolated sample 4 (L)
 	stosw		; interpolated sample 4 (R)
 	retn
+
+; =============== S U B R O U T I N E =======================================
 
 interpolating_5_16bit_stereo:
 	; 18/11/2023
@@ -13722,6 +13940,8 @@ interpolating_5_16bit_stereo:
 	pop	ecx ; !
 	retn
 
+; =============== S U B R O U T I N E =======================================
+
 interpolating_4_16bit_mono:
 	; 18/11/2023
 	; ax = [previous_val]
@@ -13752,6 +13972,8 @@ interpolating_4_16bit_mono:
 	stosw		; interpolated sample 3 (L)
 	stosw		; interpolated sample 3 (R)
 	retn
+
+; =============== S U B R O U T I N E =======================================
 
 interpolating_4_16bit_stereo:
 	; 18/11/2023
@@ -13803,6 +14025,8 @@ interpolating_4_16bit_stereo:
 	stosw 		; interpolated sample 3 (R)
 	retn
 
+; ---------------------------------------------------------------------------
+
 ; 13/11/2023
 previous_val:
 previous_val_l: dw 0
@@ -13819,6 +14043,9 @@ faz:	db 0
 ; ---------------------------------------------------------------------------
 ; ref: playwav9.s (18/12/2024) - sb16play.s (20/12/2024)
 
+; =============== S U B R O U T I N E =======================================
+
+	; 26/01/2025 (mp3play5.s) - 640*480, 256 colors -
 	; 12/01/2025
 write_audio_dev_info:
 	cmp	byte [audio_hardware], 2
@@ -13826,6 +14053,9 @@ write_audio_dev_info:
 	je	short write_ac97_pci_dev_info ; AC97
 	retn
 
+; =============== S U B R O U T I N E =======================================
+
+	; 26/01/2025 (mp3play5.s) - 640*480, 256 colors -
 	; 20/12/2024 (playwavx.s, sb16play.s)
 write_sb16_dev_info:
 	; 27/11/2024
@@ -13861,19 +14091,27 @@ write_sb16_dev_info:
 	; 22/01/2025
 	;;;;
 	call 	clear_window
-	mov	dh, 12
+	;mov	dh, 12
+	; 26/01/2025
+	mov	dh, 15
 	mov	dl, 0
 	call	setCursorPosition
 	;;;;
 
 	; 12/01/2025	
 	; 20/12/2024
-	sys	_msg, msgSB16Info, 255, 07h
+	;sys	_msg, msgSB16Info, 255, 07h
+	; 26/01/2025
+	mov	ebp, msgSB16Info
+	call	sys_gmsg
 
 	; 22/01/2025
 	;retn
 	jmp	write_buffer_size
-	
+
+; =============== S U B R O U T I N E =======================================
+
+	; 26/01/2025 (mp3play5.s) - 640*480, 256 colors -	
 write_ac97_pci_dev_info:
 	; 19/11/2024
 	; 30/05/2024
@@ -14011,93 +14249,253 @@ _w_ac97imsg_:
 	; 22/01/2025
 	;;;;
 	call 	clear_window
-	mov	dh, 12
-	; 23/01/2025
-	;;;
-	cmp	byte [blocks], 0
-	ja	short _w_ac97imsg_@
-	dec	dh
-_w_ac97imsg_@:
-	;;;
+	;mov	dh, 12
+	; 26/01/2025
+	mov	dh, 14
+; 26/01/2025
+;	; 23/01/2025
+;	;;;
+;	cmp	byte [blocks], 0
+;	ja	short _w_ac97imsg_@
+;	dec	dh
+;_w_ac97imsg_@:
+;	;;;
 	mov	dl, 0
 	call	setCursorPosition
 	;;;;
 
 	; 12/01/2025
 	; 01/12/2024
-	sys	_msg, msgAC97Info, 255, 07h
+	;sys	_msg, msgAC97Info, 255, 07h
+	; 26/01/2025
+	mov	ebp, msgAC97Info
+	call	sys_gmsg
 
 	; 19/11/2024
         ;retn
 
+; ---------------------------------------------------------------------------
+
+	; 26/01/2025
 	; 30/05/2024
 write_VRA_info:
 	; 12/01/2025
 	; 01/12/2024
-	sys	_msg, msgVRAheader, 255, 07h
+	;sys	_msg, msgVRAheader, 255, 07h
+	; 26/01/2025
+	mov	ebp, msgVRAheader
+	call	sys_gmsg
+
 	cmp	byte [vra], 0
 	jna	short _w_VRAi_no
 _w_VRAi_yes:
-	sys	_msg, msgVRAyes, 255, 07h
+	;sys	_msg, msgVRAyes, 255, 07h
+	; 26/01/2025
+	mov	ebp, msgVRAyes
+	call	sys_gmsg
+
 	; 22/01/2025
 	;retn
+
 	jmp	short write_buffer_size
 
 _w_VRAi_no:
-	sys	_msg, msgVRAno, 255, 07h
+	;sys	_msg, msgVRAno, 255, 07h
+	; 26/01/2025
+	mov	ebp, msgVRAno
+	call	sys_gmsg
 	
 	; 13/01/2025
 	cmp	byte [interpolation], 0
 	ja	short _w_VRAi_no_yes
 
-	sys	_msg, crlf, 2, 07h
+	;sys	_msg, crlf, 2, 07h
+	; 26/01/2025
+	mov	ebp, crlf
+	call	sys_gmsg
 
 	; 22/01/2025
 	;retn
 	jmp	short write_buffer_size
 
 _w_VRAi_no_yes:
-	sys	_msg, msgInterp, 255, 07h
+	;sys	_msg, msgInterp, 255, 07h
 	; 22/01/2025
 	;retn
+	; 27/01/2025
+	mov	ebp, msgInterp
+	call	sys_gmsg
 
-; ---------------------------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
-	; 13/01/2025
+	; 29/01/2025
+	; 26/01/2025 (mp3play5.s) - graphics mode -
+	; 22/01/2025	
+	; 13/01/2025 (mp3play4.s) - text mode -
 	; 12/01/2025
 write_buffer_size:
+	; 29/01/2025
 	;;;	
-	mov	al, [blocks]	; (must be less than 10) 
-	add	al, '0'
-	mov	byte [blocks_txt], al
+	;mov	al, [blocks]	; (must be less than 10) 
+	;add	al, '0'
+	;mov	byte [blocks_txt], al
 	;;;
 	cmp	byte [interpolation], 1
 	jnb	short write_buffer_size_x
 	;;;
-	mov	edx, buffersize_txt
-	call	wrstr_edx
-	mov	eax, [buffer_size]
-	call	wr_decimal_eax_with_thousands_seperator
-	mov	edx, bytes_txt
-	call	wrstr_edx
-	retn
 
+	;mov	edx, buffersize_txt
+	;call	wrstr_edx
+	; 26/01/2025
+	mov	ebp, buffersize_txt
+	call	sys_gmsg
+
+	mov	eax, [buffer_size]
+	;call	wr_decimal_eax_with_thousands_seperator
+	; 26/01/2025
+	call	convert_to_string
+	mov	ebp, txtfilesize ; temporary string address
+	call	sys_gmsg
+
+	;mov	edx, bytes_txt
+	;call	wrstr_edx
+	;retn
+	; 26/01/2025
+	mov	ebp, bytes_txt
+	jmp	short sys_gmsg
+
+; =============== S U B R O U T I N E =======================================
+
+	; 26/01/2025
 	; 13/01/2025 (Indirect interpolation info)
 write_buffer_size_x:
-	mov	edx, buffers1_txt
-	call	wrstr_edx
+	;mov	edx, buffers1_txt
+	;call	wrstr_edx
+	; 26/01/2025
+	mov	ebp, buffers1_txt
+	call	sys_gmsg
+
 	mov	eax, [loadsize] ; decoding buffer size
 	; 15/01/2025
-	call	wr_decimal_eax_with_thousands_seperator
+	;call	wr_decimal_eax_with_thousands_seperator
+	; 26/01/2025
+	call	convert_to_string
+	mov	ebp, txtfilesize ; temporary string address
+	call	sys_gmsg
+
 	call	w_dbuff_bytes
-	mov	edx, buffers2_txt
-	call	wrstr_edx
+
+	;mov	edx, buffers2_txt
+	;call	wrstr_edx
+	; 26/01/2025
+	mov	ebp, buffers2_txt
+	call	sys_gmsg
+
 	mov	eax, [buffer_size] ; wav buffer size
-	call	wr_decimal_eax_with_thousands_seperator
+	;call	wr_decimal_eax_with_thousands_seperator
+	; 26/01/2025
+	call	convert_to_string
+	mov	ebp, txtfilesize ; temporary string address
+	call	sys_gmsg
 w_dbuff_bytes:
-	mov	edx, bytes2_txt
-	call	wrstr_edx
+	;mov	edx, bytes2_txt
+	;call	wrstr_edx
+	;retn
+	; 26/01/2025
+	mov	ebp, bytes2_txt
+	;jmp	short sys_gmsg
+
+; =============== S U B R O U T I N E =======================================
+
+	; 26/01/2025 (mp3play5.s)
+	; 22/12/2024 (vgaplay.s)
+	;;;
+	; 21/12/2024
+	; (write message in VGA/VESA-VBE mode)
+sys_gmsg:
+	mov	al, [ebp]
+	and	al, al
+	jz	short sys_gmsg_ok
+	cmp	al, 20h
+	jnb	short sys_gmsg_3
+	cmp	al, 13 ; CR
+	jne	short sys_gmsg_2
+	; carriege return, move cursor to column 0
+	mov	word [screenpos], 0
+sys_gmsg_1:
+	inc	ebp
+	jmp	short sys_gmsg
+sys_gmsg_2:
+	cmp	al, 10 ; LF
+	jne	short sys_gmsg_ok ; 22/12/2024
+	; line feed, move cursor to next row
+	add	word [screenpos+2], 16
+	jmp	short sys_gmsg_1
+sys_gmsg_3:
+	mov	esi, [screenpos]
+		; hw = (cursor) row
+		; si = (cursor) column
+	mov	ecx, 07h ; gray (light)
+	call	write_character
+	add	esi, 8
+	;;;
+	cmp	si, 640
+	jb	short sys_gmsg_5
+	shr	esi, 16
+	add	si, 16
+	cmp	si, 480
+	jb	short sys_gmsg_4
+	xor	esi, esi
+sys_gmsg_4:
+	shl	esi, 16
+	;;;
+sys_gmsg_5:
+	mov	[screenpos], esi
+	inc	ebp
+	jmp	short sys_gmsg
+sys_gmsg_ok:
 	retn
+	;;;
+
+; =============== S U B R O U T I N E =======================================
+
+	; 26/01/2025
+	; convert number to string with thousand separator
+convert_to_string:
+cfs:
+	mov	ebx, 10
+	mov	ebp, esp
+	xor	ecx, ecx
+	mov	edi, txtfilesize
+	mov	esi, edi
+.cfs_lop:
+	xor	edx, edx
+	div	ebx
+	add	dl, '0'
+	push	edx
+	inc	ecx
+	cmp	cl, 3
+	jb	short .cfs_1
+	or	eax, eax
+	jz	short .cfs_2
+	sub	ecx, ecx
+	mov	dl, ','
+	push	edx
+.cfs_1:
+	and	eax, eax
+	jnz	short .cfs_lop
+.cfs_2:
+	pop	eax
+	stosb
+	cmp	esp, ebp
+	jb	short .cfs_2
+
+	xor	eax, eax ; 0
+	stosb	; asciiz string
+
+	retn
+
+; ---------------------------------------------------------------------------
 
 ; 22/01/2025
 ; 11/01/2025
@@ -14105,8 +14503,9 @@ buffersize_txt	db 0Dh, 0Ah
 		db ' Buffer Size: ', 0
 ; 12/01/2025
 ;bytes_txt:	db ' bytes ', 0Dh, 0Ah, 0
-bytes_txt:	db ' bytes ('
-blocks_txt	db '0 blocks) ', 0Dh, 0Ah, 0
+; 29/01/2025
+;bytes_txt:	db ' bytes ('
+;blocks_txt	db '0 blocks) ', 0Dh, 0Ah, 0
 
 ; 22/01/2025
 ; 13/01/2025
@@ -14114,6 +14513,8 @@ buffers1_txt	db 0Dh, 0Ah
 		db ' Buffer size for', 0Dh, 0Ah
 		db '     decoding is ', 0
 buffers2_txt	db '   wav output is ', 0
+; 29/01/2025
+bytes_txt:
 bytes2_txt:	db ' bytes ', 0Dh, 0Ah, 0
 
 ; ---------------------------------------------------------------------------
@@ -14152,7 +14553,7 @@ msgVRAno	db "NO " ; 13/01/2025
 msgInterp	db "(INTERPOLATION: YES)"
 		db 0Dh, 0Ah, 0	
 
-; ----------------------------------
+; ---------------------------------------------------------------------------
 
 ; 24/11/2024
 msgSB16Info	db 0Dh, 0Ah
@@ -14165,7 +14566,7 @@ crlf:		; 13/01/2025
 		db 0Dh, 0Ah, 0
 
 ; 13/01/2025
-; ----------------------------------
+; ---------------------------------------------------------------------------
 ; 25/11/2023
 msg_no_vra:
 		db 10, 13
@@ -14178,153 +14579,11 @@ msg_no_vra:
 ; ---------------------------------------------------------------------------
 ; ref: playwav9.s (17/01/2025)
 
-		; 23/01/2025
-if 0
-		; 22/01/2025
-checkUpdateEvents:
-		cmp	byte [tsb], 1
-		jb	short .c4ue_@
+; =============== S U B R O U T I N E =======================================
 
-		mov	byte [tsb], 0
-
-		call	clear_keyb_buf
-
-		; 23/01/2025
-		mov	[fb_flag], 1
-
-		jmp	.c4ue_cpt
-.c4ue_@:
-		call	check4keyboardstop
-		jc	short .c4ue_ok
-
-		or	eax, eax
-		jz	short .c4ue_ok
-
-		push	eax
-		call	clear_keyb_buf
-		pop	eax
-
-		cmp	byte [fb_flag], 0
-		jna	short .c4ue_ok
-		mov	byte [fb_flag], 0
-
-		cmp	al, 20h ; SPACE (spacebar) ; pause/play
-		jne	short .c4ue_chk_s
-		cmp	byte [stopped], 0
-		ja	short .c4ue_chk_ps
-		; pause
-		call	audio_f_pause
-.c4ue_0_ind:
-		; stopped/paused indicator
-		mov	ax, 4E30h
-		mov	[0B8000h], ax
-.c4ue_ok:
-		retn
-.c4ue_chk_ps:
-		cmp	byte [stopped], 1
-		ja	short .c4ue_replay
-		
-		; continue to play (after a pause)
-		call	audio_f_play
-
-		retn
-.c4ue_replay:
-		pop	eax ; return address
-	
-		mov	byte [stopped], 0
-
-		; move to beginning
-		;mov	eax, [stream_start]
-		mov	eax, [stream_begin] ; 1st [stream_pos] value
-		mov	[stream_pos], eax
-		mov	eax, [stream_size]
-		mov	[bytes_left], eax
-
-		cmp	byte [interpolation], 0
-		ja	short .c4ue_rp_indr
-		jmp	start.direct
-.c4ue_rp_indr:
-		jmp	start.indirect
-.c4ue_chk_s:
-		cmp	al, 'S'	; stop
-		jne	short .c4ue_chk_fb
-		cmp	byte [stopped], 0
-		ja	short .c4ue_sc_ok ; Already stopped/paused
-.c4ue_stop:
-		call	audio_f_stop
-		jmp	short .c4ue_0_ind
-.c4ue_chk_fb:
-		cmp	al, 'F'
-		jne	short .c4ue_chk_b
-		call	Player_ProcessKey_Forwards
-		;retn
-		; 23/01/2025
-		jmp	short .c4ue_cpt
-.c4ue_chk_b:
-		cmp	al, 'B'
-		jne	short .c4ue_chk_h
-		call 	Player_ProcessKey_Backwards
-		;retn
-		; 23/01/2025
-		jmp	short .c4ue_cpt
-.c4ue_chk_h:
-		cmp	al, 'H'
-		jne	short .c4ue_chk_cr
-		mov	byte [wleds], 0
-		call 	write_audio_dev_info
-		mov	dh, 24
-		mov	dl, 79
-		call	setCursorPosition
-		retn
-.c4ue_chk_cr:
-		cmp	al, 0Dh ; ENTER/CR key
-		clc
-		jne	short .c4ue_sc_ok
-		
-		xor	ebx, ebx
-		mov	bl, [wleds]
-		inc	bl
-		and	bl, 0Fh
-		jnz	short .c4ue_sc
-		inc	ebx
-.c4ue_sc:
-		mov	[wleds], bl	
-		shr	bl, 1
-		mov	al, [ebx+colors]
-		jnc	short .c4ue_sc_@
-		or	al, 10h ; blue (dark) background
-.c4ue_sc_@:
-		mov	[ccolor], al
-		;;;
-.c4ue_sc_ok:
-		retn
-.c4ue_cpt:
-		cmp	byte [stopped], 0
-		ja	short .c4ue_uvb_ok
-	
-		call	CalcProgressTime
-
-		cmp	eax, [ProgressTime]
-		je	short .c4ue_uvb
-				; same second, no need to update
-
-		call	UpdateProgressBar
-.c4ue_uvb:
-		cmp	byte [wleds], 0
-		jna	short .c4ue_uvb_ok
-
-		call	UpdateWaveLeds
-.c4ue_uvb_ok:
-.ckb_ok:
-		;clc
-
-		retn
-end if
-
-; --------------------------------------------------------
-		
+		; 26/01/2025 (mp3play5.s)
+		; 24/12/2024 (vgaplay.s)
 		; 23/01/2025 (mp3play4.s)
-if 1
 		; 07/12/2024 (playwav9.s)
 
 checkUpdateEvents:
@@ -14343,8 +14602,11 @@ checkUpdateEvents:
 		call	audio_f_pause
 .c4ue_0_ind:
 		; stopped/paused indicator
-		mov	ax, 4E30h
-		mov	[0B8000h], ax
+		;mov	ax, 4E30h
+		;mov	[0B8000h], ax
+		; 26/01/2025
+		mov	bx, 0C30h
+		call	display_indicator
 		jmp	.c4ue_cpt
 .c4ue_chk_ps:
 		cmp	byte [stopped], 1
@@ -14393,31 +14655,51 @@ checkUpdateEvents:
 		jmp	short .c4ue_cpt
 .c4ue_chk_h:
 		cmp	al, 'H'
-		jne	short .c4ue_chk_cr
+		;jne	short .c4ue_chk_cr
+		; 26/01/2025
+		jne	short .c4ue_chk_g
+
 		mov	byte [wleds], 0
 		call 	write_audio_dev_info
-		mov	dh, 24
-		mov	dl, 79
-		call	setCursorPosition
+		
+		; 26/01/2025
+		;mov	dh, 24
+		;mov	dl, 79
+		;call	setCursorPosition
+		
 		jmp	short .c4ue_cpt
+
+		; 26/01/2025
+		; 24/12/2024
+.c4ue_chk_g:
+		cmp	al, 'G'
+		je	short .c4ue_g
+
 .c4ue_chk_cr:
 		cmp	al, 0Dh ; ENTER/CR key
 		jne	short .c4ue_cpt
 		
 		xor	ebx, ebx
+		
+		; 26/01/2025
+		; 24/12/2024 (wave lighting points option)
+		mov	[p_mode], bl ; 0
 		mov	bl, [wleds]
 		inc	bl
 		and	bl, 0Fh
 		jnz	short .c4ue_sc
 		inc	ebx
 .c4ue_sc:
-		mov	[wleds], bl	
+		mov	[wleds], bl
 		shr	bl, 1
 		mov	al, [ebx+colors]
-		jnc	short .c4ue_sc_@
-		or	al, 10h ; blue (dark) background
-.c4ue_sc_@:
+		; 24/12/2024
 		mov	[ccolor], al
+		jc	short .c4ue_g_@
+		
+		; 26/01/2025
+		; 24/12/2024
+		call	reset_wave_leds ; prepare all leds as turned off
 		;;;
 .c4ue_cpt:
 		sys	_time, 4 ; get timer ticks (18.2 ticks/second)
@@ -14428,6 +14710,21 @@ checkUpdateEvents:
 .c4ue_utt:	
 		mov	[timerticks], eax
 		jmp	short .c4ue_cpt_@
+
+		; 27/01/2025
+		; 24/12/2024
+.c4ue_g:
+		cmp	byte [wleds], 0
+		ja	short .c4ue_g_@
+		;
+		inc	byte [wleds]	; force wave lighting ('G' key)
+.c4ue_g_@:
+		; 26/01/2025
+		;mov	byte [wleds], 1
+		mov	byte [p_mode], 1 ; points option enabled
+		call	clear_window
+		jmp	short .c4ue_cpt
+ 
 .c4ue_skip_utt:
 		and	ecx, ecx
 		jz	short .c4ue_uvb_ok
@@ -14446,28 +14743,26 @@ checkUpdateEvents:
 		cmp	byte [wleds], 0
 		jna	short .c4ue_uvb_ok
 
+		; 26/01/2025
+		; 24/12/2024 (wave points mode)
+		cmp	byte [p_mode], 0
+		ja	short .c4ue_uwp
+
 		call	UpdateWaveLeds
+
 .c4ue_uvb_ok:
 		;clc
 
 		retn
-end if
 
-; --------------------------------------------------------
+		; 26/01/2025
+.c4ue_uwp:
+		;call	UpdateWavePoints
+		;retn
+		jmp	UpdateWavePoints
 
-; 23/01/2025
-if 0
-		; 22/01/2025
-clear_keyb_buf:
-		; clear keyboard buffer
-		mov	ah, 1
-		int	32h
-		jz	short checkUpdateEvents.ckb_ok
-		mov	ah, 0
-		int	32h
-		jmp	short clear_keyb_buf
 
-end if
+; =============== S U B R O U T I N E =======================================
 
 ; --------------------------------------------------------
 ; 22/01/2025 - Check for Keyboard Stop (Request)
@@ -14653,7 +14948,7 @@ Player_ProcessKey_set_pos:
 		sub	ecx, eax
 		jnc	short .ppk_sp@@
 		xor	ecx, ecx
-.ppk_sp@@: 
+.ppk_sp@@:
 		; 23/01/2025
 		mov	[bytes_left], ecx
 if 0
@@ -14703,26 +14998,107 @@ end if
 
 
 ; ---------------------------------------------------------------------------
-; 21/01/2025 - Player Window Display Functions
+; 25/01/2025 - Player Window Display Functions
 ; ---------------------------------------------------------------------------
-; ref: playwav9.s (17/01/2025)
+; ref: vgaplay2.s (18/01/2025)
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
-		; 21/01/2025
-setCursorPosition:
-		; dh = Row
-		; dl = Column
-		mov	ax, 0500h
-		int	31h
-		mov	ah, 02h
-		mov	bh, 00h
-		int	31h
+		; 26/01/2025
+		; 25/01/2025 (mp3play5.s)
+		; 26/12/2024 (vgaplay.s)
+		; 21/12/2024 (dplayvga.s)
+
+	;;drawsplashscreen:
+	;;	mov	ebp, SplashScreen
+	;;	;;mov	dword [nextrow], 00100000h ; 8*16
+	;;	;mov	dword [nextrow], 000E0000h ; 8*14
+	;;	;mov	esi, 0 ; row 0, column 0
+	;;	mov	esi, 00020000h ; row 2, column 0 ; top margin = 2
+	;;	jmp	short p_d_x
+
+drawplayingscreen:
+		mov	ebp, PlayingScreen
+		;mov	dword [nextrow], 000E0000h ; 8*14
+		; 26/01/2025
+		mov	esi, 0 ; row 0, column 0
+		;mov	esi, 00070000h ; row 7, column 0 ; top margin = 7
+p_d_x:
+		mov	byte [columns], 80
+p_d_x_n:
+		xor	edx, edx
+		mov	dl, [ebp]
+		and	dl, dl
+		jz	short p_d_x_ok
+		shl	edx, 4 ; * 16 (for 8x16 font)
+
+		mov	edi, fontbuff2 ; start of user font data
+		add	edi, edx
+
+		;; NOTE: Following system call writes fonts at
+		;; Std VGA video memory 0A0000h, BL bit 7 selects
+		;; screen width as 640 pixels (instead of 320 pixels)
+		;; so 8Fh is sub function 0Fh (write char)
+		;; with 640 pixels screen witdh. 
+		;; (Even if VESA VBE mode -LFB- is in use, QEMU and
+		;; a real computer with NVIDIA GEFORCE FX 550 uses
+		;; A0000h, so.. even if fonts are written at A0000h-B0000h
+		;; region, the text is appeared on screen
+		;; while LFB is at C0000000h or E0000000h.)
+
+		;sys	_video, 018Fh, [tcolor], 8001h
+			;; use STD VGA video memory
+			;; (0A0000h)
+		;sys	_video, 020Fh, [tcolor], 8001h ; 8x16 user font
+		 	; use LFB for current VBE mode
+		 	; for writing fonts on screen
+		; 26/12/2024
+		sys	_video, 020Fh, 0Fh, 8001h ; 8x16 user font
+
+		inc	ebp
+		add	si, 8 ; next char pos
+		dec	byte [columns]
+		jnz	short p_d_x_n	; next column
+		xor	si, si
+		;;add	esi, 00100000h	; next row ; 8*16
+		;add	esi, [nextrow]
+		add	esi, 000E0000h	; next row ; 8*14
+		jmp	short p_d_x
+p_d_x_ok:
 		retn
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
-		; 22/01/2025
+; 25/01/2025
+if 0
+		; 21/12/2024
+clearscreen:
+		; fast clear
+		; 640*480, 256 colors
+		mov	edi, [LFB_ADDR]
+		mov	ecx, (640*480*1)/4 ; 22/12/2024
+		xor	eax, eax
+		rep	stosd
+		retn
+end if
+
+; =============== S U B R O U T I N E =======================================
+
+		; 25/01/2025
+		; 21/12/2024
+set_text_mode:
+		xor    ah, ah
+		mov    al, 3
+ 		;int   10h ; al = 03h text mode, int 10 video
+		int    31h ; TRDOS 386 - Video interrupt
+		retn
+
+; =============== S U B R O U T I N E =======================================
+
+		; 26/01/2025
+		; 25/01/2025 (mp3play5.s) -graphics/VGA mode-
+		; 21/12/2024 (vgaplay.s)
+		; 22/01/2025 (mp3play4.s) -text mode-
 		; 21/01/2025
 SetTotalTime:
 		;;;; 22/01/2025
@@ -14758,7 +15134,13 @@ SetTotalTime:
 		push	eax ; **
 		push	eax ; *
 
-		mov	dh, 24
+		; 25/01/2025
+
+		;mov	dh, 24
+		; 21/12/2024 (640*480)
+		;mov	dh, 32
+		; 26/01/2025
+		mov	dh, 33
 		mov	dl, 42
 		call	setCursorPosition
 
@@ -14766,23 +15148,33 @@ SetTotalTime:
 		xor	ah, ah
 		mov	ebp, 2
 		call	PrintNumber
-	
-		mov	dh, 24
+
+		;mov	dh, 24
+		; 21/12/2024 (640*480)
+		;mov	dh, 32
+		; 26/01/2025
+		mov	dh, 33
 		mov	dl, 45
 		call	setCursorPosition
 
 		pop	eax ; **
 		mov	al, ah
 		xor	ah, ah
-		;mov	bp, 2
+		; 21/12/2024
+		mov	bp, 2
 		;jmp	short PrintNumber
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
-		; 21/01/2025
+		; 26/01/2025
+		; 25/01/2025 (mp3play5.s)
+		; 22/12/2024 (vgaplay.s)
+		; 21/12/2024 (write numbers in VESA VBE graphics mode)
 PrintNumber:
 		; eax = binary number
 		; ebp = digits
+		mov	esi, [screenpos]
+			; hw = row, si = column
 		mov	ebx, 10
 		xor	ecx, ecx
 printNumber_CutNumber:
@@ -14796,17 +15188,37 @@ printNumber_CutNumber:
 
 printNumber_printloop:
 		pop	eax
-		mov	ah, 0Eh	; write as TTY
+		; 21/12/2024
+		; ebp = count of digits
+		; eax <= 9
+
 		add	al, '0'
-		mov	bl, 0Fh  ; white
-		int	31h  ; TRDOS 386 video interrupt
-		loop	printNumber_printloop
-	
+
+		; esi = pixel position (hw = row, si = column)
+		; eax = al = character
+		;call	write_character
+		; 22/12/2024
+		call	write_character_white
+
+		; 26/01/2025
+		add	esi, 8	; next column
+
+		dec	ebp
+ 		jz	short printNumber_ok
+
+		jmp	short printNumber_printloop
+printNumber_ok:
+		; 26/01/2025
+		mov	[screenpos], esi
+
 		retn
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
-		; 21/01/2025
+		; 26/01/2025
+		; 25/01/2025 (mp3play5.s)
+		; 21/12/2024 (vgaplay.s)
+		; 21/01/2025 (mp3play4.s)
 SetProgressTime:
 		;; Calculate playing/progress seconds in file
 		call	CalcProgressTime
@@ -14823,7 +15235,13 @@ UpdateProgressTime:
 		push	eax ; **
 		push	eax ; *
 
-		mov	dh, 24
+		; 25/01/2025
+
+		;mov	dh, 24
+		; 21/12/2024 (640*480)
+		;mov	dh, 32
+		; 26/01/2025
+		mov	dh, 33
 		mov	dl, 33
 		call	setCursorPosition
 
@@ -14831,18 +15249,24 @@ UpdateProgressTime:
 		xor	ah, ah
 		mov	ebp, 2
 		call	PrintNumber
-	
-		mov	dh, 24
+
+		;mov	dh, 24
+		; 21/12/2024 (640*480)
+		;mov	dh, 32
+		; 26/01/2025
+		mov	dh, 33
 		mov	dl, 36
 		call	setCursorPosition
 
 		pop	eax ; **
 		mov	al, ah
 		xor	ah, ah
-		;mov	bp, 2
+		; 
+		; 21/12/2024
+		mov	bp, 2
 		jmp	short PrintNumber
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
 		; 21/01/2025
 CalcProgressTime:
@@ -14858,18 +15282,22 @@ cpt_ok:
 		; eax = (new) progress time
 		retn
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
-		; 24/01/2025
+		; 26/01/2025
+		; 25/01/2025 (mp3play5.s)
+		; 26/12/2024 (vgaplay2.s)
+		; 24/01/2025 (mp3play4.s)
 		; 21/01/2025
 UpdateFileInfo:
 		;; Print File Name
-		mov	dh, 7
+		;mov	dh, 7
+		mov	dh, 8 ; 26/01/2025
 		mov	dl, 22
 		call	setCursorPosition
-	
+
 		mov	esi, [mp3_src_fname]
-	
+
 		;;;
 		; skip directory separators
 		; (note: asciiz string, max. 79 bytes except zero tail)
@@ -14887,17 +15315,36 @@ chg_fpos:
 chg_fpos_ok:
 		mov	esi, ebx ; file name (without its path/directory)
 		;;;
+_fnl_chk:
+		; 26/12/2024 (file name length limit -display-)
+		;mov	ebx, 12
+		; 25/01/2025
+		mov	ebx, 17 ; ????????.mp3?????
+		push	esi
+_fnl_chk_loop:
+		lodsb
+		and	al, al
+		jz	short _fnl_ok
+ 		dec	ebx
+		jnz	short _fnl_chk_loop
+		mov	byte [esi], 0
+_fnl_ok:
+		pop	esi
+		;;;
 
 		call	PrintString
 
 		; 24/01/2025
 		;; Print File Size
-		mov	dh, 7
+		;mov	dh, 7
+		mov	dh, 8 ; 26/01/2025
 		mov	dl, 56
 		call	setCursorPosition
 
 		;;;; 24/01/2025 - Erdogan Tan
                 mov     eax, [mp3_file_size]
+; 26/01/2025
+if 0
 		mov	ebx, 10
 		mov	ebp, esp
 		xor	ecx, ecx
@@ -14916,16 +15363,23 @@ chg_fpos_ok:
 		sub	ecx, ecx
 		mov	dl, ','
 		push	edx
-.cfs_1:		
+.cfs_1:
 		and	eax, eax
-		jnz	short .cfs_lop		
+		jnz	short .cfs_lop
 .cfs_2:
 		pop	eax
 		stosb
 		cmp	esp, ebp
 		jb	short .cfs_2
-		
-		mov	eax, ' byt'	
+else
+		; 26/01/2025
+		;call	cfs	
+		call	convert_to_string
+end if
+		;;; 28/01/2025
+		dec	edi
+		;;;
+		mov	eax, ' byt'
 		stosd
 		mov	ax, 'es'
 		stosw
@@ -14938,7 +15392,8 @@ chg_fpos_ok:
 
 		; 24/01/2025
 		;; Print Input Frequency
-		mov	dh, 8
+		;mov	dh, 8
+		mov	dh, 9 ; 26/01/2025
 		mov	dl, 22
 		call	setCursorPosition
 
@@ -14948,7 +15403,8 @@ chg_fpos_ok:
 		
 		; 23/01/2025
 		;; Print Output Frequency
-		mov	dh, 8
+		;mov	dh, 8
+		mov	dh, 9 ; 26/01/2025
 		mov	dl, 56
 		call	setCursorPosition
 
@@ -14958,7 +15414,8 @@ chg_fpos_ok:
 
 		; 24/01/2025
 		;; Print Input Channels Number
-		mov	dh, 9
+		;mov	dh, 9
+		mov	dh, 10 ; 26/01/2025
 		mov	dl, 22
 		call	setCursorPosition
 
@@ -14968,7 +15425,8 @@ chg_fpos_ok:
               
 		; 23/01/2025
 		;; Print Output Channels Number
-		mov	dh, 9
+		;mov	dh, 9
+		mov	dh, 10 ; 26/01/2025
 		mov	dl, 56
 		call	setCursorPosition
 		mov	eax, [mp3_output_num_channels]
@@ -14977,7 +15435,8 @@ chg_fpos_ok:
 
 		; 24/01/2025
 		;; Print Input BitRate
-		mov	dh, 10
+		;mov	dh, 10
+		mov	dh, 11 ; 26/01/2025
 		mov	dl, 22
 		call	setCursorPosition
 
@@ -14993,7 +15452,8 @@ chg_fpos_ok:
 
 		; 23/01/2025
 		;; Print Output BitRate
-		mov	dh, 10
+		;mov	dh, 10
+		mov	dh, 11 ; 26/01/2025
 		mov	dl, 56
 		call	setCursorPosition
 		mov	eax, [mp3_bytes_per_sample]
@@ -15004,12 +15464,16 @@ chg_fpos_ok:
 		;call	UpdateVolume
 		;retn
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
+		; 26/01/2025
 		; 21/01/2025
 UpdateVolume:
 		;; Print Volume
-		mov	dh, 24
+		;mov	dh, 24
+		; 26/01/2025 (640*480)
+		;mov	dh, 32
+		mov	dh, 33
 		mov	dl, 75
 		call	setCursorPosition
 
@@ -15029,9 +15493,11 @@ UpdateVolume:
 		;retn
 		jmp	PrintNumber	
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
-		; 21/01/2025
+		; 25/01/2025 (mp3play5.s)
+if 0
+		; 21/01/2025 (mp3play4.s)
 PrintString:
 		; esi = string address 
 		mov	bx, 0Fh	 ; white
@@ -15045,12 +15511,110 @@ printstr_loop:
 		jmp	short printstr_loop
 printstr_ok:
 		retn
+else
+		; 25/01/2025 (mp3play5.s)
+		; 21/12/2024 (vgaplay.s)
+		; write text in VESA VBE graphics mode
+PrintString:
+		; esi = string address
+printstr_loop:
+		xor	eax, eax
+		lodsb
+		or	al, al
+		jz	short printstr_ok
 
-; --------------------------------------------------------
+		push	esi
 
-		; 21/01/2025
+		mov	esi, [screenpos]
 
-		PROGRESSBAR_ROW equ 23
+		; esi = pixel position (hw = row, si = column)
+		; eax = al = character
+		;call	write_character
+		; 22/12/2024
+		call	write_character_white
+
+		add	word [screenpos], 8 ; update column (only, not row)
+
+		pop	esi
+		jmp	short printstr_loop
+
+printstr_ok:
+		retn
+end if
+
+; =============== S U B R O U T I N E =======================================
+
+		; 25/01/2025 (mp3play5.s)
+		; 26/12/2024 (vgaplay2.s)
+		; 21/12/2024
+		; write character (at cursor position)
+		; in graphics mode (640*480, 256 colors)
+		; 22/12/2024
+write_character_white:
+		mov	ecx, 0Fh
+		; 26/12/2024
+		;movzx	ecx, byte [tcolor]
+write_character:
+		; esi = pixel position (hw = row, si = column)
+		; eax = al = character
+		; cl = color
+		mov	[wcolor], ecx ; 22/12/2024
+
+		; 22/12/2024
+		push	eax
+		; clear previous character pixels
+		mov	edi, fillblock
+		sys	_video, 020Fh, 0, 8001h
+		pop	eax
+
+		shl	eax, 4 ; 8*16 pixel user font
+		mov	edi, fontbuff2 ; start of user font data
+		add	edi, eax
+
+		; 21/12/2024
+		; NOTE:
+		; TRDOS 386 does not use 8*14 pixel fonts in sysvideo
+		; system calls -in graphics mode-
+		; because 8*16 pixel operations are faster
+		;			than 8*14 pixel operations.
+		; ((so, 8*14 fonts can be converted to 8*16 fonts by
+		; adding 2 empty lines))
+		; (8*14 characters can be written via pixel operations)
+  	
+		; 21/12/2024 (TRDOS 386 v2.0.9, trdosk6.s, 27/09/2024)
+		;;;;;;;;;;;;;;;;; ; sysvideo system call
+		;sysvideo:
+		;   function in BH
+		;	02h: Super VGA, LINEAR FRAME BUFFER data transfers
+		;   sub function in BL
+		;	0Fh: WRITE CHARACTER (FONT)
+		;          CL = char's color (8 bit, 256 colors)
+		;	If DH bit 7 = 1
+		;	   USER FONT (from user buffer)
+		;	         DL = 1 -> 8x16 pixel font
+ 		;	   EDI = user's font buffer address
+		;		(NOTE: byte order is as row0,row1,row2..)
+		;	   ESI = start position (row, column)
+		;		(HW = row, SI = column)
+		;;;;;;;;;;;;;;;;;
+
+		sys	_video, 020Fh, [wcolor], 8001h
+
+		retn
+
+; =============== S U B R O U T I N E =======================================
+
+		; 26/01/2025
+		; 25/01/2025 (mp3play5.s)
+		; 22/12/2024 (vgaplay.s)
+		; 22/01/2025
+		; 21/01/2025 (mp3play4.s)
+
+		;PROGRESSBAR_ROW equ 23
+		; 21/12/2024 (640*480)
+		;PROGRESSBAR_ROW equ 31
+		; 26/01/2025
+		PROGRESSBAR_ROW equ 32
 
 UpdateProgressBar:
 		call	SetProgressTime
@@ -15063,6 +15627,14 @@ UpdateProgressBar@:
 		;div	ebx
 		; 22/01/2025
 		div	dword [TotalTime]
+
+		; 25/01/2025	
+		; 22/12/2024
+		; check progress bar indicator position if it is same 
+		cmp	al, [pbprev]
+		je	short UpdateProgressBar_ok
+		mov	[pbprev], al
+
 UpdateProgressBar@@:
 		;; Push for the 'Clean' part
 		push	eax ; **
@@ -15078,59 +15650,236 @@ UpdateProgressBar@@:
 		jz	short UpdateProgressBar_Clean
 
 UpdateProgressBar_DrawProgress:
-		mov	ecx, eax
-		mov	ah, 09h
-		mov	al, 223
-		mov	ebx, 0Fh
-		; (TRDOS 386 video interrupt)
-		int	31h
+		; 22/12/2024
+		; 21/12/2024
+		; (write progress bar chars in graphics mode)
+		;;;;
+		mov	ebp, eax
+		push	eax ; ***
+		mov	esi, [screenpos]
+UpdateProgressBar_DrawProgress_@:
+		mov	eax, 223
+	
+		; esi = pixel position (hw = row, si = column)
+		; eax = al = character
+		;call	write_character
+		; 22/12/2024
+		call	write_character_white
+
+		dec	ebp
+		jz	short UpdateProgressBar_DrawCursor
+
+		add	esi, 8 ; next column
+		jmp	short UpdateProgressBar_DrawProgress_@
+		;;;
+
+		; 25/01/2025
+		; 22/12/2024
+UpdateProgressBar_ok:
+		retn
+	
+		; 25/01/2025
 
 UpdateProgressBar_DrawCursor:
+		; 22/12/2024
+		pop	edx ; ***
 		mov	dh, PROGRESSBAR_ROW
-		dec	ecx
-		mov	dl, cl
 		call	setCursorPosition
 
-		mov	ah, 09h
+		; 21/12/2024
+		; (write progress bar character in graphics mode)
+		;;;;
+		;;;mov	eax, 223
+		;;;shl	eax, 4 ; 8*16 pixel user font
+		;;mov	eax, 223*16
+		;;mov	edi, fontbuff2 ; start of user font data
+		;;add	edi, eax
+		;mov	edi, fontbuff2+(223*16)
+		;
+		;sys	_video, 020Fh, 0Ch, 8001h
+		; 22/12/2024
+		;mov	eax, 223
+		; eax = 0
 		mov	al, 223
-		mov	ebx, 0Ch
-		mov	ecx, 1
-		int	31h
+		mov	cl, 0Ch ; red
+		call	write_character
+		;;;;
 
 UpdateProgressBar_Clean:
-		pop	eax  ; **
-		mov	ecx, 80
-		sub	cx, ax
+		;pop	eax  ; **
+		; 22/12/2024
+		pop	edx  ; **
+		; 21/12/2024
+		mov	ebp, 80
+		;sub	bp, ax
+		sub	bp, dx ; 22/12/2024
 		jz	short UpdateProgressBar_ok
 
 		mov	dh, PROGRESSBAR_ROW
-		mov	dl, al
+		;mov	dl, al ; 22/12/2024
 		call	setCursorPosition
 
-		;; 09h = Write character multiple times
-		mov	ah, 09h
+		; 21/12/2024
+		; (write progress bar chars in graphics mode)
+		;;;;
+		mov	esi, [screenpos]
+UpdateProgressBar_Clean_@:
+		;;;mov	eax, 223
+		;;;shl	eax, 4 ; 8*16 pixel user font
+		;;mov	eax, 223*16
+		;mov	edi, fontbuff2 ; start of user font data
+		;add	edi, eax
+		;mov	edi, fontbuff2+(223*16)
+		;
+		;sys	_video, 020Fh, 08h, 8001h
+		; 22/12/2024
+		;mov	eax, 223
+		; eax = 0
 		mov	al, 223
-		mov	ebx, 8
-		int	31h
+		mov	cl, 08h ; gray (dark)
+		call	write_character
+		;;;;
 
-		clc	; +
-UpdateProgressBar_ok:
+		dec	ebp
+		jz	short UpdateProgressBar_ok
+
+		add	esi, 8 ; next column
+		jmp	short UpdateProgressBar_Clean_@
+		;;;;
+
+; =============== S U B R O U T I N E =======================================
+
+		; 26/01/2025
+		; 25/01/2025 (mp3play5.s)
+		; 22/12/2024 (vgaplay.s)
+		; 21/12/2024
+		; simulate cursor position in VGA (VESA VBE) mode
+		; ! for 640*480, 256 colors (1 byte/pixel) !
+setCursorPosition:
+		; dh = Row
+		; dl = Column
+	
+		xor	eax, eax
+		mov	al, 14	; row height is 14 pixels (8*14)
+		mul	dh
+		; 26/01/2025
+		;add	ax, 7	; top margin
+		shl	eax, 16
+		mov	al, dl	; * 8 ; character width = 8 pixels
+		shl	ax, 3
+				; hw = row, ax = column
+		mov	[screenpos], eax
+		; 22/12/2024
+		xor	eax, eax
 		retn
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
-		; 22/01/2025
+		; 25/01/2025 (mp3play5.s)
+		; 22/01/2025 (mp3play4.s)
 UpdateWaveLeds:
 		call	get_current_sounddata
 
-		call	reset_wave_leds
+		;call	reset_wave_leds
+
+		; (vgaplay.s)
+		; --------------------------------------------
+		; 22/12/2024 (faster method, 80 against 80*16)
+		; turn off previously lighting wave leds at first
+		;;;
+		mov	esi, prev_leds
+		cmp	dword [esi], 0
+		jz	short UpdateWaveLeds_ok
+		mov	ecx, 80
+turn_off_led:
+		lodsd
+		mov	edi, eax
+		; edi = wave led address
+		mov	ebp, 14
+		mov	ebx, fontbuff2+(254*16) ; char = 254
+		xor	edx, edx
+		mov	al, 8 ; gray (dark)
+toffl_next_line:
+		;;mov	edx, 8 ; 8 pixels (8*14 pixel font)
+		;mov	dl, 8
+		mov	dl, al ; 8
+		mov	ah, [ebx]
+toffl_next_pixel:
+		shl	ah, 1
+		jnc	short toffl_skip_this
+		stosb
+toffl_next_pixel_@:
+		dec	edx
+		jnz	short toffl_next_pixel
+		dec	ebp
+		jz	short toffl_next_led
+		add	edi, 640-8 ; next line
+		inc	ebx
+		jmp	short toffl_next_line
+toffl_skip_this:
+		inc	edi
+		jmp	short toffl_next_pixel_@
+toffl_next_led:
+		loop	turn_off_led
+UpdateWaveLeds_ok:
+		; --------------------------------------------
 
 		jmp	dword [turn_on_leds]
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
+		; 25/01/2025 (mp3play5.s)
+		; 22/12/2024 (vgaplay.s)
+		; 21/12/2024
+		; (simulate wave leds in graphics mode)
+		; (640*480, 256 colors)
+reset_wave_leds:
+		; 22/12/2024
+		mov	dword [prev_leds], 0
+		;
+		mov	ebp, 16*80 ; 80 columns with 16 levels
+		mov	esi, wleds_addr
+next_led:
+		lodsd
+		mov	edi, eax
+		mov	edx, 14 ; 14 lines (8*14 pixel font)
+		mov	ebx, fontbuff2+(254*16) ; char = 254
+led_line:
+		mov	ah, [ebx]
+		mov	ecx, 8 ; 8 pixels (8*16 pixel font)
+next_pixel:
+		shl	ah, 1
+		jnc	short skip_this
+		mov	al, 8 ; gray
+		stosb
+		dec	ecx
+		jnz	short next_pixel
+		jmp	short next_line
+skip_this:
+		mov	al, 0 ; black
+		stosb
+		dec	ecx
+		jnz	short next_pixel
+next_line:
+		dec	edx
+		jnz	short next_line_@
+		dec	ebp
+		jnz	short next_led
+		;clc	; 25/12/2024
+		retn
+next_line_@:
+		; 22/12/2024
+		add	edi, 640-8 ; next line
+		inc	ebx
+		jmp	short led_line
+
+; =============== S U B R O U T I N E =======================================
+
+		; 27/01/2025
 		; 26/01/2025
-		; 23/01/2025
+		; 25/01/2025 (mp3play5.s)
+		; 21/12/2025 (vgaplay.s)
+		; 23/01/2025 (mp3play4.s)
 		; 22/01/2025
 turn_on_leds_stereo_16bit:
 		;mov	esi, sample_buffer
@@ -15138,6 +15887,8 @@ turn_on_leds_stereo_16bit:
 		mov	ecx, 80
 		xor	eax, eax ; 0
 		mov	ebx, wleds_addr
+		; 25/01/2025
+		mov	edi, prev_leds
 .fill_c:
 		lodsw	; left
 		; 23/01/2025
@@ -15148,29 +15899,85 @@ turn_on_leds_stereo_16bit:
 		add	ah, 80h
 		; 23/01/2025
 		add	eax, edx
-		;shr	eax, 13
-		shr	eax, 14
+		; 25/01/2025
+		shr	eax, 13	; (L+R/2) & 16 volume levels
 
 		; 26/01/2025
-		add	esi, 7*4 ; skip next 7 (L+R) samples 
+		;add	esi, 7*4 ; skip next 7 (L+R) samples 
+		; 27/01/2025
+		add	esi, 3*4 ; skip next 3 (L+R) samples
 
-		push	ebx
-		shl	eax, 2
-		add	ebx, eax
-		mov	edi, [ebx]
-		mov	ah, [ccolor]
-		mov	al, 254
-		mov	[edi], ax
-		pop	ebx
-		add	ebx, 32
+		; 25/01/2025
+		call	turn_on_leds_@
+
 		loop	.fill_c
 		
 		retn
 
-; --------------------------------------------------------
+; ---------------------------------------------------------------------------
 
 		; 26/01/2025
-		; 23/01/2025
+		; 25/01/2025 (mp3play5.s)
+		; 21/12/2025 (vgaplay.s)
+turn_on_leds_@:
+		push	ebx ; *
+		shl	eax, 2
+		add	ebx, eax
+
+		; 25/01/2025
+		; 22/12/2024
+		;mov	edi, [ebx]
+		mov	eax, [ebx]
+		stosd
+		push	edi ; **
+		mov	edi, eax
+		;;;
+		; 21/12/2024
+		; (simulate wave leds in graphics mode)
+		; (640*480, 256 colors)
+.tol:
+		; edi = wave led address
+		mov	ebp, 14
+		mov	ebx, fontbuff2+(254*16) ; char = 254
+		mov	al, [ccolor]
+.tol_nln:
+		mov	edx, 8 ; 8 pixels (8*14 pixel font)
+		mov	ah, [ebx]
+.tol_np:
+		shl	ah, 1
+		jnc	short .skip
+		stosb
+.tol_np@:
+		dec	edx
+		jnz	short .tol_np
+		dec	ebp
+		jz	short .tol_nld
+		; 22/12/2024
+		add	edi, 640-8 ; next line
+		inc	ebx
+		jmp	short .tol_nln
+.skip:
+		inc	edi
+		jmp	short .tol_np@
+.tol_nld:
+		; 22/12/2024
+		pop	edi ; **
+		;;;
+		pop	ebx ; *
+		add	ebx, 16*4
+
+		; 26/01/2025
+		xor	eax, eax ; 0
+		
+		retn
+
+; =============== S U B R O U T I N E =======================================
+
+		; 27/01/2025
+		; 26/01/2025
+		; 25/01/2025
+		; 25/01/2025 (mp3play5.s)
+		; 23/01/2025 (mp3play4.s)
 		; 22/01/2025
 turn_on_leds_mono_16bit:
 		;mov	esi, sample_buffer
@@ -15181,29 +15988,27 @@ turn_on_leds_mono_16bit:
 .fill_c:
 		lodsw
 		add	ah, 80h
-		shr	eax, 13
+		; 25/01/2025
+		shr	eax, 12	; 16 volume levels
 
 		; 26/01/2025
-		add	esi, 7*2 ; skip next 7 samples 
+		;add	esi, 7*2 ; skip next 7 samples 
+ 		; 27/01/2025
+		add	esi, 3*2 ; skip next 3 samples
+		
+		; 25/01/2025
+		call	turn_on_leds_@
 
-		push	ebx
-		shl	eax, 2
-		; eax = 0 to 28
-		add	ebx, eax
-		mov	edi, [ebx]
-		mov	ah, [ccolor]
-		mov	al, 254
-		mov	[edi], ax
-		pop	ebx
-		add	ebx, 32
 		loop	.fill_c
 
 		retn
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
+		; 27/01/2025
 		; 26/01/2025
-		; 23/01/2025
+		; 25/01/2025 (mp3play5.s)
+		; 23/01/2025 (mp3play4.s)
 		; 22/01/2025
 turn_on_leds_stereo_8bit:
 		;mov	esi, sample_buffer
@@ -15226,30 +16031,27 @@ turn_on_leds_stereo_8bit:
 		add	eax, edx
 		shr	eax, 1 ; (L+R/2)
 		sub	al, 255	; max. value will be shown on top
-		shr	eax, 5
-		; eax = 0 to 7 ; 18/12/2024
+		shr	eax, 4
+		; eax = 0 to 15 ; 16 volume levels
 
 		; 26/01/2025
-		add	esi, 7*2 ; skip next 7 (L+R) samples 
+		;add	esi, 7*2 ; skip next 7 (L+R) samples
+ 		; 27/01/2025
+		add	esi, 3*2 ; skip next 3 (L+R) samples
 
-		push	ebx
-		shl	eax, 2
-		; eax = 0 to 28 ; 18/12/2024
-		add	ebx, eax
-		mov	edi, [ebx]
-		mov	ah, [ccolor]
-		mov	al, 254
-		mov	[edi], ax
-		pop	ebx
-		add	ebx, 32
+		; 25/01/2025
+		call	turn_on_leds_@
+		
 		loop	.fill_c
 
 		retn
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
 
+		; 27/01/2025
 		; 26/01/2025
-		; 22/01/2025
+		; 25/01/2025 (mp3play5.s)
+		; 22/01/2025 (mp3play4.s)
 turn_on_leds_mono_8bit:
 		;mov	esi, sample_buffer
 		mov	esi, sounddata
@@ -15264,73 +16066,231 @@ turn_on_leds_mono_8bit:
 		xor	eax, eax
 		lodsb
 		sub	al, 255	; max. value will be shown on top
-		shr	eax, 5
-		; eax = 0 to 7 ; 18/12/2024
+		shr	eax, 4
+		; eax = 0 to 15 ; 16 volume levels
 
 		; 26/01/2025
-		add	esi, 7 ; skip next 7 samples
+		;add	esi, 7 ; skip next 7 samples
+ 		; 27/01/2025
+		add	esi, 3 ; skip next 3 samples
 
-		push	ebx
-		shl	eax, 2
-		; eax = 0 to 28 ; 18/12/2024
-		add	ebx, eax
-		mov	edi, [ebx]
-		mov	ah, [ccolor]
-		mov	al, 254
-		mov	[edi], ax
-		pop	ebx
-		add	ebx, 32
+		; 25/01/2025
+		call	turn_on_leds_@
+
 		loop	.fill_c
 
 		retn
 
+; =============== S U B R O U T I N E =======================================
 
-; --------------------------------------------------------
-
-		; 23/01/2025
-		; 22/01/2025
+		; 26/01/2025
+		; 25/01/2025 (mp3play5.s)
+		; 25/12/2024 (vgaplay.s)
+		; 22/12/2024 (VESA VBE mode graphics) 
+		; (640*480, 256 colors)
 clear_window:
-		xor	eax, eax
-		;jmp	short clear_window_@
-		; 23/01/2025
-		mov	edi, 0B8000h + 1920
-		mov	ecx, 10*80/2
+		mov	edi, [LFB_ADDR]
+		;add	edi, (13*80*8*14)
+		; 25/12/2024
+		;add	edi, 164*640
+		; 26/01/2025
+		add	edi, 178*640
+		sub	eax, eax
+		;mov	ecx, (16*640*14)/4 ; 16 rows
+		mov	ecx, 64*640 ; 256 volume level points
 		rep	stosd
-		retn		
-
-; --------------------------------------------------------
-
-		; 23/01/2025
-		; 22/01/2025
-reset_wave_leds:
-		xor	eax, eax
-		; 23/01/2025
-		mov	edi, 0B8000h + 1920
-		mov	ecx, 80/2
-		rep	stosd
-		mov	eax, 08FE08FEh
-;clear_window_@:
-		;mov	edi, 0B8000h + 2080
-		mov	ecx, 8*80/2
-		rep	stosd
-		xor	eax, eax ; 0
-		; 23/01/2025
-		mov	ecx, 80/2
-		rep	stosd
+		; 24/12/2024
+		mov	[prev_points], eax ; 0
+		;
 		retn
 
-; --------------------------------------------------------
+; =============== S U B R O U T I N E =======================================
+
+		; 26/01/2025 (mp3play5.s)	
+		; 26/12/2024 (vgaplay2.s)
+		; 24/12/2024
+UpdateWavePoints:
+		call	get_current_sounddata
+
+		mov	esi, prev_points
+		mov	ebp, 640
+		cmp	dword [esi], 0
+		jz	short .lights_off_ok
+		mov	ecx, ebp ; 640
+.light_off:
+		lodsd
+		; eax = wave point (lighting point) address
+		mov	byte [eax], 0 ; black point (light off)
+		loop	.light_off	
+.lights_off_ok:
+		; 26/01/2025
+		mov	esi, sounddata
+		mov	edi, prev_points
+		mov	ecx, ebp ; 640
+		mov	ebx, [graphstart] ; start (top) line
+
+		jmp	dword [draw_wave_points]
+
+; =============== S U B R O U T I N E =======================================
+
+		; 26/01/2025 (mp3play5.s)
+		; 26/12/2024 (vgaplay2.s)
+		; 24/12/2024
+UpdateWavePoints_16s:
+		; 26/01/2025
+		;mov	esi, sounddata
+		;mov	edi, prev_points
+		;mov	ecx, 640
+		;mov	ebp, ecx
+		;mov	ebx, [graphstart] ; start (top) line
+.lights_on:
+		xor	eax, eax ; 0
+		lodsw	; left
+		add	ah, 80h
+		mov	edx, eax
+		lodsw	; right
+		add	ah, 80h
+		add	eax, edx
+		shr	eax, 9	; (L+R/2) & 256 volume levels
+		; 26/01/2025
+		sub	al, 255	; max. value will be shown on top
+		mul	ebp	; * 640 (row)
+		add	eax, ebx ; + column
+		mov	dl, [ccolor]
+		mov	[eax], dl ; pixel (light on) color
+		stosd		; save light on addr in prev_points
+		inc	ebx
+		loop	.lights_on
+		retn
+
+; =============== S U B R O U T I N E =======================================
+
+		; 26/01/2025 (mp3play5.s)
+UpdateWavePoints_16m:
+		; 26/01/2025
+		;mov	esi, sounddata
+		;mov	edi, prev_points
+		;mov	ecx, 640
+		;mov	ebp, ecx
+		;mov	ebx, [graphstart] ; start (top) line
+.lights_on:
+		lodsw
+		add	ah, 80h
+		shr	eax, 8	; 256 volume levels
+		sub	al, 255	; max. value will be shown on top
+		mul	ebp	; * 640 (row)
+		add	eax, ebx ; + column
+		mov	dl, [ccolor]
+		mov	[eax], dl ; pixel (light on) color
+		stosd		; save light on addr in prev_points
+		inc	ebx
+		loop	.lights_on
+		retn
+
+; =============== S U B R O U T I N E =======================================
+
+		; 26/01/2025 (mp3play5.s)
+UpdateWavePoints_8s:
+		; 26/01/2025
+		;mov	esi, sounddata
+		;mov	edi, prev_points
+		;mov	ecx, 640
+		;mov	ebp, ecx
+		;mov	ebx, [graphstart] ; start (top) line
+.lights_on:
+		xor	eax, eax ; 0
+		lodsb	; left
+		mov	edx, eax
+		lodsb	; right
+		add	eax, edx
+		shr	eax, 1 ; (L+R/2)
+		sub	al, 255	; max. value will be shown on top
+		; eax = 0 to 255 ; 256 volume levels
+		mul	ebp	; * 640 (row)
+		add	eax, ebx ; + column
+		mov	dl, [ccolor]
+		mov	[eax], dl ; pixel (light on) color
+		stosd		; save light on addr in prev_points
+		inc	ebx
+		loop	.lights_on
+		retn
+
+; =============== S U B R O U T I N E =======================================
+
+		; 26/01/2025 (mp3play5.s)
+UpdateWavePoints_8m:
+		; 26/01/2025
+		;mov	esi, sounddata
+		;mov	edi, prev_points
+		;mov	ecx, 640
+		;mov	ebp, ecx
+		;mov	ebx, [graphstart] ; start (top) line
+.lights_on:
+		xor	eax, eax
+		lodsb
+		sub	al, 255	; max. value will be shown on top
+		; eax = 0 to 255 ; 256 volume levels
+		mul	ebp	; * 640 (row)
+		add	eax, ebx ; + column
+		mov	dl, [ccolor]
+		mov	[eax], dl ; pixel (light on) color
+		stosd		; save light on addr in prev_points
+		inc	ebx
+		loop	.lights_on
+		retn
+		
+; =============== S U B R O U T I N E =======================================
 
 ; --------------------------------------------------------
 ; 22/01/2025 - Get Current Sound Data For Graphics
 ; --------------------------------------------------------
 ; ref: cgaplay2.s (08/01/2025)
 
-	; 22/01/2025
+	; 27/01/2025
+	; 26/01/2025 (mp3play5.s)
+	; 22/01/2025 (mp3play4.s)
 get_current_sounddata:
+	; 26/01/2025
+	;;;;
+	cmp	byte [p_mode], 0
+	jna	short gcsd_80	
+	;;;;
+	;cmp	byte [interpolation], 1
+	;jnb	short gcsd_1
+	;cmp	byte [audio_hardware], 1
+	;je	short gcsd_1
+	;;;;
+
 	sys	_audio,	0F00h, [sd_count], sounddata
 	retn
 
+; 27/01/2025	
+;gcsd_1:
+;	; pointer only (not data transfer)
+;	sys	_audio,	0F00h, 0
+;	; eax = dmabuffer offset
+;	mov	esi, dmabuffer
+;	mov	ecx, [buffer_size]
+;	shl	ecx, 1 ; dma buffer size 
+;	add	ecx, esi
+;	sub	ecx, [sd_count]
+;	add	esi, eax
+;	cmp	esi, ecx
+;	jna	short gcsd_2
+;	mov	esi, ecx
+;gcsd_2:
+;	mov	edi, sounddata
+;	mov	ecx, [sd_count]
+;	shr	ecx, 2
+;	rep	movsd
+;	retn	
+
+	; 27/01/2025
+gcsd_80:
+	mov	eax, [sd_count]
+	shr	eax, 1  ; 320 points ; 80*4
+	sys	_audio,	0F00h, eax, sounddata
+	retn
 
 ; ===========================================================================
 ; end of TRDOS 386 specific procedures.
@@ -15960,8 +16920,8 @@ txt_hello       db 13,10
 		;db 'NOCASH MP3 PLAYER v1.4 for Windows ',0
 		; 09/01/2025
 		;db 'NOCASH MP3 PLAYER v1.0 for TRDOS386 ',0
-		; 21/01/2025
-		db 'NOCASH MP3 PLAYER v1.0t for TRDOS386 ',0
+		; 26/01/2025
+		db 'NOCASH MP3 PLAYER v1.0v for TRDOS386 ',0
 		 
 txt_file        db 'file: ',0          
 txt_file_size   db 'file size: ',0     
@@ -15974,8 +16934,8 @@ txt_channels    db ' channels, ',0
 txt_bit         db ' bit',0            
 txt_kbit_s      db ' kbit/s',0         
 txt_not_found   db 'cannot open source file',0Dh,0Ah,0
-		; 21/01/2025
-txt_help        db 'usage: mp3play4 input.mp3 [output.wav] [verify.pcm] [/test]', 0Dh,0Ah
+		; 26/01/2025
+txt_help        db 'usage: mp3play5 input.mp3 [output.wav] [verify.pcm] [/test]', 0Dh,0Ah
                 db '                          [/mono] [/8bit] [/fast] [/half|/quarter]',0Dh,0Ah,0
 _@@txt_verify1  db 'verify max difference = ',0
 _@@txt_verify1_at_mp3 db ' at mp3:',0  
@@ -15999,17 +16959,20 @@ half_buffer	db 0
 ; ---------------------------------------------------------------------------
 ; 21/01/2025 - Player Window
 ; ---------------------------------------------------------------------------
-		
-		; 24/01/2025
-Template:
-		;db  201, 78 dup(205), 187
-		;db  186, 33 dup(219), " DOS Player ", 33 dup(219), 186
+
+		; 26/01/2025
+		; 25/01/2025 (mp3play5.s)
+PlayingScreen:		
+		; 24/01/2025 (mp3play4.s)
+;Template:
+		; 26/01/2025
+		db  201, 78 dup(205), 187
 		; 23/01/2025
 		db  186, 20 dup(219), " NOCASH MP3 PLAYER v1.0 for TRDOS386 ", 21 dup(219), 186
 		db  204, 78 dup(205), 185
 		;db  186, 33 dup(32), " User Guide ", 33 dup(32), 186
 		db  186, 6  dup(32), "<Space>        Play/Pause     ", 4 dup(32), "<H>            Hardware Info ", 9 dup(32), 186
-		db  186, 6  dup(32), "<S>            Stop           ", 4 dup(32), "<Enter>        Wave Lighting ", 9 dup(32), 186
+		db  186, 6  dup(32), "<S>            Stop           ", 4 dup(32), "<Enter>/<G>    Wave Lighting ", 9 dup(32), 186
 		db  186, 6  dup(32), "<F>            Forwards       ", 4 dup(32), "<+>/<->        Inc/Dec Volume ", 8 dup(32), 186
 		db  186, 6  dup(32), "<B>            Backwards      ", 4 dup(32), "<Q>            Quit Program  ", 9 dup(32), 186
 		db  204, 78 dup(205), 185
@@ -16022,8 +16985,17 @@ Template:
 		db  186, 6  dup(32), " Bit Rate :    0              ", 4 dup(32), "          :    0  bits       ", 9 dup(32), 186
 		db  200, 78 dup(205), 188
 		db  80 dup(32)
-improper_samplerate_txt:			; 03/11/2024
+improper_samplerate_txt:
 read_error_txt:
+		; 26/01/2025
+		db  80 dup(32)
+		db  80 dup(32)
+		db  80 dup(32)
+		db  80 dup(32)
+		db  80 dup(32)
+		db  80 dup(32)
+		db  80 dup(32)
+		db  80 dup(32)
 		db  80 dup(32)
 		db  80 dup(32)
 		db  80 dup(32)
@@ -16036,17 +17008,38 @@ read_error_txt:
 		db  80 dup(205)
 		db  80 dup(32)
 		db  33 dup(32), "00:00 ", 174, 175, " 00:00", 24 dup(32), "VOL 000%"
+		db  0
+
+; ---------------------------------------------------------------------------
+
+		; 25/01/2025 (mp3play5.s)
+		; 22/12/2024 (vgaplay.s)
+fillblock:
+		times 14 db 0FFh
+		dw 0
+
+; ---------------------------------------------------------------------------
 
 ; 23/11/2024
 colors:		db 0Fh, 0Bh, 0Ah, 0Ch, 0Eh, 09h, 0Dh, 0Fh
 			; white, cyan, green, red, yellow, blue, magenta
 ccolor:		db 0Bh	; cyan
 
+; ---------------------------------------------------------------------------
+
 ; 24/01/2025
 volume_level	db 3
- 
-EOF:
 
+; ---------------------------------------------------------------------------
+
+; 26/01/2025
+; 07/12/2024
+trdos386_err_msg:
+		db 'TRDOS 386 System call error !',10,13,0
+
+; ---------------------------------------------------------------------------
+
+EOF:
 
 ; ===========================================================================
 ; Uninitialized DATA (BSS)
@@ -16054,16 +17047,37 @@ EOF:
 
 align 4
 
+; 25/01/2025 (mp3play5.s)
+; 26/12/2024 (vgaplay.s)
+LFB_ADDR:	rd 1
+graphstart:	rd 1	; start (top) line/row for wave lighting points
+fontbuff1:	rb 256*14 ; 8x14 font data (from system)
+fontbuff2:	rb 256*16 ; 8x16 font data (modif. from 8x14)
+wleds_addr:	rd 80*16 ; 32 bit addresses, 80 leds, 16 volume levels
+prev_leds:	rd 80	; previous lighting leds
+screenpos: 	rd 1	; hw = (cursor) row, lw = (cursor) column
+wcolor:		rd 1
+columns:	rb 1
+pbprev:		rb 1	; previous progress bar indicator position
+
+align 4
+
+; 25/01/2025
 ; 21/01/2025
-wleds_addr	rd 80*8
+;wleds_addr	rd 80*8
 stream_size	rd 1
 turn_on_leds	rd 1
 ; 22/01/2025
-sd_count	rd 1
+;sd_count	rd 1
 stream_begin	rd 1
 fb_count	rd 1
+; 26/01/2025
+draw_wave_points rd 1
 
 bss_start:
+
+; 26/01/2025
+sd_count	rd 1
 
 ; 10/01/2025
 ;ABSOLUTE bss_start
@@ -16090,6 +17104,8 @@ audio_intr	rb 1
 ; 21/01/2025
 wleds		rb 1
 stopped		rb 1
+; 26/01/2025
+p_mode		rb 1
 
 align 4
 
@@ -16120,8 +17136,12 @@ conversion	rd 1	; pointer to convers(t)ion
 loadsize	rd 1	; decoding buffer size
 interpolation	rb 1	; interpolation status
 counter		rb 1	; 15/01/2025
-cursortype	rw 1	; 22/01/2025
+; 25/01/2025
+;cursortype	rw 1	; 22/01/2025
 ;;;;
+
+; 25/01/2025
+align 4
 
 mp3_context_start:
 main_data_pool_start	rb 4096
@@ -16151,9 +17171,9 @@ mp3_synth_filter_proc	rd 1
 mp3_synth_buf   rd 2048
 mp3_synth_index rd 2
 mp3_sb_samples  rd 2304
-	                           ; MP3_MAX_CHANNELS*36*SBLIMIT
+				; MP3_MAX_CHANNELS*36*SBLIMIT
 mp3_mdct_buf    rd 1152
-                                   ; MP3_MAX_CHANNELS*SBLIMIT*18
+				; MP3_MAX_CHANNELS*SBLIMIT*18
 mp3_free_format_frame_size rd 1
 
 mp3_curr_vfrac_bits rb 1
@@ -16290,14 +17310,15 @@ _@@pcm_steps    rw 2
 _@@worst_pcm_filepos rd 1
 _@@worst_mp3_filepos rd 1
 		rd 1
-;align 4
+align 4
+
 
 ; 22/01/2025
-;sounddata	rb 80*4
+;sounddata	rb 80*4	; For Text Mode (80 wave points)
 
-; 26/01/2025
-align 4096
-sounddata	rb 80*4*4 ; 320*4
+; 25/01/2025 (mp3play5.s)
+; 24/12/2024 (vgaplay.s)
+prev_points	rd 640 ; previous wave points (which are lighting)
 
 ; 24/01/2025
 txtfilesize	rb 20
@@ -16310,10 +17331,31 @@ align 4096
 ;sample_buffer	rb 8*MP3_MAX_OUTPUT_SIZE
 ;sample_buffer_size equ $-sample_buffer
 
+; 27/01/2025
 ; 15/01/2025
-decoding_buffer	rb 8192  ; 2*4096 (max. 4608)
+decoding_buffer rb 8192  ; 2*4096 (max. 4608)
 sample_buffer	rb 36864 ; 8*4608
 
+; 26/01/2025
+;decoding_buffer rb 18432 ; 4*4608
+
+; 27/01/2025
+;align 4096
+;sample_buffer	rb 36864 ; 8*4608
+
+; 26/01/2025
+;align 4096
+
+; 25/01/2025
+sounddata	rb 640*4 ; For Graphics mode (640 wave points)
+
+; 26/01/2025
+align 4096
+
+; 26/01/2025
+;dmabuffer:	rb 36864*2 ; max. (possible) dma buffer size
+
+; 26/01/2025
 ;align 4096
 
 end_of_bss:
