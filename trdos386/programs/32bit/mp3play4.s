@@ -11157,7 +11157,9 @@ audio_system_init_x:
 		jmp	.set_sizes_@
 .chk_8khz:
 		cmp	eax, 8000
-		jne	short .vra_needed
+		;jne	short .vra_needed
+		; 01/02/2025
+		jne	short .chk_12khz
 		; 30/01/2025
 		mov	eax, 6 ; *
 		cmp	byte [mp3_bytes_per_sample], 1
@@ -11183,6 +11185,34 @@ audio_system_init_x:
 		;mov	eax, 6 ; *
 		mul	ecx
 		jmp	.set_sizes_@
+
+		;;;;
+		; 01/02/2025
+.chk_12khz:
+		cmp	eax, 12000
+		jne	short .vra_needed
+		mov	eax, ecx ; *
+		cmp	byte [mp3_bytes_per_sample], 1
+		jna	short .chk_12khz_1
+		mov	ebx, load_12khz_stereo_16_bit
+		cmp	byte [mp3_output_num_channels], 1
+		jne	short .chk_12khz_2
+		mov	ebx, load_12khz_mono_16_bit
+		jmp	short .chk_12khz_3
+.chk_12khz_1:
+		shl	eax, 1
+		mov	ebx, load_12khz_stereo_8_bit
+		cmp	byte [mp3_output_num_channels], 1
+		jne	short .chk_12khz_2
+		mov	ebx, load_12khz_mono_8_bit
+.chk_12khz_3:
+		shl	eax, 1
+.chk_12khz_2:
+		; 48000/12000 = 4/1
+		;mov	eax, ecx ; *
+		shl	eax, 2
+		jmp	.set_sizes_@
+		;;;;
 
 .vra_needed:
 		pop	eax ; discard return address to the caller
@@ -11547,6 +11577,7 @@ lff32_3:
 lff44_3:
 lff22_3:
 lff11_3:
+lff12_3: 	; 01/02/2025
 	; 08/12/2024 (BugFix)
 	; 31/05/2024 (BugFix)
 	mov	ecx, [buffer_size] ; 16 bit (48 kHZ, stereo) samples
@@ -13109,6 +13140,110 @@ lff44s2_2_2:
 
 ; --------------------------------------------------------
 
+	; 01/02/2025
+load_12khz_mono_8_bit:
+	mov	esi, decoding_buffer ; (contains 8bit stereo samples)
+	mov	edi, sample_buffer ; wav output buffer
+	mov	ecx, [loadsize]
+lff12m_1:
+	; original-interpolated-interpolated-interpolated
+	lodsb
+	mov	dl, 80h
+	dec	ecx
+	jz	short lff12m_2
+	mov	dl, [esi]
+lff12m_2:	
+	; al = [previous_val]
+	; dl = [next_val]
+ 	call	interpolating_4_8bit_mono
+	jecxz	lff12m_3
+	jmp	short lff12m_1
+
+; --------------------------------------------------------
+
+	; 01/02/2025
+load_12khz_stereo_8_bit:
+	; 13/01/2025 (mp3play3.s)
+	mov	esi, decoding_buffer ; (contains 8bit stereo samples)
+	mov	edi, sample_buffer ; wav output buffer
+	mov	ecx, [loadsize]
+	shr	ecx, 1	; word count
+lff12s_1:
+	; original-interpolated-interpolated-interpolated
+	lodsw
+	mov	dx, 8080h
+	dec	ecx
+	jz	short lff12s_2
+	mov	dx, [esi]
+lff12s_2:	
+	; al = [previous_val_l]
+	; ah = [previous_val_r]
+	; dl = [next_val_l]
+	; dh = [next_val_r]
+	call	interpolating_4_8bit_stereo
+	jecxz	lff12s_3
+	jmp	short lff12s_1
+
+lff12m_3:
+lff12s_3:
+	jmp	lff12_3	; padfill
+		; (put zeros in the remain words of the buffer)
+
+; --------------------------------------------------------
+
+	; 01/02/2025
+load_12khz_mono_16_bit:
+	mov	esi, decoding_buffer ; (contains 8bit stereo samples)
+	mov	edi, sample_buffer ; wav output buffer
+	mov	ecx, [loadsize]
+	shr	ecx, 1	; word count
+lff12m2_9:
+	mov	ebp, 6	; interpolation (one step) loop count
+lff12m2_1:
+	; original-interpolated-interpolated-interpolated
+	lodsw
+	xor	edx, edx
+	dec	ecx
+	jz	short lff12m2_2
+	mov	dx, [esi]
+lff12m2_2:	
+	; ax = [previous_val]
+	; dx = [next_val]
+ 	call	interpolating_4_16bit_mono
+	jecxz	lff12m_3
+	jmp	short lff12m2_1
+
+; --------------------------------------------------------
+
+	; 01/02/2025
+load_12khz_stereo_16_bit:
+	mov	esi, decoding_buffer ; (contains 8bit stereo samples)
+	mov	edi, sample_buffer ; wav output buffer
+	mov	ecx, [loadsize]
+	shr	ecx, 2	; dword count
+lff12s2_1:
+	; original-interpolated-interpolated-interpolated
+	lodsw
+	mov	ebx, eax
+	lodsw
+	mov	edx, [esi]
+	dec	ecx
+	jnz	short lff12s2_2
+	xor	edx, edx ; 0
+lff12s2_2:
+	mov	[next_val_l], dx
+	shr	edx, 16
+	mov	[next_val_r], dx
+	; bx = [previous_val_l]
+	; ax = [previous_val_r]
+	; [next_val_l]
+	; [next_val_r]
+	call	interpolating_4_16bit_stereo
+	jecxz	lff12s_3
+	jmp	short lff12s2_1
+
+; --------------------------------------------------------
+
 interpolating_3_8bit_mono:
 	; 01/02/2025
 	; 16/11/2023
@@ -13726,7 +13861,8 @@ interpolating_4_16bit_mono:
 	; 18/11/2023
 	; ax = [previous_val]
 	; dx = [next_val]
-	; original-interpolated
+	; 01/02/2025
+	; original-interpolated-interpolated-interpolated
 
 	stosw		; original sample (L)
 	stosw		; original sample (R)
