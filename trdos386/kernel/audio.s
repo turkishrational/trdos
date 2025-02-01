@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.8 - audio.s
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.10 - audio.s
 ; ----------------------------------------------------------------------------
-; Last Update: 06/06/2024  (Previous: 02/12/2023 - Kernel v2.0.7)
+; Last Update: 28/01/2025  (Previous: 06/06/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 03/04/2017
 ; ----------------------------------------------------------------------------
@@ -1906,6 +1906,7 @@ RestoreIrqs:
 %endmacro
 
 SbInit_play:
+	; 28/01/2025 - TRDOS 386 Kernel v2.0.10
 	; 06/08/2022 - TRDOS 386 Kernel v2.0.5
 	; 22/10/2017
 	; 20/10/2017
@@ -1918,14 +1919,19 @@ SetBuffer:
 
 	mov	ebx, [audio_dma_buff] ; physical addr of DMA buff
 	mov	edi, ebx
-	mov     ecx, [audio_dmabuff_size]
+	;mov	ecx, [audio_dmabuff_size]
+	; 28/01/2025 (BugFix)
+	mov	ecx, [dma_hbuff_size]
+	;shl	ecx, 1 ; * 2 ; *!*
 
 	cmp	byte [audio_bps], 16
 	jne	short sbInit_0 ; set 8 bit DMA buffer
 	
 	; 09/08/2017
 	; convert byte count to word count
-	shr	ecx, 1
+	; 28/01/2025
+	;shr	ecx, 1 ; *!*
+	
 	dec	ecx ; word count - 1
 	; convert byte offset to word offset
 	shr	ebx, 1
@@ -1966,7 +1972,10 @@ SetBuffer:
 
 	jmp	short ClearBuffer
 
-sbInit_0:    
+sbInit_0:
+	; 28/01/2025
+	shl	ecx, 1 ; half buffer size * 2 ; *!*
+
 	dec     ecx	; 09/08/2017
 
 	; 8 bit DMA buffer setting (DMA channel 1)
@@ -2157,6 +2166,8 @@ sb_Exit:
 sb16_int_handler:
 	; Interrupt Handler for Sound Blaster 16 Audio Card
 	; Note: called by 'dev_IRQ_service'
+	; 28/01/2025
+	;	TRDOS 386 Kernel v2.0.10
 	; 20/10/2017
 	; 12/10/2017
 	; 10/10/2017 
@@ -2196,8 +2207,10 @@ sb_irq_h1:
 	; 09/10/2017
 sb16_tuneloop:
 	mov	edi, [audio_dma_buff]
-	mov	ecx, [audio_dmabuff_size]
-	shr	ecx, 1 ; dma buff size / 2 = half buffer size
+	;mov	ecx, [audio_dmabuff_size]
+	;shr	ecx, 1 ; dma buff size / 2 = half buffer size
+	; 28/01/2025 (BugFix)
+	mov	ecx, [dma_hbuff_size]
 
 	; 22/05/2017
 	test	byte [audio_flag], 1  ; Current flag value
