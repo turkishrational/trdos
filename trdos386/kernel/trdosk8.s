@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 15/01/2025  (Previous: 29/12/2024)
+; Last Update: 28/01/2025  (Previous: 29/12/2024)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1862,6 +1862,10 @@ set_dev_IRQ_service:
 	retn
 
 sysaudio: ; AUDIO FUNCTIONS
+	; 28/01/2025
+	; 27/01/2025
+	; 15/01/2025
+	; 12/01/2025
 	; 11/01/2025 (TRDOS 386 v2.0.10)
 	; 29/12/2024
 	; 19/12/2024
@@ -2273,6 +2277,8 @@ sound_alloc:
 	; FUNCTION = 2
 	; ecx = audio buffer size (in bytes)
 	; edx = audio buffer address (virtual)
+	; 28/01/2025
+	; 27/01/2025 (BugFix)
 	; 15/01/2025
 	; 12/01/2025	
 	; 25/11/2023
@@ -2305,8 +2311,9 @@ snd_alloc_6:
 	cmp	ecx, 320
 	jb	short sound_buff_error
 	;
+	; 28/01/2025
 	; 12/01/2025
-	mov	ebx, edx ; (new) virtual address of audio_buffer
+	;mov	ebx, edx ; (new) virtual address of audio_buffer
 	;
 	mov	eax, [audio_buffer] ; audio buffer address (current)
 	or	eax, eax
@@ -2329,7 +2336,9 @@ snd_alloc_6:
 	;; buffer size and then allocate a new one
 	;; (address range may be used before)
 snd_alloc_2:
-	mov	ecx, [audio_buff_size]
+	;mov	ecx, [audio_buff_size]
+	; 28/01/2025
+	xchg	ecx, [audio_buff_size] ; *	
 	mov	ebx, eax ; audio buffer address (current)
 ;snd_alloc_7:
 	; 12/01/2025	
@@ -2338,8 +2347,9 @@ snd_alloc_2:
 	;cmp	ecx, [audio_buff_size]
 	;je	short snd_alloc_3 ; Nothing to do !
 	;			  ; Buffer has been set already!
-snd_alloc_1:
-	push	ecx
+;snd_alloc_1:
+	; 28/01/2025
+	;push	ecx
 	push	edx
 	; 12/01/2025
 	;mov	ebx, eax ; audio buffer address (current)
@@ -2348,13 +2358,17 @@ snd_alloc_1:
 	; ecx = audio buffer size in bytes
 	call	deallocate_user_pages
 	pop	edx
-	pop	ecx
+	;pop	ecx
+	; 28/01/2025
+	mov	ecx, [audio_buff_size] ; * ; requested size
 	xor	eax, eax ; 0
 	mov	[audio_buffer], eax  ; 0
  	mov	[audio_p_buffer], eax  ; 0
  	mov	[audio_buff_size], eax
 	mov	[audio_user], al ; 0
 
+	; 27/01/2025 (BugFix)
+snd_alloc_1:
 	; 12/01/2025
 ;snd_alloc_2:
 	mov	ebx, edx
@@ -2386,7 +2400,7 @@ snd_alloc_1:
 	pop	ebx
 	pop	eax
 	pop	edx ; 26/11/2023
-	jc	short snd_alloc_4  ; insufficient memory, buff error
+	jc	short snd_alloc_4 ; insufficient memory, buff error
 	; eax = physical address of the user's audio buffer
 	; ebx = virtual address of the user's audio buffer
 	; 26/11/2023
