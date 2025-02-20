@@ -5,7 +5,7 @@
 ;
 ; 09/02/2025
 ;
-; [ Last Modification: 15/02/2025 ]
+; [ Last Modification: 20/02/2025 ]
 ;
 ; Assembler: NASM 2.15
 ; ----------------------------------------------------------------------------
@@ -206,7 +206,8 @@ a_1:
 	and	ah, ah
 	jz	short a_2
 
-	cmp	al, '\'
+	; 20/02/2025
+	cmp	al, '/'
 	jne	short a_2
 	mov	ah, 0
 a_2:
@@ -7205,7 +7206,7 @@ FileHandle:	dd -1
 
 Credits:	db 'Tiny WAV Player for TRDOS 386 by Erdogan Tan. '
 		db 'February 2025.',10,13,0
-		db '15/02/2025',10,13
+		db '20/02/2025',10,13
 reset:		db 0
 
 msg_usage:	db 10,13
