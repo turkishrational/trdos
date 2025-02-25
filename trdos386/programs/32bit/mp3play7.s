@@ -11162,15 +11162,15 @@ txt_help        db 0Dh, 0Ah
 		; 21/01/2025
 		;db 'usage: mp3play4 input.mp3 [output.wav] [verify.pcm] [/test]', 0Dh,0Ah
                 ;db '                          [/mono] [/8bit] [/fast] [/half|/quarter]',0Dh,0Ah,0
-_@@txt_verify1  db 'verify max difference = ',0
-_@@txt_verify1_at_mp3 db ' at mp3:',0  
-_@@txt_verify2  db ', average difference = ',0
+;_@@txt_verify1  db 'verify max difference = ',0
+;_@@txt_verify1_at_mp3 db ' at mp3:',0  
+;_@@txt_verify2  db ', average difference = ',0
 
 ; Erdogan Tan - 17/10/2024
                ;db 'NOCASH MP3 PLAYER v1.4 for Windows ',0
-txt_ctrlc       db '(press CTRL+C to quit)', 13,10,0
-txt_ctrlc_size = $ - txt_ctrlc
-txt_about       db 13,10
+;txt_ctrlc      db '(press CTRL+C to quit)', 13,10,0
+;txt_ctrlc_size = $ - txt_ctrlc
+;txt_about      db 13,10
                 ;;db '----------------------------------',13,10
 	        ;db '------------------------------------',13,10
 		; 24/02/2025
