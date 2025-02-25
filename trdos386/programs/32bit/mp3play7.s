@@ -11404,7 +11404,7 @@ mp3_mdct_win		rd 288
 mp3_is_table_lsf	rd 512
 mp3_synth_win		rd 1024
 mp3_lsf_sf_expand_exploded_table rb 8192
-;mp3_context_end:
+mp3_context_end:
 _@@region_address0	rd 1
 _@@region_address1	rd 1
 _@@saved_sp		rd 1
@@ -11465,9 +11465,6 @@ _@@curr_table_size	rd 1
 _@@curr_table_mask	rd 1
 _@@curr_table_index	rd 1
 _@@granule_addr		rd 1
-
-; 23/02/2025
-mp3_context_end:
 
 ; HANDLE hFile
 ;hFile          rd 1
