@@ -192,6 +192,11 @@ start:
 		mov	al, 0Ah
 		int	31h
 
+
+		; 15/02/2025
+		sys	_msg, txt_bdate, 255, 0Fh
+		sys	_msg, txt_original,255,07h
+
 		; 20/02/2025
                 ;call	get_commandline
                 ;jc	ExitP@
@@ -216,7 +221,7 @@ start:
 		mov	esi, esp
 		lodsd
 		cmp	eax, 2 ; two arguments 
-			; (program file name & mod file name)
+			; (program file name & mp3 file name)
 		jb	short pmsg_usage ; nothing to do
 		;mov	[argc], al
 		shl	eax, 2 ; *4
@@ -438,7 +443,7 @@ mp3_open_err:
 
 		; ------------------------------------
 		; 22/02/2025
-txt_not_found:	db 13, 10
+txt_not_found:	;db 13, 10
 		db 'Error: file not found.', 13, 10, 0
 		; ------------------------------------
 
@@ -478,7 +483,7 @@ write_err_msg_exit:
 		; ------------------------------------
 		; 22/02/2025
 not_valid_mp3f:
-		db 13, 10
+		;db 13, 10
 		db 'Not a proper/valid MP3 file !', 13, 10, 0
 
 		; ------------------------------------
@@ -737,7 +742,7 @@ exit@@@:
 		;mov	dword [mp3_initialized], 0
 		; 23/02/2025
 		; (reset to the initial value is needed)
-		mov	dword [mp3_huff_num_entries], 12h ; 18
+		;mov	dword [mp3_huff_num_entries], 12h ; 18
 		;;;;
 
 		call	set_break
@@ -6005,6 +6010,7 @@ mp3_decode_frame:
 
 ; =============== S U B R O U T I N E =======================================
 
+		; 24/02/2025
 		; 23/02/2025
 		; 16/02/2025
 		; 15/02/2025
@@ -6015,6 +6021,11 @@ mp3_init:
                 xor     eax, eax        ; ERRIF @@len AND 03h
                 rep stosd               ; clear context
                 mov	dword [main_data_pool_wr_ptr], main_data_pool_start
+		
+		; 24/02/2025
+		; (reset to the initial value is needed)
+		mov	dword [mp3_huff_num_entries], 12h ; 18
+
 		; 23/02/2025
 		;cmp	dword [mp3_initialized], 0
                 ;jnz	short .already_initialized
@@ -9173,8 +9184,8 @@ _w_VRAi_yes:
 	; 22/01/2025
 	;retn
 	;jmp	short write_buffer_size
-	; 22/02/2025
-	jmp	short _w_buff_size
+	; 24/02/2025
+	jmp	short _w_crlf
 
 _w_VRAi_no:
 	sys	_msg, msgVRAno, 255, 07h
@@ -9183,6 +9194,8 @@ _w_VRAi_no:
 	cmp	byte [interpolation], 0
 	ja	short _w_VRAi_no_yes
 
+	; 24/02/2025
+	sys	_msg, crlf, 2, 07h
 _w_crlf:
 	sys	_msg, crlf, 2, 07h
 
@@ -10924,9 +10937,11 @@ mp3_pow2_quarters dd 80000000h
                 dd 9837F052h            ; 4C1BF829h*2 ; 2^(1/4)
                 dd 0B504F334h           ; 5A82799Ah*2 ; 2^(2/4)
                 dd 0D744FCCCh           ; 6BA27E66h*2 ; 2^(3/4)
-mp3_initialized dd 0                   
-mp3_huff_num_entries dd 12h            
-wrchr_buf       db 0
+;mp3_initialized dd 0                   
+;mp3_huff_num_entries dd 12h  
+; 24/02/2025
+mp3_huff_num_entries dd 0          
+;wrchr_buf       db 0
 ; 20/02/2025
 num_enqueued_frames db 0
 
@@ -11138,6 +11153,8 @@ txt_hello       db 13,10
 		;; 21/01/2025
 		; 20/02/2025
 		db 'NOCASH MP3 PLAYER v1.0t+ for TRDOS386 ',0D,0Ah,0
+		; 24/02/2025
+txt_bdate	db 'February 2025.',13,10,0
 		 
 		; 22/02/2025
 txt_help        db 0Dh, 0Ah
@@ -11154,12 +11171,14 @@ _@@txt_verify2  db ', average difference = ',0
 txt_ctrlc       db '(press CTRL+C to quit)', 13,10,0
 txt_ctrlc_size = $ - txt_ctrlc
 txt_about       db 13,10
-                ;db '----------------------------------',13,10
-	        db '------------------------------------',13,10
+                ;;db '----------------------------------',13,10
+	        ;db '------------------------------------',13,10
+		; 24/02/2025
+txt_original	db 13, 10
                 db 'Erdogan Tan - 24/02/2025 (Assembler: FASM)', 13,10
                 db 'Original code: MP3PLAYER.EXE v1.4 (20/09/2024)', 13,10
                 db '               by Martin Korth (TASM source code)'
-                db 13,10,13,10,0
+                db 13,10,0
                 db 'v1.4.0'
 ; 10/01/2025
 half_buffer	db 0
