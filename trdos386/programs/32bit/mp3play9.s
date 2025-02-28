@@ -623,7 +623,7 @@ skip_init_volume:
 
 		call	UpdateFileInfo
 
-		call	UpdateVolume
+		;call	UpdateVolume
 
 		call	UpdateProgressBar
 
