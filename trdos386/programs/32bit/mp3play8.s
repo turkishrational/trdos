@@ -6,7 +6,7 @@
 ;
 ; 25/02/2025
 ;
-; [ Last Modification: 26/02/2025 ]
+; [ Last Modification: 28/02/2025 ]
 ;
 ; Modified from 'mp3play5.s' (01/02/2025) and 'mp3play7.s' (24/02/2025)
 ;
@@ -10007,6 +10007,23 @@ p_d_x_n:
 		mov	dl, [ebp]
 		and	dl, dl
 		jz	short p_d_x_ok
+
+		; 28/02/2025
+		;;;;
+		cmp	dl, 20h
+		jne	short p_d_x_@
+
+		; 28/02/2025 ; !!!!
+		; clear previous character pixels
+		; (TRDOS 386 Kernel v2.0.9 has a bug: space character
+		; does not clear previous character pixels at same
+		; position)
+		mov	edi, fillblock
+		sys	_video, 020Fh, 0, 8001h
+		jmp	short p_d_x_@@
+p_d_x_@:
+		;;;;
+
 		shl	edx, 4 ; * 16 (for 8x16 font)
 
 		mov	edi, fontbuff2 ; start of user font data
@@ -10031,7 +10048,7 @@ p_d_x_n:
 		 	; for writing fonts on screen
 		; 26/12/2024
 		sys	_video, 020Fh, 0Fh, 8001h ; 8x16 user font
-
+p_d_x_@@:
 		inc	ebp
 		add	si, 8 ; next char pos
 		dec	byte [columns]
@@ -11710,7 +11727,7 @@ txt_help	db 0Dh, 0Ah
 	        ;db '------------------------------------',13,10
 		; 26/02/2025
 txt_original	db 13, 10
-                db 'Erdogan Tan - 26/02/2025 (Assembler: FASM)', 13,10
+                db 'Erdogan Tan - 28/02/2025 (Assembler: FASM)', 13,10
                 db 'Original code: MP3PLAYER.EXE v1.4 (20/09/2024)', 13,10
                 db '               by Martin Korth (TASM source code)'
                 db 13,10,0
@@ -11779,7 +11796,9 @@ read_error_txt:
 		; 22/12/2024 (vgaplay.s)
 fillblock:
 		times 14 db 0FFh
-		dw 0
+		; 28/02/2025
+		dw 0FFFFh	
+		;dw 0
 
 ; ---------------------------------------------------------------------------
 
