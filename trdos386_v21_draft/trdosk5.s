@@ -2318,6 +2318,8 @@ ude_2:
 	mov	al, [ebx+OF_ATTRIB]
 	or	al, attr_archive	; set archive
 	mov	[edi+DirEntry_Attr], al
+
+	push	ebx
 	
 	shl	ebx, 2
 	mov	eax, [ebx+OF_FCLUSTER]
@@ -2345,12 +2347,15 @@ ude_3:
 	; (MSDOS -> FLUSHBUF)
 	call	FlushBuffers
 	jnc	short ude_4
+
+	pop	ebx
 	mov	eax, ERR_DEV_ACCESS ; (MSDOS -> error_access_denied)
 	retn
 ude_4:
-	push	ebx
 	call	update_fat32_fsinfo
+
 	pop	ebx
+
 	retn
 
 ; --------------------------------------------------------------------
