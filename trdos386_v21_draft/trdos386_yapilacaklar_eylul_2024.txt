@@ -1,0 +1,194 @@
+18/09/2024 tarihli TRDOS 386 v2.0.9 Kernel'de mevcut kusurlar...
+
+*WRITETST.PRG programý göre gerçek bilgisayarýn FAT32 dosya sisteminde...
+ (QEMU'da bu kusur yok)
+ SAMPLE.TXT dosyasý varken programdan silinerek yeniden oluþturulunca
+hata veriyor. Dosya boyutu 0'da kalýyor. Ama dosya boyutu sýfýr
+yani ilk cluster 0 ise dosya yazýlýyor.
+(delete/create metod hatasý)
+Yani bir sample.txt dosyasý var 162 byte... delete/create olursa hata
+ama create/truncate olursa hata yok. (programýn içinden delete/create)
+Ama boþ sample.txt var ise (first cluster = 0) bu hata oluþmuyor.
+(QEMU içinde hiç hata oluþmadý.)
+
+Fakat QEMU FAT32 fs copy iþleminde... bir dosya FAT32 subdir
+içine kopyelenince de oluþuyor... command failed,error code=0
+2inci denemede kopyememe baþarýlý oluyor. 
+(Hata kodu alýndýðýnda sýfýr boyutlu dosya oluþuyor.)
+(overwrite'da problem yok..)
+Eðer bir kez bile hedef dizine cd yapýlýrsa bu hata alýnmýyor.
+(örnek copy writetst.prg c:/deneme/ A:'dan çalýþtýrýlýrsa hata veriyor
+ama sýfýr boyutlu dosya oluþuyor. Bu hataya raðmen 2nci deneme
+baþarýlý oluyor, 162 byte'lýk sample.txt oluyor.)
+
+
+* Gerçek bilgisayar FAT32 dosya sisteminde, 20 MBlýk WAV dosyasýný
+kopyelemek çok uzun sürüyor (5-10 dakika) muhtemelen
+"add_new_cluster" içinde FAT32 FS ile ilgili iþlemler logaritmik uzatýyor.
+FAT16 sisteminde ayný 20 MB dosya 10 saniyede kopyeleniyor.
+20 MB dosya var ise FAT32 dosya sisteminde overwrite olduðunda
+de 10 saniyede yazýlabiliyor.. (add_new_cluster büyük ölçüde
+bypass oluyor, get_next_cluster ile kestirme oluyor çünkü eski
+clusterlara yazýyor)
+Yapýlmasý gereken: ADD NEW CLUSTER'da FAT32 FSINFO sektörü dahil
+ve get first free cluster dahil... zaman kaybettiren okuma/yazmalarý
+azaltmak, duruma göre save fat buffer sayýsý da azaltýlmalý...
+(zaten FAT BUFFER STATUS = 2 deðilse save fat buffer iþlem yapmýyor)
+
+* FAT BUFFER daima 3 sektör okuyup yazýyor... Bunu MSDOS'daki gibi
+tek sektör yapýp, FAT12'deki artýk byte'ý bir deðiþken içinde
+kayýtlamak lazým. Yani FAT12'de artýk byte var ise ortak sektörler
+-2 sektör- yazýlacak. Bu 511. byte'da cluster parçasý varsa oluyor.
+1 sektörde 1024 nibble -4 bit- var ve bu 3 nibbledan oluþan
+cluster numarasýna bölününce 341 cluster oluyor. 1 nibble sonraki
+sektörde kalýyor...
+
+20/09/2024 - Erdogan Tan
+
+PAGE FAULT testi ve BugFix ihtiyacý... (PFTEST.PRG programý)
+
+* 0FFC00000h adresi TRDOS 386'da user space'de geçersiz adres cünkü
+  User space 400000h base (ilk 4MB sonunda) adresinden baþlýyor
+  (onu 0 olarak görüyor)... Sadece interruptlar için Page Directory
+  ilk entry, kernel'in page table'ýný gösteriyor.
+  Esas olarak ilk 4MB programlar için gizli kernel space.
+  Bu durumda user/kullanýcý için 4GB-4MB virtual address space var
+  olup, bu sýnýr sondan aþýlýrsa (stack yani esp doðru yere çekilse 
+  bile) yani 0FFC00000h ve üstüne adlereleme (MOV vs) yapýlýrsa
+  Page Table Error (CPU Exception) 0Eh ortaya çýkýyor.
+  TRDOS 386 Kernel'i bunu sayfa tahsis ederek çözmeye çalýþýyor.
+  (Bu bir kusur olmalý çünkü test programý kýsa süre meþgul kalýyor.
+  Sonra kernel fault gösteriyor. Tam 0FFC00000h'a geçilince.)
+  Fiziksel sayfa atansa bile, aslýnda bu adress 4MB base address
+  dolayýsýyla devriliyor... ilk 4MB'a baþa dönüyor...
+  (User segment register'ý/selektörü aktif iken -ring 3- virtual
+  address linear adrese çevrilirken 4MB base address eklendiði için
+  page directroy'de linear adresse denk egelen o entry'e bakýlýyor.
+  ama aslýnda 0FFC00000h ve üstü için devrilme/overrun nedeniyle
+  Page Directory 1st entry karþýlýk geliyor ve burada yapýlan 
+  iþlem iþe yaramayýp aksine diðer programlarýn da Page fault
+  vermesine yol açýyor.)
+
+  Þöyle bir çözüm olabilir: Kernel Page Fault hatasý alýnan
+  virtual adresi kontrol etmeli.. Ve bu adres 0FFC00000h veya
+  üstü ise.. Sayfa atamaya çalýþmadan programý sonlandýrmalý.
+  (Bu sýrada Kernele ait Kýrmýzý Zeminli Sarý Page Fault Mesajý
+  hangi kod adresinde page fault alýndýðýný göstermiþ oluyor.)
+
+*** Diðer konu...
+
+* 3GB üstü RAM olmasý durumunda TRDOS 386 kernelinden yapýlmasý
+  gereken muhtemel düzeltmeler:
+  VESA VBE2 Linear Frame Buffer addresi ve yukarýsýna user kodu
+  adreslenmeyecek (kernel eriþecek)... Memory Allocation table
+  iþlenmeyecek... Ame Kernel page table'lar zorunlu olarak
+  bu adresleri 1'e 1 gösteriyor olacak.
+  4GB bellek için 4MB page tables + 4KB page directory gerekiyor.
+  Bu durumda user segment selektörlerinin base address deðeri
+  4MB olursa, son 1MB lýk page table kýsmý (3-4 GB'a denk gelir)
+  traþlanabilir. Kullanýcý için bu münkün deðil gibi ama bir yerde
+  örneðin interrrupt'lar bozulabilir. (BU page table'lara bakmak
+  isteyen kod user'ýn page directory'isi CR3'de aktif iken
+  bunlara eriþemez. Sonucu ne kadar etkiler bilemiyorum ama
+  yaklaþýk olarak 2.5GB (2.5-3GB arasý bir yerde) üstünde RAM
+  varmýþ gibi ayarlandýðýnda TRDOS 386 video -VESA ve ya VGA-
+  kullanan programlarda protection fault veriyordu. Esas olarak
+  1MB konvansiyonel memory + 64K da kernel var. 
+  Memory Allocation Table 128KB. Sonra page directory, page table,
+  upage'lar vs var. En az 128MB'lýk Page Table yerini iþgal etmiþ
+  olur. O durumda kernel 3GB-128MB veya daha az addresleme 
+  yapabilir. Bunun üzerinde çalýþmam gerekiyor. Mümkün olduðunca
+  4GB'lý addreslettirmem lazým. (Yani kernel space 5MB kadar.)
+
+22/09/2024 - Erdogan Tan
+
+** Dosyanýn directory içindeki poziyonu çok ötede ise
+   o dosya içine yazmada problem oluyor. (syswrite esnasýnda...)
+   A disketinde root directoryde silinmiþ dosyalardan ve olanlardan
+   dolayý aþaðýda kalan bir ASM dosyasýný oluþturunca ona sadece
+   1 byte yazýp býraktýðý oldu.
+
+** 23 Eylül 2024 günü Small C Compiler'ýn ilk TRDOS 386 uyarlamasýný
+   ayný zamanda ilk TRDOS 386 C compiler'ýný yazmýþ oldum.
+   5-23 eylül arasý sürdü. FASM formatýnda ASM çýkýþý yapýyor.
+   Bir kalýba göre ASM dosyasý oluþturun include yaptýrarak 
+   FASM ile (BIN) PRG oluþturulabiliyor. Kolibri OS'tan deðiþtirdim,
+   onlarda (baþkasýndan sonra) SCC'in MSDOS kaynak kodundan
+   deðiþtirmiþ. MSDOS kodu da ASM çýkýþýyapýyor ama kendi 
+   Assembler'ýna göre çýkýþ.
+   <Yukarýda bahsetiðim ASM dosyasýna yazmayabiliyor durumu, SCC
+   çalýþtýrýyor olabiliyor. Sadece A:/' da denedim. Fakat
+   sebebi TRDOS 386 kerneli olacak þekilde, yeni dosya oluþturmak
+   biraz uzun sürüyor, "add_new_cluster" vs konusu.>
+
+23/09/2024 - Erdoðan Tan
+
+
+*** systime ve int 35h RTC clock ahatasý verdiðinde çözüm lazým.
+    Buna göre RTC_20 prosedüründen hata dönüþü olursa systime
+    zamaný eax = -1 olarak döndürebilir. Bir çözüm lazým.
+
+29/09/2024 - Erdoðan Tan
+
+*** sysseek, file pointer'ý döndürmeli. FASM'de faydasý olacak.
+    ('lseek' prosedürü)..
+
+06/10/2024
+
+Yeni versiyonda systimer'a veya systime'a 1 milisaniye bekle
+ve dön fonksiyonu eklenecek. (Kontrolü Refresch Detect
+61714/931 -1ms döngü- prosedüründen alacak.
+(Emülatörde mili saniyede 1/3 oranýnda hata olabildiði için
+gerçek deðer, systime ile ve systimer ile kontrol edilecek.)
+Ayrýca wait for -15.0857 micro seconds - refresh detect fonsiyonu
+eklenebilir. (1 milisaniyede 66.3 refresh detect)
+(Normalde 66 kez refresh olunca -port 61- 1ms geçmiþ olmalý.)
+
+Kaynak: PCTIM003.TXT - Kris Heidenstrom - Timing on the PC family under DOS
+;;;;;;
+## 7.37.2  SAMPLE CODE: DELAY(MILLISECONDS) FUNCTION USING REFRESH DETECT
+
+This function uses the Refresh Detect signal to provide a delay(milliseconds)
+function. This function does not check that the refresh channel is operating
+with the correct divisor. It also does not check that it is running on an AT
+or later machine with the required Port B hardware. If required, these checks
+should be done at the start of the program that will use this function.
+
+-------------------------------- snip snip snip -----------------------------
+
+Params	=	4		; USE 6 FOR FAR CODE MODELS!
+
+_delay	PROC	near
+	push	bp		; Preserve BP
+	mov	bp,sp		; Address stacked parameters
+	mov	cx,[bp+Params]	; Get loword of number of milliseconds
+	mov	dx,[bp+Params+2] ; Get hiword
+	mov	bx,61714	; Initialise negative count register
+	in	al,61h		; Read Port B initially
+	mov	ah,al		; To AH
+	jmp	SHORT DelayDecr	; Decrement count and loop if nonzero
+DelayLoop:
+	in	al,61h		; Read Port B
+	xor	al,ah		; Get different bits
+	test	al,00100000b	; Did Refresh Detect toggle?
+	jz	DelayLoop	; If not, keep waiting
+	xor	ah,00100000b	; Toggle last known state flag
+	sub	bx,931		; Approximating the number of Refresh
+	jnb	DelayLoop	;   of Refresh Detect toggles per
+	add	bx,61714	;   millisecond as 61714 / 931
+DelayDecr:
+	sub	cx,1		; One millisecond has elapsed
+	sbb	dx,0		; Borrow into hiword
+	jnb	DelayLoop	; If more milliseconds remaining
+	pop	bp		; Restore BP from caller
+	ret
+_delay	ENDP
+;;;;;;
+
+10/10/2024 (yukarýsý)
+
+** systell, sys seek gibi çalýþmalý... dl = 2 ile çaðrýlýrsa
+   file size döndürmeli...
+   ayrýca sysseek file offset pointer döndürmüyor...
+
+21/10/2024

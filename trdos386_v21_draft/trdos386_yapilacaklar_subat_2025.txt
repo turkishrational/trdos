@@ -1,0 +1,59 @@
+06/02/2025 itibarý ile TRDOS 386 v2.0.9'da
+olmayan özelliðin write string fonskiyonunu bozmasý...
+****
+þu düzeltilecek:
+*****
+PMI32 = enabled iken video modu VESA VBE3 PMI Video BIOS'a
+geçilerek ayarlanýyordu. (Özellikle Video MODE 13h)
+ama video modeu kernel dýþýnda ayarlanýrken
+[CHAR_HEIGHT] ve [CRT_COLS] video moduna göre deðiþtirlmmeiþ oluyor
+ve text modundaki (Video MODE 3 deki) haliyle kalýyor.
+(Diðer parametreler de önemli olabilir).
+*****
+Böyle olunca, INT 31h 1300h fonksiyonu
+(Int10h function 13h, sub function 0) graik modunu algýlýyor ama
+([current_mode]), [CHAR_HEIGHT] ve [CRT_COLS] deðerleri doðru olmadýðý
+için ekrana bozuk yazýyor.
+*****
+Doðrusu "vga_params" tablosunda ilgili video modu kýsmýnýn ilk 3 byte'ý
+columns, rows-1, char pixels deðerini veriyor (vidata.s).
+Write string fonsyonu bu deðerleri kullanýyorsa ekrana doðru yazabilir.
+*****
+Buna çözüm bulunacak.
+
+cgaplay1.s (CGAPLAY1.PRG) INT31h write string fonksiyonunu kullanýyor.
+PMI32=ENABLED ike ekran bozuk görünyor.
+(Tam ekran 24*80 ekrana yazýyor.)
+Düzeltme yapýldýktan sonra ekran doðru oluþmalý.
+
+Þimdilik PMI32=enabled iken INT 31h, karakter yazmayý iptal edip
+programa direkt video access ile karakter pixellerini yazdýrmak çözüm
+olabilir. O þekilde çalýþan CGAPLAY.PRG düzgün görüntü veriyor.
+(Program tarihleri: 05/02/2025)
+
+Erdoðan Tan - 06/02/2025
+
+; 14/02/2025
+mp3play6.prg'da display indikatör (ekranýn sol üstündeki sayý)
+0 iken sarý renk (font color), 1 pixel kolonu saða taþýp ilk 4 pizeli
+sarý yapýyor... (7 pixel geniþlikteki karakterin hemen saðýnýn tepedeki
+4 pixeli). Bunun sysvideo 010Fh (ebx), 0Eh (ecx) ve edx = 01??h 
+çaðrýsýnda olduðunu tahdmin ediyorum. (dipslay_indicator prosedürü)
+kernelin ilgili 8*8 karalyter yazma prosedüründe hata olabilir.
+(Video Mode 13h)
+
+; 27/02/2025
+VGA veya VESA modunda userfont vs yazdýrýlýrken
+sys _video, 020Fh, [wcolor], 8001h
+(mp3play8.s, write_character)
+boþuk (20h) karakterleri yazýlmayýp pas geçilince
+o karakterin poziyonundaki eski karakter silinmemiþ oluyor sanýyorum.
+Bu durumda karakterin (background color ile) silinmiþ olmasý lazým.
+Bu deðiþiklik gerekiyor.
+(mmp3player8.s, drawplayingscreen, updatefileinfo prosedürleri)
+nasýl bir kusur oluþuyor: potbori.mp3'den sonmra alana kvp.mp3 yazýnca
+görntü kvp.mp3.mp3 oluyor bu durum mp3_file_name string alanýndan
+deðil drawpplayingscrwen esnasýnda önceki potbori.mp3 yazýsýnýn
+silinmemesinden ileri geliyor çünkü þburada boþluk karakteri var.
+
+
