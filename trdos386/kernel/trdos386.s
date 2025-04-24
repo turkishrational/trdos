@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.10
 ; ----------------------------------------------------------------------------
-; Last Update: 28/01/2025 (Previous: 29/12/2024)
+; Last Update: 24/04/2025 (Previous: 29/12/2024)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -3768,13 +3768,14 @@ panic_msg:
 ;       db 0Dh, 0Ah, 0
 
 starting_msg:
-	;;;;;;db "Turkish Rational DOS v2.0 [18/04/2021] ...", 0
-	;;;;;db "Turkish Rational DOS v2.0 [11/08/2022] ...", 0
-	;;;;db "Turkish Rational DOS v2.0 [30/08/2023] ...", 0
-	;;;db "Turkish Rational DOS v2.0 [07/12/2023] ...", 0
-	;;db "Turkish Rational DOS v2.0 [23/06/2024] ...", 0
-	;db "Turkish Rational DOS v2.0 [29/12/2024] ...", 0
-	db "Turkish Rational DOS v2.0 [28/01/2025] ...", 0
+	;;;;;;;db "Turkish Rational DOS v2.0 [18/04/2021] ...", 0
+	;;;;;;db "Turkish Rational DOS v2.0 [11/08/2022] ...", 0
+	;;;;;db "Turkish Rational DOS v2.0 [30/08/2023] ...", 0
+	;;;;db "Turkish Rational DOS v2.0 [07/12/2023] ...", 0
+	;;;db "Turkish Rational DOS v2.0 [23/06/2024] ...", 0
+	;;db "Turkish Rational DOS v2.0 [29/12/2024] ...", 0
+	;db "Turkish Rational DOS v2.0 [28/01/2025] ...", 0
+	db "Turkish Rational DOS v2.0 [24/04/2025] ...", 0
 
 NextLine:
 	db 0Dh, 0Ah, 0

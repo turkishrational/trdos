@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - MAIN PROGRAM : trdosk6.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 27/09/2024  (Previous: 29/08/2023)
+; Last Update: 24/04/2025  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2413,6 +2413,9 @@ sysclose: ;<close file>
 	jc	short sysclose_err
 	jmp	sysret
 sysclose_err:
+	; 24/04/2025
+seektell_err:
+device_rw_err:
 	mov	eax, ERR_FILE_NOT_OPEN ; file not open !
 	mov	[u.error], eax ;
 	mov	[u.r0], eax ; ! invalid handle !
@@ -2598,11 +2601,15 @@ device_read:
 	; ch = DEV_ACCESS   ; access flags
 	; al = DEV_DRIVER   ; device number (eax)
 
-	; 18/09/2024 (temporary)
-	call	rw2 ; file not open ; cf = 1
-	;jmp	error
-	; 26/09/2024
-	jmp	short sysrw_err
+	; 24/04/2025 - TRDOS 386 v2.0.10
+	;; 18/09/2024 (temporary)
+	;call	rw2 ; file not open ; cf = 1
+	;;jmp	error
+	;; 26/09/2024
+	;jmp	short sysrw_err
+	; 24/04/2025
+	jmp	short device_rw_err
+
 
 ;	test	cl, 1 ; 1 = read, 2 = write, 3 = read&write
 ;	jz	short rw3
@@ -2693,11 +2700,15 @@ rw7:
         mov	dword [u.error], 0 ; reset the last error code
 	retn
 
+; 24/04/2025 - TRDOS 386 v2.0.10
+%if 0
+
 rw2:
 	mov	eax, ERR_FILE_NOT_OPEN ; file not open !
 	;mov	dword [u.error], eax
 	;retn
 
+%endif
 	; 03/09/2024
 	; 17/04/2021
 	;jmp	short rw4
@@ -12510,6 +12521,7 @@ sysfstat:
 %endif
 
 fclose:
+	; 24/04/2025 - TRDOS 386 Kernel v2.0.10
 	; 18/09/2024 - TRDOS 386 Kernel v2.0.9
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 06/10/2016 (TRDOS 386 = TRDOS v2.0)
@@ -12563,8 +12575,10 @@ fclose:
 	;jc	device_close ; eax = device number
 	; 17/04/2021 (temporary)
 	jnc	short _fclose_0
+	; 24/04/2025 (BugFix for 'sysexit')
 	pop	eax
-	jmp	rw2 ; file not open !
+	;jmp	rw2 ; file not open !
+	retn
 _fclose_0:
 	cmp	byte [ebx+OF_MODE], 1 ; open mode ; 0 = empty entry
 	jb	short fclose_1	      ; 1 = read, 2 = write
@@ -12967,10 +12981,13 @@ seektell0:
 	or	eax, eax
 	jnz	short seektell1
 
-	mov	eax, ERR_FILE_NOT_OPEN
-	mov	[u.r0], eax 
-	mov	dword [u.error], eax ; 'file not open !'
-	jmp	error
+	; 24/04/2025 - TRDOS 386 v2.0.10
+	;mov	eax, ERR_FILE_NOT_OPEN
+	;mov	[u.r0], eax 
+	;mov	dword [u.error], eax ; 'file not open !'
+	;jmp	error
+	; 24/04/2025
+	jmp	seektell_err ; sysclose_err
 
 seektell1:
         mov     ebx, [u.fofp]
