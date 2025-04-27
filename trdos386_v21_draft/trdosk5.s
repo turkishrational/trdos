@@ -2262,12 +2262,12 @@ update_directory_entry:
 	;	eax, edx, ecx, esi, edi, ebp
 	;
 
-	mov	eax, [ebx+OF_DIRSECTOR]
+	mov	eax, [ebx+OF_DIRSECTOR] ; (physical sector number)
 	xor	edx, edx
-	mov	dh, [ebx+OF_DRIVE]
+	mov	dh, [ebx+OF_DRIVE]	; (logical drive number)
 	
 	; convert logical drv sector number to physical disk sector number
-	add	eax, [edx+LD_StartSector] ; ! physical address !
+	;add	eax, [edx+LD_StartSector] ; ! physical address !
 	mov	cl, [edx+LD_PhyDrvNo]
 
 	; ref: Retro DOS v5 ibmdos7.s - GETBUFFR ; (MSDOS)
@@ -2988,7 +2988,7 @@ DIRREAD:
 	jnz	short drd_subdir
 	
 	xchg	eax, ecx
-	jmp	short drd_doread
+	jmp	short drd_doread2
 
 drd_subdir:
 	mov	cl, [edx+LD_BPB+BPB_SecPerClust]
@@ -2999,16 +2999,17 @@ drd_subdir:
 	
 drd_sd_shift:
 	shr	cl, 1
-	jz	short drd_doread
+	jz	short drd_doread1
 	shr	eax, 1
 	jmp	short drd_sd_shift
 
-drd_doread:		
-	; eax = number of clusters to skip
+drd_doread1:		
+	mov	ecx, eax
+drd_doread2:
+	; ecx = number of clusters to skip
 	; ebx = position in cluster
 
 	mov	[SECCLUSPOS], bl
-	mov	ecx, eax
 	mov	eax, [CLUSNUM]
 	mov	[NXTCLUSNUM], eax
 	jcxz	drd_fcluster
