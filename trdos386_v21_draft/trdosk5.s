@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 24/04/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 27/04/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2247,12 +2247,13 @@ get_last_section:
 ; 21/04/2025 - TRDOS 386 v2.0.10
 
 update_directory_entry:
+	; 27/04/2025
 	; 24/04/2025
 	; 21/04/2025
 	; (MSDOS -> DirFromSFT)
 	;
 	; INPUT:
-	;	EBX = System File Number (MSDOS -> SFT enytry number)
+	;	EBX = System File Number (MSDOS -> SFT entry number)
 	; OUTPUT:
 	;	EDI = Directory Entry Location
 	;	ESI = Directory Buffer Header address
@@ -2266,7 +2267,7 @@ update_directory_entry:
 	mov	dh, [ebx+OF_DRIVE]
 	
 	; convert logical drv sector number to physical disk sector number
-	add	eax, [edx+LD_DATABegin] ; ! physical address !
+	add	eax, [edx+LD_StartSector] ; ! physical address !
 	mov	cl, [edx+LD_PhyDrvNo]
 
 	; ref: Retro DOS v5 ibmdos7.s - GETBUFFR ; (MSDOS)
@@ -2388,6 +2389,8 @@ GetBuffer:
 	;	edx = Logical DOS Drive Table address
 	; OUTPUT:
 	;	esi = Directory Buffer Header address
+	;	 cl = Physical Disk Number
+	;	edx = Logical DOS Drive Table address
 	;
 	; Modified registers:
 	;	eax, ecx, esi, edi, ebp
@@ -2486,7 +2489,7 @@ getb_10:
 	mov	ch, [pre_read]	; bit 7 = no pre-red flag
 				; bit 0 = fat buffer flag
 	test	ch, 80h			; read in new sector ?
-	jnz	short getb_20		; no, done
+	jnz	short getb_13		; no, done
 
 	lea	edi, [esi+BUFINSIZ]	; buffer data address
 
@@ -2499,7 +2502,7 @@ getb_10:
 	jmp	short getb_13
 
 getb_11:
-	; eax =  error code (if CF = 1)
+	; eax = error code (if CF = 1)
 	retn
 
 getb_12:
@@ -2624,3 +2627,458 @@ WildCrd:
 	je	short WildCrd
 MetaRet:
  	retn			; Zero set, Match
+
+
+; --------------------------------------------------------------------
+
+; 27/04/2025 - TRDOS 386 v2.0.10
+
+UNPACK:
+	; 27/04/2025
+	; (MSDOS -> UNPACK) - Ref: Retro DOS v5 - ibmdos7.s
+	; Unpack FAT entries (get next cluster)
+	;
+	; INPUT:
+	;	edx = Logical DOS Drive Description Table address
+	;	eax = Cluster Number (28bit for FAT32 fs)
+	; OUTPUT:
+	;	eax = Content of FAT for given cluster
+	;	      (next/new cluster number)
+	;	esi = Start of the buffer
+	;	ebx = buffer offset (not used)
+	;
+	;	Note: if EAX input is 0
+	;		EAX = [CL0FATENTRY]
+	;	if ZF = 1, EAX output = 0 (Free Cluster)
+	;
+	; Modified registers:
+	;	eax, ecx, ebx, esi, edi, ebp
+
+	and	eax, eax
+	jnz	short up_1
+
+	mov	eax, [CL0FATENTRY]
+	or	eax, eax
+	retn
+
+up_0:
+	mov	dword [edx+LD_FreeSectors], -1 ; invalid free sectors
+	mov	eax, ERR_CLUSTER ; 'cluster not available !'
+	stc
+	retn
+
+up_1:
+	mov	ecx, [edx+LD_Clusters] ; Last Cluster number - 1
+	inc	ecx	; Last Cluster number
+	cmp	eax, ecx
+	ja	short up_0  ; (MSDOS -> 'HURTFAT:')
+
+	;call	MAPCLUSTER
+	;; if cf = 1 -> eax  = error code
+	;; if eax = 0 -> zf = 1
+	;retn
+
+	;jmp short MAPCLUSTER
+
+; --------------------------------------------------------------------
+
+; 27/04/2025 - TRDOS 386 v2.0.10
+
+MAPCLUSTER:
+	; 27/04/2025
+	; (MSDOS -> MAPCLUSTER) - Ref: Retro DOS v5 - ibmdos7.s
+	; Buffer a FAT sector
+	;
+	; INPUT:
+	;	edx = Logical DOS Drive Description Table address
+	;	eax = Cluster Number (28bit for FAT32 fs)
+	; OUTPUT:
+	;	eax = Content of FAT for given cluster
+	;	      (next/new cluster number)
+	;	esi = Start of the buffer
+	;	ebx = buffer offset (not used)
+	;
+	;	If CF = 0 and ZF = 1 (EAX = 0) -> Free Cluster
+	;
+	; Modified registers:
+	;	eax, ecx, ebx, esi, edi, ebp
+
+	mov	[ClusNum], eax	; save current cluster number
+
+	cmp	byte [edx+LD_FATType], 2
+	ja	short mapcl_2	; FAT32
+	
+	mov	byte [ClusSplit], 0
+	mov	ebx, eax
+
+	je	short mapcl_1	; FAT16
+
+	; FAT12
+	shr	eax, 1
+mapcl_1:
+	add	eax, ebx  ; eax = 2 * cluster number (for FAT16)
+			  ;     = 1.5 * cluster number (for FAT12)
+	jmp	short mapcl_3
+mapcl_2:	
+	shl	eax, 2
+	; eax = 4 * cluster number (for FAT32)
+mapcl_3:
+	; 512 bytes per sector
+	; 9 bit shift to right
+
+	mov	ebx, eax
+	shr	eax, 9
+	and	ebx, 511 ; 1FFh
+
+	; eax = FAT sector (index) number
+	; ebx = cluster number offset in the FAT sector
+
+	add	eax, [edx+LD_FATBegin]
+	; eax = physical sector number of the FAT sector
+	
+	mov	[ClusSec], eax
+
+	mov	cl, [edx+LD_PhyDrvNo]
+
+	; edx = logical dos drive table address
+	; ebx = cluster number offset (in the buffer)
+	;  cl = physical drive number
+
+	call	GetFatBuffer
+	jc	short mapcl_5	; eax = error code
+
+	;mov	esi, [CurrentBuffer]
+	lea	edi, [esi+BUFINSIZ]
+	add	edi, ebx
+	cmp	ebx, 511
+	jne	short mapcl_4
+
+	; FAT12, cluster split
+	
+	mov	al, [edi]	
+	inc	byte [ClusSplit]
+	mov	[ClusSave], al
+
+	;mov	eax, [esi+BUFFINFO.buf_sector]
+	;mov	[ClusSec], eax
+
+	mov	eax, [ClusSec]
+	;mov	cl, [edx+LD_PhyDrvNo]
+	inc	eax
+
+	call	GetFatBuffer
+	jc	short mapcl_5	; eax = error code
+
+	mov	al, [ClusSave]
+	mov	ah, [esi+BUFINSIZ]
+
+	jmp	short mapcl_7
+
+mapcl_4:
+	mov	eax, [edi]
+
+	cmp	byte [edx+LD_FATType], 2
+	ja	short mapcl_6	; FAT32
+	jb	short mapcl_7	; FAT12
+	; FAT16
+	and	eax, 0FFFFh
+mapcl_5:
+	retn
+
+mapcl_6:
+	; FAT32
+	and	eax, 0FFFFFFFh ; 28bit
+	retn
+
+mapcl_7:
+	test	byte [ClusNum], 1 ; odd ? 
+	jz	short mapcl_8 ; no, even	
+
+	; FAT12, high 12 bit
+	shr	eax, 4
+mapcl_8:
+	; FAT12
+	; low 12 bit
+	and	eax, 0FFFh
+	retn
+
+; --------------------------------------------------------------------
+
+; 27/04/2025 - TRDOS 386 v2.0.10
+
+SETDIRSRCH:
+	; 27/04/2025
+	; (MSDOS -> SETDIRSRCH) - Ref: Retro DOS v5 - ibmdos7.s
+	; Set up a directory search
+	;
+	; INPUT:
+	;	edx = Logical DOS Drive Description Table address
+	;	eax = Cluster Number (28bit for FAT32 fs)
+	; OUTPUT:
+	;	[DIRSTART] = eax
+	;	[CLUSFAC], [CLUSNUM], [SECCLUSPOS], [DIRSEC] set
+	;
+	; Modified registers:
+	;	eax, ecx, ebx, esi, edi, ebp
+
+	or	eax, eax
+	jnz	short sds_fat32
+
+	cmp	byte [edx+LD_FATType], 2
+	jna	short SETROOTSRCH2
+
+SETROOTSRCH_FAT32:
+	mov	eax, [edx+LD_BPB+FAT32_RootFClust]
+	
+	mov	ecx, [edx+LD_Clusters]  ; Last Cluster - 1
+	inc	ecx		; Last Cluster
+	cmp	eax, ecx
+	ja	short sds_fat32
+
+	cmp	eax, 2
+	jnb	short sds_fat32
+
+sds_error:
+	mov	eax, ERR_CLUSTER ; 'cluster not available !'
+	stc
+	retn
+
+sds_fat32:
+	mov	[DIRSTART], eax
+	mov	cl, [edx+LD_BPB+BPB_SecPerClust]
+	mov	[CLUSFAC], cl
+	
+	call	UNPACK
+	jnc	short sdc_unp_ok
+	retn
+
+; --------------------------------------------------------------------
+
+; 27/04/2025 - TRDOS 386 v2.0.10
+
+SETROOTSRCH:
+	; 27/04/2025
+	; (MSDOS -> SETROOTSRCH) - Ref: Retro DOS v5 - ibmdos7.s
+	; Set up a directory search (root directory)
+	;
+	; INPUT:
+	;	edx = Logical DOS Drive Description Table address
+	;	eax = Cluster Number (28bit for FAT32 fs)
+	; OUTPUT:
+	;	[DIRSTART] = eax
+	;	[CLUSFAC], [CLUSNUM], [SECCLUSPOS], [DIRSEC] set
+	;
+	; Modified registers:
+	;	eax, ecx, ebx, esi, edi, ebp
+
+	xor	eax, eax
+SETROOTSRCH2:
+	cmp	byte [edx+LD_FATType], 2
+	ja	short SETROOTSRCH_FAT32
+
+SETROOTSRCH_FAT:
+	mov	[DIRSTART], eax ; 0
+	mov	[SECCLUSPOS], al ; 0
+
+	inc	eax
+	mov	[SRCH_CLUSTER], eax ; 1	
+	dec	eax
+	dec	eax
+	mov	[CLUSNUM], eax ; -1
+	
+	mov	eax, [edx+LD_DATABegin]
+	mov	ebx, [edx+LD_ROOTBegin]
+
+	sub	eax, ebx
+	mov	[CLUSFAC], al ; number of root dir sectors
+
+	jmp	short SETROOTSRCH3
+	
+SETROOTSRCH3:
+	mov	[DIRSEC], ebx ; physical sector number of the dir
+	clc
+	retn
+
+sdc_unp_ok:
+	; eax =	Contents of FAT for given cluster (from UNPACK)
+	; [CLUSNUM] = directory cluster number (from UNPACK)
+
+	xchg	eax, [CLUSNUM]
+	mov	[SRCH_CLUSTER], eax
+			; Directory start cluster number
+			; for searching/locating (directory entry)
+	xor	ebx, ebx
+	mov	byte [SECCLUSPOS], bl ; 0
+
+	; eax = cluster number
+	; edx = logical dos disk table address
+	call	FIGREC
+	; eax = physical sector number
+	;  cl = physical drive/disk number (not used here)
+	;
+	; CF = 0	
+ 
+	mov	[DIRSEC], eax
+	;clc
+	retn
+
+; --------------------------------------------------------------------
+
+; 27/04/2025 - TRDOS 386 v2.0.10
+
+FIGREC:
+	; 27/04/2025
+	; (MSDOS -> FIGREC) - Ref: Retro DOS v5 - ibmdos7.s
+	; Convert cluster number to physical disk sector number
+	;
+	; INPUT:
+	;	edx = Logical DOS Drive Description Table address
+	;	eax = Cluster Number (28bit for FAT32 fs)
+	;	ebx = Sector position in cluster
+	; OUTPUT:
+	;	eax = physical sector number
+	;	 cl = physical drive/disk number
+	;		(needed for GetBuffer procedure)
+	;
+	; Modified registers:
+	;	eax, ecx
+
+	mov	cl, [edx+LD_BPB+BPB_SecPerClust]
+	sub	eax, 2
+figrec_1:
+	shr	cl, 1
+	jz	short figrec_2
+	shl	eax, 1
+	jmp	short figrec_1
+
+figrec_2:
+	add	eax, ebx
+	add	eax, [edx+LD_DATABegin]
+	mov	cl, [edx+LD_PhyDrvNo]
+	retn
+
+; --------------------------------------------------------------------
+
+; 27/04/2025 - TRDOS 386 v2.0.10
+
+DIRREAD:
+	; 27/04/2025
+	; (MSDOS -> DIRREAD) - Ref: Retro DOS v5 - ibmdos7.s
+	; Read a directory sector (into [CurrentBuffer]).
+	;
+	; INPUT:
+	;	eax = directory block (index) number
+	;		(relative to the first block of directory)
+	;	edx = Logical DOS Drive Description Table address
+	;	[DIRSEC] = First physical sector of 1st cluster of dir
+	;	[CLUSNUM] = Next cluster
+	;	[CLUSFAC] = Sectors/Cluster ; not used
+	; OUTPUT:
+	;	[NXTCLUSNUM] = Next cluster (after the one skipped to)
+	;	[SECCLUSPOS] Set
+	;	[CURBUF] points to Buffer with dir sector
+	;	Carry set if error
+	;
+	; Modified registers:
+	;	eax, ecx, ebx, esi, edi, ebp
+
+	xor	ecx, ecx
+
+	cmp	[DIRSTART], ecx ; 0
+	jnz	short drd_subdir
+	
+	xchg	eax, ecx
+	jmp	short drd_doread
+
+drd_subdir:
+	mov	cl, [edx+LD_BPB+BPB_SecPerClust]
+	mov	ebx, ecx
+	dec	ebx	; cluster mask
+	and	ebx, eax
+	; ebx = sector position in the cluster
+	
+drd_sd_shift:
+	shr	cl, 1
+	jz	short drd_doread
+	shr	eax, 1
+	jmp	short drd_sd_shift
+
+drd_doread:		
+	; eax = number of clusters to skip
+	; ebx = position in cluster
+
+	mov	[SECCLUSPOS], bl
+	mov	ecx, eax
+	mov	eax, [CLUSNUM]
+	mov	[NXTCLUSNUM], eax
+	jcxz	drd_fcluster
+
+drd_skipcl:
+	push	ecx
+	call	UNPACK
+	pop	ecx
+	jc	short drd_retn
+	call	IsEOF
+	jae	short drd_skipped
+	loop	drd_skipcl
+drd_skipped:
+	mov	[NXTCLUSNUM], eax
+
+	movzx	ebx, byte [SECCLUSPOS]
+	mov	eax, [ClusNum]
+
+	call	FIGREC
+	; eax = physical sector number
+	;  cl = physical drive/disk number	
+drd_getbuf:
+	call	GetBuffer ; pre-read
+	jc	short drd_retn
+
+;set_buf_as_dir:
+	;mov	esi, [CurrentBuffer]
+	or	byte [esi+BUFFINFO.buf_flags], buf_isDIR
+drd_retn:
+	retn
+
+drd_fcluster:
+	mov	eax, [DIRSEC]
+	add	eax, ebx
+	mov	cl, [edx+LD_PhyDrvNo]
+	jmp	short drd_getbuf
+
+ --------------------------------------------------------------------
+
+; 27/04/2025 - TRDOS 386 v2.0.10
+
+IsEOF:
+	; 27/04/2025
+	; (MSDOS -> IsEOF) - Ref: Retro DOS v5 - ibmdos7.s
+	; check the cluster value for eof
+	;
+	; INPUT:
+	;	eax = Cluster value
+	;	edx = Logical DOS Drive Description Table address
+	; OUTPUT:
+	;	jae -> eof (jb -> not eof)
+	;
+	; Modified registers:
+	;	none
+
+	cmp	byte [edx+LD_FATType], 2
+	ja	short IsEOF_FAT32
+	jb	short IsEOF_FAT12
+
+IsEOF_FAT16:
+	cmp	eax, 0FFF8h
+	retn	
+
+IsEOF_FAT12:
+	;cmp	eax, 0FF0h	; media byte: F0h
+	;je	short IsEOF_other
+	cmp	eax, 0FF8h
+;IsEOF_other:
+	retn	
+
+IsEOF_FAT32:
+	cmp	eax, 0FFFFFF8h
+	retn	
