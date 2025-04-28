@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 27/04/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 28/04/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2364,6 +2364,7 @@ ude_4:
 ; 21/04/2025 - TRDOS 386 v2.0.10
 
 GetFatBuffer:
+	; 28/04/2025
 	; 21/04/2025
 	; (MSDOS -> GETBUFFRB) - Ref: Retro DOS v5 - ibmdos7.s
 	mov	ch, 1		; fat buffer flag
@@ -2371,6 +2372,7 @@ GetFatBuffer:
 	jmp	short getb_x
 
 GetBuffer_npr:
+	; 28/04/2025
 	; 21/04/2025
 	; (MSDOS -> GETBUFFR) - Ref: Retro DOS v5 - ibmdos7.s
 	
@@ -2379,6 +2381,7 @@ GetBuffer_npr:
 	jmp	short getb_x
 
 GetBuffer:
+	; 28/04/2025
 	; 24/04/2025
 	; 21/04/2025
 	; (MSDOS -> GETBUFFR) - Ref: Retro DOS v5 - ibmdos7.s
@@ -2452,6 +2455,9 @@ getb_6:
 	mov	[esi+BUFFINFO.buf_wrtcnt], al
 	mov	[esi+BUFFINFO.buf_wrtcntinc], ebp
 
+	; 28/04/2025
+	mov	[esi+BUFFINFO.buf_DPB], edx ; current ldrvt address
+
 	; ref: Retro DOS v5 ibmdos7.s - PLACEBUF ; (MSDOS)
 	call	PlaceBuffer
 
@@ -2465,7 +2471,6 @@ getb_7:
 	jne	short getb_8		; no
 
 	mov	ebp, esi		; save buffer address
-
 getb_8: 
 	;mov	esi, [esi+BUFFINFO.buf_next]
 	mov	esi, [esi]
@@ -2475,6 +2480,8 @@ getb_8:
 	cmp	ebp, -1		; 0FFFFFFFFh ; invalid (not free buf)
 	je	short getb_9
 	mov	esi, ebp ; restore free buffer (header offset) address
+	; 28/04/2025
+	mov	[esi+BUFFINFO.buf_DPB], edx ; current ldrvt address
 	jmp	short getb_10
 getb_9:
 	; The requested sector is not available in the buffers.
@@ -2483,33 +2490,61 @@ getb_9:
 	;
 	; Flush the first buffer & read in the new sector into it.
 
+	; 28/04/2025
+	push	ebx ; *
+	push	edx ; **
+	push	esi ; ***
+
+	mov	ebp, eax ; save disk sector number
+
 	call	BUFWRITE		; write out the dirty buffer
 	jc	short getb_11
 getb_10:
-	mov	ch, [pre_read]	; bit 7 = no pre-red flag
+	mov	ch, [pre_read]	; bit 7 = no pre-read flag
 				; bit 0 = fat buffer flag
 	test	ch, 80h			; read in new sector ?
 	jnz	short getb_13		; no, done
 
-	lea	edi, [esi+BUFINSIZ]	; buffer data address
-
+	; 28/04/2025
+	lea	ebx, [esi+BUFINSIZ]	; buffer data address
+	mov	esi, edx
+	
 	and	ch, ch			; fat sector ?
 	jz	short getb_12		; no
 
+	; input: eax = phy sector, ebx = buffer, esi = ldrv table
 	call	FATSECRD
+	; modified registers: (eax), ecx, edx
 	jc	short getb_11
 	mov	ch, buf_isFAT		; set buf_flags
 	jmp	short getb_13
 
 getb_11:
+	; 28/04/2025
+	pop	esi ; ***
+	pop	edx ; **
+	pop	ebx ; *
 	; eax = error code (if CF = 1)
 	retn
 
 getb_12:
+	; 28/04/2025 - TRDOS 386 v2.0.10
+	; read 1 disk sector ('trdosk7.s')
+	;   --- mov ecx, 1
+	;   --- call disk_read
+	; input: eax = phy sector, ebx = buffer, esi = ldrv table 
 	call	DREAD
+	; modified registers: eax, ebx, ecx, edx
 	jc	short getb_11
 	mov	ch, 0			; set buf_flags to no type
 getb_13:
+	; 28/04/2025
+	pop	esi ; ***
+	pop	edx ; **
+	pop	ebx ; *
+
+	mov	eax, ebp ; restore disk sector number
+
 	; eax = disk sector
 	; ch = buf_flags
 	; esi = buffer address
@@ -3083,3 +3118,327 @@ IsEOF_FAT12:
 IsEOF_FAT32:
 	cmp	eax, 0FFFFFF8h
 	retn	
+
+ --------------------------------------------------------------------
+
+; 28/04/2025 - TRDOS 386 v2.0.10
+
+FATSECRD:
+	; 28/04/2025
+	; (MSDOS -> FATSECRD) - Ref: Retro DOS v5 - ibmdos7.s
+	; Read a FAT sector
+	;
+	; INPUT:
+	;	EAX = Physical sector number
+	;	EBX = Buffer (Transfer) address
+	;	ESI = Logical DOS Drive Description Table address
+	; OUTPUT:
+	;	Calls to disk bios (disk_read)
+	;
+	;	if cf = 1 -> eax = error code
+	;
+	; Modified registers:
+	;	EAX, ECX, EDX
+
+	xor	ecx, ecx
+
+	mov	cl, [esi+LD_BPB+BPB_NumFATs] ; FAT count
+
+	cmp	byte [esi+LD_FATType], 2
+	jna	short fatsecrd_1 ; not FAT32
+
+	test	[esi+LD_BPB+BPB_ExtFlags], 80h
+	jz	short fatsecrd_1
+	mov	cl, 1 ; only one FAT is active
+fatsecrd_1:
+	push	eax ; *
+	push	ebx ; **
+	push	ecx ; ***
+	
+	;call	DSKREAD ; MSDOS (RetroDOS v5)
+	call	DREAD	; TRDOS 386 v2.0.10 (read one sector)
+		; mov ecx, 1
+		; call disk_read
+	; modified registers: eax, ebx, ecx, edx
+
+	pop	ecx ; ***
+	pop	ebx ; **
+	pop	eax ; *
+	jnc	short fatsecrd_2
+
+	loop	fatsecrd_3
+
+	; 28/04/2025
+	;mov	edx, esi ; LDRVT address for failed disk read
+
+	mov	eax, ERR_DRV_READ ; 'disk read error !'
+	stc
+fatsecrd_2:
+	retn 
+
+fatsecrd_3:
+	cmp	byte [esi+LD_FATType], 2
+	jna	short fatsecrd_4 ; not FAT32
+
+	add	eax, [esi+LD_BPB+BPB_FATSz32] ; FAT sectors
+	jmp	short fatsecrd_1
+
+fatsecrd_4:
+	movzx	edx, word [esi+LD_BPB+BPB_FATSz16] ; FAT sectors
+	add	eax, edx
+	jmp	short fatsecrd_1
+
+ --------------------------------------------------------------------
+
+; 28/04/2025 - TRDOS 386 v2.0.10
+
+BUFWRITE:
+	; 28/04/2025
+	; (MSDOS -> BUFWRITE) - Ref: Retro DOS v5 - ibmdos7.s
+	; Write out a buffer if dirty
+	;
+	; INPUT:
+	; 	ESI = Buffer header address
+	; OUTPUT:
+	;	Buffer marked free
+	;
+	;	if cf = 1 -> eax = error code
+	;		  -> edx = LDRTVT addr for failed drive
+	;
+	; Modified registers:
+	;	EAX, EBX, ECX, EDX
+
+	xor	ecx, ecx
+	mov	cl, 0FFh ; -1
+	xchg	ecx, [esi+BUFFINFO.buf_ID]
+	cmp	cl, 0FFh
+	je	short bufwrt_4 ; Buffer is clean, carry clear
+	
+	test	ch, buf_dirty
+	jz	short bufwrt_4 ; Buffer is clean, carry clear.
+
+	;call	DEC_DIRTY_COUNT
+	dec	dword [DirtyBufferCount]
+	jns	short bufwrt_1
+	inc	dword [DirtyBufferCount] ; reset (must be 0)
+bufwrt_1:
+	mov	eax, [esi+BUFFINFO.buf_sector]
+	;movzx	ecx, [esi+BUFFINFO.buf_wrtcnt] ; write count
+	shr	ecx, 16 ; ecx = write count (for FAT buffer)
+	xor	edx, edx ; 0
+bufwrt_2:
+	lea	ebx, [esi+BUFINSIZ]	; Point at buffer
+
+	push	eax
+	push	edx
+	push	ecx
+	push	esi	; buffer header address
+
+	mov	esi, [esi+BUFFINFO.buf_DPB] ; LDRVT address
+
+	; eax = physical disk sector
+	; ebx = buffer (transfer) address 
+	; esi = logical dos drive description table address
+
+	call 	DWRITE	; TRDOS 286 v2.0.10
+		; mov ecx, 1
+		; call disk_write
+	pop	esi
+	pop	ecx ; write count (remain)
+	pop	edx
+	pop	eax
+	jc	short bufwrt_3
+
+	inc	edx	
+bufwrt_3:
+	add	eax, [esi+BUFFINFO.buf_wrtcntinc]
+
+	loop	bufwrt_2
+	
+	or	edx, edx
+	jnz	short bufwrt_4 ; At least one write succeed
+
+	; 28/04/2025
+	; return LDRVT address for failed disk
+	mov	edx, [esi+BUFFINFO.buf_DPB]
+	
+	mov	eax, ERR_DRV_WRITE ; 'disk write error !'
+	stc
+bufwrt_4:
+	retn
+
+burada kaldým...
+
+
+;Break	<FLUSHBUF -- WRITE OUT DIRTY BUFFERS>
+;----------------------------------------------------------------------------
+; Input:
+;	DS = DOSGROUP
+;	AL = Physical unit number local buffers only
+;	   = -1 for all units and all remote buffers
+; Function:
+;	Write out all dirty buffers for unit, and flag them as clean
+;	Carry set if error (user FAILed to I 24)
+;	    Flush operation completed.
+; DS Preserved, all others destroyed (ES too)
+;----------------------------------------------------------------------------
+
+	; 20/05/2019 - Retro DOS v4.0
+	; DOSCODE:9A35h (MSDOS 6.21, MSDOS.SYS)
+
+	; 27/11/2022 - Retro DOS v4.0 (Modified MSDOS 5.0 MSDOS.SYS)
+	; DOSCODE:99DAh (MSDOS 5.0, MSDOS.SYS)
+
+	; 06/03/2024 - Retro DOS v5.0 (Modified PCDOS 7.1 IBMDOS.COM)
+	; PCDOS 7.1 IBMDOS.COM - DOSCODE:0AC2Bh
+
+
+no_invalidate flag eklenmeli...
+
+FLUSHBUF:
+	; MSDOS 6.0
+	call	GETCURHEAD
+	;TEST	word [ss:DOS34_FLAG],FROM_DISK_RESET ; from disk reset ? ;hkn;
+	TEST	byte [ss:DOS34_FLAG],FROM_DISK_RESET ; 4
+	jnz	short scan_buf_queue
+	cmp	word [ss:DirtyBufferCount],0			;hkn;
+	je	short end_scan
+	
+scan_buf_queue:
+	call	CHECKFLUSH
+
+hata alýnan dirty buffera ne yapýlacaðýnýn
+flagý olacak.
+
+	;push	ax  ; MSDOS 3.3
+	; MSDOS 6.0
+	;mov	ah,[di+4]
+	mov	ah,[DI+BUFFINFO.buf_ID]
+	cmp	[SS:WPERR],ah					;hkn;
+	je	short free_the_buf
+	;TEST	word [ss:DOS34_FLAG],FROM_DISK_RESET ; from disk reset ? ;hkn;
+	TEST	byte [ss:DOS34_FLAG],FROM_DISK_RESET ; 4
+	jz	short dont_free_the_buf
+	; MSDOS 3.3
+	;;mov	al,[di+4]
+	;mov	al,[DI+BUFFINFO.buf_ID]
+	;cmp	[SS:WPERR],al					;hkn;
+	; 15/08/2018
+	;jne	short dont_free_the_buf	
+free_the_buf:
+	; MSDOS 6.0 (& MSDOS 3.3)
+	mov	word [DI+BUFFINFO.buf_ID],00FFh
+dont_free_the_buf:
+	;pop	ax  ; MSDOS 3.3 	   	
+
+	; MSDOS 3.3
+	;mov	di,[DI]
+	;;mov	di,[DI+BUFFINFO.buf_link] ; .buf_next
+	;
+	; 15/08/2018
+	;lds	di,[di]
+	;
+	;cmp	di,-1 ; 0FFFFh
+	;jnz	short scan_buf_queue 
+	
+	; MSDOS 6.0
+	mov	di,[di]
+	;mov	di,[DI+BUFFINFO.buf_next] ; .buf_link
+	cmp	di,[SS:FIRST_BUFF_ADDR]				;hkn;
+	jne	short scan_buf_queue
+
+end_scan:
+	push	ss
+	pop	ds
+	; 01/08/2018 - Retro DOS v3.0
+	;cmp	byte [FAILERR],0
+	;jne	short bad_flush
+	;retn
+;bad_flush:
+	;stc
+	;retn
+
+	; 17/12/2022
+	; 27/11/2022 MSDOS 5.0 MSDOS.SYS compatibility)
+	; 01/08/2018 - Retro DOS v3.0
+	cmp	byte [FAILERR],1
+	cmc
+flushbuf_retn:
+	retn
+	
+	; 17/12/2022
+	; 27/11/2022 MSDOS 5.0 MSDOS.SYS compatibility)
+	;cmp	byte [FAILERR],0
+	;jne	short bad_flush
+	;retn
+;bad_flush:
+	;stc
+	;retn
+
+;----------------------------------------------------------------------------
+;
+; Procedure Name : CHECKFLUSH
+;
+; Inputs : AL - Drive number, -1 means do not check for drive
+;	   DS:DI - pointer to buffer
+;
+; Function : Write out a buffer if it is dirty
+;
+; Carry set if problem (currently user FAILed to I 24)
+;
+;----------------------------------------------------------------------------
+
+	; 07/03/2024 - Retro DOS v5.0 (Modified PCDOS 7.1 IBMDOS.COM)
+
+CHECKFLUSH:
+	; MSDOS 6.0
+	mov	ah,-1	; 01/08/2018 Retro DOS v3.0
+	;cmp	[di+4],ah
+	CMP	[DI+BUFFINFO.buf_ID],AH
+	jz	short flushbuf_retn	; Skip free buffer, carry clear
+	CMP	AH,AL			; 
+	JZ	short DOBUFFER		; do this buffer
+	;cmp	al,[di+4]
+	CMP	AL,[DI+BUFFINFO.buf_ID]
+	CLC
+	jnz	short flushbuf_retn	; Buffer not for this unit or SFT
+
+	; 07/03/2024 (PCDOS 7.1 IBMDOS.COM)
+	;;;
+	xor	bx,bx
+	mov	bl,al
+	;test	ss:drive_flags[bx],8 
+	test	byte [ss:bx+drive_flags],8 ; bit 3
+	jnz	short flushbuf_retn
+	;;;
+
+DOBUFFER:
+	;test	byte [di+5],40h
+	TEST	byte [DI+BUFFINFO.buf_flags],buf_dirty
+	jz	short flushbuf_retn	; Buffer not dirty, carry clear by TEST
+	PUSH	AX
+	;push	word [di+4]
+	PUSH	WORD [DI+BUFFINFO.buf_ID]
+
+burada kaldým...
+push dword olacak
+
+	CALL	BUFWRITE
+
+pop eax olacak
+
+	POP	AX
+	JC	short LEAVE_BUF		; Leave buffer marked free (lost).
+	;and	ah,0BFh
+	AND	AH,~buf_dirty		; Buffer is clean, clears carry
+	;mov	[di+4],ax
+	MOV	[DI+BUFFINFO.buf_ID],AX
+
+þöyle olacak:
+MOV [esi+BUFFINFO.buf_ID], eax
+
+
+LEAVE_BUF:
+	POP	AX			; Search info
+checkflush_retn:
+	retn

@@ -301,7 +301,7 @@ struc BUFFINFO
 				; Bit 1 = 1 if buffer is FAT
 				; Bit 0 = Reserved
 .buf_wrtcnt:	resb 1
-.buf_reserved:	resb 1		; make DWORD boundary for 386
+.buf_reserved:	resb 1		; make DWORD boundary for 386 (must be 0)
 .buf_sector:	resd 1		; Sector number of buffer (flags bit 7 = 0)
 ; The next two items are often refed as a word (flags bit 7 = 0)
 	; For FAT sectors, # times sector written out

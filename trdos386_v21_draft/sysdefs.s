@@ -33,7 +33,7 @@ nproc 	equ	16  ; number of processes
 ntty	equ     8   ; 8+1 -> 8 (10/05/2013)
 ; 17/04/2025 - TRDOS 386 v2.0.10
 nbuf	equ	114
-;nbuf	equ	4   ; 6 ;; 21/08/2015 - 'namei' buffer problem when nbuf > 4 	
+;nbuf	equ	4   ; 6 ;; 21/08/2015 - 'namei' buffer problem when nbuf > 4
 		; NOTE: If fd0 super block buffer addres is beyond of the 1st
 		; 32K, DMA r/w routine or someting else causes a jump to 
 		; kernel panic routine (in 'alloc' routine, in u5.s)
@@ -54,7 +54,7 @@ nbuf	equ	114
 	; '/core' dump file size = 32768 bytes
  
 ; 08/03/2014 
-;sdsegmnt equ	6C0h  ; 256*16 bytes (swap data segment size for 16 processes)		 	 
+;sdsegmnt equ	6C0h  ; 256*16 bytes (swap data segment size for 16 processes)
 ; 19/04/2013 Retro UNIX 8086 v1 feaure only !
 ;;sdsegmnt equ 	740h  ; swap data segment (for user structures and registers)
 
@@ -221,20 +221,20 @@ ERR_INV_FORMAT	   equ 28 ; 'invalid format !' error
 ERR_INV_DATA	   equ 29 ; 'invalid data !' error
 ; TRDOS 8086 -> TRDOS 386 (0Eh -> 20)
 ERR_ZERO_LENGTH	   equ 20  ; 'zero length !' error 	
-; TRDOS 8086 -> TRDOS 386 (15h -> 17, 1Dh -> 18, 1Eh -> 17) 	
+; TRDOS 8086 -> TRDOS 386 (15h -> 17, 1Dh -> 18, 1Eh -> 17)
 ERR_DRV_NR_READ	   equ 17 ; 'drive not ready or read error !'
-ERR_DRV_NR_WRITE   equ 18 ; 'drive not ready or write error !'		
+ERR_DRV_NR_WRITE   equ 18 ; 'drive not ready or write error !'
 ; 15/10/2016
 ERR_INV_PATH_NAME  equ 19 ; 'bad path name !' error
 ERR_BAD_CMD_ARG	   equ  1 ; 'bad command argument !' ; TRDOS 8086
 ERR_INV_FNUMBER	   equ  1 ; 'invalid function number !' ; TRDOS 8086
-ERR_BIG_FILE	   equ  8 ; 'big file & out of memory ! ; TRDOS 8086 	
+ERR_BIG_FILE	   equ  8 ; 'big file & out of memory ! ; TRDOS 8086
 ERR_BIG_DATA	   equ  8 ; 'big data & out of memory ! ; TRDOS 8086
 ERR_CLUSTER	   equ 35 ; 'cluster not available !' ; TRDOS 8086
 ERR_OUT_OF_MEMORY  equ  4 ; 'out of memory !'
 			  ; 'insufficient memory !'
 ERR_P_VIOLATION	   equ	6 ; 'protection violation !'
-ERR_PAGE_FAULT	   equ 224 ;'page fault !' ;0E0h						 
+ERR_PAGE_FAULT	   equ 224 ;'page fault !' ;0E0h
 ERR_SWP_DISK_READ  	   equ 40
 ERR_SWP_DISK_NOT_PRESENT   equ 41
 ERR_SWP_SECTOR_NOT_PRESENT equ 42

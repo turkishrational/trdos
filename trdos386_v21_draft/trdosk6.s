@@ -2419,7 +2419,7 @@ sysclose_err:
 	;mov	[u.error], eax ;
 	mov	eax, [u.error]
 	; eax = [u.error] = error code
-	mov	[u.r0], eax ; ! invalid handle !
+	mov	[u.r0], eax
 	jmp	error
 
 sysread: ; < read from file >
