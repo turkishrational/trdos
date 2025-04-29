@@ -3,7 +3,7 @@
 What are being changed:
 
 * (FAT file system) disk buffering methods are being changed to MSDOS (PCDOS 7.1, Retro DOS v5) style buffering.
-    So, TRDOS v1.0 style buffering (FAT buffer -3sectors-, Directory Buffer, Sector Buffer) will not be
+    So, TRDOS v1.0 style buffering (FAT buffer -3 sectors-, Directory Buffer, Sector Buffer) will not be
     used after version 2.0.10 (version 2.0.10 is the last update of TRDOS 386 version 2.0) 
    ((Even if it is written as v2.0.10 modifications on source code pages.. 
      there are two versions of 2.0.10, one of them is v2.1 pre-work.))
