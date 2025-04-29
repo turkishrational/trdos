@@ -2357,7 +2357,7 @@ ude_3:
 	; Note:
 	; (FAT file system buffer flush never returns with error)
 	; If there is a buffer write error, it is marked on the LDRVT.
-	; LD_MediaByte bit 7 (buffer write error flag) will be set.
+	; LD_MediaChanged bit 7 (buffer write error flag) will be set.
 	;
 	;pop	ebx
 	;mov	eax, ERR_DEV_ACCESS ; (MSDOS -> error_access_denied)
