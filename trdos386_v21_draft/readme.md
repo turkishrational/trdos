@@ -13,9 +13,9 @@ What are being changed:
 What will be different for 386 DOS v1.0 than TRDOS 386 v2.1:
    * 386 DOS v1.0 kernel will be used with external command interpreter (as similar to a simple command.com)
     -imagine that, it will run as a 32 bit protected mode command.com (as simplified)-
-    --possible name of it will be 'main.prg'--
+    --possible name of it will be 'main.prg'-- (Possible Alternative: unix type shell, 'shell.prg')
    * TRDOS 386 v2.1 will continue to use internal command interpreter ('mainprog' section of the kernel).
-   * Both will have internationalization support (like as msdos internationalization method and content)
+   * Both will have internationalization support (like as msdos internationalization method and content).
    * Keyboard map, character font and date-time-currency display format will be depended on configuration.
      But internationalization will be done via 'syscountry' system call before multi tasking is enabled.
      (If multi tasking is enabled via 'sysemt' system call. Modification will be prohibited except process 1.)
