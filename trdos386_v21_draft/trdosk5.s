@@ -2350,11 +2350,18 @@ ude_3:
 	mov	ah, 1	; bit 0 = 1 -> do not invalidate buffers 
 	; (MSDOS -> FLUSHBUF)
 	call	FlushBuffers
-	jnc	short ude_4
-
-	pop	ebx
-	mov	eax, ERR_DEV_ACCESS ; (MSDOS -> error_access_denied)
-	retn
+	; 29/04/2025
+	;jnc	short ude_4
+	;
+	; 29/04/2025
+	; Note:
+	; (FAT file system buffer flush never returns with error)
+	; If there is a buffer write error, it is marked on the LDRVT.
+	; LD_MediaByte bit 7 (buffer write error flag) will be set.
+	;
+	;pop	ebx
+	;mov	eax, ERR_DEV_ACCESS ; (MSDOS -> error_access_denied)
+	;retn
 ude_4:
 	call	update_fat32_fsinfo
 
@@ -3287,7 +3294,7 @@ FlushBuffers:
 	; OUTPUT:
 	;	none
 	;
-	;	if cf = 1 -> edx = LDRVT addr for failed drive
+	;	(if cf = 1 -> edx = LDRVT addr for failed drive)
 	;
 	; Modified registers:
 	;	EBX, ECX, EDX, ESI
