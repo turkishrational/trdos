@@ -18,6 +18,6 @@ What will be different for 386 DOS v1.0 than TRDOS 386 v2.1:
    * Both will have internationalization support (like as msdos internationalization method and content).
    * Keyboard map, character font and date-time-currency display format will be depended on configuration.
      But internationalization will be done via 'syscountry' system call before multi tasking is enabled.
-     (If multi tasking is enabled via 'sysemt' system call. Modification will be prohibited except process 1.)
+     (If multi tasking is enabled via 'sysemt' system call, modification will be prohibited except process 1.)
 
 Erdogan Tan - 29/04/2025
