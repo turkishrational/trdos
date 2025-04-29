@@ -3203,7 +3203,7 @@ BUFWRITE:
 	;	Buffer marked free
 	;
 	;	if cf = 1 -> eax = error code
-	;		  -> edx = LDRTVT addr for failed drive
+	;		  -> edx = LDRVT addr for failed drive
 	;
 	; Modified registers:
 	;	EAX, EBX, ECX, EDX
@@ -3284,7 +3284,7 @@ FlushBuffers:
 	; OUTPUT:
 	;	none
 	;
-	;	if cf = 1 -> edx = LDRTVT addr for failed drive
+	;	if cf = 1 -> edx = LDRVT addr for failed drive
 	;
 	; Modified registers:
 	;	EBX, ECX, EDX, ESI
@@ -3359,7 +3359,7 @@ CHECKFLUSH:
 	; OUTPUT:
 	;	none
 	;
-	;	if cf = 1 -> edx = LDRTVT addr for failed drive
+	;	if cf = 1 -> edx = LDRVT addr for failed drive
 	;
 	; Modified registers:
 	;	EBX, ECX, EDX
