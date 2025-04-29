@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 28/04/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 29/04/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -3267,178 +3267,125 @@ bufwrt_3:
 bufwrt_4:
 	retn
 
-burada kaldým...
+ --------------------------------------------------------------------
 
+; 29/04/2025 - TRDOS 386 v2.0.10
 
-;Break	<FLUSHBUF -- WRITE OUT DIRTY BUFFERS>
-;----------------------------------------------------------------------------
-; Input:
-;	DS = DOSGROUP
-;	AL = Physical unit number local buffers only
-;	   = -1 for all units and all remote buffers
-; Function:
-;	Write out all dirty buffers for unit, and flag them as clean
-;	Carry set if error (user FAILed to I 24)
-;	    Flush operation completed.
-; DS Preserved, all others destroyed (ES too)
-;----------------------------------------------------------------------------
+FlushBuffers:
+	; 29/04/2025
+	; (MSDOS -> FLUSHBUF) - Ref: Retro DOS v5 - ibmdos7.s
+	; Write out all dirty buffers for disk and flag them as clean
+	;
+	; INPUT:
+	;	AL = Physical drive/disk number
+	;	   = -1 for all drives
+	;	AH = bit 0 = 0 -> invalidate all buffers
+	;	   = bit 0 = 1 -> do not invalidate
+	; OUTPUT:
+	;	none
+	;
+	;	if cf = 1 -> edx = LDRTVT addr for failed drive
+	;
+	; Modified registers:
+	;	EBX, ECX, EDX, ESI
 
-	; 20/05/2019 - Retro DOS v4.0
-	; DOSCODE:9A35h (MSDOS 6.21, MSDOS.SYS)
+	; Note: if AL = -1 all of disk buffers will be invalidated
+	;	after writing
+	;	Otherwise, no_invalidate flag (AH) will be checked 	
 
-	; 27/11/2022 - Retro DOS v4.0 (Modified MSDOS 5.0 MSDOS.SYS)
-	; DOSCODE:99DAh (MSDOS 5.0, MSDOS.SYS)
+	;call	GETCURHEAD ; (MSDOS)
+	call	GetCurrentHead
 
-	; 06/03/2024 - Retro DOS v5.0 (Modified PCDOS 7.1 IBMDOS.COM)
-	; PCDOS 7.1 IBMDOS.COM - DOSCODE:0AC2Bh
+	cmp	al, -1
+	je	short scan_buf_queue
 
+	test	ah, 1
+	jz	short scan_buf_queue	; invalidate all buffers
 
-no_invalidate flag eklenmeli...
-
-FLUSHBUF:
-	; MSDOS 6.0
-	call	GETCURHEAD
-	;TEST	word [ss:DOS34_FLAG],FROM_DISK_RESET ; from disk reset ? ;hkn;
-	TEST	byte [ss:DOS34_FLAG],FROM_DISK_RESET ; 4
-	jnz	short scan_buf_queue
-	cmp	word [ss:DirtyBufferCount],0			;hkn;
+	cmp	dword [DirtyBufferCount], 0
 	je	short end_scan
 	
 scan_buf_queue:
 	call	CHECKFLUSH
+	;jc	short dont_free_the_buf ; already invalidated
+	; 29/04/2025
+	jc	short flushbuf_err
 
-hata alýnan dirty buffera ne yapýlacaðýnýn
-flagý olacak.
+	cmp	al, -1
+	je	short free_the_buf	; invalidate all buffers
 
-	;push	ax  ; MSDOS 3.3
-	; MSDOS 6.0
-	;mov	ah,[di+4]
-	mov	ah,[DI+BUFFINFO.buf_ID]
-	cmp	[SS:WPERR],ah					;hkn;
-	je	short free_the_buf
-	;TEST	word [ss:DOS34_FLAG],FROM_DISK_RESET ; from disk reset ? ;hkn;
-	TEST	byte [ss:DOS34_FLAG],FROM_DISK_RESET ; 4
-	jz	short dont_free_the_buf
-	; MSDOS 3.3
-	;;mov	al,[di+4]
-	;mov	al,[DI+BUFFINFO.buf_ID]
-	;cmp	[SS:WPERR],al					;hkn;
-	; 15/08/2018
-	;jne	short dont_free_the_buf	
+	test	ah, 1
+	jnz	short dont_free_the_buf ; do not invalidate
+
+	; 29/04/2025
+	; invalidate buffers only for the requested physical disk
+	cmp	al, [esi+BUFFINFO.buf_ID]
+	jne	short dont_free_the_buf	; not same disk/drive
+
 free_the_buf:
-	; MSDOS 6.0 (& MSDOS 3.3)
-	mov	word [DI+BUFFINFO.buf_ID],00FFh
-dont_free_the_buf:
-	;pop	ax  ; MSDOS 3.3 	   	
+	; free the buffer (invalidate) 
+	mov	dword [esi+BUFFINFO.buf_ID], 0FFh
 
-	; MSDOS 3.3
-	;mov	di,[DI]
-	;;mov	di,[DI+BUFFINFO.buf_link] ; .buf_next
-	;
-	; 15/08/2018
-	;lds	di,[di]
-	;
-	;cmp	di,-1 ; 0FFFFh
-	;jnz	short scan_buf_queue 
-	
-	; MSDOS 6.0
-	mov	di,[di]
-	;mov	di,[DI+BUFFINFO.buf_next] ; .buf_link
-	cmp	di,[SS:FIRST_BUFF_ADDR]				;hkn;
+dont_free_the_buf:
+	mov	esi, [esi]
+	;mov	esi, [esi+BUFFINFO.buf_next] ; .buf_link
+	cmp	esi, [FIRST_BUFF_ADDR]
 	jne	short scan_buf_queue
 
 end_scan:
-	push	ss
-	pop	ds
-	; 01/08/2018 - Retro DOS v3.0
-	;cmp	byte [FAILERR],0
-	;jne	short bad_flush
-	;retn
-;bad_flush:
-	;stc
-	;retn
-
-	; 17/12/2022
-	; 27/11/2022 MSDOS 5.0 MSDOS.SYS compatibility)
-	; 01/08/2018 - Retro DOS v3.0
-	cmp	byte [FAILERR],1
-	cmc
-flushbuf_retn:
 	retn
-	
-	; 17/12/2022
-	; 27/11/2022 MSDOS 5.0 MSDOS.SYS compatibility)
-	;cmp	byte [FAILERR],0
-	;jne	short bad_flush
-	;retn
-;bad_flush:
-	;stc
-	;retn
 
-;----------------------------------------------------------------------------
-;
-; Procedure Name : CHECKFLUSH
-;
-; Inputs : AL - Drive number, -1 means do not check for drive
-;	   DS:DI - pointer to buffer
-;
-; Function : Write out a buffer if it is dirty
-;
-; Carry set if problem (currently user FAILed to I 24)
-;
-;----------------------------------------------------------------------------
+	; 29/04/2025
+flushbuf_err:
+	; set disk (buffer) write error flag (bit 7)
+	; edx = logical dos drive table address (from CHECKFLUSH)
+	or	[edx+LD_MediaChanged], 80h
+	jmp	short dont_free_the_buf ; already invalidated
 
-	; 07/03/2024 - Retro DOS v5.0 (Modified PCDOS 7.1 IBMDOS.COM)
+ --------------------------------------------------------------------
+
+; 29/04/2025 - TRDOS 386 v2.0.10
 
 CHECKFLUSH:
-	; MSDOS 6.0
-	mov	ah,-1	; 01/08/2018 Retro DOS v3.0
-	;cmp	[di+4],ah
-	CMP	[DI+BUFFINFO.buf_ID],AH
-	jz	short flushbuf_retn	; Skip free buffer, carry clear
-	CMP	AH,AL			; 
-	JZ	short DOBUFFER		; do this buffer
-	;cmp	al,[di+4]
-	CMP	AL,[DI+BUFFINFO.buf_ID]
-	CLC
-	jnz	short flushbuf_retn	; Buffer not for this unit or SFT
+	; 29/04/2025
+	; (MSDOS -> CHECKFLUSH) - Ref: Retro DOS v5 - ibmdos7.s
+	; Write out a buffer if it is dirty
+	;
+	; INPUT:
+	;	AL = Physical drive/disk number
+	;	   = -1 for all drives (do not check drive number)
+	;      ESI = Buffer header address
+	;
+	; OUTPUT:
+	;	none
+	;
+	;	if cf = 1 -> edx = LDRTVT addr for failed drive
+	;
+	; Modified registers:
+	;	EBX, ECX, EDX
 
-	; 07/03/2024 (PCDOS 7.1 IBMDOS.COM)
-	;;;
-	xor	bx,bx
-	mov	bl,al
-	;test	ss:drive_flags[bx],8 
-	test	byte [ss:bx+drive_flags],8 ; bit 3
-	jnz	short flushbuf_retn
-	;;;
+CHECKFLUSH:
+	push	eax
+	mov	ah, -1
+	cmp	[esi+BUFFINFO.buf_ID], ah ; -1
+	je	short chk_flush_2	; Skip free buffer, cf = 0
+	cmp	al, ah	; cmp al, -1
+	je	short chk_flush_1	; do this buffer
 
-DOBUFFER:
-	;test	byte [di+5],40h
-	TEST	byte [DI+BUFFINFO.buf_flags],buf_dirty
-	jz	short flushbuf_retn	; Buffer not dirty, carry clear by TEST
-	PUSH	AX
-	;push	word [di+4]
-	PUSH	WORD [DI+BUFFINFO.buf_ID]
+	cmp	al, [esi+BUFFINFO.buf_ID]
+	clc				; cf = 0
+	jne	short chk_flush_2	; Buffer not for this drive/disk
+chk_flush_1:
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+	jz	short chk_flush_2	; Buffer not dirty, cf = 0
 
-burada kaldým...
-push dword olacak
-
-	CALL	BUFWRITE
-
-pop eax olacak
-
-	POP	AX
-	JC	short LEAVE_BUF		; Leave buffer marked free (lost).
-	;and	ah,0BFh
-	AND	AH,~buf_dirty		; Buffer is clean, clears carry
-	;mov	[di+4],ax
-	MOV	[DI+BUFFINFO.buf_ID],AX
-
-þöyle olacak:
-MOV [esi+BUFFINFO.buf_ID], eax
-
-
-LEAVE_BUF:
-	POP	AX			; Search info
-checkflush_retn:
+	push	dword [esi+BUFFINFO.buf_ID]
+	call	BUFWRITE
+	pop	eax
+	jc	short chk_flush_2	; Leave buffer marked free (lost).
+	
+	and	ah, ~buf_dirty		; Buffer is clean, cf = 0
+	mov	[esi+BUFFINFO.buf_ID], eax
+chk_flush_2:
+	pop	eax
 	retn
