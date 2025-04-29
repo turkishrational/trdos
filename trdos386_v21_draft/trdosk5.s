@@ -2247,6 +2247,7 @@ get_last_section:
 ; 21/04/2025 - TRDOS 386 v2.0.10
 
 update_directory_entry:
+	; 29/04/2025
 	; 27/04/2025
 	; 24/04/2025
 	; 21/04/2025
@@ -2345,6 +2346,8 @@ ude_2:
 	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
 ude_3:
 	mov	al, [edx+LD_PhyDrvNo]
+	; 29/04/2025
+	mov	ah, 1	; bit 0 = 1 -> do not invalidate buffers 
 	; (MSDOS -> FLUSHBUF)
 	call	FlushBuffers
 	jnc	short ude_4
