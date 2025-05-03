@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - SYS INIT : trdosk1.s
 ; ----------------------------------------------------------------------------
-; Last Update: 17/04/2025 (Previous: 26/09/2024, v2.0.9)
+; Last Update: 03/05/2025 (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -780,20 +780,21 @@ stime1:
 
 ; ----------------------------------------------------------------------
 
+	; 03/05/2025
 	; 17/04/2025 - TRDOS 386 v2.0.10
 	; ref: Retro DOS v5.0 (PCDOS 7.1)
 set_buffers:
 	; input: none
 	; output: buffers Queue established
 	mov	edi, BUFFERS
-	mov	[Buff_Queue], edi		; head of Buff Q
+	mov	[BufferQueue], edi		; head of Buff Q
 	xor	ecx, ecx ; 0
-	mov	[Dirty_Buff_Count], ecx ; 0	; set dirty_count to 0.
+	mov	[DirtyBufferCount], ecx ; 0	; set dirty_count to 0.
 	mov	[buf_prev_off], ecx ; 0
 
 	;mov	ecx, nbuf			; number of buffers
 	mov	cl, nbuf
-	mov	edx, bufinsiz + 512 ; 536	; space for one buffer
+	mov	edx, BUFINSIZ + 512 ; 536	; space for one buffer
 nxt_buff:
 	call	set_buffer_info 		; set buf_link,buf_id...
 	loop	nxt_buff
