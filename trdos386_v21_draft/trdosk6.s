@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 24/04/2025  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 03/05/2025  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2494,6 +2494,7 @@ sysread: ; < read from file >
 	jnc	short sysread_0
 
 sysrw_err:	; 03/09/2024
+device_rw_error: ; 03/05/2025	
 	mov	[u.r0], eax ; error code
 	jmp	error
 	 
@@ -2592,6 +2593,7 @@ rw0: ; 1:
 	; 17/04/2021 (temporary)
 device_write:
 device_read:
+	; 03/05/2025
 	; 24/04/2025 - TRDOS 386 v2.0.10
 	; 26/09/2024
 	; 18/09/2024 - TRDOS 386 v2.0.9
@@ -2609,6 +2611,9 @@ device_read:
 	;;jmp	error
 	;; 26/09/2024
 	;jmp	short sysrw_err
+	; 03/05/2025 - Temporary !
+	mov	eax, ERR_DEV_ACCESS ; 11
+			; 'permission denied !' error 
 	jmp	device_rw_error
 
 ;	test	cl, 1 ; 1 = read, 2 = write, 3 = read&write

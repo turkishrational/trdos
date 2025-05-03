@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - DEFINITIONS : trdosk0.s
 ; ----------------------------------------------------------------------------
-; Last Update: 17/04/2025 (Previous: 29/02/2016, v2.0.0)
+; Last Update: 03/05/2025 (Previous: 29/02/2016, v2.0.0)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -318,7 +318,7 @@ endstruc
 				;buf_offset in the file and contains
 				;buf_fill bytes.
 
-bufinsiz	equ	BUFFINFO.size	; Size of structure in bytes
+BUFINSIZ	equ	BUFFINFO.size	; Size of structure in bytes
 
 
 buf_Free	equ	0FFh		; buf_id of free buffer
@@ -336,8 +336,21 @@ buf_isDIR	EQU	00000100B
 buf_isFAT	EQU	00000010B
 buf_type_0	EQU	11110001B	; AND sets type to "none"
 
-buf_NetID	EQU	bufinsiz
+;buf_NetID	EQU	BUFINSIZ
 
 ; 17/04/2025
-BUFFERS		EQY	Cluster_Buffer ; start address of disk buffers
+BUFFERS		EQU	Cluster_Buffer ; start address of disk buffers
+
+; 03/05/2025
+; directory entry size
+dir_entry.size  equ 32
+
+; directory entry attributes
+attr_read_only	EQU	1h
+attr_hidden	EQU	2h
+attr_system	EQU	4h
+attr_volume_id	EQU	8h
+attr_directory	EQU	10h
+attr_archive	EQU	20h
+attr_device	EQU	40h
 

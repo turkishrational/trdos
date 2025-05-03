@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 24/04/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 03/05/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -794,10 +794,10 @@ reset:		resb 1	; AC97 init
 
 ; 28/08/2017
 ; 20/08/2017
-		;resb 1 ;
 dma_user:	resb 1	; user number for sysdma
 dma_channel:	resb 1	; dma channel for sysdma
 dma_mode:	resb 1  ; dma mode for sysdma
+
 dma_addr:	resd 1	; dma buffer physical addr for sysdma
 dma_size:	resd 1  ; dma buffer size (in bytes) for sysdma
 dma_start:	resd 1  ; dma start address for sysdma
@@ -814,7 +814,26 @@ sb16_dma_buffer: resb 65536 ; DMA buffer for sb16 audio playing.
 %endif
 
 ; 17/04/2024 - TRDOS 386 v2.0.10
-Buff_Queue:	resd 1
-Dirty_Buff_Count:
-		resd 1
+BufferQueue:	resd 1	; (MSDOS -> BufferQueue)
+DirtyBufferCount:
+		resd 1	; (MSDOS -> DirtyBufferCount)
 buf_prev_off:	resd 1
+
+; 03/05/2025
+LastBuffer:	resd 1 	; (MSDOS -> LastBuffer)
+FIRST_BUFF_ADDR:
+		resd 1	; (MSDOS -> FIRST_BUFF_ADDR)
+CL0FATENTRY	resd 1	; (MSDOS -> CL0FATENTRY)
+
+CurrentBuffer:	resd 1	; (MSDOS -> CURCUF)
+CLUSNUM:	resd 1	; (MSDOS -> CLUSNUM)
+ClusSec:	resd 1	; (MSDOS -> CLUSSEC)
+ClusSave:	resd 1	; (MSDOS -> CLUSSAVE)
+DIRSTART:	resd 1	; (MSDOS -> DIRSTART)
+DIRSEC:		resd 1	; (MSDOS -> DIRSEC) 	
+pre_read:	resb 1	; (MSDOS -> PREREAD)
+ClusSplit:	resb 1	; (MSDOS -> CLUSSPLIT)
+CLUSFAC:	resb 1	; (MSDOS -> CLUSFAC)
+SECCLUSPOS:	resb 1	; (MSDOS -> SECCLUSPOS)
+NXTCLUSNUM:	resd 1	; (MSDOS -> NXTCLUSNUM)
+SRCH_CLUSTER:	resd 1	; (MSDOS -> SRCH_CLUSTER)	

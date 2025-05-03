@@ -2452,7 +2452,7 @@ getb_3:
 
 	mov	bp, [edx+LD_BPB+BPB_FATSz16] ; FAT size in sectors
 
-	cmp	[edx+LD_FATType], 2	; FAT32 ?
+	cmp	byte [edx+LD_FATType], 2 ; FAT32 ?
 	jna	short getb_4		; no
 
 	test	byte [edx+LD_BPB+BPB_ExtFlags], 80h
@@ -2477,7 +2477,7 @@ getb_6:
 	jmp	short getb_0
 
 getb_7:
-	cmp	[esi+BUFFINFO.buf_ID], 0FFh ; -1 ; Free buffer ?
+	cmp	byte [esi+BUFFINFO.buf_ID], 0FFh ; -1 ; Free buffer ?
 	jne	short getb_8		; no
 
 	mov	ebp, esi		; save buffer address
@@ -2565,7 +2565,7 @@ getb_13:
 	mov	[esi+BUFFINFO.buf_ID], cx ; set ID and flags
 	mov	ch, [pre_read]	; bit 0 -> fat buffer flag
 				; bit 7 -> no pre-read flag
-	jmp	short getb_3				
+	jmp	getb_3				
 
 ; --------------------------------------------------------------------
 
@@ -2580,7 +2580,7 @@ GetCurrentHead:
 	; OUTPUT:
 	;	esi = the first buffer address in Queue
 	;	FIRST_BUFF_ADDR = esi
-	;	LASTBUFFER = -1
+	;	LastBuffer = -1
 	;
 	; Modified registers:
 	;	esi
@@ -2748,7 +2748,7 @@ MAPCLUSTER:
 	; Modified registers:
 	;	eax, ecx, ebx, esi, edi, ebp
 
-	mov	[ClusNum], eax	; save current cluster number
+	mov	[CLUSNUM], eax	; save current cluster number
 
 	cmp	byte [edx+LD_FATType], 2
 	ja	short mapcl_2	; FAT32
@@ -2836,7 +2836,7 @@ mapcl_6:
 	retn
 
 mapcl_7:
-	test	byte [ClusNum], 1 ; odd ? 
+	test	byte [CLUSNUM], 1 ; odd ? 
 	jz	short mapcl_8 ; no, even	
 
 	; FAT12, high 12 bit
@@ -3071,7 +3071,7 @@ drd_skipped:
 	mov	[NXTCLUSNUM], eax
 
 	movzx	ebx, byte [SECCLUSPOS]
-	mov	eax, [ClusNum]
+	mov	eax, [CLUSNUM]
 
 	call	FIGREC
 	; eax = physical sector number
@@ -3092,7 +3092,7 @@ drd_fcluster:
 	mov	cl, [edx+LD_PhyDrvNo]
 	jmp	short drd_getbuf
 
- --------------------------------------------------------------------
+; --------------------------------------------------------------------
 
 ; 27/04/2025 - TRDOS 386 v2.0.10
 
@@ -3129,7 +3129,7 @@ IsEOF_FAT32:
 	cmp	eax, 0FFFFFF8h
 	retn	
 
- --------------------------------------------------------------------
+; --------------------------------------------------------------------
 
 ; 28/04/2025 - TRDOS 386 v2.0.10
 
@@ -3157,7 +3157,7 @@ FATSECRD:
 	cmp	byte [esi+LD_FATType], 2
 	jna	short fatsecrd_1 ; not FAT32
 
-	test	[esi+LD_BPB+BPB_ExtFlags], 80h
+	test	byte [esi+LD_BPB+BPB_ExtFlags], 80h
 	jz	short fatsecrd_1
 	mov	cl, 1 ; only one FAT is active
 fatsecrd_1:
@@ -3198,7 +3198,7 @@ fatsecrd_4:
 	add	eax, edx
 	jmp	short fatsecrd_1
 
- --------------------------------------------------------------------
+; --------------------------------------------------------------------
 
 ; 28/04/2025 - TRDOS 386 v2.0.10
 
@@ -3277,7 +3277,7 @@ bufwrt_3:
 bufwrt_4:
 	retn
 
- --------------------------------------------------------------------
+; --------------------------------------------------------------------
 
 ; 29/04/2025 - TRDOS 386 v2.0.10
 
@@ -3349,10 +3349,10 @@ end_scan:
 flushbuf_err:
 	; set disk (buffer) write error flag (bit 7)
 	; edx = logical dos drive table address (from CHECKFLUSH)
-	or	[edx+LD_MediaChanged], 80h
+	or	byte [edx+LD_MediaChanged], 80h
 	jmp	short dont_free_the_buf ; already invalidated
 
- --------------------------------------------------------------------
+; --------------------------------------------------------------------
 
 ; 29/04/2025 - TRDOS 386 v2.0.10
 
@@ -3398,4 +3398,11 @@ chk_flush_1:
 	mov	[esi+BUFFINFO.buf_ID], eax
 chk_flush_2:
 	pop	eax
+	retn
+
+; --------------------------------------------------------------------
+
+; 03/05/2025 - TRDOS 386 v2.0.10
+
+update_fat32_fsinfo:
 	retn
