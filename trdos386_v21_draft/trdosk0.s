@@ -354,3 +354,25 @@ attr_directory	EQU	10h
 attr_archive	EQU	20h
 attr_device	EQU	40h
 
+; 03/05/2025 - TRDOS 386 v2.0.10
+; 03/02/2024 - Retro DOS v5.0
+; --------------------------------
+; FAT32 FSInfo Sector Structure
+; --------------------------------
+; ref: Microsoft FAT32 File System Specification (2000)
+
+struc FSINFO		; Offset ;
+.LeadSig:	resb 4	  ; 0		; Value 0x41615252. Lead Signature.
+.Reserved1:	resb 480  ; 4		; Reserved. Must be 0. Never be used.
+.StrucSig:	resb 4	  ; 484		; Value 0x61417272. Fields Signature.
+.Free_Count:	resb 4	  ; 488		; Last known free cluster count. (*) 
+.Nxt_Free:	resb 4	  ; 492		; Start clus for free clus srch. (**)
+.Reserved2:	resb 12	  ; 496		; Reserved. Must be 0. Never be used.
+.TrailSig:	resb 4	  ; 508		; Value 0xAA550000. Trail Signature.
+.size:
+endstruc
+
+; 03/05/2025
+FAT32_FreeClusters   equ BPB_Reserved ; 52
+FAT32_FirstFreeClust equ BPB_Reserved+4 ; 56 ; (NextFreeCluster)
+

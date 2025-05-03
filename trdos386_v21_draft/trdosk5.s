@@ -2247,6 +2247,7 @@ get_last_section:
 ; 21/04/2025 - TRDOS 386 v2.0.10
 
 update_directory_entry:
+	; 03/05/2025
 	; 29/04/2025
 	; 27/04/2025
 	; 24/04/2025
@@ -2345,6 +2346,9 @@ ude_2:
 
 	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
 ude_3:
+	; 03/05/2025
+	push	edx ; LDRVT address
+
 	mov	al, [edx+LD_PhyDrvNo]
 	; 29/04/2025
 	mov	ah, 1	; bit 0 = 1 -> do not invalidate buffers 
@@ -2363,6 +2367,9 @@ ude_3:
 	;mov	eax, ERR_DEV_ACCESS ; (MSDOS -> error_access_denied)
 	;retn
 ude_4:
+	; 03/05/2025
+	pop	esi ; LDRVT address
+
 	call	update_fat32_fsinfo
 
 	pop	ebx
@@ -3306,6 +3313,8 @@ FlushBuffers:
 	;call	GETCURHEAD ; (MSDOS)
 	call	GetCurrentHead
 
+	call	BUFWRITE
+
 	cmp	al, -1
 	je	short scan_buf_queue
 
@@ -3405,4 +3414,94 @@ chk_flush_2:
 ; 03/05/2025 - TRDOS 386 v2.0.10
 
 update_fat32_fsinfo:
+	; 03/05/2025
+	; Ref: Retro DOS v5 - ibmdos7.s
+	; (PCDOS 7.1, Retrodos v5 -> update_fat32_fsinfo)
+	;
+	; Update FAT32 fs info sector data
+	;
+	; INPUT:
+	;	ESI = Logical DOS Drive Description Table address
+	;
+	;	[esi+LD_BPB+FAT32_FreeClusters] = free cluster count
+	;	[esi+LD_BPB+FAT32_FirstFreeCluster] = 1st free clust
+	;
+	; OUTPUT:
+	;	if cf = 0 and EAX = 0 ->
+	;		FSINFO sector is not valid or not updated
+	;
+	;	if cf = 0 and EAX > 0 ->
+	;		eax = physical address of the FSINFO sector
+	;		which is suscessfully written/updated		
+	;
+	;	if cf = 1 -> EAX = (disk io/rw) error code
+	;
+	; Modified registers:
+	;	EAX, EBX, ECX, EDX
+
+	cmp	byte [esi+LD_FATType], 3 ; FAT32 fs ?
+	jne	short u_fat32_fsi_2 ; no, nothing to do
+
+	push	esi
+	call	GetCurrentHead	; (MSDOS -> GETCURHEAD)
+	call	BUFWRITE
+	jnc	short u_fat32_fsi_1		
+	pop	esi
+	retn
+
+u_fat32_fsi_1:
+	lea	ebx, [esi+BUFINSIZ]
+	pop	esi
+	movzx	eax, word [esi+LD_BPB+FAT32_FSInfoSec]
+	add	eax, [esi+LD_StartSector]
+
+	mov	[CFS_FAT32FSINFOSEC], eax
+
+	push	ebx
+	call	DREAD	; read fs info sector
+	pop	ebx
+	jc	short u_fat32_fsi_3
+
+	;cmp	dword [ebx+FSINFO.LeadSig], 41615252h
+	cmp	dword [ebx], 41615252h ; 'RRaA' ; (NASM syntax)
+	jne	short u_fat32_fsi_2
+
+	;cmp	dword [ebx+484], 61417272h
+	cmp	dword [ebx+FSINFO.StrucSig], 61417272h ; 'rrAa'
+	je	short u_fat32_fsi_4
+
+u_fat32_fsi_2:
+	xor	eax, eax
+	; eax = 0 -> no error
+
+u_fat32_fsi_3:
+	retn
+	
+u_fat32_fsi_4:
+	;cmp	dword [ebx+508], 0AA550000h
+	cmp	dword [ebx+FSINFO.TrailSig], 0AA550000h
+	jne	short u_fat32_fsi_2
+
+	mov	eax, [esi+LD_BPB+FAT32_FreeClusters]
+			; note: this reserved field is used to store free
+ 			;	cluster count but this field must be zero
+			;	on the disk (FAT32 volume boot sector)
+	; set free cluster count
+	mov	[ebx+FSINFO.Free_Count], eax ; BPB_Reserved ; 52
+	mov	eax, [esi+LD_BPB+FAT32_FirstFreeClust]
+			; note: this reserved field is used to store
+ 			;	the first free cluster number 
+			;	but this field must be zero on the disk
+			;		 (FAT32 volume boot sector)
+	; set first free cluster number to search
+	mov	[ebx+FSINFO.Nxt_Free], eax ; BPB_Reserved+4 ; 56
+
+	mov	eax, [CFS_FAT32FSINFOSEC]
+	
+	;push	ebx
+	call	DWRITE
+	;pop	ebx
+	jc	short u_fat32_fsi_3
+
+	mov	eax, [CFS_FAT32FSINFOSEC]
 	retn
