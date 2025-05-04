@@ -238,14 +238,18 @@ load_FAT_sectors_ok:
 	; edx = LDRVT address
 	; eax = next cluster number
 	call	IsEOF
-	jc	short gnc_@
+	jc	short gnc_ok ; cf = 1
+gnc_eof:
 	; end of cluster chain
 	xor	eax, eax
-	stc
+	; cf = 0
+gnc_ok:
+	cmc ; cf = 1 -> cf = 0
+	    ; cf = 0 -> cf = 1
 gnc_@:
 	; if cf = 0 -> 
 	;    eax = next cluster number ; eax = 0 -> free
-	; if cf = 1 -> eax = error code
+	; if cf = 1 -> eax = error code ; eax = 0 -> eof
 	; ecx = current (previous) cluster number
 
 	retn	
