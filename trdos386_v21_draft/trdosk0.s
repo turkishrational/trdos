@@ -338,8 +338,9 @@ buf_type_0	EQU	11110001B	; AND sets type to "none"
 
 ;buf_NetID	EQU	BUFINSIZ
 
+; 04/05/2025
 ; 17/04/2025
-BUFFERS		EQU	Cluster_Buffer ; start address of disk buffers
+BUFFERS		EQU	Directory_Buffer ; start address of disk buffers
 
 ; 03/05/2025
 ; directory entry size
