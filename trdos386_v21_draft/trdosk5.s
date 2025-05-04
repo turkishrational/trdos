@@ -13,6 +13,9 @@
 ; DRV_FAT.ASM (c) 2005-2011 Erdogan TAN [ 07/07/2009 ] Last Update: 21/08/2011
 
 get_next_cluster:
+	; 04/05/2025 (TRDOS 386 Kernel v2.0.10)
+	;	    -PCDOS/MSDOS style FAT fs handling-
+	;	    ((Ref: RetroDOS v5, 'ibmdos7.s'))
 	; 07/08/2022
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 15/10/2016
@@ -33,6 +36,8 @@ get_next_cluster:
 	;
 	; (Modified registers: EAX, ECX, EBX, EDX)
 
+; 04/05/2025 - TRDOS 386 v2.0.10
+%if 0
 	mov	[FAT_CurrentCluster], eax
 check_next_cluster_fat_type:
 	sub	edx, edx ; 0
@@ -218,6 +223,33 @@ load_FAT_sectors_ok:
 	mov	byte [FAT_BuffValidData], 1
 	mov	eax, [FAT_CurrentCluster]
         jmp     check_next_cluster_fat_type
+%else
+	; 04/05/2025
+	mov	edx, esi
+	push	esi
+	; edx = Logical DOS Drive Description Table address
+	; eax = Cluster Number (28bit for FAT32 fs)
+	call	MAPCLUSTER
+	; Modified registers: eax, ecx, ebx, esi, edi, ebp
+	pop	esi
+	mov	ecx, [CLUSNUM] ; current cluster number
+	jc	short gnc_@
+
+	; edx = LDRVT address
+	; eax = next cluster number
+	call	IsEOF
+	jc	short gnc_@
+	; end of cluster chain
+	xor	eax, eax
+	stc
+gnc_@:
+	; if cf = 0 -> 
+	;    eax = next cluster number ; eax = 0 -> free
+	; if cf = 1 -> eax = error code
+	; ecx = current (previous) cluster number
+
+	retn	
+%endif
 
 load_FAT_root_directory:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -432,7 +464,7 @@ read_cluster:
 	;	cf = 0 -> Cluster has been loaded at the buffer
 	;
 	; (Modified registers: EAX, ECX, EBX, EDX)
-	
+
 	movzx	ecx, byte [esi+LD_BPB+BPB_SecPerClust]
 	; CL = 1 = [esi+LD_FS_Reserved2] ; SectPerClust for Singlix FS
 
@@ -456,7 +488,7 @@ read_fat_file_sectors: ; 18/03/2016
 
 	call	disk_read
 	jnc	short rclust_retn
-	
+
 	; 15/10/2016 (15h -> 17)
 	mov	eax, 17 ; Drive not ready or read error !
 	retn
@@ -491,7 +523,9 @@ read_fs_sectors:
 	stc
 	retn
 
+get_next_free_cluster:	; 04/05/2025
 get_first_free_cluster:
+	; 04/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 02/03/2016
 	; 21/02/2016 (TRDOS 386 = TRDOS v2.0)
@@ -499,21 +533,25 @@ get_first_free_cluster:
 	; 10/07/2010
 	; INPUT ->
 	;	ESI = Logical DOS Drive Description Table address
+	;	EAX = start cluster number ; 04/05/2025
 	; OUTPUT ->
 	;	cf = 1 -> Error code in AL (EAX)
 	;	cf = 0 -> 
 	;	  EAX = Cluster number
 	;	  If EAX = FFFFFFFFh -> no free space
-	;	If the drive has FAT32 fs:
-	;	  EBX = FAT32 FSI sector buffer address (if > 0)
+	;	;;If the drive has FAT32 fs:
+	;	;;   EBX = FAT32 FSI sector buffer address (if > 0)
 	;
 	; (Modified registers: eax, ebx, ecx, edx)
 	;
 
-	mov	eax, [esi+LD_Clusters]
-	inc	eax ; add eax, 1
-	mov	[gffc_last_free_cluster], eax
+	; 04/05/2025
+	mov	ebx, [esi+LD_Clusters]
+	inc	ebx ; add ebx, 1
+	mov	[gffc_last_free_cluster], ebx
 
+; 04/05/2025 - TRDOS 386 v2.0.10
+%if 0
 	xor	ebx, ebx ; 0 ; 02/03/2016
 
 	cmp	byte [esi+LD_FATType], 2
@@ -621,6 +659,62 @@ loc_gffc_set_ffree_fat32_cluster:
 	;call	set_first_free_cluster
 	;retn
 	;jmp	short set_first_free_cluster
+
+%else
+	; 04/05/2025
+	; eax = start cluster number
+	; ebx = last cluster number
+
+	cmp	eax, ebx ; [gffc_last_free_cluster] 
+	jna	short gffc_1
+
+gffc_0:
+	mov	eax, 2 ; 1st cluster
+gffc_1:
+	mov	[gffc_first_free_cluster], eax
+
+gffc_2:
+	; eax = current (next) cluster number
+	call	get_next_cluster
+	jnc	short gffc_3
+	
+	or	eax, eax
+	jz	short gffc_7 ; eof
+
+	; error
+	cmc 	; stc
+	retn
+gffc_3:
+	and	eax, eax ; next cluster value
+	mov	eax, ecx
+	jnz	short gffc_4
+
+	; eax = first free cluster
+	retn
+gffc_4:
+	cmp	eax, [gffc_last_free_cluster]
+	jnb	short gffc_5
+
+	inc	eax ; add eax, 1
+	jmp	short gffc_2
+gffc_5:
+	mov	eax, [gffc_first_free_cluster]
+	cmp	eax, 2
+	ja	short gffc_6
+	sub	eax, eax
+	dec	eax ; FFFFFFFFh ; -1
+	retn
+gffc_6:
+	; scan previous FAT part (2 to start-1)
+	mov	eax, [gffc_first_free_cluster]
+	dec	eax
+	mov	[gffc_last_free_cluster], eax
+	jmp	short gffc_0
+gffc_7:
+	mov	eax, ecx
+	jmp	short gffc_4
+
+%endif
 
 set_first_free_cluster:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -753,7 +847,7 @@ update_cluster:
 	;
 	;
 	; (Modified registers: EAX, EBX, -ECX-, EDX)
-	
+
 	mov	[FAT_CurrentCluster], eax
 	mov	[ClusterValue], ecx
 
@@ -1180,7 +1274,7 @@ loc_update_fat32_buffer:
 	;;;
 	; 29/08/2024
 	and	ecx, 0FFFFFFFh ; 28 bit cluster value
-	;;; 
+	;;;
 	mov	[ebx], ecx ; 29/02/2016
 
 	mov	byte [FAT_BuffValidData], 2
@@ -1689,8 +1783,8 @@ truncate_cluster_chain:
 	; 	CF = 1 -> Error code in EAX (AL)
 
 	; NOTE: This procedure does not update lm date&time !
-	 
-loc_truncate_cc:	
+
+loc_truncate_cc:
 	xor	ecx, ecx ; mov ecx, 0
 	;mov	byte [FAT_BuffValidData], 0
 	mov	[FAT_ClusterCounter], ecx ; 0 ; reset
@@ -1782,7 +1876,7 @@ set_fat32_fsinfo_sector_parms:
 	jc	short update_fat32_fsinfo_sector_retn
 
 	mov	eax, [esi+LD_BPB+BPB_Reserved] ; Free Cluster Count
-	mov	edx, [esi+LD_BPB+BPB_Reserved+4] ; First free Cluster	
+	mov	edx, [esi+LD_BPB+BPB_Reserved+4] ; First free Cluster
 
         ;mov	ebx, DOSBootSectorBuff
 	mov	[ebx+488], eax
@@ -1810,7 +1904,7 @@ get_fat32_fsinfo_sector_parms:
 	;	ESI = Logical dos drive description table address
 	; OUTPUT ->
 	;	ESI = Logical dos drive description table address
-	;	EBX = FSINFO sector buffer address (DOSBootSectorBuff)	
+	;	EBX = FSINFO sector buffer address (DOSBootSectorBuff)
 	;	CF = 0 -> OK..
 	;	   EAX = FsInfo sector address
 	;	   ECX = Free cluster count
@@ -1845,7 +1939,7 @@ get_fat32_fsinfo_sector_parms:
 
 	mov	eax, [CFS_FAT32FSINFOSEC]
 	mov	ecx, [ebx+488] ; free cluster count
-	mov	edx, [ebx+492] ; first (next) free cluster	
+	mov	edx, [ebx+492] ; first (next) free cluster
 
 	retn
 
@@ -1954,7 +2048,7 @@ loc_add_new_cluster_save_fcc:
 	;;;
 	; 27/08/2024
 	dec	eax ; (*)
-	;;;  
+	;;;
 	mov	[FAT_anc_FFCluster], eax
 
 ; 27/08/2024 (TRDOS 386 v2.0.9)
@@ -2099,7 +2193,7 @@ write_cluster:
 	;	cf = 0 -> Cluster has been written successfully
 	;
 	; (Modified registers: EAX, ECX, EBX, EDX)
-	
+
 	movzx	ecx, byte [esi+LD_BPB+BPB_SecPerClust] 
 	; CL = 1 = [esi+LD_FS_Reserved2] ; SectPerClust for Singlix FS
 
@@ -2119,7 +2213,7 @@ write_fat_file_sectors:
 	; ECX = Sector count
 	; EBX = Buffer address
 	; (EDX = 0)
-	; ESI = Logical DOS drive description table address	
+	; ESI = Logical DOS drive description table address
 
 	call	disk_write
 	jnc	short wclust_retn
@@ -2139,13 +2233,13 @@ write_fs_cluster:
 	
 	; EAX = Cluster number is sector index number of the file (eax)
 	
-	; EDX = File number is the first File Descriptor Table address 
+	; EDX = File number is the first File Descriptor Table address
 	;	of the file. (Absolute address of the FDT).
 	
 	; eax = sector index (0 for the first sector)
 	; edx = FDT0 address
 		; 64 KB buffer = 128 sectors (limit) 
-	;mov	ecx, 128 ; maximum count of sectors (before eof) 
+	;mov	ecx, 128 ; maximum count of sectors (before eof)
 	; 25/07/2022
 	sub	ecx, ecx
 	mov	cl, 128
@@ -2230,7 +2324,7 @@ get_last_section:
 	; 	EAX = FDT number/address of the last section
 	; 	EDX = Last sector of the section (0,1,2,3,4...)
 	;	[glc_index] = sector index number of the last sector
-	;		      (for file, not for the last section)  	
+	;		      (for file, not for the last section)
 	;		   	
 	;	cf = 1 -> Error code in AL (EAX)
 	;
@@ -2289,7 +2383,7 @@ update_directory_entry:
 	; (MSDOS -> LOCAL_CLOSE)
 	; ebx = system file number (MSDOS -> SFT number)
 	; edx = logical dos drive description table address
-	; edi = directory entry offset (in the directory buffer) 	
+	; edi = directory entry offset (in the directory buffer)
 
 	push	edx
 
@@ -2304,7 +2398,7 @@ update_directory_entry:
 	mul	ebx
 
 	pop	edx
-	
+
 	lea	esi, [eax+OF_NAME]
 	push	edi
 	call	MetaCompare	; (MSDOS -> MetaCompare)
@@ -2328,7 +2422,7 @@ ude_2:
 	mov	eax, [ebx+OF_FCLUSTER]
 	mov	[edi+DirEntry_FstClusLO], ax
 	shr	eax, 16
-	mov	[edi+DirEntry_FstClusHI], ax		
+	mov	[edi+DirEntry_FstClusHI], ax
 
 	mov	eax, [ebx+OF_DATETIME] ; lw = time, hw = date
 	mov	[edi+DirEntry_CrtTime], eax ; hw = DirEntry_CrtDate
@@ -2351,7 +2445,7 @@ ude_3:
 
 	mov	al, [edx+LD_PhyDrvNo]
 	; 29/04/2025
-	mov	ah, 1	; bit 0 = 1 -> do not invalidate buffers 
+	mov	ah, 1	; bit 0 = 1 -> do not invalidate buffers
 	; (MSDOS -> FLUSHBUF)
 	call	FlushBuffers
 	; 29/04/2025
@@ -2525,7 +2619,7 @@ getb_10:
 	; 28/04/2025
 	lea	ebx, [esi+BUFINSIZ]	; buffer data address
 	mov	esi, edx
-	
+
 	and	ch, ch			; fat sector ?
 	jz	short getb_12		; no
 
@@ -2566,7 +2660,7 @@ getb_13:
 	; ch = buf_flags
 	; esi = buffer address
 	; edx = logical dos drive table address
-	
+
 	mov	[esi+BUFFINFO.buf_sector], eax
 	mov	cl, [edx+LD_PhyDrvNo]	; physical drive number
 	mov	[esi+BUFFINFO.buf_ID], cx ; set ID and flags
@@ -2591,7 +2685,7 @@ GetCurrentHead:
 	;
 	; Modified registers:
 	;	esi
-		
+
 	mov	esi, [BufferQueue]	; pointer to the first buffer
 	mov	dword [LastBuffer], -1	; invalidate last buffer
 	mov	[FIRST_BUFF_ADDR], esi	; save first buffer address
@@ -2662,7 +2756,7 @@ MetaCompare:
 	; INPUT:
 	;	esi = 11 chars DirEntry format name with possible '?'
 	;	edi = 11 chars DirEntry format name, no '?'
-	;			(Directory Entry)	
+	;			(Directory Entry)
 	; OUTPUT:
 	;	Zero if match else NZ
 	;
@@ -2759,7 +2853,7 @@ MAPCLUSTER:
 
 	cmp	byte [edx+LD_FATType], 2
 	ja	short mapcl_2	; FAT32
-	
+
 	mov	byte [ClusSplit], 0
 	mov	ebx, eax
 
@@ -2843,8 +2937,8 @@ mapcl_6:
 	retn
 
 mapcl_7:
-	test	byte [CLUSNUM], 1 ; odd ? 
-	jz	short mapcl_8 ; no, even	
+	test	byte [CLUSNUM], 1 ; odd ?
+	jz	short mapcl_8 ; no, even
 
 	; FAT12, high 12 bit
 	shr	eax, 4
@@ -2881,7 +2975,7 @@ SETDIRSRCH:
 
 SETROOTSRCH_FAT32:
 	mov	eax, [edx+LD_BPB+FAT32_RootFClust]
-	
+
 	mov	ecx, [edx+LD_Clusters]  ; Last Cluster - 1
 	inc	ecx		; Last Cluster
 	cmp	eax, ecx
@@ -2899,7 +2993,7 @@ sds_fat32:
 	mov	[DIRSTART], eax
 	mov	cl, [edx+LD_BPB+BPB_SecPerClust]
 	mov	[CLUSFAC], cl
-	
+
 	call	UNPACK
 	jnc	short sdc_unp_ok
 	retn
@@ -2933,11 +3027,11 @@ SETROOTSRCH_FAT:
 	mov	[SECCLUSPOS], al ; 0
 
 	inc	eax
-	mov	[SRCH_CLUSTER], eax ; 1	
+	mov	[SRCH_CLUSTER], eax ; 1
 	dec	eax
 	dec	eax
 	mov	[CLUSNUM], eax ; -1
-	
+
 	mov	eax, [edx+LD_DATABegin]
 	mov	ebx, [edx+LD_ROOTBegin]
 
@@ -2968,8 +3062,8 @@ sdc_unp_ok:
 	; eax = physical sector number
 	;  cl = physical drive/disk number (not used here)
 	;
-	; CF = 0	
- 
+	; CF = 0
+
 	mov	[DIRSEC], eax
 	;clc
 	retn
@@ -3038,7 +3132,7 @@ DIRREAD:
 
 	cmp	[DIRSTART], ecx ; 0
 	jnz	short drd_subdir
-	
+
 	xchg	eax, ecx
 	jmp	short drd_doread2
 
@@ -3048,14 +3142,14 @@ drd_subdir:
 	dec	ebx	; cluster mask
 	and	ebx, eax
 	; ebx = sector position in the cluster
-	
+
 drd_sd_shift:
 	shr	cl, 1
 	jz	short drd_doread1
 	shr	eax, 1
 	jmp	short drd_sd_shift
 
-drd_doread1:		
+drd_doread1:
 	mov	ecx, eax
 drd_doread2:
 	; ecx = number of clusters to skip
@@ -3082,7 +3176,7 @@ drd_skipped:
 
 	call	FIGREC
 	; eax = physical sector number
-	;  cl = physical drive/disk number	
+	;  cl = physical drive/disk number
 drd_getbuf:
 	call	GetBuffer ; pre-read
 	jc	short drd_retn
@@ -3123,18 +3217,18 @@ IsEOF:
 
 IsEOF_FAT16:
 	cmp	eax, 0FFF8h
-	retn	
+	retn
 
 IsEOF_FAT12:
 	;cmp	eax, 0FF0h	; media byte: F0h
 	;je	short IsEOF_other
 	cmp	eax, 0FF8h
 ;IsEOF_other:
-	retn	
+	retn
 
 IsEOF_FAT32:
 	cmp	eax, 0FFFFFF8h
-	retn	
+	retn
 
 ; --------------------------------------------------------------------
 
@@ -3171,7 +3265,7 @@ fatsecrd_1:
 	push	eax ; *
 	push	ebx ; **
 	push	ecx ; ***
-	
+
 	;call	DSKREAD ; MSDOS (RetroDOS v5)
 	call	DREAD	; TRDOS 386 v2.0.10 (read one sector)
 		; mov ecx, 1
@@ -3266,7 +3360,7 @@ bufwrt_2:
 	pop	eax
 	jc	short bufwrt_3
 
-	inc	edx	
+	inc	edx
 bufwrt_3:
 	add	eax, [esi+BUFFINFO.buf_wrtcntinc]
 
@@ -3308,7 +3402,7 @@ FlushBuffers:
 
 	; Note: if AL = -1 all of disk buffers will be invalidated
 	;	after writing
-	;	Otherwise, no_invalidate flag (AH) will be checked 	
+	;	Otherwise, no_invalidate flag (AH) will be checked
 
 	;call	GETCURHEAD ; (MSDOS)
 	call	GetCurrentHead
@@ -3402,7 +3496,7 @@ chk_flush_1:
 	call	BUFWRITE
 	pop	eax
 	jc	short chk_flush_2	; Leave buffer marked free (lost).
-	
+
 	and	ah, ~buf_dirty		; Buffer is clean, cf = 0
 	mov	[esi+BUFFINFO.buf_ID], eax
 chk_flush_2:
@@ -3453,7 +3547,7 @@ update_fat32_fsinfo:
 			  ; and free count or ffc is not changed
 
 ; 04/05/2025
-%if 0	
+%if 0
 	push	esi
 	call	GetCurrentHead	; (MSDOS -> GETCURHEAD)
 	call	BUFWRITE

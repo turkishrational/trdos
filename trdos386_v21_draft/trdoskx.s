@@ -129,6 +129,8 @@ DirBuffer_Size: resw 1
 ; 18/01/2016
 
 FreeClusterCount: resd 1
+; 04/05/2025
+FirstFreeCluster: resd 1
 
 VolSize_Unit1:   resd 1
 VolSize_Unit2:   resd 1

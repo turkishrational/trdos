@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.8) - DRV INIT : trdosk2.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - DRV INIT : trdosk2.s
 ; ----------------------------------------------------------------------------
-; Last Update: 22/05/2024 (Previous: 29/08/2023)
+; Last Update: 04/05/2025 (Previous: 22/05/2024, v2.0.8)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -563,6 +563,7 @@ loc_minidisk_next_ep_lba_chs:
 	jmp	loc_validate_hde_partition_next
 
 validate_hd_fat_partition:
+	; 04/05/2025 (TRDOS 386 v2.0.5)
 	; 17/07/2020
 	; 15/07/2020
 	;	(optimization)
@@ -821,10 +822,14 @@ loc_set_hd_FAT_cluster_count:
 	; with 2 reserved clusters= EAX +2
 loc_set_hd_FAT_fs_free_sectors:
 	;mov	dword [esi+LD_FreeSectors], 0
+	; 04/05/2025
+	; eax > 0 -> initialization
+	;   (free clusters and first free cluster fields
+	;   will be initialized)
 	call	get_free_FAT_sectors
 	jc	short loc_validate_hd_FAT_partition_retn
 	mov	[esi+LD_FreeSectors], eax
-	mov	byte [esi+LD_MediaChanged], 6  ; Volume Name Reset
+	mov	byte [esi+LD_MediaChanged], 6 ; Volume Name Reset
 
 	; 15/07/2020
 	inc 	byte [Last_DOS_DiskNo] ; > 1
@@ -1042,6 +1047,7 @@ load_masterboot_ok:
 	retn
 
 get_free_FAT_sectors:
+	; 04/05/2025 (TRDOS 386 v2.0.10)
 	; 29/08/2023
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 21/12/2017
@@ -1058,14 +1064,36 @@ get_free_FAT_sectors:
 
 	xor	eax, eax
 	;mov	[esi+LD_FreeSectors], eax ; Reset
-	
-        cmp     byte [esi+LD_FATType], 2
-	jna	short loc_gfc_get_fat_free_clusters
 
+	; 04/05/2025
+	mov	 [FreeClusterCount], eax ; 0
+	dec	eax  ; mov eax, -1
+
+        cmp     byte [esi+LD_FATType], 2
+	;jna	short loc_gfc_get_fat_free_clusters
+	ja	short gffs_1
+gffs_0:
+	; invalidate free cluster count & first free cluster at first
+	;mov	[esi+LD_BPB+64], eax
+	mov	[esi+LD_BPB+FAT_FreeClusters], eax ; -1
+	;mov	[esi+LD_BPB+68], eax
+	mov	[esi+LD_BPB+FAT_FirstFreeClust], eax ; -1
+	inc	eax ; 0
+	jmp	short loc_gfc_get_fat_free_clusters
+gffs_1:
 	; 29/02/2016
-	dec	eax ; 0FFFFFFFFh
-	mov	[esi+LD_BPB+BPB_Reserved], eax ; Free cluster count (reset)
-	mov	[esi+LD_BPB+BPB_Reserved+4], eax ; First Free Cluster (reset)
+	;dec	eax ; 0FFFFFFFFh
+	; 04/05/2025
+	;mov	[esi+LD_BPB+BPB_Reserved], eax ; Free cluster count (reset)
+	mov	[esi+LD_BPB+FAT32_FreeClusters], eax ; -1
+	;mov	[esi+LD_BPB+BPB_Reserved+4], eax ; First Free Cluster (reset)
+	mov	[esi+LD_BPB+FAT32_FirstFreeClust], eax ; -1
+	; 04/05/2025
+	;mov	[esi+LD_BPB+BPB_Reserved+8], eax
+	mov	[esi+LD_BPB+FAT32_fsinfo_sector], eax ; -1
+
+; 04/05/2025
+%if 0
 	inc	eax ; 0
 	;
 	mov	ax, [esi+LD_BPB+BPB_FSInfo]
@@ -1092,49 +1120,127 @@ loc_gfc_check_fsinfo_signs:
 	jne	short retn_gfc_get_fsinfo_stc
 	;add	ebx, 4
 	;mov	eax, [ebx]
-	mov	eax, [ebx+488]
-	; 29/02/2016
-	mov	[esi+LD_BPB+BPB_Reserved], eax ; Free cluster count
-	mov	edx, [ebx+492] 
-	; 29/08/2023 (BugFix)
-	mov	[esi+LD_BPB+BPB_Reserved+4], edx ; First Free Cluster
-	; 21/12/2017
-	mov	ebx, eax ; (initial value = 0FFFFFFFFh)
-	inc	ebx ; 0FFFFFFFFh -> 0  
-	jnz	short short retn_from_get_free_fat32_clusters
-	retn
+%else
+	; 04/05/2025 - TRDOS 386 v2.0.10
+	
+	call	read_fat32_fsinfo
+	jc	short gffc_err
+%endif
 
-retn_gfc_get_fsinfo_stc:
-	stc
-	retn
+	;mov	eax, [ebx+488]
+	; 04/05/2025
+	mov	eax, [ebx+FSINFO.Free_Count]
+	; 29/02/2016
+	;mov	[esi+LD_BPB+BPB_Reserved], eax ; Free cluster count
+	mov	[esi+LD_BPB+FAT32_FreeClusters], eax
+
+	;mov	edx, [ebx+492]
+	; 04/05/2025 
+	mov	edx, [ebx+FSINFO.Nxt_Free]
+
+	; 29/08/2023 (BugFix)
+	;mov	[esi+LD_BPB+BPB_Reserved+4], edx ; First Free Cluster
+	mov	[esi+LD_BPB+FAT32_FirstFreeClust], edx
+
+	; 21/12/2017
+	;mov	ebx, eax ; (initial value = 0FFFFFFFFh)
+	;inc	ebx ; 0FFFFFFFFh -> 0  
+	;jnz	short short retn_from_get_free_fat32_clusters
+
+	; 04/05/2025
+	inc	eax ; 0FFFFFFFFh -> 0
+	jz	short gffs_2 ; invalid (initial), must be calculated
+	dec	eax
+	jmp	short retn_from_get_free_fat32_clusters
+gffs_2:	
+	;mov	[esi+LD_FreeSectors], eax  ; 0 ; Free clusters !
+	;jmp	short loc_gfc_get_fat_free_clusters
+
+;retn_gfc_get_fsinfo_stc:
+	;stc
 
 loc_gfc_get_fat_free_clusters:
 	;mov	eax, 2
 	mov	al, 2
-	;mov	[FAT_CurrentCluster], eax
+	;;mov	[FAT_CurrentCluster], eax
+	; 04/05/2025
+	;mov	[CLUSNUM], eax
+
+	; 04/05/2025
+	; eax = start cluster number (=2)
+	call	get_first_free_cluster
+	jc	short gffc_err
+
+	mov	[FirstFreeCluster], eax
+
+	; if eax = -1 -> disk volume is full (free clusters = 0)
+	inc	eax
+	jz	short  gffc_err
+		 ; -1 -> 0 ; not any free sectors (disk full)
+
+	mov	[CLUSNUM], eax ; next cluster to search
+
+	inc	dword [FreeClusterCount] ; 1
+	
 loc_gfc_loop_get_next_cluster:
 	call	get_next_cluster
 	jnc	short loc_gfc_free_fat_clusters_cont
 	and	eax, eax
 	jz	short loc_gfc_pass_inc_free_cluster_count
 
+	; 04/05/2025
+	; disk error
+	; invalidate free cluster count for safety
+	mov	dword [FreeClusterCount], -1
+
 retn_from_get_free_fat_clusters:
-	mov	eax, [esi+LD_FreeSectors] ; Free clusters !
+	;mov	eax, [esi+LD_FreeSectors] ; Free clusters !
+	; 04/05/2025
+	mov	eax, [FreeClusterCount]
+	mov	edx, [FirstFreeCluster]
+
+	; 04/05/2025
+        cmp     byte [esi+LD_FATType], 2
+	;jna	short loc_gfc_get_fat_free_clusters
+	ja	short gffs_3
+
+	mov	[esi+LD_BPB+FAT_FreeClusters], eax
+	mov	[esi+LD_BPB+FAT_FirstFreeClust], edx
+	jmp	short gffs_4
+gffs_3:
+	mov	[esi+LD_BPB+FAT32_FreeClusters], eax
+	mov	[esi+LD_BPB+FAT32_FirstFreeClust], edx
+	; 04/05/2025
+	; this is a flag for saving FSINFO later
+	; (if the dword value in this field is 0)
+	mov	dword [esi+LD_BPB+FAT32_fsinfo_sector], 0 ; modified
+
 retn_from_get_free_fat32_clusters:
+gffs_4:
+	; 04/05/2025
+	cmp	eax, -1
+	je	short gffc_err	
+
         movzx	ebx, byte [esi+LD_BPB+BPB_SecPerClust]
       	mul	ebx
 	;mov	[esi+LD_FreeSectors], eax ; Free sectors
 retn_get_free_sectors_calc:
+gffc_err:	; 04/05/2025
 	retn
 
 loc_gfc_free_fat_clusters_cont:
 	or	eax, eax
 	jnz	short loc_gfc_pass_inc_free_cluster_count
-	inc	dword [esi+LD_FreeSectors] ; Free clusters !
-   
+	;inc	dword [esi+LD_FreeSectors] ; Free clusters !
+	; 04/05/2025
+	inc	dword [FreeClusterCount]
+
 loc_gfc_pass_inc_free_cluster_count:
-	;mov	eax, [FAT_CurrentCluster]
-	mov	eax, ecx ; [FAT_CurrentCluster]
+	;;mov	eax, [FAT_CurrentCluster]
+	;mov	eax, ecx ; [FAT_CurrentCluster]
+	; 04/05/2025
+	;mov	eax, [CLUSNUM]
+	mov	eax, ecx ; [CLUSNUM]
 	cmp	eax, [esi+LD_Clusters]
 	ja	short retn_from_get_free_fat_clusters
 	inc	eax
