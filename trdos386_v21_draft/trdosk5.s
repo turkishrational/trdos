@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/05/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 04/05/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -3414,6 +3414,7 @@ chk_flush_2:
 ; 03/05/2025 - TRDOS 386 v2.0.10
 
 update_fat32_fsinfo:
+	; 04/05/2025
 	; 03/05/2025
 	; Ref: Retro DOS v5 - ibmdos7.s
 	; (PCDOS 7.1, Retrodos v5 -> update_fat32_fsinfo)
@@ -3432,7 +3433,9 @@ update_fat32_fsinfo:
 	;
 	;	if cf = 0 and EAX > 0 ->
 	;		eax = physical address of the FSINFO sector
-	;		which is suscessfully written/updated		
+	;		which is suscessfully written/updated
+	;	   (Or, if eax > 0,
+	;		it means fsinfo is valid and not modified)
 	;
 	;	if cf = 1 -> EAX = (disk io/rw) error code
 	;
@@ -3442,10 +3445,19 @@ update_fat32_fsinfo:
 	cmp	byte [esi+LD_FATType], 3 ; FAT32 fs ?
 	jne	short u_fat32_fsi_2 ; no, nothing to do
 
+	; 04/05/2025
+	; check modification status of FSINFO sector data
+	mov	eax, [esi+LD_BPB+FAT32_fsinfo_sector]
+	and	eax, eax
+	jnz	short u_fat32_fsi_3 ; FSINFO data is valid
+			  ; and free count or ffc is not changed
+
+; 04/05/2025
+%if 0	
 	push	esi
 	call	GetCurrentHead	; (MSDOS -> GETCURHEAD)
 	call	BUFWRITE
-	jnc	short u_fat32_fsi_1		
+	jnc	short u_fat32_fsi_1
 	pop	esi
 	retn
 
@@ -3482,6 +3494,21 @@ u_fat32_fsi_4:
 	cmp	dword [ebx+FSINFO.TrailSig], 0AA550000h
 	jne	short u_fat32_fsi_2
 
+%else
+	call	read_fat32_fsinfo
+	jnc	short u_fat32_fsi_1
+	retn
+
+u_fat32_fsi_2:
+	xor	eax, eax
+	; eax = 0 -> no error
+
+u_fat32_fsi_3:
+	retn
+
+%endif
+
+u_fat32_fsi_1:
 	mov	eax, [esi+LD_BPB+FAT32_FreeClusters]
 			; note: this reserved field is used to store free
  			;	cluster count but this field must be zero
@@ -3504,4 +3531,70 @@ u_fat32_fsi_4:
 	jc	short u_fat32_fsi_3
 
 	mov	eax, [CFS_FAT32FSINFOSEC]
+	
+	; flag/set the FSINFO sector data is valid and not-modified yet
+	; (modification procedure will reset it to zero again)
+
+	mov	[esi+LD_BPB+FAT32_fsinfo_sector], eax
+
+	retn
+
+; --------------------------------------------------------------------
+
+; 04/05/2025 - TRDOS 386 v2.0.10
+
+read_fat32_fsinfo:
+	; 04/05/2025
+	;
+	; Read FAT32 fs info sector
+	;
+	; INPUT:
+	;	ESI = Logical DOS Drive Description Table address
+	;
+	; OUTPUT:
+	;	EBX = buffer (data) address
+	;	[CFS_FAT32FSINFOSEC] = FSINFO sector address
+	;
+	;	if cf = 1 -> EAX = (disk io/rw) error code
+	;
+	; Modified registers:
+	;	EAX, EBX, ECX, EDX
+
+	push	esi
+	call	GetCurrentHead	; (MSDOS -> GETCURHEAD)
+	call	BUFWRITE
+	jnc	short u_fat32_fsi_1
+	pop	esi
+	retn
+
+r_fat32_fsi_1:
+	lea	ebx, [esi+BUFINSIZ]
+	pop	esi
+	movzx	eax, word [esi+LD_BPB+FAT32_FSInfoSec]
+	add	eax, [esi+LD_StartSector]
+
+	mov	[CFS_FAT32FSINFOSEC], eax
+
+	push	ebx
+	call	DREAD	; read fs info sector
+	pop	ebx
+	jc	short u_fat32_fsi_3
+
+	;cmp	dword [ebx+FSINFO.LeadSig], 41615252h
+	cmp	dword [ebx], 41615252h ; 'RRaA' ; (NASM syntax)
+	jne	short u_fat32_fsi_2
+
+	;cmp	dword [ebx+484], 61417272h
+	cmp	dword [ebx+FSINFO.StrucSig], 61417272h ; 'rrAa'
+	jne	short u_fat32_fsi_2
+
+	;cmp	dword [ebx+508], 0AA550000h
+	cmp	dword [ebx+FSINFO.TrailSig], 0AA550000h
+	je	short u_fat32_fsi_3
+
+r_fat32_fsi_2:
+	mov	eax, -1 ; invalid data/sector
+	stc
+
+r_fat32_fsi_3:
 	retn
