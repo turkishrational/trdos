@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - DRV INIT : trdosk2.s
 ; ----------------------------------------------------------------------------
-; Last Update: 04/05/2025 (Previous: 22/05/2024, v2.0.8)
+; Last Update: 05/05/2025 (Previous: 22/05/2024, v2.0.8)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -563,7 +563,8 @@ loc_minidisk_next_ep_lba_chs:
 	jmp	loc_validate_hde_partition_next
 
 validate_hd_fat_partition:
-	; 04/05/2025 (TRDOS 386 v2.0.5)
+	; 05/05/2025
+	; 04/05/2025 (TRDOS 386 v2.0.10)
 	; 17/07/2020
 	; 15/07/2020
 	;	(optimization)
@@ -777,7 +778,11 @@ loc_set_FAT16_RootDirLoc:
 	mul	edx
 	add	eax, [esi+LD_FATBegin]
 	mov	[esi+LD_ROOTBegin], eax
+
 loc_set_FAT16_data_begin:
+
+; 05/05/2025 - TRDOS 386 v2.0.10
+%if 0
 	mov	[esi+LD_DATABegin], eax 
 	;mov	eax, 20h  ; Size of a directory entry
 	;;movzx	edx, word [esi+LD_BPB+BPB_RootEntCnt]
@@ -788,6 +793,7 @@ loc_set_FAT16_data_begin:
 	;add	eax, ecx
 	;inc	ecx ; 512
 	;div	ecx
+
 	; 14/07/2020
 	movzx	eax, word [esi+LD_BPB+BPB_RootEntCnt]
 	add	ax, 15
@@ -795,8 +801,22 @@ loc_set_FAT16_data_begin:
 	; 25/07/2022
 	shr	eax, 4
 	add	[esi+LD_DATABegin], eax
+
 	;movzx	eax, word [esi+LD_BPB+BPB_TotalSec16]
 	mov	ax, [esi+LD_BPB+BPB_TotalSec16]
+%else
+	; 05/05/2025
+	;movzx	edx, word [esi+LD_BPB+BPB_RootEntCnt]
+	mov	dx, [esi+LD_BPB+BPB_RootEntCnt]
+	;add	dx, 15	; (not necessary)
+		; (dx value may be 112, 224, 240, 512)
+	shr	edx, 4
+		; (dx value may be 7, 14, 15, 32)
+	add	eax, edx ; + root directory sectors
+	mov	[esi+LD_DATABegin], eax
+
+	movzx	eax, word [esi+LD_BPB+BPB_TotalSec16]
+%endif
 	;test	ax, ax
 	; 25/07/2022
 	test	eax, eax
@@ -819,7 +839,7 @@ loc_set_hd_FAT_cluster_count:
         div	ecx 
 	mov	[esi+LD_Clusters], eax
 	; Maximum Valid Cluster Number= EAX +1
-	; with 2 reserved clusters= EAX +2
+	; with 2 reserved clusters
 loc_set_hd_FAT_fs_free_sectors:
 	;mov	dword [esi+LD_FreeSectors], 0
 	; 04/05/2025
