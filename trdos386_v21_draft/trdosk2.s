@@ -1477,7 +1477,7 @@ use_fd_fatfs_boot_sector_params:
 	mov	[esi+LD_TotalSectors], eax
 	sub	eax, [esi+LD_DATABegin]
 	; 06/05/2025
-	; here, ecx = 2 for floopy disks (with FAT12 fs)
+	; here, ecx = 2 for floppy disks (with FAT12 fs)
   	;movzx	ecx, byte [esi+LD_BPB+BPB_SecPerClust]
 	mov	cl, [esi+LD_BPB+BPB_SecPerClust]
 	cmp	cl, 1
