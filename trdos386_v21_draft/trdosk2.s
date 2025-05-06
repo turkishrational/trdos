@@ -1,11 +1,11 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - DRV INIT : trdosk2.s
 ; ----------------------------------------------------------------------------
-; Last Update: 05/05/2025 (Previous: 22/05/2024, v2.0.8)
+; Last Update: 06/05/2025 (Previous: 22/05/2024, v2.0.8)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
-; Assembler: NASM version 2.14 (trdos386.s)
+; Assembler: NASM version 2.15 (trdos386.s)
 ; ----------------------------------------------------------------------------
 ; Derived from TRDOS Operating System v1.0 (8086) source code by Erdogan Tan
 ; TRDOS2.ASM (09/11/2011)
@@ -563,8 +563,7 @@ loc_minidisk_next_ep_lba_chs:
 	jmp	loc_validate_hde_partition_next
 
 validate_hd_fat_partition:
-	; 05/05/2025
-	; 04/05/2025 (TRDOS 386 v2.0.10)
+	; 04/05/2025 (TRDOS 386 v2.0.5)
 	; 17/07/2020
 	; 15/07/2020
 	;	(optimization)
@@ -609,7 +608,7 @@ vhdp_FAT12_16:
 	inc	al ; mov al, 2
 	cmp	ah, 04h ; FAT16 CHS partition (< 32MB)
 	je	short loc_set_valid_hd_partition_params
-	
+
 	; 15/07/2020
 	; (ah = 05h, 02h or 03h)
 loc_not_a_valid_fat_partition1:
@@ -778,11 +777,7 @@ loc_set_FAT16_RootDirLoc:
 	mul	edx
 	add	eax, [esi+LD_FATBegin]
 	mov	[esi+LD_ROOTBegin], eax
-
 loc_set_FAT16_data_begin:
-
-; 05/05/2025 - TRDOS 386 v2.0.10
-%if 0
 	mov	[esi+LD_DATABegin], eax 
 	;mov	eax, 20h  ; Size of a directory entry
 	;;movzx	edx, word [esi+LD_BPB+BPB_RootEntCnt]
@@ -793,7 +788,6 @@ loc_set_FAT16_data_begin:
 	;add	eax, ecx
 	;inc	ecx ; 512
 	;div	ecx
-
 	; 14/07/2020
 	movzx	eax, word [esi+LD_BPB+BPB_RootEntCnt]
 	add	ax, 15
@@ -801,22 +795,8 @@ loc_set_FAT16_data_begin:
 	; 25/07/2022
 	shr	eax, 4
 	add	[esi+LD_DATABegin], eax
-
 	;movzx	eax, word [esi+LD_BPB+BPB_TotalSec16]
 	mov	ax, [esi+LD_BPB+BPB_TotalSec16]
-%else
-	; 05/05/2025
-	;movzx	edx, word [esi+LD_BPB+BPB_RootEntCnt]
-	mov	dx, [esi+LD_BPB+BPB_RootEntCnt]
-	;add	dx, 15	; (not necessary)
-		; (dx value may be 112, 224, 240, 512)
-	shr	edx, 4
-		; (dx value may be 7, 14, 15, 32)
-	add	eax, edx ; + root directory sectors
-	mov	[esi+LD_DATABegin], eax
-
-	movzx	eax, word [esi+LD_BPB+BPB_TotalSec16]
-%endif
 	;test	ax, ax
 	; 25/07/2022
 	test	eax, eax
@@ -836,10 +816,10 @@ loc_set_hd_FAT_cluster_count:
 	sub	eax, edx
 	xor	edx, edx ; 0
         movzx   ecx, byte [esi+LD_BPB+BPB_SecPerClust]
-        div	ecx 
+        div	ecx
 	mov	[esi+LD_Clusters], eax
 	; Maximum Valid Cluster Number= EAX +1
-	; with 2 reserved clusters
+	; with 2 reserved clusters= EAX +2
 loc_set_hd_FAT_fs_free_sectors:
 	;mov	dword [esi+LD_FreeSectors], 0
 	; 04/05/2025
@@ -862,6 +842,7 @@ loc_validate_hd_FAT_partition_retn:
 	retn
 
 validate_hd_fs_partition:
+	; 06/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 03/02/2018
 	; 09/12/2017
@@ -875,11 +856,13 @@ validate_hd_fs_partition:
 	;   byte [Last_DOS_DiskNo]
 	; Output
 	;  cf=0 -> Validated
-	;   ESI = Logical dos drv desc. table
-	;   EBX = Singlix FS boot sector buffer
+	;   ESI = Logical dos drive description table
+	;   ; 06/05/2025
+	;   ;EBX = Singlix FS boot sector buffer
 	;   byte [Last_DOS_DiskNo]
 	;  cf=1 -> Not a valid 'Singlix FS' partition
-	; EAX, EDX, ECX, EDI -> changed 
+	; 06/05/2025
+	; EAX, EBX, ECX, EDX, EDI -> changed
 
 	;mov	esi, PartitionTable
 	mov	ah, [esi+ptFileSystemID]
@@ -979,20 +962,31 @@ loc_hd_drv_fs_boot_validation:
 	;
 	mov	eax, edx ; [edi+LD_FS_MATLocation]
 	add	eax, [edi+LD_FS_BeginSector]
-	mov	esi, edi
+	;mov	esi, edi
+	; 06/05/2025
+	xchg	esi, edi
 mread_hd_fs_MAT_sector:
         ;mov	ebx, DOSBootSectorBuff
 	;mov	ecx, 1
-	; 25/07/2022
-	sub	ecx, ecx
-	inc	cl
-	; ecx = 1
-	call	disk_read
+	; 06/05/2025 - TRDOS 386 v2.0.10
+	;; 25/07/2022
+	;sub	ecx, ecx
+	;inc	cl
+	;; ecx = 1
+	;call	disk_read
+	call	DREAD ; read one sector
 	jc	short loc_validate_hd_fs_partition_retn
 	; EDI will not be changed
-	mov	esi, ebx
+	; 06/05/2025 (ebx has been modified in DREAD proc)
+	;mov	esi, ebx
+	xchg	edi, esi
+	; esi = MAT (master allocation table) buffer addr
+	; edi = LDRVT (logical dos drive desc. table) addr
 use_hdfs_mat_sector_params:
 	mov	eax, [esi+FS_MAT_DATLocation]
+	; 06/05/2025
+	; eax must be 1 here (DAT is just after the MAT)
+	; ((in fact, MAT is DAT header))
 	mov	[edi+LD_FS_DATLocation], eax
 	mov	eax, [esi+FS_MAT_DATScount]
 	mov	[edi+LD_FS_DATSectors], eax
@@ -1002,21 +996,31 @@ use_hdfs_mat_sector_params:
 	mov	[edi+LD_FS_FirstFreeSector], eax
 	mov	eax, [edi+LD_FS_RootDirD]
 	add	eax, [edi+LD_FS_BeginSector]
-	mov	esi, edi
+	;mov	esi, edi
+	; 06/05/2025
+	xchg	esi, edi
 read_hd_fs_RDT_sector:
-	mov	ebx, DOSBootSectorBuff
-	;mov	ecx, 1
-	mov	cl, 1
-	call	disk_read
+	;mov	ebx, DOSBootSectorBuff
+	; 06/05/2025
+	mov	ebx, edi ; DOSBootSectorBuff
+	; 06/05/2025 - TRDOS 386 v2.0.10
+	;;mov	ecx, 1
+	;mov	cl, 1
+	;call	disk_read
+	call	DREAD ; read one sector
 	jc	short loc_validate_hd_fs_partition_retn
 	; EDI will not be changed
-	mov	esi, ebx
+	;mov	esi, ebx
+	; 06/05/2025
+	xchg	edi, esi
 use_hdfs_RDT_sector_params:
 	mov	eax, [esi+FS_RDT_VolumeSerialNo]
 	mov	[edi+LD_FS_VolumeSerial], eax
 	push	edi
 	;mov	ecx, 16
 	mov	cl, 16
+	; 06/05/2025
+	; ecx < 256 (at return from DREAD)
 	add	esi, FS_RDT_VolumeName
 	add	edi, LD_FS_VolumeName
 	rep	movsd ; 64 bytes
@@ -1024,7 +1028,7 @@ use_hdfs_RDT_sector_params:
 		; Volume Name Reset
         mov     byte [esi+LD_FS_MediaChanged], 6
 	;
-        ;mov	cl, [Last_DOS_DiskNo] 
+        ;mov	cl, [Last_DOS_DiskNo]
 	;add	cl, 'A'
 	;mov	[esi+LD_FS_Name], cl
 
@@ -1032,25 +1036,31 @@ loc_validate_hd_fs_partition_retn:
 	retn
 
 load_masterboot:
+	; 06/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 14/07/2020 (Reset function has been removed)
 	;
 	; 10/01/2016 (TRDOS 386 = TRDOS v2.0)
 	; 2005 - 2011
 	; input -> DL = drive number
+	;	  ; 06/05/2025
+	;	  ; (ecx < 256)
+
 ;	mov	ah, 0Dh ; Alternate disk reset
 ;	call	int13h
 ;	jnc	short pass_reset_error
 ;harddisk_error:
 ;  	retn
 ;pass_reset_error:
+
 	mov	ebx, MasterBootBuff
 	;mov	ax, 0201h
 	;mov	cx, 1
 	; 25/07/2022
 	;xor	ecx, ecx
 	;inc	cl
-	mov	cl, 1
+	mov	cl, 1 ; sector 1
+	; 06/05/2025
 	; ecx = 1
 	mov	eax, ecx ; ch = cylinder = 0
 	mov	ah, 2  ; chs read
@@ -1268,6 +1278,7 @@ loc_gfc_pass_inc_free_cluster_count:
 	jmp	short loc_gfc_loop_get_next_cluster
 
 floppy_drv_init:
+	; 06/05/2025 (TRDOS 386 Kenrel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 09/12/2017
 	; 06/07/2016
@@ -1318,7 +1329,9 @@ use_fd_boot_sector_params:
 	mov	esi, ebx
 	cmp	word [esi+BS_Validation], 0AA55h
 	jne	short read_fd_boot_sector_stc_retn
-        cmp     word [esi+bs_FS_Identifier], 'SF'
+        ;cmp    word [esi+bs_FS_Identifier], 'SF'
+	; 06/05/2025
+	cmp	word [esi+bs_FS_Identifier], 'FS' ; NASM syntax !
 	;jne	use_fd_fatfs_boot_sector_params
 	; 25/07/2022
 	je	short use_fdfs_boot_sector_params
@@ -1376,21 +1389,29 @@ use_fdfs_mat_sector_params:
 	mov	eax, [esi+FS_MAT_FirstFreeSector]
 	mov	[edi+LD_FS_FirstFreeSector], eax
 	;
-	mov	esi, edi
- 	mov	eax, [esi+LD_FS_RootDirD]
+	;mov	esi, edi
+	; 06/05/2025
+ 	xchg	esi, edi
+	mov	eax, [esi+LD_FS_RootDirD]
 read_fd_RDT_sector_again:
 	;mov	ebx, DOSBootSectorBuff
 	;mov	cx, 1
 	mov	cl, 1
 	call	chs_read
-	mov	esi, ebx
+	;mov	esi, ebx
+	; 06/05/2025
+	; (eax, ebx, ecx, edx regs are changed)
+	; ((ecx < 256))
+	xchg	edi, esi
 	jc	short read_fd_RDT_sector_retn
+	; esi = RDT buffer (DOSBootSectorBuff)
+	; edi = Logical Dos Drv Desc. Table address
 use_fdfs_RDT_sector_params:
 	mov	eax, [esi+FS_RDT_VolumeSerialNo]
 	mov	[edi+LD_FS_VolumeSerial], eax
 	push	edi
 	;mov	ecx, 16
-	mov	cl, 16	
+	mov	cl, 16
 	add	esi, FS_RDT_VolumeName
 	add	edi, LD_FS_VolumeName
 	rep	movsd ; 64 bytes
@@ -1411,6 +1432,8 @@ use_fd_fatfs_boot_sector_params:
 	jb	short read_fd_RDT_sector_retn
 	push	edi
 	add	edi, LD_BPB
+	; 06/05/2025
+	; (ecx < 256)
 	;mov	ecx, 16
 	mov	cl, 16
 	rep	movsd ; 64 bytes
@@ -1422,7 +1445,9 @@ use_fd_fatfs_boot_sector_params:
   	mul	ecx
 	; edx = 0 !
 	mov	dx, [esi+LD_BPB+BPB_RsvdSecCnt]
-	mov	[esi+LD_FATBegin], dx
+	;mov	[esi+LD_FATBegin], dx
+	; 06/05/2025
+	mov	[esi+LD_FATBegin], edx
 	; 25/07/2022
 	add	eax, edx
 	;add	ax, dx
@@ -1435,15 +1460,24 @@ use_fd_fatfs_boot_sector_params:
 	;add	dx, 511
 	;;shr	edx, 9 ; edx = ((edx*32)+511) / 512
 	;shr	dx, 9
-	add	dx, 15 ; 06/07/2016 (+(512/32)-1)
+	; 06/05/2025
+	; following round up is not necessary
+	; because root directory entry count is 112 or 224
+	;	 (for floppiy disks)
+	;add	dx, 15 ; 06/07/2016 (+(512/32)-1)
+
 	;shr	dx, 4 ; / 16 (==16 entries per sector)
 	; 25/07/2022
 	shr	edx, 4
 	add 	[esi+LD_DATABegin], edx ; + rd sectors
+	; 06/05/2025
+	; here, eax <= 18 for floppy disks (with FAT12 fs)
 	;movzx	eax, word [esi+LD_BPB+BPB_TotalSec16]
 	mov	ax, [esi+LD_BPB+BPB_TotalSec16]
 	mov	[esi+LD_TotalSectors], eax
 	sub	eax, [esi+LD_DATABegin]
+	; 06/05/2025
+	; here, ecx = 2 for floopy disks (with FAT12 fs)
   	;movzx	ecx, byte [esi+LD_BPB+BPB_SecPerClust]
 	mov	cl, [esi+LD_BPB+BPB_SecPerClust]
 	cmp	cl, 1
@@ -1457,7 +1491,9 @@ save_fd_fatfs_cluster_count:
 	mov	[esi+LD_Clusters], eax
 
       ; Maximum Valid Cluster Number = EAX +1
-      ; with 2 reserved clusters = EAX +2
+      ; with 2 reserved clusters
+
+; 06/05/2025 - burada kaldým...
 
 reset_FAT_buffer_decriptors:
 	sub	eax, eax ; 0  

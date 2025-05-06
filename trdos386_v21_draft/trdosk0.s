@@ -1,11 +1,11 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - DEFINITIONS : trdosk0.s
 ; ----------------------------------------------------------------------------
-; Last Update: 04/05/2025 (Previous: 29/02/2016, v2.0.0)
+; Last Update: 06/05/2025 (Previous: 29/02/2016, v2.0.0)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
-; Assembler: NASM version 2.11 (trdos386.s)
+; Assembler: NASM version 2.15 (trdos386.s)
 ; ----------------------------------------------------------------------------
 ; Derived from TRDOS Operating System v1.0 (8086) source code by Erdogan Tan
 ; TRDOS2.ASM (09/11/2011)
@@ -215,7 +215,11 @@ FS_MAT_DATLocation equ 12
 FS_MAT_DATScount equ 16
 FS_MAT_FreeSectors equ 20
 FS_MAT_FirstFreeSector equ 24
-FS_RDT_VolumeSerialNo equ 28
+;FS_RDT_VolumeSerialNo equ 28
+; 06/05/2025 - TRDOS 386 v2.0.10
+Ref: rdt1.pdf -
+;    Singlix OS, Issue: 4, Rev: 15, 05/05/2025
+FS_RDT_VolumeSerialNo equ 58
 FS_RDT_VolumeName equ 64
 
 ; FAT12 + FAT16 + FAT32
