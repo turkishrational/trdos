@@ -217,7 +217,7 @@ FS_MAT_FreeSectors equ 20
 FS_MAT_FirstFreeSector equ 24
 ;FS_RDT_VolumeSerialNo equ 28
 ; 06/05/2025 - TRDOS 386 v2.0.10
-Ref: rdt1.pdf -
+; Ref: rdt1.pdf -
 ;    Singlix OS, Issue: 4, Rev: 15, 05/05/2025
 FS_RDT_VolumeSerialNo equ 58
 FS_RDT_VolumeName equ 64
