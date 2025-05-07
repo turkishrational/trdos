@@ -1460,7 +1460,7 @@ use_fd_fatfs_boot_sector_params:
 	; 06/05/2025
 	; following round up is not necessary
 	; because root directory entry count is 112 or 224
-	;	 (for floppiy disks)
+	;	 (for floppy disks)
 	;add	dx, 15 ; 06/07/2016 (+(512/32)-1)
 
 	;shr	dx, 4 ; / 16 (==16 entries per sector)
