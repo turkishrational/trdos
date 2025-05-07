@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 04/05/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 07/05/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -256,6 +256,7 @@ gnc_@:
 %endif
 
 load_FAT_root_directory:
+	; 07/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 23/10/2016
 	; 15/10/2016
@@ -270,16 +271,21 @@ load_FAT_root_directory:
 	; OUTPUT ->
 	;	cf = 1 -> Root directory could not be loaded
 	;	    EAX > 0 -> Error number
-	;	cf = 0 -> EAX = 0
+	;	cf = 0 -> ;; EAX = 0
 	;	ECX = Directory buffer size in sectors (CL)
-	;	EBX = Directory buffer address
-	; 	NOTE: DirBuffer_Size is in bytes ! (word)
+	;	; 07/05/2025
+	;	EAX = Pysical addr of the 1st root dir sector
+	;	EBX = Directory buffer (header) address
+	;
+	; 	;;NOTE: DirBuffer_Size is in bytes ! (word)
 	;
 	; (Modified registers: EAX, ECX, EBX, EDX)
 
 	; NOTE: Only for FAT12 and FAT16 file systems !
 	; (FAT32 fs root dir must be loaded as sub directory)
 
+; 07/05/2025
+%if 0
 	mov	bl, [esi+LD_Name]
 	mov	bh, [esi+LD_FATType]
 
@@ -361,6 +367,38 @@ load_DirBuff_error:
 	mov	al, 17
 	stc
         retn
+%else
+	; 07/05/2025 - TRDOS 386 v2.0.10
+ 	mov	eax, [esi+LD_ROOTBegin]
+load_FAT_root_directory_ns:
+	; eax = root directory sector
+	mov	cl, [esi+LD_PhyDrvNo]
+	mov	edx, esi
+	mov	ebx, eax
+	push	esi
+	push	edi
+	push	ebp
+	call	GetBuffer
+	pop	ebp
+	pop	edi
+	pop	esi
+	jc	short load_fat_root_dir_err
+			; cf = 1 ; eax = error code
+	; cf = 0
+	; [CurrentBuffer] = allocated directory buffer addr
+
+	movzx	ecx, word [esi+LD_BPB+RootDirEnts]
+	; ecx = 512 or 224 or 112
+	shr	ecx, 4 ; / 16 (16 entries per sector)
+	; ecx = root directory sectors
+	mov	eax, ebx ; (physical disk sector)
+			 ; eax = [esi+LD_ROOTBegin]
+	mov	ebx, [CurrentBuffer]
+
+	or	byte [ebx+BUFFINFO.buf_flags], buf_isDIR
+load_fat_root_dir_err:
+	retn	
+%endif
 
 load_FAT32_root_directory:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)

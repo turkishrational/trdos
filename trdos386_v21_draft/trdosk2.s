@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - DRV INIT : trdosk2.s
 ; ----------------------------------------------------------------------------
-; Last Update: 06/05/2025 (Previous: 22/05/2024, v2.0.8)
+; Last Update: 07/05/2025 (Previous: 22/05/2024, v2.0.8)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -819,13 +819,10 @@ loc_set_hd_FAT_cluster_count:
         div	ecx
 	mov	[esi+LD_Clusters], eax
 	; Maximum Valid Cluster Number= EAX +1
-	; with 2 reserved clusters= EAX +2
+	; with 2 reserved clusters
 loc_set_hd_FAT_fs_free_sectors:
 	;mov	dword [esi+LD_FreeSectors], 0
 	; 04/05/2025
-	; eax > 0 -> initialization
-	;   (free clusters and first free cluster fields
-	;   will be initialized)
 	call	get_free_FAT_sectors
 	jc	short loc_validate_hd_FAT_partition_retn
 	mov	[esi+LD_FreeSectors], eax
@@ -1493,7 +1490,8 @@ save_fd_fatfs_cluster_count:
       ; Maximum Valid Cluster Number = EAX +1
       ; with 2 reserved clusters
 
-; 06/05/2025 - burada kaldým...
+; 07/05/2025 - TRDOS 386 v2.0.10
+%if 0
 
 reset_FAT_buffer_decriptors:
 	sub	eax, eax ; 0  
@@ -1516,10 +1514,21 @@ use_fd_FAT_sectors:
 	call	fd_init_calculate_free_clusters
 	jc	short read_fd_FAT_sectors_retn
 
+%else
+	; 07/05/2025
+	; esi = Logical Dos Drv Desc. Table
+set_fd_FAT_free_sectors:
+	call	get_free_FAT_sectors
+	jc	short read_fd_FAT_sectors_retn
+	; eax = free sectors
+	mov	[esi+LD_FreeSectors], eax
+%endif
+
 loc_use_fd_boot_sector_params_FAT:
 	mov	byte [esi+LD_FATType], 1 ; FAT 12
 	mov	byte [esi+LD_FSType], 1
         mov     eax, [esi+LD_BPB+VolumeID]
+
 loc_cont_use_fd_boot_sector_params:
 	mov	bh, [esi+LD_PhyDrvNo]
 	mov	[esi+LD_DParamEntry], bh
@@ -1533,6 +1542,9 @@ loc_cont_use_fd_boot_sector_params:
 
 read_fd_FAT_sectors_retn:
 	retn
+
+; 07/05/2025 - TRDOS 386 v2.0.10
+%if 0
 
 fd_init_calculate_free_clusters:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -1690,7 +1702,10 @@ fd_init_FAT_sectors_no_load_error:
 	mov	eax, [FAT_CurrentCluster]
         jmp     fd_init_get_next_cluster_readnext
 
+%endif
+
 get_FAT_volume_name:
+	; 07/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 10/01/2016 (TRDOS 386 = TRDOS v2.0)
 	; 12/09/2009
@@ -1700,6 +1715,9 @@ get_FAT_volume_name:
 	; OUTPUT ->
 	;	CF = 0 -> ESI = Volume name address
 	; 	CF = 1 -> Root volume name not found
+	;
+	; Modified registers:
+	;	EAX, EBX, ECX, EDX, ESI, EDI, EBP
 
 	;mov 	ah, 0FFh
 	;mov 	al, [Last_Dos_DiskNo]
@@ -1717,13 +1735,19 @@ get_FAT_volume_name:
 	jb      short loc_gfvn_dir_load_err
 	cmp 	ah, 2 
 	ja      short get_FAT32_root_cluster
-	
-	call    load_FAT_root_directory
-	jnc     short loc_get_volume_name
 
+	; 07/05/2025 (major modification)
+	call	load_FAT_root_directory
+	jnc	short loc_get_volume_name
+
+	; eax = error code
+	
 loc_gfvn_dir_load_err:
 loc_get_volume_name_retn: ; 29/08/2023
 	retn
+
+; burada kaldým... 07/05/2025
+; FAT32 için de volume name check yapýlacak...
 
 get_FAT32_root_cluster:
 	mov	eax, [esi+LD_BPB+BPB_RootClus]
@@ -1731,6 +1755,9 @@ get_FAT32_root_cluster:
 	jc	short loc_get_volume_name_retn
 
 loc_get_volume_name:
+
+; 07/05/2025
+%if 0
         mov     esi, Directory_Buffer
 	;xor	cx, cx ; 0
 	; 25/07/2022
@@ -1779,6 +1806,57 @@ loc_gfvn_load_FAT32_dir_cluster:
 loc_get_volume_name_retn_xor:
 	xor 	eax, eax
 	retn
+%else
+	; 07/05/2025 - TRDOS 386 v2.0.10
+	; eax = root directory (1st) sector
+	mov	ebp, ecx ; root dir sectors
+check_root_volume_name_ns: ; next sector
+	; ebx = directory buffer (header) address
+	; ecx = root directory sectors
+	; esi = LDRVT address (= edx)
+	; eax = root directory sector
+
+	add	ebx, BUFINSIZ
+	; ebx = buffer data address
+
+	mov	edi, eax ; save phy sector number
+	mov	edx, 16 ; 16 entries per sector
+check_root_volume_name:
+	mov	al, [ebx]
+	or	al, al
+	jz	short loc_get_volume_name_stc_retn
+	cmp	al, 0E5h
+	je	short chk_next_rde ; deleted entry
+	cmp     byte [ebx+0Bh], 08h
+	je      short loc_get_volume_name_retn
+chk_next_rde:
+	dec	edx
+	jz	short load_next_root_dir_sector
+	add	ebx, 32 ; directory entry size
+	jmp	short check_root_volume_name
+
+load_next_root_dir_sector:
+	dec	ebp ; root dir (remain) sectors
+	jz	short loc_get_volume_name_retn
+
+	; load next root dir sector	
+	mov	eax, edi ; restore phy sector number
+	inc	eax
+	; esi = LDRVT address
+	call    load_FAT_root_directory_ns
+	jnc	short check_root_volume_name_ns
+	
+	; eax = error code
+	retn
+	
+loc_get_volume_name_stc_retn	
+	stc	
+
+loc_get_volume_name_retn:
+	; esi = volume name offset/address in dir buf
+	; (11 byte volume name)
+	retn
+%endif
 
 get_media_change_status:
 	; 10/01/2016 (TRDOS 386 = TRDOS v2.0)
