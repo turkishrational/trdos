@@ -1753,7 +1753,7 @@ gfvn_load_FAT32_root_dir:
 gfvn_load_FAT32_root_dir_nc:
 	; 08/05/2025 - TRDOS 386 Kernel v2.0.10
 	; ! major modification !
-	call   load_FAT_sub_directory
+	call	load_FAT_sub_directory
 	jc	short loc_gfvn_dir_load_err
 
 	; 08/05/2025
