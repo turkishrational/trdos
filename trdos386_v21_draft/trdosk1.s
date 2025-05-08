@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - SYS INIT : trdosk1.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/05/2025 (Previous: 26/09/2024, v2.0.9)
+; Last Update: 08/05/2025 (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -14,6 +14,7 @@
 ;
 
 sys_init:
+	; 08/05/2025
 	; 17/04/2025 (TRDOS 386 v2.0.10)
 	; 26/09/2024 (TRDOS 386 v2.0.9)
 	; 18/04/2021 (TRDOS 386 v2.0.4)
@@ -46,11 +47,12 @@ sys_init:
 	mov	eax, '?:/'
 	mov	[Current_Dir_Drv], eax
 
-	; Logical DRV INIT (only for hard disks)
-	call 	ldrv_init  ; trdosk2.s
-
+	; 08/05/2025
 	; 17/04/2025 - TRDOS 386 v2.0.10
 	call	set_buffers
+
+	; Logical DRV INIT (only for hard disks)
+	call 	ldrv_init  ; trdosk2.s
 
 	; When floppy_drv_init call is disabled
 	; media changed sign is needed
@@ -803,7 +805,7 @@ nxt_buff:
 	; 17/04/2025 - TRDOS 386 v2.0.10
 	; ref: Retro DOS v5.0 (PCDOS 7.1)
 set_buffer_info:
-	;function: set buf_link,buf_id,buf_sector
+	; function: set buf_link,buf_id,buf_sector
 	mov	ebx, [buf_prev_off]
 	mov	[edi+BUFFINFO.buf_prev], ebx
 	mov	eax, edi

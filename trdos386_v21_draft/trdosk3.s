@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - MAIN PROGRAM : trdosk3.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 26/09/2024  (Previous: 02/12/2023, TRDOS 386 v2.0.7)
+; Last Update: 08/05/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -17,6 +17,7 @@
 ; FILE.ASM [ FILE FUNCTIONS ] Last Update: 09/10/2011
 
 change_current_drive:
+	; 08/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 26/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 16/10/2016
 	; 02/02/2016
@@ -136,8 +137,10 @@ loc_ccdrv_get_FAT_volume_name_1:
 	pop	ebx
 	; BL = 0
 	jc	short loc_change_current_drv1
-	and	al, al
-	jz	short loc_change_current_drv1
+	
+	; 08/05/2025 - TRDOS 386 v2.0.10
+	;and	al, al
+	;jz	short loc_change_current_drv1
 
 loc_ccdrv_move_FAT_volume_name:
 	mov	ecx, 11

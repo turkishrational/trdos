@@ -1705,6 +1705,7 @@ fd_init_FAT_sectors_no_load_error:
 %endif
 
 get_FAT_volume_name:
+	; 08/05/2025
 	; 07/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 10/01/2016 (TRDOS 386 = TRDOS v2.0)
@@ -1734,26 +1735,33 @@ get_FAT_volume_name:
 	cmp 	al, 'A'
 	jb      short loc_gfvn_dir_load_err
 	cmp 	ah, 2 
-	ja      short get_FAT32_root_cluster
+	ja      short gfvn_load_FAT32_root_dir
 
-	; 07/05/2025 (major modification)
+	; 07/05/2025 - TRDOS 386 Kernel v2.0.10
+	; ! major modification !
 	call	load_FAT_root_directory
 	jnc	short loc_get_volume_name
 
 	; eax = error code
 	
 loc_gfvn_dir_load_err:
-loc_get_volume_name_retn: ; 29/08/2023
 	retn
 
-; burada kaldým... 07/05/2025
-; FAT32 için de volume name check yapýlacak...
-
-get_FAT32_root_cluster:
+	; 08/05/2025
+gfvn_load_FAT32_root_dir:
 	mov	eax, [esi+LD_BPB+BPB_RootClus]
-	call    load_FAT_sub_directory
-	jc	short loc_get_volume_name_retn
+gfvn_load_FAT32_root_dir_nc:
+	call   load_FAT_sub_directory
+	jc	short loc_gfvn_dir_load_err
 
+	; 08/05/2025
+	; eax = physical address of dir sector
+	; ebx = directory buffer (header) address
+	; ecx = next cluster
+	movzx	ebp, byte [esi+LD_BPB+SecPerClust]
+	; ebp = sectors per cluster
+	jmp	short check_root_volume_name_ns
+	
 loc_get_volume_name:
 
 ; 07/05/2025
@@ -1812,7 +1820,7 @@ loc_get_volume_name_retn_xor:
 	mov	ebp, ecx ; root dir sectors
 check_root_volume_name_ns: ; next sector
 	; ebx = directory buffer (header) address
-	; ecx = root directory sectors
+	; ebp = root directory sectors
 	; esi = LDRVT address (= edx)
 	; eax = root directory sector
 
@@ -1827,8 +1835,17 @@ check_root_volume_name:
 	jz	short loc_get_volume_name_stc_retn
 	cmp	al, 0E5h
 	je	short chk_next_rde ; deleted entry
-	cmp     byte [ebx+0Bh], 08h
-	je      short loc_get_volume_name_retn
+	cmp	byte [ebx+0Bh], 08h
+	;je	short loc_get_volume_name_retn
+	; 08/05/2025
+	jne	short chk_next_rde
+
+loc_get_volume_name_ok:
+	mov	esi, ebx
+	; esi = volume name offset/address in dir buf
+	; (11 byte volume name)
+	retn
+
 chk_next_rde:
 	dec	edx
 	jz	short load_next_root_dir_sector
@@ -1837,25 +1854,38 @@ chk_next_rde:
 
 load_next_root_dir_sector:
 	dec	ebp ; root dir (remain) sectors
-	jz	short loc_get_volume_name_retn
+	;jz	short loc_get_volume_name_stc_retn
+	; 08/05/2025
+	jz	short check_fat32_nc_or_gvn_retn
 
-	; load next root dir sector	
+	; load next root dir sector
 	mov	eax, edi ; restore phy sector number
 	inc	eax
 	; esi = LDRVT address
+
 	call    load_FAT_root_directory_ns
 	jnc	short check_root_volume_name_ns
-	
+
+loc_get_volume_name_retn:	
 	; eax = error code
 	retn
 	
-loc_get_volume_name_stc_retn	
+loc_get_volume_name_stc_retn:
 	stc	
-
-loc_get_volume_name_retn:
-	; esi = volume name offset/address in dir buf
-	; (11 byte volume name)
 	retn
+
+check_fat32_nc_or_gvn_retn:
+	; 08/05/2025
+	cmp	byte [esi+LD_FATType], 3
+	jb	short loc_get_volume_name_retn ; cf = 1
+
+	; FAT32
+	; ecx = next cluster
+	mov	eax, ecx
+	cmp	ecx, 0FFFFFF8h
+	jnb	short loc_get_volume_name_stc_retn
+	
+	jmp	gfvn_load_FAT32_root_dir_nc
 %endif
 
 get_media_change_status:

@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 07/05/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 08/05/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -370,8 +370,16 @@ load_DirBuff_error:
 %else
 	; 07/05/2025 - TRDOS 386 v2.0.10
  	mov	eax, [esi+LD_ROOTBegin]
+	; 08/05/2025
+	movzx	ecx, word [esi+LD_BPB+RootDirEnts]
+	; ecx = 512 or 224 or 112
+	shr	ecx, 4 ; / 16 (16 entries per sector)
+	; ecx = root directory sectors
 load_FAT_root_directory_ns:
 	; eax = root directory sector
+load_FAT32_root_directory_ns: ; ecx = next cluster
+	; 08/05/2025
+	push	ecx
 	mov	cl, [esi+LD_PhyDrvNo]
 	mov	edx, esi
 	mov	ebx, eax
@@ -382,15 +390,16 @@ load_FAT_root_directory_ns:
 	pop	ebp
 	pop	edi
 	pop	esi
+	pop	ecx
 	jc	short load_fat_root_dir_err
 			; cf = 1 ; eax = error code
 	; cf = 0
 	; [CurrentBuffer] = allocated directory buffer addr
 
-	movzx	ecx, word [esi+LD_BPB+RootDirEnts]
-	; ecx = 512 or 224 or 112
-	shr	ecx, 4 ; / 16 (16 entries per sector)
-	; ecx = root directory sectors
+	; 08/05/2025
+	; ecx = root directory sectors (FAT)
+	; ecx = next cluster number (FAT32)
+
 	mov	eax, ebx ; (physical disk sector)
 			 ; eax = [esi+LD_ROOTBegin]
 	mov	ebx, [CurrentBuffer]
@@ -401,6 +410,7 @@ load_fat_root_dir_err:
 %endif
 
 load_FAT32_root_directory:
+	; 08/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 02/02/2016 (TRDOS 386 = TRDOS v2.0)
 	;
@@ -409,25 +419,39 @@ load_FAT32_root_directory:
 	; OUTPUT ->
 	;	cf = 1 -> Root directory could not be loaded
 	;	    EAX > 0 -> Error number
-	;	cf = 0 -> EAX = 0
-	;	ECX = Directory buffer size in sectors (CL)
-	;	EBX = Directory buffer address
-	; 	NOTE: DirBuffer_Size is in bytes ! (word)
+	;	;;cf = 0 -> EAX = 0
+	;	;;ECX = Directory buffer size in sectors (CL)
+	;	;EBX = Directory buffer address
 	;
-	; (Modified registers: EAX, ECX, EBX, EDX)
+	;	; 08/05/2025
+	;	EAX = Physical sector number (dir sector)
+	;	EBX = Directory buffer (header) address
+	;	ECX = Next cluster number
+	;	ESI = Logical dos drive desc. table (LDRVT)
+	;
+	; 	;NOTE: DirBuffer_Size is in bytes ! (word)
+	;
+	; (Modified registers: EAX, ECX, EBX, EDX) ; 08/05/2025
 
+; 08/05/2025
+%if 0
 	mov	bl, [esi+LD_Name]
 	mov	bh, [esi+LD_FATType]
 
 	;mov	[DirBuff_DRV], bl
 	;mov	[DirBuff_FATType], bh
 	mov	[DirBuff_DRV], bx
+%endif
 
 load_FAT32_root_dir0:
 	mov	eax, [esi+LD_BPB+FAT32_RootFClust]
-	jmp	short load_FAT_sub_dir0
-	
+
+	; 08/05/2025 - - TRDOS 386 v2.0.10
+	;jmp	short load_FAT_sub_dir0
+load_FAT32_sub_directory:
+		
 load_FAT_sub_directory:
+	; 08/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 01/02/2016 (TRDOS 386 = TRDOS v2.0)
 	; 05/07/2011
@@ -439,14 +463,22 @@ load_FAT_sub_directory:
 	; OUTPUT ->
 	;	cf = 1 -> Sub directory could not be loaded
 	;	    EAX > 0 -> Error number
-	;	cf = 0 -> EAX = 0
-	;	ECX = Directory buffer size in sectors (CL)
-	;	EBX = Directory buffer address
+	;	;;cf = 0 -> EAX = 0
+	;	;;ECX = Directory buffer size in sectors (CL)
+	;	;EBX = Directory buffer address
 	;
-	; 	NOTE: DirBuffer_Size is in bytes ! (word)
+	;	; 08/05/2025
+	;	EAX = Physical sector number (dir sector)
+	;	EBX = Directory buffer (header) address
+	;	ECX = Next cluster number
+	;	ESI = Logical dos drive desc. table (LDRVT)
 	;
-	; (Modified registers: EAX, ECX, EBX, EDX)
+	; 	;NOTE: DirBuffer_Size is in bytes ! (word)
+	;
+	; (Modified registers: EAX, ECX, EBX, EDX) ; 08/05/2025
 
+; 08/05/2025
+%if 0
 	mov	bl, [esi+LD_Name]
 	mov	bh, [esi+LD_FATType]
 
@@ -474,6 +506,61 @@ load_FAT_sub_dir0:
 	add	eax, [esi+LD_DATABegin]
 	; ecx = sectors per cluster (dir buffer size <= 128 sectors)
 	jmp	short read_directory
+
+%else
+	; 08/05/2025 - TRDOS 386 v2.0.10
+	; eax = cluster number (0 = root directory)
+	; esi = Logical dos drive desc. table address
+
+	push	ebp
+	push	esi
+	push	edi
+
+	mov	edx, esi
+	; setup a directory search
+	; eax = cluster number
+	; edx = LDRVT address
+	call	SETDIRSRCH
+	jc	short load_subdir_err
+	; [DIRSTART] = eax
+	; [CLUSFAC], [CLUSNUM], [SECCLUSPOS], [DIRSEC] set
+	; modified regs: eax, ecx, ebx, esi, edi, ebp
+
+	; dword [DIRSTART] = start cluster number
+	; byte [CLUSFAC] = sectors per cluster
+	; byte [SECCLUSPOS] = sector position/index in cluster
+	;		    = 0
+	; dword [DIRSEC] = physical address of the disk sector
+	; dword [CLUSNUM] = next cluster number
+	;		  = value/content of current cluster
+
+	; eax = [DIRSEC] ; physical sector number
+	;  cl = physical drive/disk number
+	; edx = LDRV (Logical DOS Drive) Table address 
+	
+	;mov	cl, [edx+LD_PhyDrvNo]
+	call	GetBuffer ; pre-read
+	jc	short load_subdir_err ; eax = error code
+	; modified regs: eax, ecx, esi, edi, ebp
+	
+	; esi = Directory Buffer Header address
+	;  cl = Physical Disk Number
+	; edx = Logical DOS Drive Table address
+	; [CurrentBuffer] = esi
+	; eax =  directory sector 
+
+	or	byte [esi+BUFFINFO.buf_flags], buf_isDIR
+
+	lea	ebx, [esi+BUFINSIZ]
+	mov	ecx, [CLUSNUM] ; next cluster
+	mov	eax, [DIRSEC] ; physical sector number
+	
+load_subdir_err:
+	pop	edi
+	pop	esi
+	pop	ebp
+	retn
+%endif
 
 ; DRV_FS.ASM
 
@@ -3045,6 +3132,7 @@ sds_fat32:
 ; 27/04/2025 - TRDOS 386 v2.0.10
 
 SETROOTSRCH:
+	; 08/05/2025
 	; 27/04/2025
 	; (MSDOS -> SETROOTSRCH) - Ref: Retro DOS v5 - ibmdos7.s
 	; Set up a directory search (root directory)
@@ -3080,7 +3168,8 @@ SETROOTSRCH_FAT:
 	sub	eax, ebx
 	mov	[CLUSFAC], al ; number of root dir sectors
 
-	jmp	short SETROOTSRCH3
+	; 08/05/2025
+	;jmp	short SETROOTSRCH3
 	
 SETROOTSRCH3:
 	mov	[DIRSEC], ebx ; physical sector number of the dir
