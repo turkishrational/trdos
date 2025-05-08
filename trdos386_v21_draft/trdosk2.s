@@ -1751,6 +1751,8 @@ loc_gfvn_dir_load_err:
 gfvn_load_FAT32_root_dir:
 	mov	eax, [esi+LD_BPB+BPB_RootClus]
 gfvn_load_FAT32_root_dir_nc:
+	; 08/05/2025 - TRDOS 386 Kernel v2.0.10
+	; ! major modification !
 	call   load_FAT_sub_directory
 	jc	short loc_gfvn_dir_load_err
 
