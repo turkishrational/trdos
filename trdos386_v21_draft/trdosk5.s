@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 08/05/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 09/05/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1573,6 +1573,8 @@ loc_save_FAT_buff_write_err:
 	mov	eax, 18 ; Drive not ready or write error
 	retn
 
+; burada kaldým... 
+
 calculate_fat_freespace:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 23/03/2016
@@ -1681,8 +1683,11 @@ loc_reset_fcc:
 	mov	[CFS_FAT32FC], eax
 
 	; 29/02/2016
-	mov	[esi+LD_BPB+BPB_Reserved], eax ; reset
-	mov	[esi+LD_BPB+BPB_Reserved+4], eax ; reset
+	;mov	[esi+LD_BPB+BPB_Reserved], eax ; reset
+	;mov	[esi+LD_BPB+BPB_Reserved+4], eax ; reset
+	; 09/05/2025
+	mov	[esi+LD_BPB+FAT_FreeClusters], eax ; reset
+	mov	[esi+LD_BPB+FAT_FirstFreeClust], eax ; reset
 
 	;mov 	eax, 2
 	; 25/07/2022

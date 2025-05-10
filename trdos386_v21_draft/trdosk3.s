@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 08/05/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 10/05/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -17,6 +17,7 @@
 ; FILE.ASM [ FILE FUNCTIONS ] Last Update: 09/10/2011
 
 change_current_drive:
+	; 09/05/2025
 	; 08/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 26/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 16/10/2016
@@ -57,7 +58,9 @@ loc_ccdrv_drive_not_ready_err:
 	;mov	eax, 15 ; Drive not ready
 	; 26/07/2022
 	sub	eax, eax
-	mov	al, 15
+	;mov	al, 15
+	; 09/05/2025
+	mov	al, ERR_DRV_NOT_RDY ; 15
 loc_change_current_drive_stc_retn:
 	stc
 	retn
@@ -94,7 +97,9 @@ loc_ccdrv_call_fd_init:
 
 loc_ccdrv_fdinit_fail_retn:
 	; 16/10/2016
-	mov	eax, 15 ; Drive not ready
+	;mov	eax, 15 ; Drive not ready
+	; 09/05/2025
+	mov	eax, ERR_DRV_NOT_RDY ; 15
 	retn
 
 loc_ccdrv_check_vol_serial:
@@ -108,7 +113,7 @@ loc_ccdrv_check_vol_serial:
 
 loc_reset_drv_fd_current_dir:
 	xor	eax, eax
-        mov	[esi+LD_CDirLevel], al
+        mov	[esi+LD_CDirLevel], al ; 0
 	mov	edi, esi
 	add	edi, LD_CurrentDirectory
 	mov	ecx, 32
@@ -163,6 +168,7 @@ loc_change_current_drv3:
 	;retn
 
 restore_current_directory:
+	; 09/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 26/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 11/02/2016
 	; 15/01/2016 (TRDOS 386 = TRDOS v2.0)
@@ -201,7 +207,10 @@ loc_restore_FS_current_directory:
 	;call	load_current_FS_directory
 	;retn
 	; 26/07/2022
-	jmp	load_current_FS_directory
+	;jmp	load_current_FS_directory
+	; 09/05/2025
+	mov	eax, [esi+LD_FS_RootDirD] ; root directory DDT
+	jmp	short loc_ccdrv_check_rootdir_sign
 
 loc_ccdrv_reset_cdir_FAT_12_16_32_fcluster:
 	cmp	al, 3
@@ -512,7 +521,7 @@ loc_escape:
 	mov	bx, 7 ; attribute/color (bl)
 		      ; video page 0 (bh=0)
 	call	_write_tty
-	;mov	bx, 7  ; attribute/color
+	;mov	bx, 7 ; attribute/color
 		      ; video page 0 (bh=0)
 	mov	al, 0Ah ; LF
 	call	_write_tty
@@ -1355,6 +1364,7 @@ loc_set_time_progress:
 	jmp	loc_set_time_ok
 
 print_volume_info:
+	; 09/05/2025 - TRDOS 386 v2.0.10
 	; 01/03/2016
 	; 08/02/2016
 	; 06/02/2016
@@ -1383,7 +1393,7 @@ print_volume_info:
 loc_pvi_set_vol_name:
 	mov	[Vol_Drv_Name], al
 	push	esi
-	call	move_volume_name_and_serial_no ;;;
+	call	move_volume_name_and_serial_no
 	jnc	short loc_pvi_mvn_ok
 	pop	esi
 	retn
@@ -1454,26 +1464,60 @@ loc_write_vol_FAT_str_2:
 	;movzx	ebx, word [esi+LD_BPB+BPB_BytsPerSec]
 	mov	bx, [esi+LD_BPB+BPB_BytsPerSec]
 	mov	eax, [esi+LD_FreeSectors]
+	; 09/05/2025
+	; LD_FreeSectors = LD_FS_FreeSectors = offset 116
 
 loc_vol_freespace_recalc0:
+	; 09/05/2025
+	and	cl, cl ; byte [esi+LD_FATType]
+	jz	short loc_vol_freespace_mul32
+	; 10/05/2025
+	and	eax, eax
+	jz	short loc_vol_freespace_recalc1
 	; 01/03/2016
 	cmp	eax, 0FFFFFFFFh
 	jb	short loc_vol_freespace_mul32
 	;inc	eax ; 0
-	and	cl, cl ; byte [esi+LD_FATType]
-	jz	short loc_vol_freespace_mul32
+
+; 10/05/2025
+%if 0
 	push	ebx
 	mov	bx, 0FF00h ; recalculate free sectors
 	call	calculate_fat_freespace
 	pop	ebx
+%else
+loc_vol_freespace_recalc1:
+	push	ebx
+	call	get_free_FAT_sectors
+	pop	ebx
+	jnc	short loc_vol_fspc_skip_fsects
+	mov	eax, -1 ; invalidate
+loc_vol_fspc_skip_fsects:
+	mov	[esi+LD_FreeSectors], eax ; Free sectors
+%endif
 
 loc_vol_freespace_mul32:
+	; 10/05/2025
+	mov	ecx, VolSize_Bytes
+	mov	edi, Vol_Free_Sectors_Str_End
+	;mov	byte [edi], 0
+	inc	eax ; * ; -1 -> 0
+	jnz	short loc_vol_freespace_mul32_@
+	dec	edi
+	mov	byte [edi], '?'
+	jmp	short loc_write_vol_fspace_str_ok
+
+loc_vol_freespace_mul32_@:
+	dec	eax ; * 
+	;
 	mul	ebx
 	or	edx, edx
-	jnz	short loc_vol_fspace_in_kbytes
+	;jnz	short loc_vol_fspace_in_kbytes
 loc_vol_fspace_in_bytes:
-	mov	ecx, VolSize_Bytes
-	jmp	short loc_write_vol_fspace_str
+	; 10/05/2025
+	;mov	ecx, VolSize_Bytes
+	;jmp	short loc_write_vol_fspace_str
+	jz	short loc_write_vol_fspace_str
 loc_vol_fspace_in_kbytes:
 	mov	bx, 1024
 	div	ebx
@@ -1482,7 +1526,8 @@ loc_vol_fspace_in_kbytes:
 loc_write_vol_fspace_str:
 	mov	[VolSize_Unit2], ecx
 	;
-	mov	edi, Vol_Free_Sectors_Str_End
+	; 10/05/2025
+	;mov	edi, Vol_Free_Sectors_Str_End
         ;mov	byte [edi], 0
 	mov	ecx, 10
 loc_write_vol_fspace_chr:
@@ -2879,6 +2924,8 @@ rediv_tfs_hex:
 	;retn
 	; 27/07/2022
 	jmp	print_msg
+
+; burada kaldým... 10/05/2025
 
 find_first_file:
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
