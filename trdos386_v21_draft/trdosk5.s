@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 09/05/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 12/05/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -3827,4 +3827,771 @@ r_fat32_fsi_2:
 	stc
 
 r_fat32_fsi_3:
+	retn
+
+; --------------------------------------------------------------------
+
+; 11/05/2025 - TRDOS 386 v2.0.10
+
+DOS_SEARCH_FIRST:
+	; 12/05/2025
+	; 11/05/2025
+	; (MSDOS -> DOS_SEARCH_FIRST) - Ref: Retro DOS v5 - ibmdos7.s
+	;
+	; Initiate a search for the given file spec
+	;
+	; INPUT:
+	;	[WFP_START] Points to WFP string 
+	;	   ("d:/" must be first 3 chars, NUL terminated)
+	;	[CURR_DIR_END] Points to end of Current dir part of string
+	;	   ( = -1 if current dir not involved, else
+	;	   Points to first char after last "/" of current dir part)
+	;	[THISCDS] Points to CDS being used
+	;	   (Low word = -1 if NUL CDS (Net direct request))
+	;	[SATTRIB] is attribute of search,
+	;		  determines what files can be found
+	;	FINDFILE_BUFFER is FFF destination bufferr
+	;
+	; OUTPUT:
+	;	FINDFILE_BUFFER is filled
+	;
+	;	if cf = 1 -> EAX = error code
+	;
+	; Modified registers:
+	;	EAX, EBX, ECX, EDX
+
+	mov	byte [NoSetDir], 1	; if we find a dir, don't change to it
+	call	GETPATH
+	; ebx = offset NAME1
+	jnc	short found_entry
+	jnz	short bad_path3	
+	or	cl, cl
+	jz	short bad_path3
+find_no_more:
+	mov	eax, ERR_NO_MORE_FILES	; 12
+BadBye:
+	stc
+	retn
+
+bad_path3:
+	mov	eax, ERR_PATH_NOT_FOUND	; 3
+	jmp	short BadBye	
+
+found_entry:
+	; EBX points to start of entry in [CurrentBuffer]
+	; ESI points to start of dir_first field in [CurrentBuffer]
+
+; burada kaldým TRDOS 386 ile PCDOS 7.1 FFF structure
+; uydurulacak ! dikkat ! 12/05/2025
+
+	mov	edi, FINDFILE_BUFFER
+	mov	al, [WFP_START]		; get pointer to beginning
+	sub	al, 'A'-1		; logical drive
+	stosb
+	mov	esi, NAME1
+	mov	ecx, 11
+	rep	movsb
+	
+	mov	al, [ATTRIB]
+	stosb
+	mov	eax, [LASTENT]
+	stosd
+	mov	eax, [DIRSTART]
+
+; --------------------------------------------------------------------
+
+; 11/05/2025 - TRDOS 386 v2.0.10
+
+GETPATH:
+	; 11/05/2025
+	; (MSDOS -> GETPATH) - Ref: Retro DOS v5 - ibmdos7.s
+	;
+	; Parse a WFP (crack the path)
+	;
+	; INPUT:
+	;	[WFP_START] Points to WFP string 
+	;	   ("d:/" must be first 3 chars, NUL terminated)
+	;	[CURR_DIR_END] Points to end of Current dir part of string
+	;	   ( = -1 if current dir not involved, else
+	;	   Points to first char after last "/" of current dir part)
+	;	[THISCDS] Points to CDS being used
+	;	   (Low word = -1 if NUL CDS (Net direct request))
+	;	[SATTRIB] is attribute of search,
+	;		  determines what files can be found
+	;	[NoSetDir] set
+	;
+	; OUTPUT:
+	;	[ATTRIB] = [SATTRIB]
+	;	EDX points to Logical DOS Drive Description Table
+	;
+	;	if cf = 1 -> ERROR
+	;	   ESI points to path element causing failure
+	;	   if zf = 1
+	;	      [DIRSTART],[DIRSEC],[CLUSNUM] and [CLUSFAC]
+	;	        are set up to start a search on the last directory
+	;	      CL is zero if there is a bad name in the path
+	;	      CL is non-zero if the name was simply not found
+	;		 [ENTFREE] may have free spot in directory
+	;		 [NAME1] is the name.
+	;		 CL = 81H if '*'s or '?' in NAME1, 80H otherwise
+	;	   if zf = 0
+	;	      File in middle of path or bad name in path
+	;			or attribute mismatch
+	;			or path too long or malformed path
+	;	if cf = 0
+	;	   [CurrentBuffer] = -1 if root directory
+	;	   [CurrentBuffer] contains directory record with match
+	;	   EBX points to start of entry in [CurrentBuffer]
+	;	   ESI points to start of dir_first field in [CurrentBuffer]
+	;	   [NAME1] has name looked for
+	;	   If last element is a directory zero flag is set and:
+	;	      [DIRSTART],[SECCLUSPOS],[DIRSEC],[CLUSNUM] & [CLUSFAC]
+	;	        are set up to start a search on it.
+	;	      unless [NoSetDir] is non zero in which case
+	;		the return is like that for a file
+	;				(except for zero flag)
+	;	   If last element is a file zero flag is reset and:
+	;	      [DIRSEC],[CLUSNUM],[CLUSFAC],[NXTCLUSNUM],[SECCLUSPOS],
+	;	      [LASTENT], [ENTLAST] are set to continue search of last
+	;	      directory for further matches on NAME1 via the NEXTENT
+	;	      entry point in FindEntry (or GETENT entry in GETENTRY in
+	;	      which case [NXTCLUSNUM] & [SECCLUSPOS] need not be valid)
+	;
+	; Modified registers:
+	;	EAX, EBX, ECX, EDX, ESI, EDI, EBP
+	;
+
+	mov	word [CREATING], 0E500h ; Not Creating, not DEL *.*
+
+	; Same as GetPath only CREATING and DELALL already set
+
+	;entry	GetPathNoSet
+GetPathNoSet:
+	; (MSDOS -> [CURBUF])
+	mov	eax, -1
+	mov	[CurrentBuffer], eax	; -1 ; initial setting
+	xor	edx, edx
+	mov	dh, [Current_Drv]
+	; edx = LDRVT address		; (MSDOS -> [THISDPB])
+CrackIt:
+	mov	byte [ATTRIB],attr_directory+attr_system+attr_hidden
+				; Attributes to search through Dirs
+	mov	edi, [THISCDS]
+	mov	ebx, [edi+curdir.ID]
+	mov	esi, [CURR_DIR_END]
+
+	; EAX = -1
+	; EBX = Cluster number of current directory.
+	;	This number is -1 if the media has been uncertainly changed.
+	; ESI = Path offset to end of current directory text.
+	;	This may be -1 if no current directory part has been used.
+	
+	cmp	esi, eax		; if Current directory is not part
+	je	short NO_CURR_D		; then we must crack from root
+	
+	cmp	ebx, eax	; is the current directory cluster valid ?
+	jne	short short Got_Search_Cluster ; yes
+	
+	; no, crack from the root
+NO_CURR_D:
+	mov	esi, [WFP_START]
+	add	esi, 3			; skip 'd:/'
+	;xor	edx, edx
+	;mov	dh, [Current_Drv]
+	; edx = LDRVT address		; (MSDOS -> [THISDPB])
+	jmp	short ROOTPATH
+
+	; crack from the current directory part
+Got_Search_Cluster:
+	;xor	edx, edx
+	;mov	dh, [Current_Drv]
+	; edx = LDRVT address		; (MSDOS -> [THISDPB])
+	call	SETDIRSRCH
+	jnc	short FINDPATH
+SetFErr:
+	xor	cl, cl			; set zero
+	stc
+	retn
+
+; --------------------------------------------------------------------
+
+; 11/05/2025 - TRDOS 386 v2.0.10
+
+ROOTPATH:
+	; 11/05/2025
+	; (MSDOS -> ROOTPATH) - Ref: Retro DOS v5 - ibmdos7.s
+	;
+	; Search from root for path
+	;
+	; INPUT:
+	;	Same as FINDPATH but,
+	;	ESI Points to asciiz string of path which is assumed
+	;	    to start at the root (no leading '/').
+	;
+	; OUTPUT:
+	;	Same as FINDPATH but:
+	;	If root directory specified,
+	;	   [CURBUF] and [NAME1] are NOT set,
+	;	   and [NoSetDir] is ignored.
+	;
+	; Modified registers:
+	;	EAX, EBX, ECX, ESI, EDI, EBP
+	;
+
+ROOTPATH:
+	push	esi
+	call	SETROOTSRCH
+	pop	esi
+	cmp	byte [esi], 0
+	ja	short FINDPATH
+
+	; Root dir specified
+	
+	mov	al, [SATTRIB]
+	mov	[ATTRIB], al
+
+	retn
+
+; --------------------------------------------------------------------
+
+; 11/05/2025 - TRDOS 386 v2.0.10
+
+FINDPATH:
+	; 11/05/2025
+	; (MSDOS -> FINDPATH) - Ref: Retro DOS v5 - ibmdos7.s
+	;
+	; Parse path name - Search from path
+	;
+	; INPUT:
+	;	[ATTRIB] Set to get through directories
+	;	[SATTRIB] Set to find last element
+	;	EDX Points to Logical Dos Drive Description Table
+	;	ESI Points to asciz string of path (no leading '/').
+	;	[SECCLUSPOS] = 0
+	;	[DIRSEC] = Phys sec # of first sector of directory
+	;	[CLUSNUM] = Cluster # of next cluster
+	;	[CLUSFAC] = Sectors per cluster
+	;	[NoSetDir] set
+	;	[CURR_DIR_END] Points to end of Current dir part of string
+	;	   ( = -1 if current dir not involved, else
+	;	   Points to 1st char after last "/" of current dir part)
+	;	[THISCDS] Points to CDS being used
+	;	[CREATING] and [DELALL] set
+	;
+	; OUTPUT:
+	;	ID field of [THISCDS] updated appropriately
+	;	[ATTRIB] = [SATTRIB]
+	;	EDX points to Logical DOS Drive Description Table
+	;
+	;	if cf = 1 -> ERROR
+	;	   ESI points to path element causing failure
+	;	   if zf = 1
+	;	      [DIRSTART],[DIRSEC],[CLUSNUM] and [CLUSFAC]
+	;	        are set up to start a search on the last directory
+	;	      CL is zero if there is a bad name in the path
+	;	      CL is non-zero if the name was simply not found
+	;		 [ENTFREE] may have free spot in directory
+	;		 [NAME1] is the name.
+	;		 CL = 81H if '*'s or '?' in NAME1, 80H otherwise
+	;	   if zf = 0
+	;	      File in middle of path or bad name in path
+	;			or attribute mismatch
+	;			or path too long or malformed path
+	;	if cf = 0
+	;	   [CurrentBuffer] = -1 if root directory
+	;	   [CurrentBuffer] contains directory record with match
+	;	   EBX points to start of entry in [CurrentBuffer]
+	;	   ESI points to start of dir_first field in [CurrentBuffer]
+	;	   [NAME1] has name looked for
+	;	   If last element is a directory zero flag is set and:
+	;	      [DIRSTART],[SECCLUSPOS],[DIRSEC],[CLUSNUM] & [CLUSFAC]
+	;	        are set up to start a search on it.
+	;	      unless [NoSetDir] is non zero in which case
+	;		the return is like that for a file
+	;				(except for zero flag)
+	;	   If last element is a file zero flag is reset and:
+	;	      [DIRSEC],[CLUSNUM],[CLUSFAC],[NXTCLUSNUM],[SECCLUSPOS],
+	;	      [LASTENT], [ENTLAST] are set to continue search of last
+	;	      directory for further matches on NAME1 via the NEXTENT
+	;	      entry point in FindEntry (or GETENT entry in GETENTRY in
+	;	      which case [NXTCLUSNUM] & [SECCLUSPOS] need not be valid)
+	;
+	; Modified registers:
+	;	EAX, EBX, ECX, ESI, EDI, EBP
+	;
+
+	push	esi ; *
+	cmp	dword [CURR_DIR_END], -1
+	je	short NOIDS		; No current dir part
+	cmp	esi, [CURR_DIR_END]
+	jne	short NOIDS		; Not to current dir end yet
+	mov	ecx, [DIRSTART]		; Get start clus of dir being searched
+	mov	edi, [THISCDS]
+	mov	[edi+curdir.ID], ecx	; Set current directory cluster
+NOIDS:
+	; Parse the name offset of ESI into NAME1.
+	; AL = 1 if there was a meta character in the string.
+	; ECX, EDI are destroyed.
+	
+	xor	ecx, ecx
+	mov	edi, NAME1
+	puh	edi
+	mov	al, ' ' ; 20h ; space
+	mov	cl, 11
+	rep	stosb
+	pop	edi
+GetNam:
+	lodsb
+	cmp	al, '.'	; 2Eh
+	je	short _SetExt
+	or	al, al
+	jz	short _GetDone
+	cmp	al, '/'
+	je	short _GetDone
+	cmp	al, '?'
+	jne	short StoNam
+	or	cl, 1
+StoNam: 
+	stosb
+	jmp	short GetNam
+_SetExt:
+	mov	edi, NAME1+8
+GetExt:
+	lodsb
+	or	al, al
+	jz	short _GetDone
+	cmp	al, '/'
+	je	short _GetDone
+	cmp	al, '?'
+	jne	short StoExt
+	or	cl, 1
+StoExt: 
+	stosb
+	jmp	short GetExt
+_GetDone:
+	dec	esi
+	or	cl, 80h
+	pop	edi ; *			; Start of this element
+	cmp	esi, edi
+	jne	short FindFile
+	jmp	short _BadPath		; NUL parse (two delims most likely)
+
+FindFile:
+	push	esi ; *			; Start of next element
+	push	edi ; **		; Start of this element
+	push	ecx ; ***
+
+	call	FINDENTRY
+DIR_FOUND:
+	pop	ecx ; ***
+	pop	esi ; **
+	jnc	short LOAD_BUF
+	jmp	short BADPATHPOP
+
+LOAD_BUF:
+	mov	edi, [CurrentBuffer]	; (MSDOS ->[CURBUF])
+	test	byte [ebx+dir_entry.dir_attr], attr_directory
+	jnz	short GO_NEXT
+FILEINPATH_j:
+	jmp	short FILEINPATH	; Error or end of path
+
+	; 03/03/2025
+_SETRET:
+	retn
+
+	; if not a directory, then check for end of string
+GO_NEXT:
+	cmp	byte [NoSetDir], 0
+	jz	short SetDir
+	mov	ecx, edi		; Save pointer to entry
+
+	pop	edi ; *			; Start of next element
+
+	cmp	byte [edi], 0
+	jz	short _SETRET
+
+NEXT_ONE:
+	push	edi ; *		; Put start of next element back on stack
+	mov	edi, ecx		; Get back pointer to entry
+SetDir:
+	xor	eax, eax
+	cmp	byte [edx+LD_FATType], 3
+	jb	short SetDir2 ; not FAT32
+	mov	ax, [esi-6]		; dir_entry.dir_fclus_hi
+	shl	eax, 16
+SetDir2:
+	mov	ax, [esi] 		; dir_entry.dir_first
+
+DO_NORMAL:
+	sub	ebx, edi	; Offset into sector of start of entry
+	sub	esi, edi	; Offset into sector of dir_first
+	push	ebx ; ++++
+	push	eax ; +++
+	push	esi ; ++
+	push	ecx ; +
+
+	mov	ebx, [edi+BUFFINFO.buf_sector]
+	push	ebx
+
+	; eax = cluster number
+	; edx = LDRVT address
+
+	call	SETDIRSRCH	; This uses UNPACK which might blow
+				; the entry sector buffer
+	pop	ebx
+	jc	short SKIP_GETB
+
+	; eax = [DIRSEC] = physical sector number
+	;  cl = physical drive/disk number (not used here) 
+
+	call	GETBUFFER ; pre-read
+
+	; esi = [CurrentBuffer] Points to the Buffer for the sector
+	; (MSDOS -> [CURBUF])
+	; edx = Logical DOS Drive Table address	
+
+SKIP_GETB:
+	pop	ecx ; +
+	pop	esi ; ++
+	pop	eax ; +++
+	pop	ebx ; ++++
+	jnc	short SET_THE_BUF
+	pop	esi ; *			; Start of next element
+	jmp	short _BADPATH
+
+SET_THE_BUF:
+	mov	edi, [CurrentBuffer]	; (MSDOS -> [CURBUF])
+	add	esi, edi		; Get the offsets back
+	add	ebx, edi
+	pop	edi ; *			; Start of next element
+
+	mov	al, [edi]
+	or	al, al
+	jz	short _SETRET		; At end
+	inc	edi			; Skip over "/"
+	mov	esi, edi		; Point with ESI
+
+	; 11/05/2025
+	; !!! (al = '/' there is no other possibility) !!!
+	;call	PATHCHRCMP ; (MSDOS)
+	cmp	al, '/'
+	jnz	short find_bad_name	; oops
+	jmp	short FINDPATH		; Next element
+
+find_bad_name:
+	dec	esi			; Undo above INC to get failure point
+_BadPath:
+	xor	cl, cl			; Set zero
+	jmp	short BADPRET
+
+FILEINPATH:
+	pop	edi ; *			; Start of next element
+
+	mov	al, [edi]
+	or	al, al
+	jnz 	short BADPRET_X		; Path too long
+
+	inc	al			; Reset zero
+	; zf = 0
+	retn
+
+BADPATHPOP:
+	pop	esi ; * 		; Start of next element
+	mov	al, [esi]
+	or	al, al	; zero if bad element is last, non-zero if path too long
+BADPRET_X:
+	mov	esi, edi		; Start of bad element
+BADPRET:
+	mov	al, [SATTRIB]
+	mov	[ATTRIB], al		; Make sure return correct
+	stc
+	retn
+
+; --------------------------------------------------------------------
+
+; 11/05/2025 - TRDOS 386 v2.0.10
+
+SEARCH:
+FINDENTRY:
+	; 11/05/2025
+	; (MSDOS -> FINDENTRY) - Ref: Retro DOS v5 - ibmdos7.s
+	;
+	; Look for a directory entry
+	;	(find file name in disk directory)
+	;
+	; INPUT:
+	;	;;;[THISDPB] = Base of drive parameters (MSDOS)
+	;	EDX Points to Logical Dos Drive Description Table
+	;	[SECCLUSPOS] = 0
+	;	[DIRSEC] = Starting directory sector number (physical)
+	;	[CLUSNUM] = Next cluster of directory
+	;	[CLUSFAC] = Sectors per cluster
+	;	[NAME1] = Name to look for
+	;
+	; OUTPUT:
+	;	If cf = 1 -> name not found
+	;	if cf = 0
+	;		Zero set if attributes match
+	;			 (always except when creating)
+	;	;;;[THISDPB] = Base of drive parameters (MSDOS)
+	;	EDX Points to Logical Dos Drive Description Table
+	;	EBX = Pointer into directory buffer
+	;	ESI = Pointer to 1st Cluster field in directory entry
+	;	;[CURBUF] has directory record with match (MSDOS)
+	;	[CurrentBuffer] has directory sector with match
+	;	[NAME1] has file name
+	;	[LASTENT] is entry number of the entry
+	;
+	; Modified registers:
+	;	EAX, EBX, ECX, ESI, EDI, EBP
+	;
+
+	call	STARTSRCH
+	mov	al, [ATTRIB]
+	and	al, ~attr_ignore	; Ignore useless bits	
+	cmp	al, attr_volume_id	; Looking for vol ID only ?
+	jne	short NotVolSrch	; No
+	call	SETROOTSRCH		; Yes force search of root
+NotVolSrch:	
+	call	GETENTRY
+	jc	short SETESRET
+
+	; EBX = Pointer to next directory entry in CURBUF
+	; ECX = Pointer to first byte after end of CURBUF
+	; [LASTENT] = New directory entry number
+	; [NXTCLUSNUM],[SECCLUSPOS] set
+	; EDX = LDRVT address (MSDOS -> [THISDPB])
+SRCH:
+	;mov	word [LNE_COUNT], 0	; reset long name entry count
+	mov	byte [LNE_COUNT], 0	; reset long name entry count
+SRCH2:
+	mov	ah, [ebx] ; [ebx+dir_entry.dir_name] ; mov ah, [ebx+0]
+	or	ah, ah
+	jz	short findentry_free
+	mov	al, [ebx+dir_entry.dir_attr] ; [ebx+0Bh]	
+	push	eax
+	call	check_longname
+	pop	eax
+	jz	short NEXTENT2
+
+	cmp	ah, [DELALL]		; Free entry?
+	je	short findentry_free
+
+	test	byte [ebx+dir_entry.dir_attr], attr_volume_id
+					; Volume ID file?
+	jz	short CHKFNAM 		; NO
+
+	inc	byte [VOLID]
+CHKFNAM:
+	mov	edi, ebx  ; no possible '?' ; directory entry
+	mov	esi, NAME1 ; possible '?'
+	call	MetaCompare
+	jz	short findentry_found
+NEXTENT:
+	;mov	edx, [THISDPB]
+	; edx = Logical DOS Drive Description Table address
+	call	NEXTENTRY
+	jnc	short SRCH
+SETESRET:
+	push	dword [ENTLAST]
+	pop	dword [ENTLAST_PREV]	; previous ENTLAST
+	jc	short SETESRETN
+	;mov	word [LNE_COUNT], 0	; reset long name entry count
+	mov	byte [LNE_COUNT], 0	; reset long name entry count
+SETESRETN:
+	retn
+
+NEXTENT2:
+	;inc	word [LNE_COUNT]	; Long Name entry count
+	inc	byte [LNE_COUNT]
+NEXTENT3:
+	;mov	edx, [THISDPB]
+	; edx = Logical DOS Drive Description Table address
+	call	NEXTENTRY
+	jnc	short SRCH2
+	jmp	short SETESRET
+
+findentry_free:
+	mov	ecx, [LASTENT]
+	cmp	ecx, [ENTFREE]
+	jae	short TSTALL
+	mov	[ENTFREE], ecx
+TSTALL:
+	cmp	ah, [DELALL]		; At end of directory?
+	je	short NEXTENT3		; No - continue search
+	mov	[ENTLAST], ecx
+	stc
+	jmp	short SETESRET
+
+findentry_found:
+	; We have a file with a matching name.
+	; We must now consider the attributes:
+	
+	; ATTRIB     Action
+	; ------     ------
+	; Volume_ID  Is Volume_ID in test?
+	; Otherwise  If no create then Is ATTRIB+extra superset of test?
+	;	     If create then Is ATTRIB equal to test?
+
+	mov	ch, [esi]		; Attributes of file
+	mov	ah, [ATTRIB]		; Attributes of search
+	;and	ah, 9Eh
+	and	ah, ~attr_ignore
+	;lea	esi, [esi+15]
+	lea	esi, [esi+dir_entry.dir_first-dir_entry.dir_attr]
+					; point to first cluster field
+	;test	ch, 8
+	test	ch, attr_volume_id	; Volume ID file?
+	jz	short check_one_volume_id ; Nope check other attributes
+	;test	ah, 8
+	test	ah, attr_volume_id	; Can we find Volume ID?
+	jz	short NEXTENT 		; Nope
+	xor	ah, ah			; Set zero flag
+	; zf = 1
+	jmp	short SETESRET
+
+check_one_volume_id:
+	;cmp	ah, 8
+	cmp	ah, attr_volume_id	; Looking only for Volume ID?
+	je	short NEXTENT		; Yes, continue search
+	call	MatchAttributes
+	jz	short SETESRET
+	test	byte [CREATING], -1	; Pass back mismatch if creating
+	jz	short NEXTENT		; Otherwise continue searching
+	; zf = 0
+	jmp	short SETESRET
+
+; --------------------------------------------------------------------
+
+; 11/05/2025 - TRDOS 386 v2.0.10
+
+STARTSRCH:
+	; 11/05/2025
+	; (MSDOS -> STARTSRCH) - Ref: Retro DOS v5 - ibmdos7.s
+	;
+	; Initiate a directory search
+	;	(Set up a search for GETENTRY and NEXTENTRY)
+	;
+	; INPUT:
+	;	;;;[THISDPB] = Base of drive parameters (MSDOS)
+	;	;EDX Points to Logical Dos Drive Description Table
+	; OUTPUT:
+	;	;;;ES:BP = Drive parameters (MSDOS)
+	;	;EDX Points to Logical Dos Drive Description Table
+	;
+	;	Sets up LASTENT=VOLID=0, ENTFREE=ENTLAST=-1
+	;
+	; Modified registers:
+	;	EAX
+	;
+
+	;;;;les	bp, [THISDPB] 
+
+	xor	eax, eax ; 0
+	mov	[LASTENT], eax
+	mov	[VOLID], al ; 0	; No volume ID found
+	dec	eax ; -1
+	mov	[ENTFREE], eax
+	mov	[ENTLAST], eax
+	retn
+
+
+; --------------------------------------------------------------------
+
+; 11/05/2025 - TRDOS 386 v2.0.10
+
+GETENTRY:
+	; 11/05/2025
+	; (MSDOS -> GETENTRY) - Ref: Retro DOS v5 - ibmdos7.s
+	;
+	; Locates directory entry in preparation for search
+	; (GETENT provides entry for passing desired entry in EAX)
+	;
+	; INPUT:
+	;	[LASTENT] has directory entry
+	;	EDX Points to Logical Dos Drive Description Table
+	;	[DIRSEC],[CLUSNUM],[CLUSFAC],[ENTLAST] set
+	;					 for DIR involved
+	; OUTPUT:
+	;	EBX = Pointer to next directory entry in CURBUF
+	;	ECX = Pointer to first byte after end of CURBUF
+	;	[LASTENT] = New directory entry number
+	;	[NXTCLUSNUM],[SECCLUSPOS] set via DIRREAD
+	;
+	;	Carry set if error
+	;
+	; Modified registers:
+	;	EAX, EBX, ECX, ESI, EDI, EBP
+	;
+
+GETENTRY:
+	mov	eax, [LASTENT]
+	; 11/05/2025
+	jmp	short GETENT_@
+GETENT:
+	mov	[LASTENT], eax
+GETENT_@:
+	; Convert the entry number in EAX into a byte offset
+	;	from the beginning of the directory
+	shl	eax, 5 ; * 32
+	mov	ebx, edx
+	xor	edx, edx ; 0
+	;mov	ecx, 512
+	movzx	ecx, word [ebx+LD_BPB+BytesPerSec]
+	div	ecx
+	xchg	ebx, edx
+
+	push	ecx ; bytes per sector	
+	push	ebx ; byte offset to dir entry
+
+	; eax = directory block (index) number
+	;	(relative to the first block of directory)
+	; edx = Logical DOS Drive Description Table address
+	; [DIRSEC] = First physical sector of 1st cluster of dir
+	; [CLUSNUM] = Next cluster
+	; [CLUSFAC] = Sectors/Cluster ; not used	
+	
+	call	DIRREAD
+	pop	ebx ; byte offset to dir entry
+	pop	ecx ; bytes per sector
+	jc	short getentry_retn
+
+	; [NXTCLUSNUM] = Next cluster (after the one skipped to)
+	; [SECCLUSPOS] Set
+	; [CURBUF] points to Buffer with dir sector	
+
+SETENTRY:
+	mov	eax, [CurrentBuffer] ; (MSDOS -> [CURBUF])
+	add	eax, BUFINSIZ
+	add	ebx, eax
+	add	ecx, eax
+	;clc
+getentry_retn:
+	retn
+
+; --------------------------------------------------------------------
+
+; 12/05/2025 - TRDOS 386 v2.0.10
+
+MatchAttributes:
+	; 12/05/2025
+	; (MSDOS -> MatchAttributes) - Ref: Retro DOS v5 - ibmdos7.s
+	;
+	; the final check for attribute matching
+	;
+	; INPUT:
+	;	[ATTRIB] = attribute to search for
+	;	CH = found attribute
+	; OUTPUT:
+	;	JZ <match>
+	;	JNZ <nomatch>
+	;
+	; Modified registers: EAX
+	;
+
+	mov	al, [ATTRIB]	; searchset
+	not	al		; searchset'
+	and	al, ch	; 	; searchset' and foundset
+	;and	al, 16h
+	and	al, attr_all	; searchset' & foundset & important
 	retn

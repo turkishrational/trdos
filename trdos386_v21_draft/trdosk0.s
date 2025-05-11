@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - DEFINITIONS : trdosk0.s
 ; ----------------------------------------------------------------------------
-; Last Update: 06/05/2025 (Previous: 29/02/2016, v2.0.0)
+; Last Update: 11/05/2025 (Previous: 29/02/2016, v2.0.0)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -359,6 +359,14 @@ attr_directory	EQU	10h
 attr_archive	EQU	20h
 attr_device	EQU	40h
 
+; 11/05/2025
+attr_ignore	EQU	attr_read_only+attr_archive
+			; ignore these attributes during search first/next
+attr_all	EQU	attr_hidden+attr_system+attr_directory
+			; OR of hard attributes for FINDENTRY
+attr_changeable EQU	attr_read_only+attr_hidden+attr_system+attr_archive
+			; changeable via CHMOD
+
 ; 03/05/2025 - TRDOS 386 v2.0.10
 ; 03/02/2024 - Retro DOS v5.0
 ; --------------------------------
@@ -384,3 +392,22 @@ FAT32_FirstFreeClust equ BPB_Reserved+4 ; 56 ; (NextFreeCluster)
 FAT32_fsinfo_sector  equ BPB_Reserved+8 ; 60
 FAT_FreeClusters     equ 64
 FAT_FirstFreeClust   equ 68
+
+; 11/05/2025 - TRDOS 386 v2.0.10
+struc FindFile
+.Drv:		  resb 1
+.Directory:	  resb 65
+.Name:		  resb 13
+.LongNameEntryLength:
+.LongNameYes: 	  resb 1 ; Sign for longname procedures
+;Above 80 bytes form
+;TR-DOS Source/Destination File FullName Format/Structure
+.AttributesMask:  resw 1
+.DirEntry:	  resb 32
+.DirFirstCluster: resd 1
+.DirCluster:	  resd 1
+.DirEntryNumber:  resw 1
+.MatchCounter:	  resw 1
+.Reserved:	  resw 1
+.size:		; 128 bytes
+endstruc
