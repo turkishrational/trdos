@@ -4591,7 +4591,7 @@ MatchAttributes:
 
 	mov	al, [ATTRIB]	; searchset
 	not	al		; searchset'
-	and	al, ch	; 	; searchset' and foundset
+	and	al, ch		; searchset' and foundset
 	;and	al, 16h
 	and	al, attr_all	; searchset' & foundset & important
 	retn
