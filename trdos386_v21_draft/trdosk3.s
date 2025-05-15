@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 15/05/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 16/05/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -168,6 +168,7 @@ loc_change_current_drv3:
 	;retn
 
 restore_current_directory:
+	; 16/05/2025
 	; 14/05/2025
 	; 09/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 26/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -246,13 +247,16 @@ loc_ccdrv_reset_cdir_FAT_12_16_fcluster:
 loc_ccdrv_reset_cdir_FAT_fcluster:
 	mov	[Current_Dir_FCluster], eax
 
-	mov	edi, PATH_Array
+	; 16/05/2025 - TRDOS 386 v2.0.10
+	;mov	edi, PATH_Array
 	mov	edx, esi
 	add	esi, LD_CurrentDirectory
-	mov	ecx, 32
-	rep	movsd
+	;mov	ecx, 32
+	;rep	movsd
 
-	call	change_prompt_dir_string
+	;call	change_prompt_dir_string
+	; 16/05/2025
+	call	change_prompt_dir_str
 
 	mov	esi, edx
 
