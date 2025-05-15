@@ -270,7 +270,7 @@ loc_ccdrv_reset_cdir_FAT_fcluster:
 dos_prompt:
 	; 14/05/2025 (TRDOS 386 Kernel v2.0.5)
 	; (8 sub dir levels, max. 103 chars curdir string, +zero )
-	; ((max. 65 bytes curdir ASCIIZ string will be displayed))
+	; ((max. 66 bytes curdir ASCIIZ string will be displayed))
 	;
 	; 26/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 06/05/2016
@@ -338,8 +338,6 @@ trim_cdir_str_1:
 	jne	short trim_cdir_str_1
 
 	; esi points to the 1st non-path ('/') char
-	; remain char count of the string may be 61-13 to 61
-	; (including zero byte)
 
 skip_trim_cdir_str:
 	;;;
