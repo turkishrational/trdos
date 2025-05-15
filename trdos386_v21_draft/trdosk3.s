@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 10/05/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 15/05/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -127,7 +127,7 @@ loc_ccdrv_get_FAT_volume_name_0:
 	push	esi 
 	cmp	al, 2
 	ja	short loc_ccdrv_get_FAT32_vol_name
-             
+
 loc_ccdrv_get_FAT2_16_vol_name:
 	add	esi, LD_BPB + VolumeLabel
 	jmp	short loc_ccdrv_get_FAT_volume_name_1
@@ -142,7 +142,7 @@ loc_ccdrv_get_FAT_volume_name_1:
 	pop	ebx
 	; BL = 0
 	jc	short loc_change_current_drv1
-	
+
 	; 08/05/2025 - TRDOS 386 v2.0.10
 	;and	al, al
 	;jz	short loc_change_current_drv1
@@ -168,6 +168,7 @@ loc_change_current_drv3:
 	;retn
 
 restore_current_directory:
+	; 14/05/2025
 	; 09/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 26/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 11/02/2016
@@ -180,24 +181,31 @@ restore_current_directory:
 	;
 	; OUTPUT:
 	;   ESI = Logical DOS Drive Description Table
-	;   EDI = offset Current_Dir_Drv 
+	;   EDI = offset Current_Dir_Drv
 
 	mov	al, [esi+LD_FATType]
 	mov	[Current_FATType], al
 
-	mov	ah, [esi+LD_Name] 
+	mov	ah, [esi+LD_Name]
 	mov	[Current_Dir_Drv], ah
 
 	and	al, al
 	jz	short loc_restore_FS_current_directory
 
 loc_restore_FAT_current_directory:
-	mov	ah, [esi+LD_CDirLevel]
-	mov	[Current_Dir_Level], ah
-	or	ah, ah
-        jz	short loc_ccdrv_reset_cdir_FAT_12_16_32_fcluster
+	; 14/05/2025
+	;mov	ah, [esi+LD_CDirLevel]
+	;mov	[Current_Dir_Level], ah
+	;or	ah, ah
+	movzx	edx, byte [esi+LD_CDirLevel]
+	mov	[Current_Dir_Level], dl
+	or	dl, dl        
+	jz	short loc_ccdrv_reset_cdir_FAT_12_16_32_fcluster
 
-	movzx	edx, ah
+	; 14/05/2025 (8 sub dir levels)
+	;movzx	edx, ah
+	dec	edx ; level 1 -> the first field/entry 
+
 	shl	dl, 4 ; * 16
         add	edx, esi
 	mov	eax, [edx+LD_CurrentDirectory+12]
@@ -213,22 +221,27 @@ loc_restore_FS_current_directory:
 	jmp	short loc_ccdrv_check_rootdir_sign
 
 loc_ccdrv_reset_cdir_FAT_12_16_32_fcluster:
-	cmp	al, 3
+	;cmp	al, 3
+	; 14/05/2025
+	cmp	dl, 3
 	jb	short loc_ccdrv_reset_cdir_FAT_12_16_fcluster
 loc_ccdrv_reset_cdir_FAT32_fcluster:
 	mov	eax, [esi+LD_BPB+FAT32_RootFClust]
 	jmp	short loc_ccdrv_check_rootdir_sign
-loc_ccdrv_reset_cdir_FAT_12_16_fcluster:   
+
+loc_ccdrv_reset_cdir_FAT_12_16_fcluster:
 	;xor	al, al  ; xor eax, eax
 	; 26/07/2022
 	xor	eax, eax
-	;xor	edx, edx
-loc_ccdrv_check_rootdir_sign:
-	cmp	byte [esi+LD_CurrentDirectory], 0
-	jne	short loc_ccdrv_reset_cdir_FAT_fcluster
-loc_ccdrv_set_rootdir_FAT_fcluster:
-        mov     [esi+LD_CurrentDirectory+12], eax
-	mov	dword [esi+LD_CurrentDirectory], 'ROOT'
+
+; 14/05/2025	
+;	;xor	edx, edx
+;loc_ccdrv_check_rootdir_sign:
+;	cmp	byte [esi+LD_CurrentDirectory], 0
+;	jne	short loc_ccdrv_reset_cdir_FAT_fcluster
+;loc_ccdrv_set_rootdir_FAT_fcluster:
+;	mov	[esi+LD_CurrentDirectory+12], eax
+;	mov	dword [esi+LD_CurrentDirectory], 'ROOT'
 
 loc_ccdrv_reset_cdir_FAT_fcluster:
 	mov	[Current_Dir_FCluster], eax
@@ -240,9 +253,9 @@ loc_ccdrv_reset_cdir_FAT_fcluster:
 	rep	movsd
 
 	call	change_prompt_dir_string
-	
+
 	mov	esi, edx
-	
+
         sub	eax, eax
        ;sub	edx, edx
 	mov	edi, Current_Dir_Drv
@@ -251,6 +264,10 @@ loc_ccdrv_reset_cdir_FAT_fcluster:
 	retn
 
 dos_prompt:
+	; 14/05/2025 (TRDOS 386 Kernel v2.0.5)
+	; (8 sub dir levels, max. 103 chars curdir string, +zero )
+	; ((max. 65 bytes curdir ASCIIZ string will be displayed))
+	;
 	; 26/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 06/05/2016
 	; 30/01/2016
@@ -279,13 +296,61 @@ pass_prompt_label:
 	mov	byte [edi], 20h
 	inc	edi
 	mov	esi, Current_Dir_Drv
-	movsw
-	movsb
+	movsw	; '?:'
+	movsb	; '/'
 loc_prompt_current_directory:
+	; esi = offset Current_Directory
 	cmp	byte [esi], 20h
 	jb	short pass_prompt_current_directory
+
+	;;;
+	; 14/05/2025
+	; decrease string length depending on prompt label
+	mov	eax, TextBuffer+11+62 ; '[!] C:/'
+	sub	eax, edi
+	; if the prompt is '[TRDOS] C:/', AL = 62
+	; if the prompt is '[!] C:/', AL = 66
+	; if the prompt is '[11BYTES-MAX] C:/', AL = 56
+
+trim_cdir_str_0:
+
+	;cmp	byte [Current_Dir_StrLen], 65
+	cmp	byte [Current_Dir_StrLen], al ; path limit for prompt
+	jna	short skip_trim_cdir_str
+
+	; trim path string
+	mov	dword [edi], '.../'
+	movzx	ecx, byte [Current_Dir_StrLen]
+	;sub	cl, 65-4
+	sub	al, 4 ; '.../'
+	sub	cl, al
+	lodsd	; add esi, 4
+	; skip excessive chars
+	add	esi, ecx
+	
+trim_cdir_str_1:
+	lodsb
+	cmp	al, '/'
+	jne	short trim_cdir_str_1
+
+	; esi points to the 1st non-path ('/') char
+	; remain char count of the string may be 61-13 to 61
+	; (including zero byte)
+
+skip_trim_cdir_str:
+	;;;
+
 	movsb
-	jmp	short loc_prompt_current_directory
+
+	;;;
+	;jmp	short loc_prompt_current_directory
+	; 14/05/2025
+	cmp	byte [esi], 20h
+	jnb	short skip_trim_cdir_str
+
+	; here, zero byte found at the end of string
+	;;;
+
 pass_prompt_current_directory:
 	mov	byte [edi], '>'
 	inc	edi
@@ -2925,9 +2990,8 @@ rediv_tfs_hex:
 	; 27/07/2022
 	jmp	print_msg
 
-; burada kaldým... 10/05/2025
-
 find_first_file:
+	; 15/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 11/02/2016
 	; 10/02/2016
@@ -2970,7 +3034,7 @@ find_first_file:
 	rep	stosd	; 44 bytes
 	;stosw		; +2 bytes 
 
-	mov	edi, FindFile_Name ; FFF structure, offset 66
+	mov	edi, FindFile_Name ; FFF structure, offset 105 ; 15/05/2025
 	cmp	esi, edi
 	je	short loc_fff_mfn_ok
 	mov	edx, edi 

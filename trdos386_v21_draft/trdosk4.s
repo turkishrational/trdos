@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - Directory Functions : trdosk4.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/09/2024  (Previous: 29/08/2023)
+; Last Update: 16/05/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -34,6 +34,7 @@ change_prompt_dir_str: ; 05/10/2016 (call from 'set_working_path')
 	retn
 
 set_current_directory_string:
+	; 16/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 11/08/2022 (TRDOS 386 Kernel v2.0.5)
 	; 24/01/2016 (TRDOS 386 = TRDOS v2.0)
 	; 27/03/2011
@@ -49,7 +50,9 @@ set_current_directory_string:
 	push    edi
 	cmp     ah, 0
 	jna	short pass_write_path
-	add	esi, 16
+	; 16/05/2025
+	; (8 sub dir levels)
+	;add	esi, 16
 	mov	ebx, esi
 loc_write_path:
 	;mov	ecx, 8
@@ -104,6 +107,7 @@ pass_write_path:
 	retn
 
 get_current_directory:
+	; 16/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 29/08/2023 (TRDOS 386 Kernel v2.0.6)
 	; 11/08/2022
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -187,14 +191,15 @@ loc_get_current_drive_not_ready_retn:
 	retn
 
 loc_get_current_drive_3:
-        mov     edi, PATH_Array
-	push	edi
+	; 16/05/2025
+	;mov	edi, PATH_Array
+	;push	edi
 	add	esi, LD_CurrentDirectory
-	;mov	ecx, 32
-	; 28/07/2022
-	mov	cl, 32
-	rep	movsd
-	pop	esi ; Path Array Address
+	;;mov	ecx, 32
+	;; 28/07/2022
+	;mov	cl, 32
+	;rep	movsd
+	;pop	esi ; Path Array Address
 	pop	edi ; pushed esi (current dir buffer offset)
 	;
 	call	set_current_directory_string
@@ -205,6 +210,8 @@ loc_get_current_drive_4:
 	retn
 
 change_current_directory:
+	; 14/05/2025 (TRDOS 386 Kernel v2.0.10)
+	;	(8 sub directory levels, + root directory)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 02/03/2021 (TRDOS 386 v2.0.3) ((BugFix))
 	; 19/02/2016
@@ -221,7 +228,7 @@ change_current_directory:
 	; OUTPUT ->
 	; 	EDI = DOS Drive Description Table
 	; 	cf = 1 -> error
-	;	   EAX = Error code
+	;	   EAX = Error code (in AL) ; 14/05/2025
 	;	cf = 0 -> successful
 	;	   ESI = PATH_Array
 	;	   EAX = Current Directory First Cluster
@@ -250,10 +257,12 @@ loc_ccd_parse_path_name:
 	; proc_change_prompt_dir_string
 
 	movzx	ecx, al
-	inc	cl
+	; 14/05/2025 (8 sub dir levels, 9 dir levels)
+	;inc	cl
 	shl	cl, 4
 	add	edi, ecx
-	mov	cl, 7
+	;mov	cl, 7
+	mov	cl, 8
 	sub	cl, al
 	shl	cl, 2
 	mov	ebx, eax
@@ -271,7 +280,7 @@ loc_ccd_parse_path_name:
 		; AL = CCD_Level
         call    parse_dir_name
 		; AL = CCD_Level
-		; AH = Last_Dir_Level
+		; AH = Last Sub Directory Level
 		; (EDI = PATH_Array)
 
 pass_ccd_parse_dir_name:
@@ -291,7 +300,9 @@ pass_ccd_parse_dir_name:
 
 	mov	[CCD_DriveDT], esi
 
-	cmp	al, 7
+	; 14/05/2025 - TRDOS 386 v2.0.9
+	cmp	al, 8
+	;cmp	al, 7
 	jb	short loc_ccd_load_child_dir
 
 loc_ccd_bad_path_name_retn:
@@ -299,25 +310,29 @@ loc_ccd_bad_path_name_retn:
 	;mov	eax, 19 ; Bad directory/path name
 	; 28/07/2022
 	sub	eax, eax
-	mov	al, 19
+	mov	al, 19	; ERR_INV_PATH_NAME
 	stc
 loc_ccd_retn_p:
 	retn
 
 loc_ccd_load_child_dir:
 	; AL = CCD_Level
+	; AH = Last_Dir_Level
 	or	al, al
 	jz	short loc_ccd_load_root_dir
 
-	;mov	cx, ax
 	; 28/07/2022
 	mov	ecx, eax
+
+	; 14/05/2025 - TRDOS 386 v2.0.10 (8 sub dir levels)
+	dec	eax  ; 1 -> 0, 8 -> 7
+
 	shl	al, 4
 	movzx	esi, al
      	add	esi, edi  ; offset PATH_Array
 
 	mov	eax, [esi+12]
-	cmp	cl, ch
+	cmp	cl, ch ; ch = 0
 	;je	loc_ccd_load_sub_directory
 	; 28/07/2022
 	jne	short loc_ccd_1
@@ -335,7 +350,6 @@ loc_ccd_load_child_dir_next:
 	; Volume name attribute: 8h
 	mov	ah, 00001000b ; 08h (Attrib NAND, AND --> zero mask)
 
-	;xor	cx, cx  
 	xor	ecx, ecx ; 02/03/2021
 	call	locate_current_dir_file
 	jnc	short loc_ccd_set_dir_cluster_ptr
@@ -364,10 +378,12 @@ loc_ccd_path_not_found_retn:
 	retn
 
 loc_ccd_load_FAT_root_dir:
-	cmp	byte [Current_FATType], 2
+	;mov	esi, [CCD_DriveDT]
+	; 14/05/2025
+	cmp	byte [esi+LD_FATType], 2
+	;cmp	byte [Current_FATType], 2
 	ja	short loc_ccd_load_FAT32_root_dir
 
-	;mov	esi, [CCD_DriveDT]
 	;push	esi
 	call	load_FAT_root_directory
 	;pop	edi ; Dos Drv Description Table
@@ -380,7 +396,9 @@ loc_ccd_load_FAT_root_dir:
         jmp	short loc_ccd_set_cdfc
 
 loc_ccd_load_root_dir:
-	cmp	byte [Current_FATType], 1
+	; 14/05/2025
+	cmp	byte [esi+LD_FATType], 1
+	;cmp	byte [Current_FATType], 1
 	jnb	short loc_ccd_load_FAT_root_dir
 
 loc_ccd_load_FS_root_dir:
@@ -398,7 +416,9 @@ loc_ccd_set_dir_cluster_ptr:
 	mov	ax, [edi+26] ; First Cluster Low Word
 
 	mov	esi, [CCD_DriveDT]
-	cmp	byte [Current_FATType], 1
+	; 14/05/2025
+	cmp	byte [esi+LD_FATType], 1
+	;cmp	byte [Current_FATType], 1
 	jb	short loc_ccd_load_FS_sub_directory_next
 	;push	esi
 	call	load_FAT_sub_directory
@@ -409,19 +429,26 @@ pass_ccd_set_dir_cluster_ptr:
 	mov	esi, PATH_Array
 	jc	short loc_ccd_retn_c
 
-	mov	eax, [DirBuff_Cluster]
+	;mov	eax, [DirBuff_Cluster]
+	; 14/05/2025
+	mov	eax, [CLUSNUM]
 
-	inc	byte [CCD_Level]
+	; 14/05/2025 - TRDOS 386 v2.0.10
+	;	(8 sub dir levels, + root directory)
 	movzx	ebx, byte [CCD_Level]
+	inc	byte [CCD_Level]
+	;movzx	ebx, byte [CCD_Level]
 	shl	bl, 4 ; * 16 (<= 128)
 	add	esi, ebx ; 19/02/2016
 	mov	[esi+12], eax
 	jmp	short loc_ccd_set_cdfc
 
 loc_ccd_load_FAT32_root_dir:
-	mov	esi, PATH_Array
-	mov	eax, [esi+12]
-	mov	esi, [CCD_DriveDT]
+	; 14/05/2025
+	;mov	esi, PATH_Array
+	;mov	eax, [esi+12]
+	;mov	esi, [CCD_DriveDT]
+	mov	eax, [esi+LD_BPB+BPB_RootClus]
 
 loc_ccd_load_FAT_sub_directory:
 	;push	esi
@@ -433,7 +460,9 @@ pass_ccd_load_FAT_sub_directory:
 	mov	esi, PATH_Array
 	jc	short loc_ccd_retn_c
 
-	mov	eax, [DirBuff_Cluster]
+	;mov	eax, [DirBuff_Cluster]
+	; 14/05/2025
+	mov	eax, [CLUSNUM]
 
 loc_ccd_set_cdfc:
 	mov	cl, [CCD_Level]
@@ -441,7 +470,7 @@ loc_ccd_set_cdfc:
 	mov	[Current_Dir_FCluster], eax
 
 	mov	ch, [Last_Dir_Level]
-	cmp	cl, ch 
+	cmp	cl, ch
 	;jb	loc_ccd_load_child_dir_next
 	; 28/07/2022
 	jnb	short loc_ccd_2	
@@ -467,6 +496,7 @@ loc_ccd_load_sub_directory:
 	jmp	short pass_ccd_load_FAT_sub_directory
 
 loc_ccd_save_current_dir:
+	; 14/05/2025 (TRDOS 386 v2.0.10)
 	; 02/03/2021 (TRDOS 386 v2.0.3) ((BugFix))
 	; ('find_directory_entry' has been fixed to prevent large
 	; ECX value > 65535)
@@ -478,10 +508,9 @@ loc_ccd_save_current_dir:
 	mov	[edi], cl
 	inc	edi ; LD_CurrentDirectory
 	push	esi
-	;;mov	ecx, 32  ; always < 65536 (in this procedure)
-	mov	cx, 32
-	; 02/03/2021
-	;mov	ecx, 32
+	;mov	cx, 32
+	; 14/05/2025
+	mov	ecx, 32
 	rep	movsd
 	; Current directory has been saved to
 	; the DOS drive description table, cdir area !
@@ -491,6 +520,7 @@ loc_ccd_save_current_dir:
 	retn
 
 parse_dir_name:
+	; 14/05/2025 - TRDOS 386 v2.0.10
 	; 11/02/2016
 	; 10/02/2016
 	; 07/02/2016 (TRDOS 386 = TRDOS v2.0)
@@ -500,7 +530,7 @@ parse_dir_name:
 	;	ESI = ASCIIZ Directory String Address
 	;	AL = Current Directory Level
 	;	EDI = Destination Adress
-	;	     (8 levels, each one 12+4 byte)
+	;	     (8 sub dir levels, each one 12+4 bytes)
 	; OUTPUT ->
 	;	EDI = Dir Entry Formatted Array
 	;	     with zero cluster pointer at the last level
@@ -554,10 +584,16 @@ repeat_ppdn_name_dot_dot:
 	jb	short pass_ppdn_convert_sub_dir_name
 loc_ppdn_convert_sub_dir_name:
 	mov	ah, [PATH_Level]
-	cmp	ah, 7
+	; 14/05/2025
+	cmp	ah, 8
+	;cmp	ah, 7
 	jnb	short pass_ppdn_convert_sub_dir_name
-	inc	ah
-	mov	[PATH_Level], ah
+	;inc	ah
+	;mov	[PATH_Level], ah
+	; 14/05/2025
+	;dec	ah
+	inc	byte [PATH_Level] ; Last sub dir level
+	;
 	mov	esi, Dir_File_Name
 	;mov	edi, [PATH_Array_Ptr]
 	mov	al, 16
@@ -579,7 +615,7 @@ end_of_parse_dir_name:
 	pop	edi
 	cmc
 	;mov	al, [PATH_CDLevel]
-	;mov	ah, [PATH_Level]
+	;mov	ah, [PATH_Level] ; Last sub dir level
 	mov	ax, [PATH_CDLevel]
 	retn
 
@@ -590,13 +626,15 @@ loc_ppdn_dot_dot:
 loc_ppdn_dot_dot_prev_level:
 	mov	ax, [PATH_CDLevel]
 	sub	ah, 1
-	adc	ah, 0
+	adc	ah, 0 ; Last sub dir level - 1 (if > 0)
 	cmp	al, ah
 	jna	short pass_ppdn_set_al_to_ah
 	mov	al, ah
 pass_ppdn_set_al_to_ah:
 	mov	[PATH_CDLevel], ax
 	jmp	short pass_ppdn_convert_sub_dir_name
+
+burada kaldým... 16/05/2025
 
 locate_current_dir_file:
 	; 26/08/2024 (TRDOS 386 v2.0.9)
@@ -729,12 +767,12 @@ loc_cdir_locate_file_retn:
 loc_locatefile_next_cluster:
 	call	load_FAT_sub_directory
 	;jc	short loc_locatefile_drive_not_ready_read_err
-	jc	short loc_cdir_locate_file_retn 
+	jc	short loc_cdir_locate_file_retn
 
 loc_locatefile_search_again:
-	mov	esi, [CDLF_FNAddress] 
+	mov	esi, [CDLF_FNAddress]
 	mov	ax, [CDLF_AttributesMask]
-	mov	cx, [CDLF_DEType] 
+	mov	cx, [CDLF_DEType]
 	jmp	short loc_cdir_locatefile_search
 
 reload_current_directory:
@@ -800,7 +838,7 @@ find_directory_entry:
 	;	CL = 0 -> Return the First Free Dir Entry
 	;	CL = E5h -> Return the 1st deleted entry
 	;	CL = FFh -> Return the 1st deleted or free entry
-	;	CL > 0 and CL <> E5h and CL <> FFh -> Return the first 
+	;	CL > 0 and CL <> E5h and CL <> FFh -> Return the first
 	;            proper entry (which fits with Atributes Masks)
 	;	CX = 0 -> Find Valid File/Directory/VolumeName
 	;	? = Any One Char
@@ -1054,7 +1092,7 @@ loc_check_ffde_retn_2:
 	mov	dh, [PreviousAttr]
 	mov	[DirBuff_CurrentEntry], bx
 	retn
- 
+
 loc_check_ffde_0_next:
 	;inc	bx
 	; 28/07/2022
@@ -1251,7 +1289,7 @@ save_longname_sub_component:
 	;push	ecx
 	;push	edx
 	push	eax
-           
+
 	sub	ecx, ecx
 	;sub	eax, eax
 	mov	cl, 26
@@ -1342,7 +1380,7 @@ parse_path_name:
 	;	     EAX = Error Code (AL)
 	;
 	; (Modified registers: eax, ecx, esi, edi)
-	
+
 	; Clear the pathname bytes in TR-DOS Findfile data buffer
 	push	edi
 	;mov	ecx, 20  ; 80 bytes
@@ -1350,7 +1388,7 @@ parse_path_name:
 	sub	ecx, ecx
 	mov	cl, 20
 	xor	eax, eax
-	rep	stosd 
+	rep	stosd
 	pop	edi
 
 	mov	ax, [esi]
@@ -1452,7 +1490,7 @@ loc_ppn_invalid_drive:
 	; cf = 1
 	; The Drive Letter/Char < "A" or > "Z"
 	mov	ax, 0Fh
-	; MS-DOS Error Code 0Fh = Disk Drive Invalid 
+	; MS-DOS Error Code 0Fh = Disk Drive Invalid
 	; (MainProg ErrMsg: "Drive not ready or read error!")
 	retn
 
@@ -1461,7 +1499,7 @@ find_longname:
 	; 13/02/2016 (TRDOS 386 = TRDOS v2.0)
 	; 24/01/2010 (DIR.ASM, 'proc_find_longname')
 	; 17/10/2009
-	
+
 	; INPUT -> 
 	;	ESI = DOS short file name address
 	; 	for example: "filename.ext"
@@ -1472,7 +1510,7 @@ find_longname:
 	;	AL = 0 & CF=1 -> longname not found
 	;	     the file/directory has no longname
 	; 	cf = 0 -> AL = FAT Type 
- 
+
 	; 17/10/2009
 	; ASCIIZ string will be returned
 	; as LongFileName

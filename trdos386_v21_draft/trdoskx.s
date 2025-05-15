@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/05/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 15/05/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -32,7 +32,9 @@ Current_Drv: resb 1
 Current_Dir_Drv:   resb 1 ; '?'
                    resb 1 ; ':'
 Current_Dir_Root:  resb 1 ; '/'
-Current_Directory: resb 90
+;Current_Directory: resb 90
+; 14/05/2025 - TRDOS 386 v2.0.10
+Current_Directory: resb 103 ; 8 sub dir levels (7*13 + 12)
 End_Of_Current_Dir_Str: resb 1
 Current_Dir_StrLen: resb 1
 
@@ -200,12 +202,26 @@ AttributesMask: resw 1 ; CMD_INTR.ASM ; 09/11/2011
 ; 10/02/2016 (128 bytes -> 126 bytes)
 ; 08/02/2016
 ;FFF Structure (128 bytes) ; DIR.ASM ; 09/10/2011
+FINDFILE_BUFFER:	; 11/05/2025
+;;;;
+; 12/05/2025 - Temporary
+; (TRDOS 386 v2.0.10)
+find_buf.drive:	resb 1		; drive of search
+find_buf.name:	resb 11		; formatted name
+find_buf.sattr: resb 1		; attribute of search
+find_buf.LastEnt:  resd 1	; LastEnt
+find_buf.DirStart: resd 1	; DirStart
+find_buf.NETID:	resd 1		; Reserved for NET
+find_buf.DirEntry: resb 32	; Directory Entry
+
 FindFile_Drv:		  resb 1
-FindFile_Directory:	  resb 65
+;FindFile_Directory:	  resb 65
+; 15/05/2025
+FindFile_Directory:	  resb 104 ; 7*13 + 12 + zero
 FindFile_Name:		  resb 13
 FindFile_LongNameEntryLength:
 FindFile_LongNameYes: 	  resb 1 ; Sign for longname procedures
-;Above 80 bytes form
+;Above 120 bytes form
 ;TR-DOS Source/Destination File FullName Format/Structure
 FindFile_AttributesMask:  resw 1
 FindFile_DirEntry:	  resb 32
@@ -838,4 +854,5 @@ ClusSplit:	resb 1	; (MSDOS -> CLUSSPLIT)
 CLUSFAC:	resb 1	; (MSDOS -> CLUSFAC)
 SECCLUSPOS:	resb 1	; (MSDOS -> SECCLUSPOS)
 NXTCLUSNUM:	resd 1	; (MSDOS -> NXTCLUSNUM)
-SRCH_CLUSTER:	resd 1	; (MSDOS -> SRCH_CLUSTER)	
+SRCH_CLUSTER:	resd 1	; (MSDOS -> SRCH_CLUSTER)
+LASTENT:	resd 1	; (MSDOS -> LASTENT)	
