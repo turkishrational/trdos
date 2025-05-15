@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/05/2025  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 16/05/2025  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -14910,7 +14910,7 @@ sysfff: ; <Find First File>
 	;          cf = 1 -> Error code in AL
 	;
 	; Modified Registers: EAX (at the return of system call)
-	;  
+	;
 	; TR-DOS FindFile (FFF) Structure (128 bytes):
 	; 09/10/2011 (DIR.ASM) - 10/02/2016 (trdoskx.s)
 	;
@@ -15060,7 +15060,7 @@ sysfnf_12:
 
         ;mov	esi, FindFile_DirEntry
 	call	get_file_name
-	
+
 	; 25/08/2024
 	; ecx <= 7 (from 'get_file_name')
 	;mov	cl, [FFF_Valid] ; (*)
@@ -15208,7 +15208,7 @@ sysfnf_10:
 	;je	short sysfff_6 ; esi = FindFile_Drv
 	; 25/08/2024 (BugFix of BugFix) (*)
 	je	short sysfnf_11 ; esi <> FindFile_Drv
-	
+
 	jmp	sysfnf_12
 
 stsfnf_2:
@@ -17082,11 +17082,14 @@ sysdrive_ok:
 	jmp	sysret
 
 sysdir: ; Get Current (Working) Drive & Directory (for user)
+	; 16/05/2025 (TRDOS 386 v2.0.10)
 	; 30/12/2017 (TRDOS 386 = TRDOS v2.0)
 	;
         ; INPUT ->
         ;          EBX = Current directory name buffer address
-	;		(Buffer length = 92 bytes)
+	;		;; (Buffer length = 92 bytes)
+	;	16/05/2025 - TRDOS 386 v2.0.10
+	;		(Buffer length = 104 bytes)
 	; OUTPUT ->
 	;          AL = Current drive (0=A: .. 2=C:)
 	;	   If CF = 1 -> AL = error code
@@ -17094,18 +17097,26 @@ sysdir: ; Get Current (Working) Drive & Directory (for user)
 	; Modified Registers: EAX (at the return of system call)
 	;
 	; Note: Required directory name buffer length may be
-	;	<= 92 bytes for current TRDOS 386 version.
-	;	(7*12 name chars + 7 slash + 0)
+	;	;<= 92 bytes for current TRDOS 386 version.
+	;	;(7*12 name chars + 7 slash + 0)
+	;	; 16/05/2025
+	;	;<= 104 bytes for since TRDOS 386 v2.10.10.
+	;	;(8*12 name chars + 7 slash + 0)
 
 	mov	ebp, esp
-	sub	esp, 96
+	;sub	esp, 96
+	; 16/05/2025
+	sub	esp, 104
 	push	ebx ; User's buffer address
 	xor	dl, dl ; 0 = current drive
   	call	get_current_directory
 	jc	short sysdrive_err ; 'drive not ready !' error
 	mov	esi, esp ; System's buffer address
 	pop	edi  ; User's buffer address
-	; ecx = transfer (byte) count (<=92)
+	; 16/05/2025
+	;cmp	ecx, 104
+	;ja	short sysdir_err
+	; ecx = transfer (byte) count (<=104) ; 16/05/2025
 	call	transfer_to_user_buffer
 	mov	esp, ebp
 	jnc	short sysdir_ok
