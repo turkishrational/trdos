@@ -634,9 +634,8 @@ pass_ppdn_set_al_to_ah:
 	mov	[PATH_CDLevel], ax
 	jmp	short pass_ppdn_convert_sub_dir_name
 
-burada kaldým... 16/05/2025
-
 locate_current_dir_file:
+	; 16/05/2025 (TRDOS 386 v2.0.10)
 	; 26/08/2024 (TRDOS 386 v2.0.9)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 20/11/2017
@@ -688,31 +687,71 @@ locate_current_dir_file:
 	xor	ebx, ebx
 	mov	[PreviousAttr], bl ; 0  ; 13/02/2016
 
-	mov	bh, [Current_Drv]
-	cmp	byte [DirBuff_ValidData], bl ; 0
-	jna	short loc_lcdf_reload_current_dir2
-        mov     bl, [DirBuff_DRV]
-	sub	bl, 'A'
-	cmp	bh, bl
-	jne	short loc_lcdf_reload_current_dir1
-	mov	edx, [DirBuff_Cluster]
-	cmp	edx, [Current_Dir_FCluster]
-	je	short loc_cdir_locatefile_search
+	; 16/05/2025 - TRDOS 386 v2.0.10
+	xor	edx, edx
+	mov	dh, [Current_Drv]
 
-loc_lcdf_reload_current_dir1:
-	xor	bl, bl
-loc_lcdf_reload_current_dir2:
-	mov	esi, ebx
-        add     esi, Logical_DOSDisks
-	call	reload_current_directory
-	jnc	short loc_locatefile_search_again
-	retn
+	mov	eax, [Current_Dir_FCluster]
+	mov	[DirBuff_Cluster], eax
+	and	eax, eax
+	jnz	short locate_current_sub_dir_file
+
+	; root directory
+	mov	[DirBuff_Cluster], eax ; 0
+	mov	ecx, [edx+LD_DATABegin]
+	mov	eax, [edx+LD_ROOTBegin]
+	sub	ecx, eax
+	;mov	[DirBuff_sectors], cl ; (MSDOS -> [CLUSFAC])
+	mov	[CLUSFAC], cl
+
+locate_current_sub_dir_file_ns:
+	mov	cl, [edx+LD_PhyDrvNo]
+	jmp	short locate_current_sub_dir_file_@
+	jmp	short locate_current_dir_file_@
+
+loc_locatefile_next_cluster:
+	mov	[DirBuff_Cluster], eax
+
+locate_current_sub_dir_file:
+	mov	cl, [edx+LD_BPB+SecPerClust]
+	;mov	[DirBuff_sectors], cl
+	mov	[CLUSFAC], cl
+	
+	sub	ebx, ebx
+
+	; edx = Logical DOS Drive Description Table address
+	; eax = Cluster Number (28bit for FAT32 fs)
+	; ebx = Sector position in cluster = 0
+
+	call	FIGREC
+
+locate_current_sub_dir_file_@:	
+	; eax = physical sector number
+	;  cl = physical drive/disk number
+	;       (needed for GETBUFFER procedure)
+	mov	[DIRSEC], eax
+
+	call	GETBUFFER
+	jc	short loc_cdir_locate_file_retn
+	
+	;mov	esi, [CurrentBuffer]
+	or	byte [esi+BUFFINFO.buf_flags], buf_isDIR
 
 loc_cdir_locatefile_search:
-	xor	ebx, ebx
-	push	ebp ; 20/11/2017
+	; 16/05/2025
+	lea	edi, [esi+BUFINSIZ]
+	mov	esi, [CDLF_FNAddress]
+	mov	eax, [CDLF_AttributesMask]
+	mov	cx, [CDLF_DEType]
+
+	;mov	byte [DirBuff_LastEntry], 16 ; 512/32
+
+	xor	ebx, ebx ; 0  ; current entry index in the dir buff 
+	; edi = directory buffer (data) start address
+
+	push	edx ; LDRVT address
 	call	find_directory_entry
-	pop	ebp ; 20/11/2017
+	pop	ebp
 	jnc	short loc_cdir_locate_file_retn
 
 loc_locatefile_check_stc_reason:
@@ -720,35 +759,31 @@ loc_locatefile_check_stc_reason:
 	jz	short loc_cdir_locate_file_stc_retn
 
 loc_locatefile_check_next_entryblock:
-	;mov	bh, [Current_Drv]
-	;sub	bl, bl
-	;movzx	esi, bx
-	; 28/07/2022
-        xor	ebx, ebx
-	mov	bh, [Current_Drv]
-	mov	esi, ebx
-	add     esi, Logical_DOSDisks
+	; 16/05/2025
+        mov	edx, ebp ; Logical DOS Drive Desc. Table address
 
-	cmp	byte [Current_Dir_Level], 0
-	jna	short loc_locatefile_check_FAT_type
+	dec	byte [CLUSFAC] ; (MSDOS -> [CLUSFAC])
+	jz	short loc_locatefile_check_root_dir
+	
+	mov	eax, [DIRSEC]
+	inc	eax
 
-	cmp	byte [Current_FATType], 1
-	jnb	short loc_locatefile_load_subdir_cluster
-	retn
+	jmp	short locate_current_sub_dir_file_ns
 
-loc_locatefile_check_FAT_type:
-	cmp	byte [Current_FATType], 3
-	jb	short loc_cdir_locate_file_retn
-
-loc_locatefile_load_subdir_cluster:
+loc_locatefile_check_root_dir:
 	mov	eax, [DirBuff_Cluster]
+	or	eax, eax
+	jz	short loc_locatefile_file_notfound
+
+	mov	esi, edx
 	call	get_next_cluster
 	jnc	short loc_locatefile_next_cluster
+
 	or	eax, eax
-	jnz	short loc_locatefile_drive_not_ready_read_err
-	;stc
-	; 28/07/2022
-;loc_locatefile_file_notfound:
+	jnz	short loc_locatefile_drv_not_ready_read_err
+
+	; 16/05/2025
+loc_locatefile_file_notfound:
 	;mov	eax, 2 ; File/Directory/VolName not found
 	;xor	eax, eax
 	; 26/08/2024
@@ -757,68 +792,15 @@ loc_locatefile_load_subdir_cluster:
 	stc
 	retn
 
-loc_locatefile_drive_not_ready_read_err:
+loc_locatefile_drv_not_ready_read_err:
 	;mov	eax, 17 ;Drive not ready or read error
 loc_cdir_locate_file_stc_retn:
 	cmc ;stc
 loc_cdir_locate_file_retn:
 	retn
 
-loc_locatefile_next_cluster:
-	call	load_FAT_sub_directory
-	;jc	short loc_locatefile_drive_not_ready_read_err
-	jc	short loc_cdir_locate_file_retn
-
-loc_locatefile_search_again:
-	mov	esi, [CDLF_FNAddress]
-	mov	ax, [CDLF_AttributesMask]
-	mov	cx, [CDLF_DEType]
-	jmp	short loc_cdir_locatefile_search
-
-reload_current_directory:
-	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
-	; 06/02/2016 (TRDOS 386 = TRDOS v2.0)
-	; 13/06/2010
-	; 22/09/2009
-        ;
-	; INPUT ->
-	;	ESI = Dos drive description table address
-
-	;mov	al, [esi+LD_FATType]
-	mov	al, [Current_FATType]
-	cmp	al, 2
-	ja	short loc_reload_FAT_sub_directory
-	mov	ah, [Current_Dir_Level]
-	or	al, al
-	jz	short loc_reload_FS_directory
-	or	ah, ah
-	jnz	short loc_reload_FAT_sub_directory
-loc_reload_FAT_12_16_root_directory:
-	;call	load_FAT_root_directory
-	;retn
-	; 28/07/2022
-	jmp	load_FAT_root_directory
-loc_reload_FS_directory:
-	and	ah, ah
-	jnz	short loc_reload_FS_sub_directory 
-loc_reload_FS_root_directory: 
-	;call	load_FS_root_directory
-	;retn
-	; 28/07/2022
-	jmp	load_FS_root_directory
-loc_reload_FS_sub_directory:
-	mov	eax, [Current_Dir_FCluster]
-	;call	load_FS_sub_directory
-	;retn
-	jmp	load_FS_sub_directory 
-loc_reload_FAT_sub_directory:
-	mov	eax, [Current_Dir_FCluster]
-	;call	load_FAT_sub_directory
-	;retn
-	; 28/07/2022
-	jmp	load_FAT_sub_directory
-
 find_directory_entry:
+	; 16/05/2025 (TRDOS 386 Kernel v2.0.10)	
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 02/03/2021 (TRDOS 386 v2.0.3) ((BugFix))
 	; 14/02/2016
@@ -829,6 +811,9 @@ find_directory_entry:
 	; 19/09/2009
 	; 2005
 	; INPUT ->
+	;	16/05/2025
+	;	EDI = Directory Buffer Address (512 bytes, data)
+	;	;;;
 	;	ESI = Sub Dir or File Name Address
 	;	AL = Attributes Mask 
 	;	(<AL AND EntryAttrib> must be equal to AL)
@@ -863,12 +848,16 @@ find_directory_entry:
 	;
 	; (EAX, EBX, ECX, EDX, EDI, EBP will be changed)
 
-	cmp	bx, [DirBuff_LastEntry]
-	ja      short loc_ffde_stc_retn_255 ; 28/07/2022
+	;cmp	bx, [DirBuff_LastEntry]
+	;ja	short loc_ffde_stc_retn_255 ; 28/07/2022
+	; 16/05/2025
+	cmp	ebx, 16 ; 512/32
+	jnb	short loc_ffde_stc_retn_255
 
 	;mov    [DirBuff_CurrentEntry], bx
 
-  	mov	edi, Directory_Buffer
+	; 16/05/2025
+  	;mov	edi, Directory_Buffer
 	mov	[FDE_AttrMask], ax
 
 	sub	eax, eax
@@ -876,7 +865,9 @@ find_directory_entry:
 	;;mov	[PreviousAttr], al ; 0 ;; 13/02/2016
 	mov	[AmbiguousFileName], ax ; 0
 
-	mov	ax, bx
+	;mov	ax, bx
+	; 16/05/2025
+	mov	eax, ebx
 	;shl	ax, 5 ; ; * 32 ; Directory entry size
 	; 28/07/2022
 	shl	eax, 5
@@ -912,7 +903,8 @@ loc_check_ffde_retn_1:
 	sub	eax, eax
 	mov	al, 2
 	mov	dh, [PreviousAttr]
-	mov	[DirBuff_CurrentEntry], bx
+	;mov	[DirBuff_CurrentEntry], bx
+	mov	[DirBuff_CurrentEntry], bl
 	stc
 	retn
 
@@ -931,8 +923,11 @@ loc_find_dir_next_entry_1:
 	;inc	bx
 	; 28/07/2022
 	inc	ebx
-	cmp	bx, [DirBuff_LastEntry]
-	ja	short loc_ffde_stc_retn_255
+	;cmp	bx, [DirBuff_LastEntry]
+	;ja	short loc_ffde_stc_retn_255
+	; 16/05/2025
+	cmp	bl, 16 ; 512/32
+	jnb	short loc_ffde_stc_retn_255
         ; 28/07/2022
 	;jmp	short check_find_dir_entry
 
@@ -975,7 +970,9 @@ loc_check_attributes_mask:
 	;sub	eax, eax
 	xor	al, al
 	mov	dh, [PreviousAttr]
-	mov	[DirBuff_CurrentEntry], bx
+	;mov	[DirBuff_CurrentEntry], bx
+	; 16/05/2025
+	mov	[DirBuff_CurrentEntry], bl
 	retn
 
 pass_direntry_attr_check:
@@ -1058,7 +1055,9 @@ loc_find_dir_proper_direntry_1:
 	mov	ax, [AmbiguousFileName]
 loc_find_dir_proper_direntry_2:
 	mov     dh, [PreviousAttr]
-	mov	[DirBuff_CurrentEntry], bx
+	;mov	[DirBuff_CurrentEntry], bx
+	; 16/05/2025
+	mov	[DirBuff_CurrentEntry], bl
 	retn
 
 loc_scasb_find_dir_ext:
@@ -1090,7 +1089,9 @@ loc_check_ffde_retn_2:
 	; 28/07/2022
 	sub	eax, eax
 	mov	dh, [PreviousAttr]
-	mov	[DirBuff_CurrentEntry], bx
+	;mov	[DirBuff_CurrentEntry], bx
+	; 16/05/2025
+	mov	[DirBuff_CurrentEntry], bl
 	retn
 
 loc_check_ffde_0_next:
@@ -1100,10 +1101,13 @@ loc_check_ffde_0_next:
 	add	edi, 32
 	;inc	word [DirBuff_EntryCounter]
 	 
-        cmp	bx, [DirBuff_LastEntry]
-	;ja	short loc_ffde_stc_retn_255
-	; 07/08/2022
-	ja	short jmp_ffde_stc_retn_255
+        ;cmp	bx, [DirBuff_LastEntry]
+	;;ja	short loc_ffde_stc_retn_255
+	;; 07/08/2022
+	;ja	short jmp_ffde_stc_retn_255
+	; 16/05/2025
+	cmp	bl, 16
+	jnb	short jmp_ffde_stc_retn_255
 
 	mov	[PreviousAttr], dl
 	mov	ch, [edi]
@@ -1121,10 +1125,14 @@ loc_find_free_deleted_entry_2:
 	; 28/07/2022
 	inc	ebx
 	add	edi, 32
-	cmp	bx, [DirBuff_LastEntry]
-	;ja	short loc_ffde_stc_retn_255
-	; 07/08/2022
-	ja	short jmp_ffde_stc_retn_255
+
+        ;cmp	bx, [DirBuff_LastEntry]
+	;;ja	short loc_ffde_stc_retn_255
+	;; 07/08/2022
+	;ja	short jmp_ffde_stc_retn_255
+	; 16/05/2025
+	cmp	bl, 16
+	jnb	short jmp_ffde_stc_retn_255
 
 	mov	ch, [edi]
 	jmp	short loc_find_free_deleted_entry_2
@@ -1137,10 +1145,15 @@ pass_loc_check_ffde_0_err:
 	; 28/07/2022
 	inc	ebx
 	add	edi, 32
-	cmp	bx, [DirBuff_LastEntry]
-        ;ja	loc_ffde_stc_retn_255
-	; 28/07/2022
-	jna	short loc_ffe_save_prev_attr
+
+	;cmp	bx, [DirBuff_LastEntry]
+        ;;ja	loc_ffde_stc_retn_255
+	;; 28/07/2022
+	;jna	short loc_ffe_save_prev_attr
+	; 16/05/2025
+	cmp	bl, 16 ; 512/32
+	jb	short loc_ffe_save_prev_attr
+
 jmp_ffde_stc_retn_255:	; 07/08/2022
 	jmp	loc_ffde_stc_retn_255
 
