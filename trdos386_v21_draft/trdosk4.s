@@ -692,7 +692,6 @@ locate_current_dir_file:
 	mov	dh, [Current_Drv]
 
 	mov	eax, [Current_Dir_FCluster]
-	mov	[DirBuff_Cluster], eax
 	and	eax, eax
 	jnz	short locate_current_sub_dir_file
 
@@ -704,15 +703,15 @@ locate_current_dir_file:
 	;mov	[DirBuff_sectors], cl ; (MSDOS -> [CLUSFAC])
 	mov	[CLUSFAC], cl
 
-locate_current_sub_dir_file_ns:
+locate_current_dir_file_ns:
 	mov	cl, [edx+LD_PhyDrvNo]
-	jmp	short locate_current_sub_dir_file_@
 	jmp	short locate_current_dir_file_@
 
 loc_locatefile_next_cluster:
+	;mov	edx, esi	; LDRVT address
+locate_current_sub_dir_file:
 	mov	[DirBuff_Cluster], eax
 
-locate_current_sub_dir_file:
 	mov	cl, [edx+LD_BPB+SecPerClust]
 	;mov	[DirBuff_sectors], cl
 	mov	[CLUSFAC], cl
@@ -725,7 +724,7 @@ locate_current_sub_dir_file:
 
 	call	FIGREC
 
-locate_current_sub_dir_file_@:	
+locate_current_dir_file_@:	
 	; eax = physical sector number
 	;  cl = physical drive/disk number
 	;       (needed for GETBUFFER procedure)
@@ -768,7 +767,7 @@ loc_locatefile_check_next_entryblock:
 	mov	eax, [DIRSEC]
 	inc	eax
 
-	jmp	short locate_current_sub_dir_file_ns
+	jmp	short locate_current_dir_file_ns
 
 loc_locatefile_check_root_dir:
 	mov	eax, [DirBuff_Cluster]
@@ -777,7 +776,7 @@ loc_locatefile_check_root_dir:
 
 	mov	esi, edx
 	call	get_next_cluster
-	jnc	short loc_locatefile_next_cluster
+	jnc	short loc_locatefile_next_cluster  ; edx = esi
 
 	or	eax, eax
 	jnz	short loc_locatefile_drv_not_ready_read_err
