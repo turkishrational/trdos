@@ -3103,10 +3103,10 @@ loc_fff_longname_no:
 	mov	eax, [Current_Dir_FCluster]
 	mov	[FindFile_DirFirstCluster], eax
 
+loc_fff_fnf_inc_mc:
 	mov	eax, [DirBuff_Cluster]
 	mov	[FindFile_DirCluster], eax
 
-loc_fff_fnf_inc_mc:
 	inc	word [FindFile_MatchCounter]
 
 	mov	ebx, edi
@@ -3249,7 +3249,8 @@ loc_cont_search_next_file_nc:
 
 loc_fnf_load_next_dir_cluster:
 	; 17/05/2025
-	mov	[FindFile_DirCluster], eax
+	;mov	[FindFile_DirCluster], eax
+	mov	ebx, eax
 	mov	esi, Dir_Entry_Name
 	mov	ax, [FindFile_AttributesMask]
 	;xor	edx, edx

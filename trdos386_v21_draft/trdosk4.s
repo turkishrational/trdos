@@ -665,7 +665,7 @@ locate_current_dir_file:
 	; OUTPUT ->
 	;	EDI = Directory Entry Address (in Directory Buffer)
 	;	ESI = DOS DirEntry Format FileName Address
-	;	CF = 0 -> No Error, Proper Entry,
+	;	CF = 0 -> No Error, Proper Entry
 	;	DL = Attributes
 	;	DH = Previous Entry Attr (LongName Check)
 	;	AL > 0 -> Ambiguous filename wildcard "?" used
@@ -701,11 +701,12 @@ locate_current_dir_file_@:
 	xor	eax, eax
 	mov	[PreviousAttr], al ; 0  ; 13/02/2016
 
-	and	ebx, ebx
+	mov	eax, ebx
+	and	eax, eax
 	jnz	short locate_current_sub_dir_file
 
 	; root directory
-	mov	[DirBuff_Cluster], ebx ; 0
+	mov	[DirBuff_Cluster], eax ; 0
 	mov	ecx, [edx+LD_DATABegin]
 	mov	eax, [edx+LD_ROOTBegin]
 	sub	ecx, eax
@@ -719,7 +720,7 @@ locate_current_dir_file_ns:
 loc_locatefile_next_cluster:
 	;mov	edx, esi	; LDRVT address
 locate_current_sub_dir_file:
-	mov	[DirBuff_Cluster], ebx ; 17/05/2025
+	mov	[DirBuff_Cluster], eax ; 17/05/2025
 
 	mov	cl, [edx+LD_BPB+SecPerClust]
 	;mov	[DirBuff_sectors], cl
