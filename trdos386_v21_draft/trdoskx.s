@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 15/05/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 17/05/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -203,33 +203,27 @@ AttributesMask: resw 1 ; CMD_INTR.ASM ; 09/11/2011
 ; 08/02/2016
 ;FFF Structure (128 bytes) ; DIR.ASM ; 09/10/2011
 FINDFILE_BUFFER:	; 11/05/2025
-;;;;
-; 12/05/2025 - Temporary
-; (TRDOS 386 v2.0.10)
-find_buf.drive:	resb 1		; drive of search
-find_buf.name:	resb 11		; formatted name
-find_buf.sattr: resb 1		; attribute of search
-find_buf.LastEnt:  resd 1	; LastEnt
-find_buf.DirStart: resd 1	; DirStart
-find_buf.NETID:	resd 1		; Reserved for NET
-find_buf.DirEntry: resb 32	; Directory Entry
 
 FindFile_Drv:		  resb 1
 ;FindFile_Directory:	  resb 65
 ; 15/05/2025
 FindFile_Directory:	  resb 104 ; 7*13 + 12 + zero
 FindFile_Name:		  resb 13
-FindFile_LongNameEntryLength:
-FindFile_LongNameYes: 	  resb 1 ; Sign for longname procedures
-;Above 120 bytes form
-;TR-DOS Source/Destination File FullName Format/Structure
+; 17/05/2025
 FindFile_AttributesMask:  resw 1
 FindFile_DirEntry:	  resb 32
 FindFile_DirFirstCluster: resd 1
 FindFile_DirCluster:	  resd 1
-FindFile_DirEntryNumber:  resw 1
+FindFile_DirSector:	  resd 1
+FindFile_DirEntryNumber:  resb 1
+FindFile_DirSectorCount:  resb 1
 FindFile_MatchCounter:	  resw 1
-FindFile_Reserved:	  resw 1 ; 06/03/2016
+FindFile_Reserved1:	  resw 1 ; 06/03/2016
+FindFile_LongNameEntryLength:
+FindFile_LongNameYes: 	  resb 1 ; Sign for longname procedures
+FindFile_Reserved2:	  resb 1 ; 17/05/2025
+FindFile_DirBuffer:	  resd 1
+; 176 bytes
 
 First_Path_Pos: resd 1	; DIR.ASM ; 09/10/2011
 Last_Slash_Pos: resd 1	; DIR.ASM

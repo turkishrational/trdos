@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 16/05/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 17/05/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -635,6 +635,7 @@ pass_ppdn_set_al_to_ah:
 	jmp	short pass_ppdn_convert_sub_dir_name
 
 locate_current_dir_file:
+	; 17/05/2025
 	; 16/05/2025 (TRDOS 386 v2.0.10)
 	; 26/08/2024 (TRDOS 386 v2.0.9)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -680,23 +681,31 @@ locate_current_dir_file:
 
 	;mov	word [DirBuff_EntryCounter], 0 ; Zero Based
 
-	mov	[CDLF_FNAddress], esi
-	mov	[CDLF_AttributesMask], ax
-	mov	[CDLF_DEType], cx
-
-	xor	ebx, ebx
-	mov	[PreviousAttr], bl ; 0  ; 13/02/2016
-
+	; 17/05/2025
 	; 16/05/2025 - TRDOS 386 v2.0.10
 	xor	edx, edx
 	mov	dh, [Current_Drv]
 
-	mov	eax, [Current_Dir_FCluster]
-	and	eax, eax
+	; 17/05/2025
+	mov	ebx, [Current_Dir_FCluster]
+
+locate_current_dir_file_@:
+	; edx = LDRVT address
+	; ebx = current (search, fff/fnf) cluster
+
+	mov	[CDLF_FNAddress], esi
+	mov	[CDLF_AttributesMask], ax
+	mov	[CDLF_DEType], cx
+
+	; 17/05/2025
+	xor	eax, eax
+	mov	[PreviousAttr], al ; 0  ; 13/02/2016
+
+	and	ebx, ebx
 	jnz	short locate_current_sub_dir_file
 
 	; root directory
-	mov	[DirBuff_Cluster], eax ; 0
+	mov	[DirBuff_Cluster], ebx ; 0
 	mov	ecx, [edx+LD_DATABegin]
 	mov	eax, [edx+LD_ROOTBegin]
 	sub	ecx, eax
@@ -710,21 +719,22 @@ locate_current_dir_file_ns:
 loc_locatefile_next_cluster:
 	;mov	edx, esi	; LDRVT address
 locate_current_sub_dir_file:
-	mov	[DirBuff_Cluster], eax
+	mov	[DirBuff_Cluster], ebx ; 17/05/2025
 
 	mov	cl, [edx+LD_BPB+SecPerClust]
 	;mov	[DirBuff_sectors], cl
 	mov	[CLUSFAC], cl
 	
-	sub	ebx, ebx
+	; 17/05/2025
+	;sub	ebx, ebx
 
 	; edx = Logical DOS Drive Description Table address
 	; eax = Cluster Number (28bit for FAT32 fs)
-	; ebx = Sector position in cluster = 0
+	;;ebx = Sector position in cluster = 0
 
 	call	FIGREC
 
-locate_current_dir_file_@:	
+locate_current_dir_file_@:
 	; eax = physical sector number
 	;  cl = physical drive/disk number
 	;       (needed for GETBUFFER procedure)
@@ -739,6 +749,7 @@ locate_current_dir_file_@:
 loc_cdir_locatefile_search:
 	; 16/05/2025
 	lea	edi, [esi+BUFINSIZ]
+
 	mov	esi, [CDLF_FNAddress]
 	mov	eax, [CDLF_AttributesMask]
 	mov	cx, [CDLF_DEType]
@@ -799,6 +810,7 @@ loc_cdir_locate_file_retn:
 	retn
 
 find_directory_entry:
+	; 17/05/2025
 	; 16/05/2025 (TRDOS 386 Kernel v2.0.10)	
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 02/03/2021 (TRDOS 386 v2.0.3) ((BugFix))
@@ -827,7 +839,7 @@ find_directory_entry:
 	;	CX = 0 -> Find Valid File/Directory/VolumeName
 	;	? = Any One Char
 	;	* = Every Chars
-	;	EBX = Current Dir Entry (BX)
+	;	EBX = Current Dir Entry (BX) < 16 ; 17/05/2025
 	;
 	; OUTPUT ->
 	;	EDI = Directory Entry Address (in DirectoryBuffer)
@@ -849,9 +861,10 @@ find_directory_entry:
 
 	;cmp	bx, [DirBuff_LastEntry]
 	;ja	short loc_ffde_stc_retn_255 ; 28/07/2022
+	; 17/05/2025
 	; 16/05/2025
-	cmp	ebx, 16 ; 512/32
-	jnb	short loc_ffde_stc_retn_255
+	;cmp	ebx, 16 ; 512/32
+	;jnb	short loc_ffde_stc_retn_255
 
 	;mov    [DirBuff_CurrentEntry], bx
 
@@ -866,7 +879,9 @@ find_directory_entry:
 
 	;mov	ax, bx
 	; 16/05/2025
-	mov	eax, ebx
+	;mov	eax, ebx
+	; 17/05/2025
+	mov	al, bl
 	;shl	ax, 5 ; ; * 32 ; Directory entry size
 	; 28/07/2022
 	shl	eax, 5
@@ -945,8 +960,8 @@ loc_fde_check_attrib:
 	cmp	ch, 0E5h ; Is it a deleted file?
 	je	short loc_find_dir_next_entry_prevdeleted
 
-	cmp     dl, 0Fh ; longname sub component check
-	jne     short loc_check_attributes_mask
+	cmp	dl, 0Fh ; longname sub component check
+	jne	short loc_check_attributes_mask
 	call	save_longname_sub_component
 
 loc_check_attributes_mask:

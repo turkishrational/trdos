@@ -2993,6 +2993,7 @@ rediv_tfs_hex:
 	jmp	print_msg
 
 find_first_file:
+	; 17/05/2025
 	; 15/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 11/02/2016
@@ -3059,8 +3060,20 @@ loc_fff_mfn_ok:
 	; EDI = Directory Entry
 	; EBX = Directory Buffer Entry Index/Number
 
+loc_fff_fnf_found:
+	; 17/05/2025
+	mov	cl, [CLUSFAC]
+	mov	[FindFile_DirSectorCount], cl
+	mov	ecx, [DIRSEC]
+	mov	[FindFile_DirSector], ecx
+	mov	ecx, [CurrentBuffer]
+	add	ecx, BUFINSIZ
+	mov	[FindFile_DirBuffer], ecx
+
 loc_fff_fnf_ln_check:
-	xor	ch, ch
+	;xor	ch, ch
+	; 17/05/2025
+	xor 	ecx, ecx
 	xor	dh, 0Fh
 	jz	short loc_fff_longname_yes
 	mov	[FindFile_LongNameYes], ch ; 0
@@ -3073,13 +3086,19 @@ loc_fff_longname_yes:
 
 loc_fff_longname_no:
 	;mov	bx, [DirBuff_CurrentEntry]
-	mov	[FindFile_DirEntryNumber], bx
+	;mov	[FindFile_DirEntryNumber], bx
+	; 17/05/2025
+	mov	[FindFile_DirEntryNumber], bl
 	;mov	dx, ax ; Ambiguous Filename chars used sign > 0
 	; 28/07/2022
 	mov	edx, eax
 
+	; 17/05/2025
+	cmp	word [FindFile_MatchCounter], 0
+	jnz	short loc_fff_fnf_inc_mc ; find next file
+
 	mov	al, [Current_Drv]
-	mov	[FindFile_Drv], al 
+	mov	[FindFile_Drv], al
 
 	mov	eax, [Current_Dir_FCluster]
 	mov	[FindFile_DirFirstCluster], eax
@@ -3087,6 +3106,7 @@ loc_fff_longname_no:
 	mov	eax, [DirBuff_Cluster]
 	mov	[FindFile_DirCluster], eax
 
+loc_fff_fnf_inc_mc:
 	inc	word [FindFile_MatchCounter]
 
 	mov	ebx, edi
@@ -3112,6 +3132,7 @@ loc_fff_retn:
 	retn
 
 find_next_file:
+	; 17/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 15/10/2016
 	; 10/02/2016
@@ -3134,24 +3155,26 @@ find_next_file:
 	; (EAX, EBX, ECX, EDX, ESI, EDI will be changed)
 
 	cmp	word [FindFile_MatchCounter], 0
-	ja	short loc_start_search_next_file
-
-loc_fnf_stc_retn:
-	stc
-loc_fnf_ax12h_retn:
-	mov	eax, 12 ; No More files
-;loc_fnf_retn:
-	retn
+	jna	short loc_fnf_stc_retn
 
 loc_start_search_next_file:
-	mov	bx, [FindFile_DirEntryNumber]
+	; 17/05/2025
+	;;mov	bx, [FindFile_DirEntryNumber]
+	;movzx	ebx, byte [FindFile_DirEntryNumber]
+	mov	bl, [FindFile_DirEntryNumber]
 	;inc	bx
 	; 28/07/2022
 	inc	ebx
-	cmp	bx, [DirBuff_LastEntry]
-	ja	short loc_cont_search_next_file
+	;cmp	bx, [DirBuff_LastEntry]
+	;ja	short loc_cont_search_next_file
+	; 17/05/2025
+	cmp	bl, 16 ; 512/32
+	jnb	short loc_cont_search_next_file
 
 loc_fnf_search:
+	; 17/05/2025
+	mov	edi, [FindFile_DirBuffer]
+loc_fnf_search_@:
 	mov	esi, Dir_Entry_Name
 	mov	ax, [FindFile_AttributesMask]
 	;xor	cx, cx
@@ -3159,45 +3182,94 @@ loc_fnf_search:
 	xor	ecx, ecx
 	call	find_directory_entry
 	;jnc	loc_fff_fnf_ln_check
+	; 17/05/2025
 	; 28/07/2022
-	jc	short loc_cont_search_next_file
+	jc	short loc_cont_search_next_file_@
 	jmp	loc_fff_fnf_ln_check
 
+loc_fnf_stc_retn:
+	stc
+loc_fnf_ax12h_retn:
+	mov	eax, 12 ; No More files
+loc_fnf_retn:
+	retn
+
+loc_cont_search_next_file_@:
+	; 17/05/2025
+	;or	cx, cx
+	or	ecx, ecx
+	jz	short loc_fnf_stc_retn ; end of dir
+	
 loc_cont_search_next_file:
-	xor	ebx, ebx
-	mov	bh, [Current_Drv]
-	mov	esi, Logical_DOSDisks
-	add	esi, ebx
+	; 17/05/2025
+	dec	byte [FindFile_DirSectorCount]
+	jz	short loc_cont_search_next_file_nc
 
-	cmp	byte [Current_Dir_Level], 0
-	jna	short loc_fnf_check_FAT_type
-	cmp	byte [esi+LD_FATType], 1
-	jb	short loc_fnf_ax12h_retn
-	jmp	short loc_fnf_check_next_cluster
+	inc	dword [FindFile_DirSector]
+	mov	eax, [FindFile_DirSector]
 
-loc_fnf_check_FAT_type:
-	cmp	byte [esi+LD_FATType], 3
-	jb	short loc_fnf_ax12h_retn
+	xor	edx, edx
+	;mov	dh, [Current_Drv]
+	mov	dh, [FindFile_Drv]
+	add	edx, Logical_DOSDisks
+	mov	cl, [edx+LD_PhyDrvNo]
+	
+	call	GETBUFFER
+	jc	short loc_fnf_retn
+	
+	;mov	esi, [CurrentBuffer]
+	or	byte [esi+BUFFINFO.buf_flags], buf_isDIR
+	
+	lea	edi, [esi+BUFINSIZ]
+	mov	[FindFile_DirBuffer], edi
+	jmp	short loc_fnf_search_@
+	
+loc_cont_search_next_file_nc:
+	; 17/05/2025
+	xor	edx, edx
+	;mov	eax, [DirBuff_Cluster]
+	mov	eax, [FindFile_DirCluster]
+	cmp	eax, edx ; 0
+	jna	short loc_fnf_stc_retn ; end of root dir
 
-loc_fnf_check_next_cluster:
-	mov	eax, [DirBuff_Cluster]
+	;mov	dh, [Current_Drv]
+	mov	dh, [FindFile_Drv]
+	add	edx, Logical_DOSDisks
+	mov	cl, [edx+LD_PhyDrvNo]
+	mov	esi, edx
+
 	call	get_next_cluster
 	jnc	short loc_fnf_load_next_dir_cluster
 	or	eax, eax
 	jz	short loc_fnf_stc_retn
 	;mov	eax, 17 ;Drive not ready or read error
  	cmc	;stc
-loc_fnf_retn:
+;loc_fnf_retn:
 	retn
 
 loc_fnf_load_next_dir_cluster:
-	call	load_FAT_sub_directory
-	jc	short loc_fnf_retn
-	;xor	bx, bx
-	; 28/07/2022
-	xor	ebx, ebx
-	mov	[FindFile_DirEntryNumber], bx
-	jmp	short loc_fnf_search
+	; 17/05/2025
+	mov	[FindFile_DirCluster], eax
+	mov	esi, Dir_Entry_Name
+	mov	ax, [FindFile_AttributesMask]
+	;xor	edx, edx
+	;mov	dh, [FindFile_Drv]
+	;add	edx, Logical_DOSDisks
+	; edx = LDRVT address
+	xor	ecx, ecx ; 0
+	call	locate_current_dir_file_@
+	jc	short loc_fnf_check_err_reason
+	jmp	short loc_fff_fnf_found
+
+loc_fnf_check_err_reason:
+	cmp	eax, 2 ; file not found
+	jne	short loc_fnf_stc_retn_@
+	jmp	short loc_fnf_stc_retn ; no more files !
+loc_fnf_stc_retn_@:
+	stc
+	retn
+
+; burada kaldým... 18/05/2025
 
 get_and_print_longname:
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)

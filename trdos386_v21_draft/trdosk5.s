@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 13/05/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 17/05/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -3248,6 +3248,7 @@ sdc_unp_ok:
 ; 27/04/2025 - TRDOS 386 v2.0.10
 
 FIGREC:
+	; 17/05/2025
 	; 27/04/2025
 	; (MSDOS -> FIGREC) - Ref: Retro DOS v5 - ibmdos7.s
 	; Convert cluster number to physical disk sector number
@@ -3255,7 +3256,8 @@ FIGREC:
 	; INPUT:
 	;	edx = Logical DOS Drive Description Table address
 	;	eax = Cluster Number (28bit for FAT32 fs)
-	;	ebx = Sector position in cluster
+	;	; 17/05/2025
+	;	;ebx = Sector position in cluster
 	; OUTPUT:
 	;	eax = physical sector number
 	;	 cl = physical drive/disk number
@@ -3273,7 +3275,8 @@ figrec_1:
 	jmp	short figrec_1
 
 figrec_2:
-	add	eax, ebx
+	; 17/05/2025
+	;add	eax, ebx
 	add	eax, [edx+LD_DATABegin]
 	mov	cl, [edx+LD_PhyDrvNo]
 	retn
