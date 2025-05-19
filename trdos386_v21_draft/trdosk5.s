@@ -2923,7 +2923,7 @@ pb_x:
 
 ; 24/04/2025 - TRDOS 386 v2.0.10
 
-METACOMPARE
+METACOMPARE:
 	; 24/04/2025
 	; (MSDOS -> MetaCompare) - Ref: Retro DOS v5 - ibmdos7.s
 	;

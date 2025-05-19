@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 17/05/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 18/05/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -122,9 +122,12 @@ get_current_directory:
 	;
 	;   Note: Required dir buffer length may be <= 92 bytes
 	;         for TRDOS (7*12 name chars + 7 slash + 0)
+	; 	; 16/05/2025 - buffer length <= 104 bytes
+	;	  (8*12 name chars + 7 slashes + 0)		
+
 	; OUTPUT ->  ESI = Current Directory Buffer
 	;            EAX, EBX, ECX, EDX, EDI will be changed
-	;            CX/CL = Current Directory String Length
+	;            ECX/CL = Current Directory String Length
 	;	     DL = Drive Number (0 based)
 	;            (If input is 0, output is current drv number)
 	;            DH = same with input 
@@ -635,6 +638,7 @@ pass_ppdn_set_al_to_ah:
 	jmp	short pass_ppdn_convert_sub_dir_name
 
 locate_current_dir_file:
+	; 18/05/2025
 	; 17/05/2025
 	; 16/05/2025 (TRDOS 386 v2.0.10)
 	; 26/08/2024 (TRDOS 386 v2.0.9)
@@ -668,9 +672,13 @@ locate_current_dir_file:
 	;	CF = 0 -> No Error, Proper Entry
 	;	DL = Attributes
 	;	DH = Previous Entry Attr (LongName Check)
-	;	AL > 0 -> Ambiguous filename wildcard "?" used
-	;	AH > 0 -> Ambiguous filename wildcard "*" used
-	;	AX = 0 -> Filename full fits with directory entry
+	;	;AL > 0 -> Ambiguous filename wildcard "?" used
+	;	;AH > 0 -> Ambiguous filename wildcard "*" used
+	;	;AX = 0 -> Filename full fits with directory entry
+	;       18/05/2025
+	;	AL bit 0, 1 -> "?" used (bit 1 for name ext.)
+	;	AL bit 2, 3 -> '*' used (bit 3 for name ext.)
+	;	AL = 0 -> Filename full fits with directory entry
 	;	CH = The 1st Name Char of Current Dir Entry
 	;	CF = 1 -> Proper entry not found, Error Code in EAX/AL
 	;	CL = 0 and CH = 0 -> Free Entry (End Of Dir)
@@ -811,6 +819,7 @@ loc_cdir_locate_file_retn:
 	retn
 
 find_directory_entry:
+	; 18/05/2025
 	; 17/05/2025
 	; 16/05/2025 (TRDOS 386 Kernel v2.0.10)	
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -848,9 +857,13 @@ find_directory_entry:
 	;	CF = 0 -> No Error, Proper Entry,
 	;	DL = Attributes
 	;	DH = Previous Entry Attr (LongName Check)
-	;	AL > 0 -> Ambiguous filename wildcard "?" used
-	;	AH > 0 -> Ambiguous filename wildcard "*" used
-	;	AX = 0 -> Filename full fits with directory entry
+	;	;AL > 0 -> Ambiguous filename wildcard "?" used
+	;	;AH > 0 -> Ambiguous filename wildcard "*" used
+	;	;AX = 0 -> Filename full fits with directory entry
+	;       18/05/2025
+	;	AL bit 0, 1 -> "?" used (bit 1 for name ext.)
+	;	AL bit 2, 3 -> '*' used (bit 3 for name ext.)
+	;	AL = 0 -> Filename full fits with directory entry
 	;	EBX = CurrentDirEntry (BX)
 	;	CH = The 1st Name Char of Current Dir Entry
 	;	CF = 1 -> Proper entry not found, Error Code in AX/AL
@@ -876,7 +889,8 @@ find_directory_entry:
 	sub	eax, eax
 
 	;;mov	[PreviousAttr], al ; 0 ;; 13/02/2016
-	mov	[AmbiguousFileName], ax ; 0
+	; 18/05/2025
+	;mov	[AmbiguousFileName], ax ; 0
 
 	;mov	ax, bx
 	; 16/05/2025
@@ -991,7 +1005,12 @@ loc_check_attributes_mask:
 	retn
 
 pass_direntry_attr_check:
-	mov	ebp, edi ; 14/02/2016
+	;mov	ebp, edi ; 14/02/2016
+	; 18/05/2025
+	push	edi ; *
+
+; 18/05/2025 - TRDOS 286 v2.0.10
+%if 0
 	;mov	ecx, 8
 	; 28/07/2022
 	sub	ecx, ecx
@@ -1059,17 +1078,30 @@ pass_fde_ambiguous4_check:
 	; 28/07/2022
 	jne	short loc_find_dir_next_entry_ebp
 	;jmp	short loc_find_dir_proper_direntry
+%else
+	; 18/05/2025
+	; compare 11 byte dir entr name
+	; esi = 11 chars DirEntry format name with possible '?'
+	; edi = 11 chars DirEntry format name, no '?'
+
+	call	METACOMPARE
+	pop	edi ; *
+	jnz	short loc_find_dir_next_entry
+%endif
 
 loc_find_dir_proper_direntry:
 	xor	cl, cl
 loc_find_dir_proper_direntry_1:
 	pop	esi
-        mov     edi, ebp
+	; 18/05/2025
+        ;mov	edi, ebp
 	mov	ch, [edi]
-	mov     dl, [edi+0Bh] ; Dir entry attributes
-	mov	ax, [AmbiguousFileName]
+	mov	dl, [edi+0Bh] ; Dir entry attributes
+	;mov	ax, [AmbiguousFileName]
+	; 18/05/2025
+	mov	al, [AmbiguousFileName]
 loc_find_dir_proper_direntry_2:
-	mov     dh, [PreviousAttr]
+	mov	dh, [PreviousAttr]
 	;mov	[DirBuff_CurrentEntry], bx
 	; 16/05/2025
 	mov	[DirBuff_CurrentEntry], bl
@@ -1189,6 +1221,7 @@ loc_check_ffde_attrib:
         jmp	short loc_check_ffde_retn_2
 
 convert_file_name:
+	; 18/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 06/03/2016
 	; 11/02/2016
@@ -1203,6 +1236,12 @@ convert_file_name:
 	;	EDI = Dir Entry Format File Name Location
 	;	ESI = Dot File Name Location (capitalized)
 	;
+	;	18/05/2025
+	;      [AmbiguousFileName] bits will be set 
+	;	if DOT file name contains '?' or '*'
+	;	   bit 0,1 -> '?' (bit 1 -> extension)
+	;	   bit 2,3 -> '*' (bit 3 -> extension)			
+	;
 	; (ECX, AL will be changed)
 
 	push	esi
@@ -1214,9 +1253,14 @@ convert_file_name:
 	mov	cl, 11
 	mov	al, 20h
 	rep	stosb
+	; 18/05/2025
+	;xor	eax, eax
+	;stosb
 
 	mov	edi, [esp]
 
+; 18/05/2025
+%if 0
 	mov	cl, 12 ; file name length (max.)
 	; 06/03/2016
 	; Directory entry name limit (11 bytes) check for
@@ -1293,6 +1337,119 @@ stop_convert_file_x:
 	pop	edi
 	pop	esi
 	retn
+%else
+	; 18/05/2025 - TRDOS 386 v2.0.10
+	;
+	; *.ext -> 8 bytes ? then '.ext'
+	; name.* -> 3 bytes ?
+	; *.* -> 11 bytes '? -> '???????????'
+	;
+	; (modified for METACOMPARE procedure)
+
+	mov	byte [AmbiguousFileName], 0 ; reset
+
+	;mov	ecx, 8
+	mov	cl, 8
+check_nch:
+	lodsb
+
+	cmp	al, 20h
+	jna	short convert_ok
+
+	cmp	al, '.'
+	je	short convert_ext
+check_s:
+	cmp	al, '*'
+	jne	short not_star
+
+	or	byte [AmbiguousFileName], 4
+
+	mov	al, '?'
+	stosb
+	dec	ecx
+	jz	short check_ext
+	push	ecx
+	rep	stosb
+	pop	ecx
+
+check_dot:
+	lodsb
+	cmp	al, '.'
+	je	short convert_ext
+	loop	check_dot
+	jmp	short convert_ok
+
+not_star:
+	cmp	al, '?'
+	jne	short check_char_ucase
+	stosb
+	or	byte [AmbiguousFileName], 1
+	loop	check_nch
+	jmp	short check_ext
+
+check_char_ucase:
+	call	simple_ucase
+	stosb
+	loop	check_nch
+
+check_ext:
+	lodsb
+	cmp	al, '.'
+	;je	short convert_ext
+	;retn
+	jne	short convert_ok
+
+convert_ext:
+	mov	cl, 3
+convert_ext_@:
+	lodsb
+	cmp	al, 20h
+	jna	short convert_ok
+
+	cmp	al, '.'
+	je	short convert_ok
+
+check_s_@:
+	cmp	al, '*'
+	jne	short not_star_@
+
+	or	byte [AmbiguousFileName], 8
+
+	mov	al, '?'
+	rep	stosb
+
+	jmp	short convert_ok
+
+not_star_@:
+	cmp	al, '?'
+	jne	short check_char_ucase_@
+
+	or	byte [AmbiguousFileName], 2
+
+	stosb
+	loop	convert_ext_@
+
+convert_ok:
+	pop	edi
+	pop	esi
+	retn
+
+check_char_ucase_@:
+	call	simple_ucase
+	stosb
+	loop	convert_ext_@
+	jmp	short convert_ok
+
+	; 18/05/2025 - TRDOS 386 v2.0.10
+simple_ucase:
+	cmp	al, 61h ; 'a'
+	jb	short simple_ucase_skip
+	cmp	al, 7Ah ; 'z'
+	ja	short simple_ucase_skip
+	and	al, 0DFh
+simple_ucase_skip:
+	retn
+%endif
 
 save_longname_sub_component:
 	; 13/02/2016

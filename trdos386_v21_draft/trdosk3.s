@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 16/05/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 18/05/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -2993,6 +2993,7 @@ rediv_tfs_hex:
 	jmp	print_msg
 
 find_first_file:
+	; 18/05/2025
 	; 17/05/2025
 	; 15/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -3023,8 +3024,10 @@ find_first_file:
 	;	     EAX = File Size
 	;	      BL = Attributes of The File/Directory
 	;	      BH = Long Name Yes/No Status (>0 is YES)
-	;             DX > 0 : Ambiguous filename chars are used
-	;
+	; 	      ;DX > 0 : Ambiguous filename chars are used
+	;	      18/05/2025
+	;	      DL > 0 : Ambiguous filename chars are used		 	
+
 	; (EAX, EBX, ECX, EDX, ESI, EDI will be changed)
 
 	mov	[FindFile_AttributesMask], ax
@@ -3048,9 +3051,12 @@ find_first_file:
 	stosb
 	mov	esi, edx
 loc_fff_mfn_ok:
-	mov	edi, Dir_Entry_Name ; Dir Entry Format File Name
+	;mov	edi, Dir_Entry_Name ; Dir Entry Format File Name
+	; 18/05/2025
+	mov	edi, FindFile_DirEntryName
 	call	convert_file_name
 	mov	esi, edi ; offset Dir_Entry_Name
+	; esi = offset FindFile_DirEntryName
 
 	mov	ax, [FindFile_AttributesMask]
 	;xor	ecx, ecx
@@ -3132,6 +3138,7 @@ loc_fff_retn:
 	retn
 
 find_next_file:
+	; 18/05/2025
 	; 17/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 15/10/2016
@@ -3150,7 +3157,9 @@ find_next_file:
 	;	    EAX = File Size
 	;	      BL = Attributes of The File/Directory
 	;	      BH = Long Name Yes/No Status (>0 is YES)
-	;             DX > 0 : Ambiguous filename chars are used
+	; 	      ;DX > 0 : Ambiguous filename chars are used
+	;	      18/05/2025
+	;	      DL > 0 : Ambiguous filename chars are used
 	;
 	; (EAX, EBX, ECX, EDX, ESI, EDI will be changed)
 
@@ -3175,7 +3184,9 @@ loc_fnf_search:
 	; 17/05/2025
 	mov	edi, [FindFile_DirBuffer]
 loc_fnf_search_@:
-	mov	esi, Dir_Entry_Name
+	;mov	esi, Dir_Entry_Name
+	; 18/05/2025
+	mov	esi, FindFile_DirEntryName
 	mov	ax, [FindFile_AttributesMask]
 	;xor	cx, cx
 	; 28/07/2022
@@ -3251,7 +3262,9 @@ loc_fnf_load_next_dir_cluster:
 	; 17/05/2025
 	;mov	[FindFile_DirCluster], eax
 	mov	ebx, eax
-	mov	esi, Dir_Entry_Name
+	;mov	esi, Dir_Entry_Name
+	; 18/05/2025
+	mov	esi, FindFile_DirEntryName
 	mov	ax, [FindFile_AttributesMask]
 	;xor	edx, edx
 	;mov	dh, [FindFile_Drv]
@@ -3352,6 +3365,7 @@ loc_lfn_err3:
 	jmp	print_msg
 
 show_file:
+	; 18/05/2025 (TRDOS 386 Kernel v2.0.10) 
 	; 07/08/2022
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 18/02/2016
@@ -3416,9 +3430,12 @@ loc_show_change_directory:
 loc_findload_showfile:
 	; 15/02/2016
 	mov	esi, FindFile_Name
-	mov	edi, Dir_Entry_Name ; Dir Entry Format File Name
+	;mov	edi, Dir_Entry_Name ; Dir Entry Format File Name
+	; 18/05/2025
+	mov	edi, FindFile_DirEntryName
 	call	convert_file_name
 	mov	esi, edi ; offset Dir_Entry_Name
+	; esi = offset FindFile_DirEntryName
 
 	sub	al, al	; Attrib AND mask = 0
 	; Directory attribute : 10h

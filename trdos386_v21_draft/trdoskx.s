@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 17/05/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 18/05/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -177,13 +177,16 @@ sector_count:	resd 1 ; DISK_IO.ASM ; (Disk_RW_SectorCount)
 
 ; 06/02/2016 (long name)
 FDE_AttrMask:	   resw 1 ; DIR.ASM
-AmbiguousFileName: resw 1 ; DIR.ASM
+;AmbiguousFileName: resw 1 ; DIR.ASM
+; 18/05/2025 - TRDOS 386 v2.0.10
+AmbiguousFileName: resb 1
 PreviousAttr:	   resb 1 ; DIR.ASM
 ;
-LongNameFound:   resb 1	  ; DIR.ASM
+LongNameFound:	 resb 1	  ; DIR.ASM
 LFN_EntryLength: resb 1   ; DIR.ASM
-LFN_CheckSum:    resb 1   ; DIR.ASM
-LongFileName:    resb 132 ; DIR.ASM
+LFN_CheckSum:	 resb 1   ; DIR.ASM
+LongFileName:	 resb 132 ; DIR.ASM
+
 
 ;PATH_Array_Ptr: resw 1 ; DIR.ASM
 PATH_CDLevel:	 resb 1 ; DIR.ASM
@@ -192,8 +195,9 @@ PATH_Level:	 resb 1 ; DIR.ASM
 ; 07/02/2016
 Dir_File_Name:	resb 13 ; DIR.ASM ; 09/10/2011
 
+; 18/05/2025
 ; 10/02/2016
-Dir_Entry_Name:	resb 13 ; DIR.ASM
+;Dir_Entry_Name: resb 13 ; DIR.ASM
 
 alignb 2
 
@@ -223,7 +227,9 @@ FindFile_LongNameEntryLength:
 FindFile_LongNameYes: 	  resb 1 ; Sign for longname procedures
 FindFile_Reserved2:	  resb 1 ; 17/05/2025
 FindFile_DirBuffer:	  resd 1
-; 176 bytes
+FindFile_DirEntryName:	  resb 13 ; 18/05/2025
+FindFile_Reserved3:	  resb 1 ; 18/05/2025
+; 190 bytes
 
 First_Path_Pos: resd 1	; DIR.ASM ; 09/10/2011
 Last_Slash_Pos: resd 1	; DIR.ASM
@@ -543,6 +549,8 @@ alignb 4
 
 ; 16/10/2016
 FFF_UBuffer:	resd 1  ; User's buffer address for FFF & FNF system calls
+; 18/05/2025 - TRDOS 386 v2.0.10
+FFF_mpid:	resw 1
 ; 15/10/2016
 FFF_Valid:	resb 1  ; Find First File Structure validation byte
 			; 0  = invalid (Find Next File can't use FFF struct)
