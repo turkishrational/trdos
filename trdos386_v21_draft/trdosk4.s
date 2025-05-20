@@ -1481,7 +1481,7 @@ save_longname_sub_component:
 	;	UNICODE chars (two bytes) wil be converted
 	;	to ASCII chars only using low bytes of
 	;	of two byte UNICODE chars,
-	;	a very simple method.
+	;	as a very simple method.
 	;
 	;	ASCIIZ longname length limit is 127+NUL.
 	;	(but string buffer size will be 130)
