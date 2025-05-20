@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 18/05/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 20/05/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -2993,6 +2993,7 @@ rediv_tfs_hex:
 	jmp	print_msg
 
 find_first_file:
+	; 19/05/2025
 	; 18/05/2025
 	; 17/05/2025
 	; 15/05/2025 (TRDOS 386 Kernel v2.0.10)
@@ -3007,7 +3008,7 @@ find_first_file:
 	;	ESI = ASCIIZ File/Dir Name Address (in Current Directory)
 	;	AL = Attributes AND mask (The AND result must be equal to AL)
 	;	      bit 0 = Read Only
-	;	      bir 1 = Hidden
+	;	      bit 1 = Hidden
 	;	      bit 2 = System
 	;	      bit 3 = Volume Label
 	;	      bit 4 = Directory
@@ -3026,7 +3027,7 @@ find_first_file:
 	;	      BH = Long Name Yes/No Status (>0 is YES)
 	; 	      ;DX > 0 : Ambiguous filename chars are used
 	;	      18/05/2025
-	;	      DL > 0 : Ambiguous filename chars are used		 	
+	;	      DL > 0 : Ambiguous filename chars are used
 
 	; (EAX, EBX, ECX, EDX, ESI, EDI will be changed)
 
@@ -3038,7 +3039,7 @@ find_first_file:
 	xor	ecx, ecx
 	mov	cl, 11
 	rep	stosd	; 44 bytes
-	;stosw		; +2 bytes 
+	;stosw		; +2 bytes
 
 	mov	edi, FindFile_Name ; FFF structure, offset 105 ; 15/05/2025
 	cmp	esi, edi
@@ -3060,7 +3061,7 @@ loc_fff_mfn_ok:
 
 	mov	ax, [FindFile_AttributesMask]
 	;xor	ecx, ecx
-	xor	cl, cl  
+	xor	cl, cl
 	call	locate_current_dir_file
 	jc	short loc_fff_retn
 	; EDI = Directory Entry
@@ -3072,9 +3073,10 @@ loc_fff_fnf_found:
 	mov	[FindFile_DirSectorCount], cl
 	mov	ecx, [DIRSEC]
 	mov	[FindFile_DirSector], ecx
-	mov	ecx, [CurrentBuffer]
-	add	ecx, BUFINSIZ
-	mov	[FindFile_DirBuffer], ecx
+	; 19/05/2025
+	;mov	ecx, [CurrentBuffer]
+	;add	ecx, BUFINSIZ
+	;mov	[FindFile_DirBuffer], ecx
 
 loc_fff_fnf_ln_check:
 	;xor	ch, ch
@@ -3087,7 +3089,7 @@ loc_fff_fnf_ln_check:
 
 loc_fff_longname_yes:
 	;inc	byte [FindFile_LongNameYes]
-	mov	cl, [LFN_EntryLength]  
+	mov	cl, [LFN_EntryLength]
 	mov	[FindFile_LongNameEntryLength], cl ; FindFile_LongNameYes
 
 loc_fff_longname_no:
@@ -3138,6 +3140,7 @@ loc_fff_retn:
 	retn
 
 find_next_file:
+	; 19/05/2025
 	; 18/05/2025
 	; 17/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -3174,16 +3177,40 @@ loc_start_search_next_file:
 	;inc	bx
 	; 28/07/2022
 	inc	ebx
-	;cmp	bx, [DirBuff_LastEntry]
-	;ja	short loc_cont_search_next_file
-	; 17/05/2025
-	cmp	bl, 16 ; 512/32
-	jnb	short loc_cont_search_next_file
+	; 19/05/2025
+	and	bl, 0Fh ; 15
+	mov	[FindFile_DirEntryNumber], bl
+	jz	short loc_cont_search_next_file
+
+	;;cmp	bx, [DirBuff_LastEntry]
+	;;ja	short loc_cont_search_next_file
+	;; 17/05/2025
+	;cmp	bl, 16 ; 512/32
+	;jnb	short loc_cont_search_next_file
 
 loc_fnf_search:
-	; 17/05/2025
-	mov	edi, [FindFile_DirBuffer]
+	; 19/05/2025
+	mov	eax, [FindFile_DirSector]
+	xor	edx, edx
+	mov	dh, [FindFile_Drv]
+	add	edx, Logical_DOSDisks
+	mov	cl, [edx+LD_PhyDrvNo]
+	
+	call	GETBUFFER
+	jc	short loc_fnf_retn
+	
+	;mov	esi, [CurrentBuffer]
+	or	byte [esi+BUFFINFO.buf_flags], buf_isDIR
+	
+	lea	edi, [esi+BUFINSIZ]
+
+	;movzx	ebx, byte [FindFile_DirEntryNumber]
+	mov	bl, [FindFile_DirEntryNumber]
+
 loc_fnf_search_@:
+	; 19/05/2025
+	; ebx (bl) = [FindFile_DirEntryNumber]
+
 	;mov	esi, Dir_Entry_Name
 	; 18/05/2025
 	mov	esi, FindFile_DirEntryName
@@ -3217,24 +3244,10 @@ loc_cont_search_next_file:
 	jz	short loc_cont_search_next_file_nc
 
 	inc	dword [FindFile_DirSector]
-	mov	eax, [FindFile_DirSector]
+	;mov	eax, [FindFile_DirSector]
+	; 19/05/2025
+	jmp	short loc_fnf_search
 
-	xor	edx, edx
-	;mov	dh, [Current_Drv]
-	mov	dh, [FindFile_Drv]
-	add	edx, Logical_DOSDisks
-	mov	cl, [edx+LD_PhyDrvNo]
-	
-	call	GETBUFFER
-	jc	short loc_fnf_retn
-	
-	;mov	esi, [CurrentBuffer]
-	or	byte [esi+BUFFINFO.buf_flags], buf_isDIR
-	
-	lea	edi, [esi+BUFINSIZ]
-	mov	[FindFile_DirBuffer], edi
-	jmp	short loc_fnf_search_@
-	
 loc_cont_search_next_file_nc:
 	; 17/05/2025
 	xor	edx, edx
@@ -3243,9 +3256,13 @@ loc_cont_search_next_file_nc:
 	cmp	eax, edx ; 0
 	jna	short loc_fnf_stc_retn ; end of root dir
 
-	;mov	dh, [Current_Drv]
 	mov	dh, [FindFile_Drv]
 	add	edx, Logical_DOSDisks
+
+	; 19/05/2025
+	;mov	cl, [edx+LD_BPB+SecPerClust]
+	;mov	[FindFile_DirSectorCount], cl
+
 	mov	cl, [edx+LD_PhyDrvNo]
 	mov	esi, edx
 
@@ -3283,9 +3300,9 @@ loc_fnf_stc_retn_@:
 	stc
 	retn
 
-; burada kaldým... 18/05/2025
-
 get_and_print_longname:
+	; 20/05/2025 (TRDOS 386 v2.0.10)
+	;	-Major Modification-
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 16/10/2016
 	; 13/02/2016 (TRDOS 386 = TRDOS v2.0)
@@ -3315,7 +3332,7 @@ loc_fln_err1:
 	jmp	cd_drive_not_ready
 loc_fln_err2:
 				   ; or
-	cmp	al, 17		   ; read error	
+	cmp	al, 17		   ; read error
 	;je	cd_drive_not_ready
 	; 28/07/2022
 	;je	short loc_fln_err1
@@ -3336,24 +3353,40 @@ loc_longname_not_found:
 	; 28/07/2022
 	jmp	short loc_lfn_err3
 
+	; 20/05/2025 - TRDOS 386 v2.0.10
+	; (LongName format here: ASCIIZ string)
 loc_print_longname:
-	;mov	esi, LongFileName
-	mov	edi, TextBuffer
+	;mov	esi, LongFileName ; (max. 130 bytes)
+	mov	edi, TextBuffer ; (max. space: 256 bytes)
 	push	edi 
+	; 20/05/2025
+	; TRDOS 386 v2.0.10 limit for FAT/FAT32 long name
+	mov	ecx, 130 ; asciiz or full 130 bytes
 	cmp	al, 0
 	ja	short loc_print_longname_1
-loc_print_FS_longname: ; Singlix FS (64 byte ASCIIZ file name)
-	lodsb
+		; asciiz name length limit for Singlix FS 
+	mov	cl, 64  ; asciiz or full 64 bytes
+loc_print_longname_1:
+;loc_print_FS_longname: ; Singlix FS (64 byte ASCIIZ file name)
+	;lodsb
+	;stosb
+	;or	al, al
+	;jnz	short loc_print_FS_longname
+	;jmp	short loc_print_longname_2
+
+	;;;;
+	; 20/02/2025
+	rep	movsb
+		 ; may be better to put a zero at the end
+	sub	al, al ; 0
 	stosb
-	or	al, al
-	jnz	short loc_print_FS_longname
-	jmp	short loc_print_longname_2
-	;
-loc_print_longname_1: ; MS Windows long name (UNICODE chars)
-	lodsw
-	stosb
-	or	al, al
-	jnz	short loc_print_longname_1
+	;;;;
+	
+;loc_print_longname_1: ; MS Windows long name (UNICODE chars)
+	;lodsw
+	;stosb
+	;or	al, al
+	;jnz	short loc_print_longname_1
 	;
 loc_print_longname_2:
 	pop	esi
@@ -3363,6 +3396,8 @@ loc_lfn_err3:
 	;call	print_msg
 	;retn
 	jmp	print_msg
+
+; burada kaldým... 20/05/2025
 
 show_file:
 	; 18/05/2025 (TRDOS 386 Kernel v2.0.10) 

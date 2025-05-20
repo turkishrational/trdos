@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 18/05/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 20/05/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -123,7 +123,7 @@ get_current_directory:
 	;   Note: Required dir buffer length may be <= 92 bytes
 	;         for TRDOS (7*12 name chars + 7 slash + 0)
 	; 	; 16/05/2025 - buffer length <= 104 bytes
-	;	  (8*12 name chars + 7 slashes + 0)		
+	;	  (8*12 name chars + 7 slashes + 0)
 
 	; OUTPUT ->  ESI = Current Directory Buffer
 	;            EAX, EBX, ECX, EDX, EDI will be changed
@@ -1452,6 +1452,8 @@ simple_ucase_skip:
 %endif
 
 save_longname_sub_component:
+	; 20/05/2025 (TRDOS 386 v2.0.10)
+	;	-Major Modification-
 	; 13/02/2016
 	; 06/02/2016 (TRDOS 386 = TRDOS v2.0)
 	; 28/02/2010
@@ -1467,6 +1469,26 @@ save_longname_sub_component:
 	;	// long name is valid.
 	;	// If a longname is longer than 65 bytes,
 	;	// it is invalid for trdos. (>45h)
+	;
+	; 20/05/2025 - TRDOS 386 v2.01.0
+	;	According to
+	;	Microsoft FAT32 File System Specification
+	;   ... Long names are limited to 255 chars,
+	;	not including the trailing NUL. ...
+	;   ... Total path length of can not exceed
+	;	260 chars including the trailing NUL. ...
+	;   So, in this version of TRDOS 386
+	;	UNICODE chars (two bytes) wil be converted
+	;	to ASCII chars only using low bytes of
+	;	of two byte UNICODE chars,
+	;	a very simple method.
+	;
+	;	ASCIIZ longname length limit is 127+NUL.
+	;	(but string buffer size will be 130)
+	;	((10*13 chars))
+	;
+	; Modified registers: ECX ; 20/05/2025
+	;
 
 	push	edi
 	push	esi
@@ -1477,26 +1499,41 @@ save_longname_sub_component:
 
 	sub	ecx, ecx
 	;sub	eax, eax
-	mov	cl, 26
+	;mov	cl, 26
+	; 20/05/2025
+	mov	cl, 13 ; 26/2
 
 	movzx	eax, byte [edi] ; LDIR_Order
-	cmp	al, 41h  ; 40h (last long entry sign) + 1
-	jb	short pass_pslnsc_last_long_entry
+	
+	;cmp	al, 41h  ; 40h (last long entry sign) + 1
+	;jb	short pass_pslnsc_last_long_entry
+	; 20/05/2025
+	test	al, 40h
+	jz	short pass_pslnsc_last_long_entry
 
 	mov	ah, al
 	sub	ah, 40h
+
 	mov	[LFN_EntryLength], ah
-	
-	cmp	al, 45h  ; 40h (last long entry sign) + 5
+
+	;cmp	al, 45h  ; 40h (last long entry sign) + 5
  		; Max 130 byte length is usable in TRDOS
-; 26*5 = 130
+	; 26*5 = 130
+	; 20/05/2025 - TRDOS 386 v2.0.10
+	cmp	al, 4Ah
+	; 26*10 = 260
 	ja	short loc_pslnsc_retn
 
-	and	al, 07h ; 0Fh
+	;and	al, 07h ; 0Fh
+	; 20/05/2025
+	;and	al, ~40h ; NOT 40h
+	and	al, 0Fh
 	mov	[LongNameFound], al
 
 	dec	al
-	;mov	cl, 26
+	;;mov	cl, 26
+	; 20/05/2025
+	;mov	cl, 13 ; 26/2
 	mul	cl
 
 	mov	esi, eax
@@ -1504,11 +1541,15 @@ save_longname_sub_component:
 		; to make is an ASCIIZ string
 		; with ax+26 bytes length
 	add	esi, LongFileName
-	mov	word [esi], 0
+	;mov	word [esi], 0
+	; 20/05/2025
+	mov	byte [esi], 0
 	jmp	short loc_pslsc_move_ldir_name2
 
 pass_pslnsc_last_long_entry:
-	cmp	al, 04h
+	;cmp	al, 04h
+	; 20/05/2025 - TRDOS 386 v2.0.10
+	cmp	al, 09h
 	ja	short loc_pslnsc_retn
 	dec	byte [LongNameFound]
 	cmp	al, [LongNameFound]
@@ -1516,25 +1557,46 @@ pass_pslnsc_last_long_entry:
 
 loc_pslsc_move_ldir_name1:
 	dec	al
-	;mov	cl, 26
+	;;mov	cl, 26
+	; 20/05/2025
+	;mov	cl, 13 ; 26/2
 	mul	cl
 
 loc_pslsc_move_ldir_name2:
 	mov	cl, [edi+0Dh] ; long name checksum
 	mov	[LFN_CheckSum], cl
+
 	mov	esi, edi ; LDIR_Order
 	mov	edi, LongFileName
 	add	edi, eax
 	inc	esi
 	mov	cl, 5 ; chars 1 to 5
-	rep	movsw
+	;rep	movsw
+	; 20/05/2025 - TRDOS 386 v2.0.10
+loc_pslsc_move_ldir_name3:
+	lodsw
+	stosb
+	loop	loc_pslsc_move_ldir_name3
+	
 	add	esi, 3
-	movsd	; char 6 & 7
-	movsd	; char 8 & 9
-	movsd	; char 10 & 11
+	; 20/05/2025
+	;movsd	; char 6 & 7
+	;movsd	; char 8 & 9
+	;movsd	; char 10 & 11
+	mov	cl, 6
+loc_pslsc_move_ldir_name4:
+	lodsw
+	stosb
+	loop	loc_pslsc_move_ldir_name4
+
 	inc	esi
 	inc	esi
-	movsd   ; char 12 & 13 
+	;movsd	; char 12 & 13 
+	; 20/05/2025	
+	lodsw
+	stosb
+	lodsw
+	stosb
 
 loc_pslnsc_retn:
  	pop	eax
@@ -1547,6 +1609,7 @@ loc_pslnsc_retn:
     	retn
 
 parse_path_name:
+	; 19/05/2025 (TRDOS 386 v2.0.10)
 	; 03/09/2024 (TRDOS 386 v2.0.9)
 	; 09/08/2022
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -1568,12 +1631,18 @@ parse_path_name:
 
 	; Clear the pathname bytes in TR-DOS Findfile data buffer
 	push	edi
-	;mov	ecx, 20  ; 80 bytes
+	;mov	ecx, 20	; 80 bytes
 	; 29/07/2022
 	sub	ecx, ecx
-	mov	cl, 20
-	xor	eax, eax
-	rep	stosd
+	;mov	cl, 20
+	; 19/05/2025 - TRDOS 386 v2.0.10
+	;		; drv: 1 byte
+	;		; dir: 104 bytes
+	;		: name: 13 bytes
+	;		: attrmask: 2 bytes (dword alignment)
+	mov	cl, 30	; total 120 bytes, 120/4
+	xor	eax, eax ; 0
+	rep	stosd	; clear
 	pop	edi
 
 	mov	ax, [esi]
@@ -1586,7 +1655,9 @@ pass_ppn_cdir:
 	mov	esi, [First_Path_Pos]
 	lodsb
 loc_ppn_get_filename:
-	add	edi, 65 ; FindFile_Name location
+	;add	edi, 65 ; FindFile_Name location
+	; 19/05/2025 - TRDOS 386 v2.0.10
+	add	edi, 104 ; FindFile_Name location
 	; TRDOS Filename length must not be more than 12 bytes
 	;mov	ecx, 12
 	mov	cl, 12
@@ -1651,11 +1722,14 @@ loc_scan_next_slash_pos:
 	mov	esi, [First_Path_Pos]
 	sub	ecx, esi
 	inc	ecx
-	;cmp	ecx, 64
-	cmp	cl, 64
+	;;cmp	ecx, 64
+	;cmp	cl, 64
+	; 19/05/2025 - TRDOS 386 v2.0.10
+	cmp	cl, 103
 	ja	short loc_ppn_invalid_drive_stc
 
-	mov	eax, edi ; Dest Dir String Location (65 bytes)
+	mov	eax, edi ; Dest Dir String Location (104 bytes)
+			 ; ((It was 65 bytes before v2.0.10))
 	rep	movsb
 	;mov	[edi], cl ; 0, End of Dir String
 	mov	esi, [Last_Slash_Pos]
@@ -1680,12 +1754,14 @@ loc_ppn_invalid_drive:
 	retn
 
 find_longname:
+	; 20/05/2025 - TRDOS 386 v2.0.10
+	;	-verified-
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 13/02/2016 (TRDOS 386 = TRDOS v2.0)
 	; 24/01/2010 (DIR.ASM, 'proc_find_longname')
 	; 17/10/2009
 
-	; INPUT -> 
+	; INPUT ->
 	;	ESI = DOS short file name address
 	; 	for example: "filename.ext"
 	;
@@ -1736,6 +1812,8 @@ loc_fln_longname_not_found_retn:
 loc_fln_retn:
 	retn
 
+	; 20/05/2025 - TRDOS 386 v2.0.10
+validate_long_name:	; called from SysFFF ; 20/05/2025
 loc_fln_check_longnamefound_number:
 	; 'LongNameFound' is set by
         ; by 'save_longname_sub_component'
@@ -1766,6 +1844,8 @@ loc_fln_longname_validation:
 	retn
 
 calculate_checksum:
+	; 20/05/2025 - TRDOS 386 v2.0.10
+	;	-verified-
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 13/02/2016 (TRDOS 386 = TRDOS v2.0)
 	; 17/10/2009 (DIR.ASM, 'proc_calculate_checksum')

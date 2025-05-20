@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - DEFINITIONS : trdosk0.s
 ; ----------------------------------------------------------------------------
-; Last Update: 18/05/2025 (Previous: 29/02/2016, v2.0.0)
+; Last Update: 19/05/2025 (Previous: 29/02/2016, v2.0.0)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -396,6 +396,7 @@ FAT32_fsinfo_sector  equ BPB_Reserved+8 ; 60
 FAT_FreeClusters     equ 64
 FAT_FirstFreeClust   equ 68
 
+; 19/05/2025
 ; 18/05/2025
 ; 17/05/2025
 ; 11/05/2025 - TRDOS 386 v2.0.10
@@ -414,9 +415,9 @@ struc FindFile
 .Reserved1:	  resw 1
 .LongNameEntryLength:
 .LongNameYes: 	  resb 1 ; Sign for longname procedures
-.Reserved2:	  resb 1
-.DirBuffer:	  resd 1
+;.Reserved2:	  resb 1
+;.DirBuffer:	  resd 1 ; 19/05/2025
 .DirEntryName:	  resb 13
-.Reserved3:	  resb 1
-.size:		; 190 bytes
+;.Reserved3:	  resb 1
+.size:		; 184 bytes
 endstruc

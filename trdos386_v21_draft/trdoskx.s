@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 18/05/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 19/05/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -187,7 +187,6 @@ LFN_EntryLength: resb 1   ; DIR.ASM
 LFN_CheckSum:	 resb 1   ; DIR.ASM
 LongFileName:	 resb 132 ; DIR.ASM
 
-
 ;PATH_Array_Ptr: resw 1 ; DIR.ASM
 PATH_CDLevel:	 resb 1 ; DIR.ASM
 PATH_Level:	 resb 1 ; DIR.ASM
@@ -225,11 +224,11 @@ FindFile_MatchCounter:	  resw 1
 FindFile_Reserved1:	  resw 1 ; 06/03/2016
 FindFile_LongNameEntryLength:
 FindFile_LongNameYes: 	  resb 1 ; Sign for longname procedures
-FindFile_Reserved2:	  resb 1 ; 17/05/2025
-FindFile_DirBuffer:	  resd 1
+;FindFile_Reserved2:	  resb 1 ; 17/05/2025
+;FindFile_DirBuffer:	  resd 1 ; 19/05/2025
 FindFile_DirEntryName:	  resb 13 ; 18/05/2025
-FindFile_Reserved3:	  resb 1 ; 18/05/2025
-; 190 bytes
+;FindFile_Reserved3:	  resb 1 ; 18/05/2025
+; 184 bytes ; 19/05/2025
 
 First_Path_Pos: resd 1	; DIR.ASM ; 09/10/2011
 Last_Slash_Pos: resd 1	; DIR.ASM
@@ -850,11 +849,11 @@ CLUSNUM:	resd 1	; (MSDOS -> CLUSNUM)
 ClusSec:	resd 1	; (MSDOS -> CLUSSEC)
 ClusSave:	resd 1	; (MSDOS -> CLUSSAVE)
 DIRSTART:	resd 1	; (MSDOS -> DIRSTART)
-DIRSEC:		resd 1	; (MSDOS -> DIRSEC) 	
+DIRSEC:		resd 1	; (MSDOS -> DIRSEC)
 pre_read:	resb 1	; (MSDOS -> PREREAD)
 ClusSplit:	resb 1	; (MSDOS -> CLUSSPLIT)
 CLUSFAC:	resb 1	; (MSDOS -> CLUSFAC)
 SECCLUSPOS:	resb 1	; (MSDOS -> SECCLUSPOS)
 NXTCLUSNUM:	resd 1	; (MSDOS -> NXTCLUSNUM)
 SRCH_CLUSTER:	resd 1	; (MSDOS -> SRCH_CLUSTER)
-LASTENT:	resd 1	; (MSDOS -> LASTENT)	
+LASTENT:	resd 1	; (MSDOS -> LASTENT)

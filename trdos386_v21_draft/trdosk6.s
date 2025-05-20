@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 18/05/2025  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 20/05/2025  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -14958,7 +14958,7 @@ sysfff: ; <Find First File>
 	;		bit 3 - FindFile_Name
 	;		bit 4 - FindFile_LongNameEntryLength
 	;		bit 5 - FindFile_Longname (66 bytes)
-	;		bit 6 -	use 104 bytes buf for directory	
+	;		bit 6 -	use 104 bytes buf for directory
 	;		bit 7 - use 128 bytes buf for longname
 	; 	examples:
 	;	  1Fh -	00011111b needs 112 bytes buffer
@@ -14968,7 +14968,7 @@ sysfff: ; <Find First File>
 	; Note:
 	;	if EDX input is 0
 	;		Only File Size will be returned in EAX (*)
-	;	if CH > 0 but 
+	;	if CH > 0 but
 	;	   CH & 3Fh is 0, buffer will not used (*)
 	;
 	; ***********************************************************
@@ -14985,7 +14985,7 @@ sysfff: ; <Find First File>
 	;mov	[FFF_Valid], ah ; 0 ; reset ; 17/10/2016
 	;call	set_working_path
 	call	set_working_path_x ; 17/10/2016
-	jnc	short sysfff_0
+	jnc	short sysfff_0  ; esi = FindFile_Name
 
 	and	eax, eax  ; 0 -> Bad Path!
 	jnz	short sysfff_err
@@ -15005,6 +15005,27 @@ sysfff_0:
 	mov	[FFF_mpid], ax	; save user process id/number
 			 	; (will be used by SysFNF)
 	mov	ah, 0
+
+	; 19/05/2025
+	mov	al, [Current_FATType]
+	mov	[FFF_FATtype], al
+	cmp	al, ah ; 0
+	ja	short sysfff_@
+
+	; SysFFF singlix fs procedure(s)
+	call	find_first_fs_file
+	jc	short sysfff_err
+
+	; all of data has been transferred and eax return
+	; value has been set in SysFFF singlix fs proc
+
+sysfff_fs_ok:
+sysfnf_fs_ok:	; 19/05/2025
+	mov	[u.r0], eax
+        call 	reset_working_path
+	jmp	sysret
+
+sysfff_@:
 	;;;
 	; 25/08/2024 (bugfix)
 	;mov	al, [esp] ; ???
@@ -15099,7 +15120,8 @@ sysfff_5:
 	;mov	cl, 24
 	;mov	[FFF_Valid], cl
 	mov	byte [FFF_Valid], 24 ; (*)
-sysfnf_12:
+;sysfnf_12:
+sysfnf_4:	; 19/05/2025
 	mov	edi, DTA ; FFF data transfer address
 	;mov	al, [esi+DirEntry_Attr] ; 11
 	mov	al, bl ; File/Dir Attributes
@@ -15131,21 +15153,25 @@ sysfnf_12:
        	mov	esi, DTA ; FFF data transfer address
 
 	; 18/05/2025
-;sysfff_6:
+;;sysfff_6:
 	; 25/08/2024
 	;sub	ecx, ecx
 	mov	cl, [FFF_Valid] ; (*) ecx <= 128
 	; 18/05/2025
 	; cl = 24 here (basic FFF/FNF data)
-sysfff_6:	; cl > 0
+;sysfff_6:	; cl > 0
 	mov	edi, [FFF_UBuffer] ; user's buffer address (edx)
+	; 20/05/2025 (jmp from 'sysfff_23:')
+sysfff_6:
+	; ecx = transfer byte count = byte [FFF_valid]
+
 	call	transfer_to_user_buffer
-	
+
 	; 18/05/2025
 	test	byte [FFF_RType], 1 ; bit 0 - FindFile_DirEntry
 	jz	short sysfff_9
+	; ecx = actual transfer count
 	add	ecx, 32 ; + Directory Entry size
-
 sysfff_9:	; 18/05/2025
 	mov	[u.r0], ecx ; actual transfer count
         call 	reset_working_path
@@ -15157,6 +15183,8 @@ sysfff_7:
 	test	ch, 3Fh ; bit 0 to bit 5 ; wrong flags ?
 	jz	short sysfff_24 ; perform as zero buffer size
 
+	; 19/05/2025
+sysfnf_5:
 	; 25/08/2024
 	;mov	byte [FFF_Valid], 128 ; (*)
 	;;;;
@@ -15164,15 +15192,19 @@ sysfff_7:
 	test	ch, 1 ; bit 0 - FindFile_DirEntry
 	jz	short sysfff_10
 	push	ecx
+	; 20/05/2025
 	mov	edi, [FFF_UBuffer]
 	mov	esi, FindFile_DirEntry
+	mov	ecx, 32
 	call	transfer_to_user_buffer
-	mov	eax, 32
-	add	edi, eax ; 32
-	mov	[FFF_UBuffer], edi
+	add	edi, 32
+	; 20/05/2025 ; (*!*)
+	;mov	[FFF_UBuffer], edi
 	mov	[FFF_valid], al
 	pop	ecx
 sysfff_10:
+	; 20/05/2025
+	push	edi ; *!*
 	mov	edi, TextBuffer ; temporary buffer
 			; max. 279-32 bytes
 	test	ch, 2	; bit 1 - FindFile_Drv
@@ -15182,7 +15214,7 @@ sysfff_10:
 sysfff_11:
 	test	ch, 4	; bit 2 - FindFile_Directory
 	jz	short sysfff_18 ; skip
-	
+
 	push	ecx ; *
 	test	ch, 40h	; bit 6 - use 104 bytes
 	jnz	short sysfff_16
@@ -15234,22 +15266,43 @@ sysfff_18:
 	movsd
 	movsb
 sysfff_19:
+	; 20/05/2025
+	test	ch, 48 ; 32+16
+	jz	short sysfff_23
+
+	push	ecx
+	; condition:
+	; same checksum & [LongNameFound] = 1
+	;		  (last LDIR_Ord & NOT 40h)
+	mov	esi, FindFile_DirEntry ; checksum
+	call	validate_long_name 
+			; (in 'find_longname')
+	pop	ecx
+	jc	short sysfff_25 ; cf = 1 & eax = 0
+
 	mov	esi, FindFile_LongNameEntryLength
 	lodsb
+sysfff_25:	; 20/05/2025
 	test	ch, 16	; bit 4 - FindFile_LNEL
 	jz	short sysfff_20 ; skip
+
 	stosb
 sysfff_20:
 	test	ch, 32	; bit 5 - FindFile_Longname
-	jz	short sysfnf_23 ;  skip
+	jz	short sysfff_23 ;  skip
 
 	and	al, al  ; zero ?
-	jz	short sysfnf_22 ; yes
+	jz	short sysfff_22 ; yes
 
-	mov	esi, FindFile_LongName
+	;mov	esi, FindFile_LongName
+	; 20/05/2025
+	mov	esi, LongFileName ; asciiz
+			; (130 bytes)
+			; ((space: 132 bytes))
+
 	test	ch, 80h	; bit 6 - use 128 bytes
 	mov	ecx, 127
-	jnz	short sysfff_21	
+	jnz	short sysfff_21
 	mov	cl, 65
 sysfff_21:
 	rep	movsb
@@ -15258,14 +15311,15 @@ sysfff_21:
 sysfff_22:
 	stosb
 
-sysfnf_23:
+sysfff_23:
 	; 18/05/2025 - TRDOS 386.v2.0.10
 	mov	ecx, edi
 	mov	esi, TextBuffer
 	sub	ecx, esi
 	; ecx  <= 247 (279-32)
 	mov	[FFF_valid], cl
-
+	; 20/05/2025
+	pop	edi ; *!*
 	jmp	short sysfff_6
 	;;;;
 	
@@ -15281,11 +15335,9 @@ sysfnf_11:
 	jmp	short sysfff_6
 %endif
 
-burada kaldým... 18/05/2025
-long name transfer kontrol
-
-
 sysfnf: ; <Find Next File>
+	; 19/05/2025
+	; 18/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/08/2024 (TRDOS 386 Kernel v2.0.9)
 	; 29/08/2023 (TRDOS 386 Kernel v2.0.6)
 	; 08/08/2022
@@ -15311,7 +15363,7 @@ sysfnf: ; <Find Next File>
 	;	    Error Codes: (in AX)
 	;	       18 - No more files
         ;
-	; TRDOS 386 (v2.0) 
+	; TRDOS 386 (v2.0)
 	; 16/10/2016
 	;
         ; INPUT ->
@@ -15325,7 +15377,7 @@ sysfnf: ; <Find Next File>
 	;          cf = 1 -> Error code in AL
 	;
  	; Modified Registers: EAX (at the return of system call)
-
+	;
 	; Note: If byte [FFF_Valid] = 0
 	;	'sysfnf' will return with 'no more files' error.
 	;	If byte [FFF_Valid] = 24
@@ -15334,6 +15386,48 @@ sysfnf: ; <Find Next File>
 	;	If byte [FFF_Valid] = 128
 	;	'sysfnf' will return with 128 bytes Find File
 	;	Structure/Table at the address which is in EDX.
+	;
+	; ***********************************************************
+	;
+	; 18/05/2025 (Major Modification)
+	; ------ TR-DOS 386 v2.0.10 --------
+	; FindFile - SysFFF/SysFNF Structure (<=281 bytes):
+	;
+	; Offset	Parameter		Size
+	; ------	------------------	--------
+	; 0		FindFile_DirEntry	32 bytes (*)
+	; 32		FindFile_Drv		1 byte
+	; 33		FindFile_Directory	65 bytes (104 bytes)
+	; 98		FindFile_Name		13 bytes
+	; 111		FindFile_LongNameEntryLength 1 byte
+	; 112		FindFile_Longname	128 bytes (max.)
+	;
+	; Parameters table/structure size: max. 279 bytes
+	;
+	; Return Options:
+	;	CH = 0 -> basic (24 bytes)
+	;	CH bits
+	;		bit 0 - FindFile_DirEntry
+	;		bit 1 - FindFile_Drv
+	;		bit 2 - FindFile_Directory (65 bytes)
+	;		bit 3 - FindFile_Name
+	;		bit 4 - FindFile_LongNameEntryLength
+	;		bit 5 - FindFile_Longname (66 bytes)
+	;		bit 6 -	use 104 bytes buf for directory
+	;		bit 7 - use 128 bytes buf for longname
+	; 	examples:
+	;	  1Fh -	00011111b needs 112 bytes buffer
+	;	  0Fh -	01001111b needs 150 bytes buffer
+	;	 0EFh -	11101111b needs 278 bytes buffer
+	;	 0FFh -	11111111b needs 279 bytes buffer
+	; Note:
+	;	if EDX input is 0
+	;		Only File Size will be returned in EAX (*)
+	;	if CH > 0 but
+	;	   CH & 3Fh is 0, buffer will not used (*)
+	;
+	; ***********************************************************
+	;
 
 	cmp	byte [FFF_Valid], 0
 	ja	short sysfnf_0
@@ -15344,6 +15438,7 @@ sysfnf_nmf:
 	; 30/07/2022
 	sub	eax, eax
 	mov	al, ERR_NO_MORE_FILES ; 12
+sysfnf_err:	; 19/05/2025
 	mov	[u.r0], eax
 	mov	[u.error], eax
 	jmp	error
@@ -15354,6 +15449,8 @@ sysfnf_0:
 	cmp	ax, [FFF_mpid] ; same user process ?
 	jne	short sysfnf_nmf ; no ; it is improper sys call!
 
+; 19/05/2025
+%if 0
 	;cmp	byte [FFF_Valid], 128
 	;je	short sysfnf_1
 	;cmp	byte [FFF_Valid], 24
@@ -15401,7 +15498,7 @@ sysfnf_10:
 	;movzx	ecx, byte [FFF_Valid]
 	; 25/08/2024
 	;cmp	cl, 128
-	cmp	byte [FFF_Valid], 128 
+	cmp	byte [FFF_Valid], 128
 	;jne	short sysfnf_12
 	;jmp	short sysfnf_11 (*)
 	;; 08/08/2022
@@ -15417,7 +15514,7 @@ sysfnf_2:
 	inc	byte [SWP_DRV_chg]
 
 	call	change_current_drive
-	jc	short sysfnf_err_1 ; read error ! 
+	jc	short sysfnf_err_1 ; read error !
 				   ; (do not stop, because
 				   ; we don't have a
 				   ; 'no more files'
@@ -15495,6 +15592,87 @@ sysfnf_13:
 	; 08/08/2022
 	jc	short sysfnf_err_1
 	jmp	sysfnf_9
+%else
+	; 19/05/2025 - TRDOS 386 v2.0.10
+	; here:
+	; [FindFile_MatchCounter] = number of files
+	;			    previously found
+	; [FindFile_DirEntryNumber] = dir entry index
+	;			    in current sector
+	; 16 = last entry index number + 1
+	; [FindFile_DirSector] = current phy sector addr
+	; [FindFile_Drv] = logical drive number
+	; [FindFile_DirSectorCount] = remain sectors
+	;			    in current cluster
+	; [FindFile_DirCluster] = current cluster
+	;			  is 0 for root dir
+	;			  (extept FAT32 fs)
+	; FindFile_DirEntryName = file/dir name
+	;			  to be searched
+	;		 (may contain '?' wildcards)
+
+	; 19/05/2025
+	cmp	[FFF_FATtype], 0
+	ja	short sysfnf_1
+
+	; SysFFF singlix fs procedure(s)
+	call	find_next_fs_file
+	jc	short sysfnf_err
+
+	; all of data has been transferred and eax return
+	; value has been set in SysFNF singlix fs proc
+
+	;mov	[u.r0], eax
+	;call 	reset_working_path
+	;jmp	sysret
+	; 19/05/2025
+	jmp	sysfnf_fs_ok
+
+sysfnf_1:
+	call	find_next_file
+	jc	short sysfnf_err ; eax = 12 (no more files !)
+
+	; esi = Directory Entry (FindFile_DirEntry) Location
+	; edi = Directory Buffer Directory Entry Location
+	; eax = File Size
+	;  bl = Attributes of The File/Directory
+	;  bh = Long Name Yes/No Status (>0 is YES)
+	;  dl > 0 : Ambiguous filename chars are used
+
+	mov	cx, [FFF_Attrib]
+	; Attribs in CL, return data type in CH
+
+	xor	cl, 0FFh
+	; cl = negative attributes
+	and	cl, bl
+	jnz	short sysfnf_1 ; it doesn't fit
+			       ;    to conditions
+	cmp	dword [FFF_UBuffer], 0
+	jna	short sysfnf_3 ; only file size
+	; return data according to
+	;	ch = [FFF_RType]
+
+	and	ch, ch
+	jnz	short sysfnf_2
+
+	jmp	sysfnf_4
+
+sysfnf_2:
+	jmp	sysfnf_5
+
+sysfnf_3:
+	; eax = file size
+	mov	ecx, eax
+	jmp	sysfff_9
+%endif
+
+find_first_fs_file:
+find_next_fs_file:
+	; 19/05/2025 (TRDOS 386 Kernel v2.0.10)
+	; 19/05/2025 - temporary !
+	mov	eax, ERR_CLUSTER ; 35 ; 'cluster not available !'
+	stc
+	retn
 
 writei:
 	; 02/09/2024
