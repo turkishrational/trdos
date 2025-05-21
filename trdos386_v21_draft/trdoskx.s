@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 19/05/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 20/05/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -550,6 +550,8 @@ alignb 4
 FFF_UBuffer:	resd 1  ; User's buffer address for FFF & FNF system calls
 ; 18/05/2025 - TRDOS 386 v2.0.10
 FFF_mpid:	resw 1
+; 20/05/2025
+FFF_FATtype:	resb 1
 ; 15/10/2016
 FFF_Valid:	resb 1  ; Find First File Structure validation byte
 			; 0  = invalid (Find Next File can't use FFF struct)

@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - INITIALIZED DATA : trdosk9.s
 ; ----------------------------------------------------------------------------
-; Last Update: 08/05/2025 (Previous: 29/12/2024 - Kernel v2.0.9)
+; Last Update: 20/05/2025 (Previous: 29/12/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -31,7 +31,7 @@ Magic_Bytes:
 		db 1
 mainprog_Version:
 		db 7
-		db "[TRDOS] Main Program v2.1.0 (08/05/2025)"
+		db "[TRDOS] Main Program v2.1.0 (20/05/2025)"
 		db 0Dh, 0Ah
 		db "(c) Erdogan Tan 2005-2025"
 		db 0Dh, 0Ah, 0
@@ -83,12 +83,41 @@ Cmd_Beep:	db "BEEP", 0
 		db 0
 
 ; 15/02/2016 (FILE.ASM, 09/10/2011)
-invalid_fname_chars:
-		db 22h, 27h, 28h, 29h, 2Ah, 2Bh, 2Ch, 2Fh
-		db 3Ah, 3Bh, 3Ch, 3Dh, 3Eh, 3Fh, 40h
-		db 5Bh, 5Ch, 5Dh, 5Eh, 60h
-sizeInvFnChars  equ ($ - invalid_fname_chars)                
+;invalid_fname_chars:
+;		db 22h, 27h, 28h, 29h, 2Ah, 2Bh, 2Ch, 2Fh
+;		db 3Ah, 3Bh, 3Ch, 3Dh, 3Eh, 3Fh, 40h
+;		db 5Bh, 5Ch, 5Dh, 5Eh, 60h
+
+; 20/05/2025 - TRDOS 386 v2.0.10
+; Ref: https://en.wikipedia.org/wiki/8.3_filename#Directory_table
+; 
+; DOS filenames include the following:
+;  UpperCase letters A-Z
+;  Numbers 0-9
+;  Space (20h)
+;  !, #, $, %, &, ', (, ), -, @, ^, _, `, {, }, ~
+;  Values 128–255	
 ;
+; This excludes the following ASCII characters: 
+;  ", *, +, ,, /, :, ;, <, =, >, ?, \, [, ], |
+;  . (DOT) within name and extension fields,
+;			 except in . and .. entries
+;  Lowercase letters a–z, stored as A–Z on FAT12/FAT16/FAT32
+;  Control characters 0–31
+;  Value 127 (DEL)
+
+	; 20/05/2025
+invalid_fname_chars_@:
+	;db 20h ; SPACE
+	db 2Eh ; .
+	; 20/05/2025
+invalid_fname_chars:
+	;   "   *   +   ,   /   :   ;   <   =   >   ?   \   [   ]   |
+	db 22h,2Ah,2Bh,2Ch,2Fh,3Ah,3Bh,3Ch,3Dh,3Eh,3Fh,5Ch,5Bh,5Dh,7Ch
+
+sizeInvFnChars  equ ($ - invalid_fname_chars)
+
+sizeInvFnChars@  equ ($ - invalid_fname_chars@) ; 20/05/2025
 
 Msg_Enter_Date:
                 db 'Enter new date (dd-mm-yy): '

@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 20/05/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 21/05/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -5764,6 +5764,580 @@ loc_createfile_retn_fcluster:
 
 loc_createfile_retn:
 	retn
+
+
+; 22/02/2025 burada kaldým...
+düzeltme ve doðrulama lazým.
+
+; 20/05/2025 - TRDOS 386 v2.0.10
+;------------------------------------------------------
+; Singlix FS1 (TRFS1) to TRDOS 386 file name conversion
+
+convert_name_from_trfs:
+	; 21/05/2025
+	; 20/05/2025
+	;
+	; INPUT:
+	;	ESI = long file name (singlix fs, asciiz format)
+	; 	      (max. 64 chars)
+	;	EDX = (max.) number of the target format chars
+	;	      (space: min. 12 chars + trailing NUL)
+	;	EDI = target file name address
+	;
+	; OUTPUT:
+	;	ECX = length of the asciiz file name
+	;		 (except NUL tail)
+	;	EDI = target file name address
+	;	EAX = 0 if the name does not contain FDT number
+	;	    = FDT number (if > 0)
+	;
+	; Modified registers: EAX, EBX, ECX
+
+	; temporary name space on stack frame
+
+	; 21/05/2025
+	mov	[fdt_number], eax
+	mov	[f_name_limit], edx
+	;mov	[f_base_start], edi
+	mov	[f_target], edi
+	xor	ebx, ebx
+	mov	[f_base_count], ebx ; 0
+	mov	[f_ext_start], ebx ; 0
+	mov	[f_ext_count], ebx ; 0
+	mov	[f_name_count], ebx ; 0
+	mov	[formal_size], ebx ; 0
+	mov	[insert_fdtnum], bl ; 0
+
+	mov	ecx, 64
+
+	;xor	ebx, ebx
+
+	; remove spaces at first
+	; and save the last dot position
+
+	push	edi ; *
+	;mov	[f_base_start], edi
+conv_f_fs_0:	; remove_spaces
+	lodsb
+	cmp	al, 20h
+	je	short conv_f_fs_2 ; rms_next
+	jb	short conv_f_fs_3 ; end_rm_space
+	cmp	al, '.'
+	jne	short conv_f_fs_1 ; not_dot
+	mov	ebx, edi ; the last dot
+conv_f_fs_1:	; not_dot
+	stosb
+conv_f_fs_2:	; rms_next
+	loop	conv_f_fs_0 ; remove spaces
+conv_f_fs_3:	; end_rm_space
+	pop	esi ; *
+	mov	ecx, edi
+	sub	ecx, esi ; number of chars
+		 	 ; (without spaces)
+	; zero tail
+	xor	al, al ; 0
+	stosb
+
+	; ebx = the last dot position
+
+	jecxz	nul_name
+
+	mov	[f_name_count], ecx
+	mov	[f_base_count], ecx
+
+	and	ebx, ebx
+	jz	short conv_f_fs_7 ; ecx > 0 ; not dot
+
+	mov	eax, ebx ; the last DOT position 	
+
+	sub	ebx, esi ; chars before the last DOT
+	jz	short dot_first ; name starts with '.'
+
+	mov	[f_base_count], bl
+
+	inc	eax
+
+	sub	ecx, eax
+	jna	short dot_last ; name ends with '.' !
+
+	mov	[f_ext_start], eax
+
+	cmp	cl, 4	; .ext size limit is 4 (.html)
+	jna	short conv_f_fs_4
+	inc	byte [insert_fdtnum] ; not exact name
+	mov	cl, 4	
+conv_f_fs_4:
+	mov	[f_ext_count], ecx
+	mov	eax, edx = [f_name_limit] ; >= 12
+	sub	eax, ecx ; ecx <= 4	
+	dec	eax ; '.'
+	cmp	eax, [f_base_count]
+	jnb	short conv_f_fs_6 ; proper
+	; (for example: [f_base_count] > 7)
+	inc	byte [insert_fdtnum] ; not exact name
+	cmp	cl, 3
+	jna	short conv_f_fs_5
+	dec	ecx
+	jmp	short conv_f_fs_4	
+conv_f_fs_5:
+	; minimum 1 byte base name is needed
+	dec	byte [f_base_count]
+	jnz	short conv_f_fs_4 ; ok
+	; cancel extension
+	xor	ecx, ecx
+	mov	[f_ext_start], ecx	
+	xchg	ecx, [f_ext_count]
+	inc	ecx ; + DOT
+conv_f_fs_6:
+	mov	ecx, [f_base_count]
+	add	ecx, [f_ext_count]
+	inc	ecx ; + DOT
+	jmp	short conv_f_fs_8 ; ecx = [f_name_count]
+
+conv_f_fs_7:	; not dot
+	; esi = [f_target] = [f_base_start]
+	; ecx = [f_base_count] = [f_name_count]
+	; edx = [f_name_limit]
+
+	cmp	ecx, edx ; limit (minimum 12)
+	jna	short conv_f_fs_9
+	inc	byte [insert_fdtnum]
+	mov	ecx, edx
+	mov	[f_base_count], ecx
+conv_f_fs_8:
+	mov	[f_name_count], ecx
+conv_f_fs_9:
+	lodsb
+	call	convert_invalid_chars
+	cmp	ah, al
+	je	short conv_f_fs_10
+	inc	byte [insert_fdtnum]
+conv_f_fs_10:	 
+	loop	no_dot_1
+	mov	byte [esi], 0
+
+	cmp	byte [insert_fdtnum], 0
+	jna	short conv_f_fs_ok
+
+	mov	eax, [fdt_number]
+
+	mov	edi, formal_string ; space = 13 bytes
+
+	; "[numbertext]" = fdt number which will inserted
+	;		between '[' and ']'
+  
+	call	convert_num_to_formalstr
+
+	; ecx = formal string length ("[....]" char count)
+	mov	[formal_size], ecx
+
+	;mov	esi, formal_string
+	mov	esi, edi ; semi-raw short name address
+	mov	edi, [f_target] ; = [f_base_start]
+
+	mov	edx, [f_base_count]
+	sub	edx, ecx ; (1)
+	jna	short use_only_formal_str ; fdt only
+
+	mov	eax, [f_name_limit]
+	sub	eax, [f_name_count]
+	cmp	eax, ecx
+	jb	short insert_formal_str ; partial+fdt
+
+	; here
+	; all of the formal string can be add to file
+	; without removing any file chars
+	
+	;mov	edx, [f_base_count]
+	add	edx, ecx ; = [f_base_count] ; (2)
+	; 21/05/2025
+	;jmp	short insert_formal_str	; complete+fdt
+
+insert_formal_str:
+	; 21/05/2025
+	; edx = [f_base_count]-[formal_size] (1) or
+	; 	[f_base_count] (2)
+	; edi = [f_target] = [f_base_start]
+	; esi = formal_string address
+	; ecx = [formal_size] ; string length
+	add	edi, edx ; [f_target] + edx
+	mov	ebx, [f_ext_start] ; extension start
+	; ebx = the 1st byte addr after the last DOT
+	or	ebx, ebx
+	jz	short add_formal_str ; not a name.ext
+	; edi = [f_target]+[f_base_count]-[formal_size]
+	xor	edx, edx ; 0
+ins_formal_1:
+	mov	al, [ebx]
+	push	eax
+	and	al, al
+	jz	short ins_formal_2 ; end of the name
+	inc	ebx
+	inc	edx
+	jmp	short ins_formal_1
+
+ins_formal_2:
+	; place [#] formal string to in the name
+	mov	ebx, ecx
+	rep	movsb
+	mov	al,'.' ; and the DOT
+	stosb
+	mov	ebx, edi
+	add	ebx, edx
+ins_formal_3:
+	; add the extension (and a nul at the end)
+	; (by moving backward, from end to start)
+	pop	eax
+	mov	[ebx], al
+	dec	ebx
+	cmp	ebx, edi
+	jnb	short ins_formal_3	
+	; ok.
+	jmp	short ins_formal_4
+
+use_only_formal_str:
+	; 21/05/2025
+	; edi = [f_target] = [f_base_start]
+	; esi = formal_string address
+ 	; ecx = [formal_size]
+add_formal_str:
+	rep	movsb
+	xor	al, al
+	stosb
+ins_formal_4:
+	mov	eax, [fdt_number] ; return value
+conv_f_fs_ok:
+	retn
+
+
+dot_first:
+	movsb	; '.'
+	
+		
+
+dot_last:
+	mov	[ebx], al ; 0 ; clear the last '.'
+
+
+nul_name:
+		
+
+
+	call	find_last_dot
+
+	xor	edx, edx
+
+	; split name to 2 parts (base, extension)
+	; if dot is found
+	
+	inc	ebx
+	jz	short not_split ; -1 -> 0
+
+	; example:
+	;
+	; esi	  ebx  ext  NUL  ecx
+	; ---     ---       ---  ---
+	; 'abcde' '.' 'fgh'  0    9
+
+	; esi = 1000
+	; ebx = 1005 		
+	; ecx = 9
+
+	; inc ebx -> 1006 = start of ext (part2)
+	; mov eax, ecx -> 9
+	; sub ebx, esi -> 6
+	; sub eax, ebx -> 3 = ext chars
+  
+	push	ebx ; *** ; part 2, start 
+	mov	eax, ecx ; actual length except the NUl tail
+	; part 1
+	sub	ebx, esi
+	; ebx = number of chars before the DOT + 1 (DOT)
+	sub	eax, ebx
+	push	eax ; ** ; part 2, chars (after the last DOT)
+
+	mov	al, [esi]
+	cmp	al, '.' ; name starts with '.'
+	jne	short loop_1
+	stosb
+	inc	esi
+	jmp	short skip_cic
+loop_1:
+	lodsb
+	cmp	al, 20h ; space
+	;je	short skip_cic  ; skip space
+	jna	short skip_cic
+	call	convert_invalid_chars
+	stosb
+	cmp	ah, al
+	je	short skip_cic
+	inc	edx ; FDT number ([#]) insert
+skip_cic:
+	dec	ebx
+	jnz	short loop1
+
+	pop	ecx ; ** ; part 2 chars
+	pop	esi ; part 2 start
+
+	jecxz	putzero
+
+	push	edi
+loop_2:
+	lodsb
+	cmp	al, 20h ; space
+	;je	short skip_cic2  ; skip space
+	jna	short skip_cic2
+	call	convert_invalid_chars
+	stosb
+	cmp	ah, al
+	je	short skip_cic2
+	inc	edx ; FDT number ([#]) insert
+skip_cic2:
+	loop	loop_2
+	pop	esi
+	cmp	esi, edi
+	je	short putzero
+	mov	[esi], '.'
+putzero:
+	xor	al, al ; 0
+	stosb
+	
+	
+
+
+not_split:
+	
+
+
+	mov	edi, esp
+
+	mov	eax, 12
+	
+	inc	ebx	; dot position
+			; -1 -> 0 = not a dot in filename
+	jz	short bg0 
+
+	xor	edx, edx
+
+bg0:
+	push	ecx
+	mov	cl, 8
+
+	dec	ebx
+	jnz	short bungec0
+
+	; file name starts with '.'
+	lodsb
+	stosb
+	dec	ecx
+bungec0:
+	cmp	ebx, ecx
+	jnb	short bunugec1
+	mov	ecx, ebx
+bunugec1:
+	lodsb
+	call	convert_invalid_chars
+	stosb
+	cmp	al, ah
+	je	short bunugec2
+	inc	edx
+bunugec2:
+	loop	bunugec1
+bunugec3:
+	mov	ecx, [esp]
+	sub	ecx, ebx
+	jna	short bunugec6
+
+	;mov	al, '.'
+	;stosb
+	movsb	; '.'	
+
+	cmp	cl, 3
+	jna	short bunugec4
+	inc	edx
+	mov	cl, 3
+bunugec4:
+	lodsb
+	call	convert_invalid_chars
+	stosb
+	cmp	al, ah
+	je	short bunugec5
+	inc	edx
+bunugec5:
+	loop	bunugec4
+bunugec6:		
+	pop	ecx
+
+bunugec:
+	
+	
+cn_f_trfs_0:
+	; ebx = dot position (>= esi)
+	; ecx = string length (except ZERO tail)
+
+	inc	ebx
+
+cn_f_trfs_@:
+	lodsb
+	cmp	al, 20h
+	jb	short cn_f_trfs_ok
+
+	cmp	al, '.'
+	jne	short cn_f_trfs_1
+
+	cmp	esi, ebx
+	je	short cn_f_trfs_2	
+
+cn_f_trfs_1:
+	call	convert_invalid_chars
+
+cn_f_trfs_2:
+	stosb
+	loop	cn_f_trfs_@	
+	
+
+cn_f_trfs_ok:
+	mov	byte [edi], 0
+	retn
+
+
+find_last_dot:
+	; 20/05/2025 - TRDOS 386 v2.0.10
+	;
+	; INPUT:
+	;  ESI = file name
+	;  ECX = search limit (64 bytes or 130 bytes)
+	; OUTPUT:
+	;  EBX = position (-1 = not found)
+	;  ECX = asciiz (file name) string length,
+	;	 except zero/NUL tail (or CR, <20h)
+	;
+	; Modified registers: EAX, EBX, ECX
+	;
+
+	push	esi
+
+	xor	ebx, ebx
+	
+	;cmp	ecx, 130 
+	;jnb	short f_l_dot_ok
+	;or	ecx, ecx
+	;jz	short f_l_dot_ok
+
+f_l_dot_1:
+	lodsb
+	cmp	al, 20h
+	jb	short f_l_dot_ok
+	cmp	al, '.'
+	jne	short f_l_dot_2
+	mov	ebx, esi
+f_l_dot_2:
+	loop	f_l_dot_1
+	inc	esi
+f_l_dot_ok:
+	mov	ecx, esi
+	dec	ecx
+	dec	ebx
+	pop	esi
+	sub	ecx, esi
+	retn
+
+convert_invalid_chars:
+	; 20/05/2025 - TRDOS 386 v2.0.10
+	;
+	; INPUT:
+	;  al = character
+	; OUTPUT:
+	;  al = converted character
+	;  ah = uppercase of AL input
+	;  (invalid char will be converted to '_')
+	;  (lowercase char will be converted to uppercase)
+	;
+	; Modified registers: EAX
+	
+	mov	ah, al
+
+	cmp	al, 128
+	jnb	short cic_3
+	
+	;cmp	al, 20h
+	;jb	short cic_3
+
+	;cmp	al, 'A'
+	cmp	al, '@'
+	jb	short cic_1
+	cmp	al, 'Z'
+	jna	short cic_3
+	cmp	al, 'a'
+	jb	short cic_1
+	cmp	al, 'z'
+	jna	short cic_4 ; convert to upper case
+cic_1:
+	push	edi
+	push	ecx
+	mov	edi, invalid_fname_chars_@
+ 	mov	ecx, sizeInvFnChars@
+	rep	scasb
+	pop	ecx
+	pop	edi
+	jnz	short cic_2
+	; invalid char
+cic_2:
+	mov	al, '_'
+cic_3:
+	retn
+cic_4:
+	; simple ucase
+	and	al, 0DFh	
+	;and	al, 5Fh
+	mov	ah, al
+	retn
+
+convert_num_to_formalstr:
+	; 20/05/2025 - TRDOS 386 v2.0.10
+	; Singlix FS short name specific procedure
+	;
+	; INPUT:
+	;  eax = number (FDT/DDT number)
+	;  edi = [#], formal string address
+	;	 has minimum 12 bytes size/space
+	; OUTPUT:
+	;  [.......] = max. 10 digits between '[' & ']'
+	;  ecx = formal string size including '[' & ']'
+
+	;
+	; Modified registers: eax, ecx, edx
+
+	push	ebp ; *
+	push	edi ; **
+	mov	byte [edi],'['
+	inc	edi
+	mov	ebp, esp
+	mov	ecx, 10
+cntfs_next:
+	xor	edx, edx
+	div	ecx
+	push	edx ; *#*
+	and	eax, eax
+	jnz	short cntfs_next
+
+	mov	cl, 2 ; '[' & ']'
+cntfs_ok:
+	pop	eax ; *#*
+	add	al, '0' ; convert to numeric char
+	stosb
+	inc	ecx
+	cmp	esp, ebp
+	jb	short cntfs_ok
+	mov	al, ']'
+	stosb
+	;xor	al, al
+	;stosb
+	pop	edi ; **
+	pop	ebp ; *	
+	retn
+			 
+
 
 ; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 

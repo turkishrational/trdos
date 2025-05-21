@@ -16333,7 +16333,7 @@ update_file_lmdt: ; & update file size
 	; 03/09/2024
 	add	ah, 'A'
 	mov	al, [esi+LD_FATType]
-	
+
 	cmp	byte [DirBuff_ValidData], 1
 	jb	short uflmdt_4
 
@@ -17417,7 +17417,7 @@ syschmod_8:
 
 sysdrive: ; Get/Set Current (Working) Drive (for user)
 	; 30/12/2017 (TRDOS 386 = TRDOS v2.0) 
-	;	
+	;
         ; INPUT ->
         ;          BL = Logical DOS Drive number (0=A: ... 2=C:)
 	;	   If BL = 0FFh -> Get Current Drive
@@ -17631,7 +17631,7 @@ systime_2:
 systime_3:
 	; eax = time
 	mov	esi, eax
-systime_4:	
+systime_4:
 	mov	ax, [year]
 	shl	eax, 16
 	mov	al, [day]
