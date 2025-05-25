@@ -5804,8 +5804,6 @@ convert_name_from_trfs:
 	;
 	; Modified registers: EAX, EBX, ECX
 
-	; temporary name space on stack frame
-
 	; 21/05/2025
 	mov	[fdt_number], eax
 	mov	[f_name_limit], edx
@@ -6225,50 +6223,6 @@ cic_4:
 	and	al, 0DFh
 	;and	al, 5Fh
 	mov	ah, al
-	retn
-
-convert_num_to_formalstr:
-	; 20/05/2025 - TRDOS 386 v2.0.10
-	; Singlix FS short name specific procedure
-	;
-	; INPUT:
-	;  eax = number (FDT/DDT number)
-	;  edi = [#], formal string address
-	;	 has minimum 12 bytes size/space
-	; OUTPUT:
-	;  [.......] = max. 10 digits between '[' & ']'
-	;  ecx = formal string size including '[' & ']'
-
-	;
-	; Modified registers: eax, ecx, edx
-
-	push	ebp ; *
-	push	edi ; **
-	mov	byte [edi],'['
-	inc	edi
-	mov	ebp, esp
-	mov	ecx, 10
-cntfs_next:
-	xor	edx, edx
-	div	ecx
-	push	edx ; *#*
-	and	eax, eax
-	jnz	short cntfs_next
-
-	mov	cl, 2 ; '[' & ']'
-cntfs_ok:
-	pop	eax ; *#*
-	add	al, '0' ; convert to numeric char
-	stosb
-	inc	ecx
-	cmp	esp, ebp
-	jb	short cntfs_ok
-	mov	al, ']'
-	stosb
-	;xor	al, al
-	;stosb
-	pop	edi ; **
-	pop	ebp ; *	
 	retn
 
 	; 25/05/2025 - TRDOS 386 v2.0.10
