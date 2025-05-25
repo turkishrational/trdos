@@ -874,4 +874,4 @@ f_ext_count:	resd 1
 formal_size:	resd 1
 insert_fdtnum:	resb 1
 target_name:	resb 13
-		resb 1
+temp_name:	resb 65

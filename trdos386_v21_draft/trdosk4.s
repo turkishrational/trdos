@@ -5783,6 +5783,7 @@ düzeltme ve doðrulama lazým.
 ; Singlix FS1 (TRFS1) to TRDOS 386 file name conversion
 
 convert_name_from_trfs:
+	; 25/05/2025
 	; 24/05/2025
 	; 23/05/2025
 	; 21/05/2025
@@ -5804,8 +5805,6 @@ convert_name_from_trfs:
 	;
 	; Modified registers: EAX, EBX, ECX
 
-	; temporary name space on stack frame
-
 	; 21/05/2025
 	mov	[fdt_number], eax
 	mov	[f_name_limit], edx
@@ -5819,6 +5818,10 @@ convert_name_from_trfs:
 	;mov	[f_name_count], ebx ; 0
 	mov	[formal_size], ebx ; 0
 	mov	[insert_fdtnum], bl ; 0
+
+	; temporary name space on bss section
+	; 25/05/2025
+	mov	edi, temp_name ; max. 64 bytes + zero
 
 	mov	ecx, 64
 
@@ -5860,7 +5863,8 @@ conv_f_fs_3:	; end_rm_space
 	;mov	[f_name_count], ecx
 	mov	[f_base_count], ecx
 
-	mov	edi, esi ;  (*)
+	; 25/05/2025
+	mov	edi, [f_target] ; (*)
 
 	and	ebx, ebx
 	jz	conv_f_fs_6 ; ecx > 0 ; not dot
@@ -5925,8 +5929,8 @@ conv_f_fs_5:
 
 	; 23/05/2025
 dot_first:
-	; 24/05/2025
-	;mov	edi, esi ;  (*)
+	; 25/05/2025
+	;mov	edi, [f_target] ; (*)
 	movsb	; skip '.'
 	inc	byte [insert_fdtnum]
 	call	check_fn_limit
@@ -5954,8 +5958,8 @@ conv_f_fs_6:	; not dot
 	call	check_fn_limit
 
 conv_f_fs_7:
-	; 24/05/2025
-	;mov	edi, esi ;  (*)
+	; 25/05/2025
+	;mov	edi, [f_target] ; (*)
 	mov	ecx, [f_base_count]
 conv_f_fs_8:
 	lodsb
@@ -5990,7 +5994,7 @@ conv_f_fs_13:
 	mov	byte [edi], 0
 
 	cmp	byte [insert_fdtnum], 0
-	jna	short conv_f_fs_ok
+	jna	conv_f_fs_ok
 
 nul_name: ; 24/05/2025 ; [f_base_count] = 0
 
@@ -6010,22 +6014,41 @@ nul_name: ; 24/05/2025 ; [f_base_count] = 0
 	mov	esi, edi ; semi-raw short name address
 	mov	edi, [f_target] ; = [f_base_start]
 
+	; 25/05/2025
+conv_f_fs_14:
 	; 24/05/2025
 	mov	edx, [f_name_limit] ; max. length
 	mov	eax, [f_ext_count]
 	or	eax, eax
-	jz	short conv_f_fs_14
+	jz	short conv_f_fs_15
 	sub	edx, eax  ; - extension length
 	dec	edx ; except DOT
 	;jz	short use_only_formal_str ; fdt only
-conv_f_fs_14:
+conv_f_fs_15:
+	; 25/05/2025
+	sub	edx, ecx
+	ja	short conv_f_fs_16 ; edx > 0
+		 ; min. 1 base name char at the beginning
+
+	; there is not base name space for a base name char
+	; (check name ext. and decrease it to 3 if it is 4)
+	; ((start with a base name char would be better))
+
+	cmp	al, 4 ; [f_ext_count]
+	jb	short conv_f_fs_18 ; edx <= 0
+
+	dec	dword [f_ext_count] ; 4 -> 3
+
+	; put zero after the 3th extension char
+	; (the nul was after the 4th extension char)
+	mov	edx, [f_ext_start]
+	mov	byte [edx+3], 0
+
+	jmp	short conv_f_fs_14 ; check again
+
+conv_f_fs_16:
 	; edx = number of base name chars
 	;	before formal string (*)
-
-	sub	edx, ecx
-	;jna	short use_only_formal_str ; fdt only
-	jb	short use_only_formal_str
-	jz	short insert_formal_str
 
 	mov	eax, [f_base_count]
 
@@ -6033,9 +6056,9 @@ conv_f_fs_14:
 	;jz	short insert_formal_str
 
 	cmp	edx, eax
-	jna	short conv_f_fs_15
+	jna	short conv_f_fs_17
 	mov	edx, eax
-conv_f_fs_15:
+conv_f_fs_17:
 	add	edi, edx
 
 insert_formal_str:
@@ -6074,6 +6097,14 @@ ins_formal_3:
 	jna	short ins_formal_4 ; ok.
 	dec	ebx
 	jmp	short ins_formal_3
+
+conv_f_fs_18:
+	; 25/05/2025
+	; edx <= 0  (from sub edx, ecx)
+	or	edx, edx
+	jz	short insert_formal_str
+	; edx < 0
+	;jmp	short use_only_formal_str
 
 	; 24/05/2025
 add_formal_str:

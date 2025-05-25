@@ -84,60 +84,60 @@ _stdio  equ 46	;  TRDOS 386 v2.0.9
 ; Retro UNIX 386 v1 system call format:
 ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
 
-[BITS 32] ; We need 32-bit intructions for protected mode
+[BITS 32] ; 32-bit intructions
 
 [ORG 0] 
 
 START_CODE:
-	sys _msg, version, 255, 0Ah
-	mov esi, esp
+	sys	_msg, version, 255, 0Ah
+	mov	esi, esp
 	lodsd
-	and eax, eax
-	jz  short terminate
-	cmp eax, 3	; number of arguments
-	jb  short show_usage
-	mov ebp, eax
+	and	eax, eax
+	jz	short terminate
+	cmp	eax, 3	; number of arguments
+	jb	short show_usage
+	mov	ebp, eax
 	lodsd	; skip program file name
-	dec ebp
+	dec	ebp
 nextarg:
-	lodsd ; number address
-	;call convert_to_formal_str
-	call convert_to_fdt_number
+	lodsd	; number address
+	;call	convert_to_formal_str
+	call	convert_to_fdt_number
 
-	mov edi, fs_name ; fs (llong) file name
-	mov ecx, 64	; file name limit
-	dec ebp
+	mov	edi, fs_name ; fs (long) file name
+	mov	ecx, 64	; file name limit
+	dec	ebp
 next_word:
-	lodsd	 
-	call move_file_name
-	jcxz put_zero
-	dec ebp
-	jnz short next_word
+	lodsd
+	call	move_file_name
+	jcxz	put_zero
+	dec	ebp
+	jnz	short next_word
 put_zero:
-	xor eax, eax
+	xor	eax, eax
 	stosb
 
-	mov esi, fs_name
-	mov edx, 12 ; max. 12 bytes
-	mov edi, target_name
-	mov eax, [fdt_number]
+	mov	esi, fs_name
+	mov	edx, 12 ; max. 12 bytes
+	mov	edi, target_name
+	mov	eax, [fdt_number]
 
-	call convert_name_from_trfs
+	call	convert_name_from_trfs
 
-	call print_short_name
+	call	print_short_name
 terminate: 
-	sys _exit
-;halt:
-	;jmp short halt
+	sys	_exit
+halt:
+	jmp	short halt
 
 show_usage:
-	sys _msg, usage, 255, 0Fh
-	jmp short terminate
+	sys	_msg, usage, 255, 0Fh
+	jmp	short terminate
 
 print_short_name:
-	sys _msg, nexline, 2, 07h
-	sys _msg, edi, 255, 0Fh
-	sys _msg, nexline, 2, 07h
+	sys	_msg, nexline, 2, 07h
+	sys	_msg, edi, 255, 0Fh
+	sys	_msg, nexline, 2, 07h
 	retn
 
 ; 23/05/2025
@@ -162,24 +162,6 @@ ctfstr_ok:
 	sub	eax, eax
 	stosb
 	pop	esi
-	retn
-
-move_file_name:
-	; eax = argument, fs file name text
-	; ecx = remain byte count
-	push esi
-	mov esi, eax
-mfn_@:
-	lodsb
-	cmp al, 20h
-	jb  short mfn_skip
-	stosb
-	loop mfn_@
-	; ecx = 0
-	;xor eax, eax
-	;stosb
-mfn_skip:
-	pop esi
 	retn
 %endif
 
@@ -220,19 +202,19 @@ cfdtnum_3:
 move_file_name:
 	; eax = argument, fs file name text
 	; ecx = remain byte count
-	push esi
-	mov esi, eax
+	push	esi
+	mov	esi, eax
 mfn_@:
 	lodsb
-	cmp al, 20h
-	jb  short mfn_skip
+	cmp	al, 20h
+	jb	short mfn_skip
 	stosb
-	loop mfn_@
+	loop	mfn_@
 	; ecx = 0
-	;xor eax, eax
+	;xor	eax, eax
 	;stosb
 mfn_skip:
-	pop esi
+	pop	esi
 	retn
 
 convert_invalid_chars:
@@ -247,7 +229,7 @@ convert_invalid_chars:
 	;  (lowercase char will be converted to uppercase)
 	;
 	; Modified registers: EAX
-	
+
 	mov	ah, al
 
 	cmp	al, 128
@@ -287,6 +269,7 @@ cic_4:
 	retn
 
 convert_name_from_trfs:
+	; 25/05/2025
 	; 24/05/2025
 	; 23/05/2025
 	; 21/05/2025
@@ -308,8 +291,6 @@ convert_name_from_trfs:
 	;
 	; Modified registers: EAX, EBX, ECX
 
-	; temporary name space on stack frame
-
 	; 21/05/2025
 	mov	[fdt_number], eax
 	mov	[f_name_limit], edx
@@ -323,6 +304,10 @@ convert_name_from_trfs:
 	;mov	[f_name_count], ebx ; 0
 	mov	[formal_size], ebx ; 0
 	mov	[insert_fdtnum], bl ; 0
+
+	; temporary name space on bss section
+	; 25/05/2025
+	mov	edi, temp_name ; max. 64 bytes + zero
 
 	mov	ecx, 64
 
@@ -364,7 +349,8 @@ conv_f_fs_3:	; end_rm_space
 	;mov	[f_name_count], ecx
 	mov	[f_base_count], ecx
 
-	mov	edi, esi ;  (*)
+	; 25/05/2025
+	mov	edi, [f_target] ; (*)
 
 	and	ebx, ebx
 	jz	conv_f_fs_6 ; ecx > 0 ; not dot
@@ -429,13 +415,13 @@ conv_f_fs_5:
 
 	; 23/05/2025
 dot_first:
-	; 24/05/2025
-	;mov	edi, esi ;  (*)
+	; 25/05/2025
+	;mov	edi, [f_target] ; (*)
 	movsb	; skip '.'
 	inc	byte [insert_fdtnum]
 	call	check_fn_limit
 	;dec	ecx
-	;jmp	short conv_f_fs_8	
+	;jmp	short conv_f_fs_8
 	jmp	short conv_f_fs_9
 
 	; 23/05/2025
@@ -458,8 +444,8 @@ conv_f_fs_6:	; not dot
 	call	check_fn_limit
 
 conv_f_fs_7:
-	; 24/05/2025
-	;mov	edi, esi ;  (*)
+	; 25/05/2025
+	;mov	edi, [f_target] ; (*)
 	mov	ecx, [f_base_count]
 conv_f_fs_8:
 	lodsb
@@ -494,7 +480,7 @@ conv_f_fs_13:
 	mov	byte [edi], 0
 
 	cmp	byte [insert_fdtnum], 0
-	jna	short conv_f_fs_ok
+	jna	conv_f_fs_ok
 
 nul_name: ; 24/05/2025 ; [f_base_count] = 0
 
@@ -514,32 +500,51 @@ nul_name: ; 24/05/2025 ; [f_base_count] = 0
 	mov	esi, edi ; semi-raw short name address
 	mov	edi, [f_target] ; = [f_base_start]
 
+	; 25/05/2025
+conv_f_fs_14:
 	; 24/05/2025
 	mov	edx, [f_name_limit] ; max. length
 	mov	eax, [f_ext_count]
 	or	eax, eax
-	jz	short conv_f_fs_14
+	jz	short conv_f_fs_15
 	sub	edx, eax  ; - extension length
 	dec	edx ; except DOT
 	;jz	short use_only_formal_str ; fdt only
-conv_f_fs_14:
+conv_f_fs_15:
+	; 25/05/2025
+	sub	edx, ecx
+	ja	short conv_f_fs_16 ; edx > 0
+		 ; min. 1 base name char at the beginning
+
+	; there is not base name space for a base name char
+	; (check name ext. and decrease it to 3 if it is 4)
+	; ((start with a base name char would be better))
+
+	cmp	al, 4 ; [f_ext_count]
+	jb	short conv_f_fs_18 ; edx <= 0
+
+	dec	dword [f_ext_count] ; 4 -> 3
+
+	; put zero after the 3th extension char
+	; (the nul was after the 4th extension char)
+	mov	edx, [f_ext_start]
+	mov	byte [edx+3], 0
+
+	jmp	short conv_f_fs_14 ; check again
+
+conv_f_fs_16:
 	; edx = number of base name chars
 	;	before formal string (*)
 
-	sub	edx, ecx
-	;jna	short use_only_formal_str ; fdt only
-	jb	short use_only_formal_str
-	jz	short insert_formal_str
-
 	mov	eax, [f_base_count]
-	
+
 	;and	eax, eax
 	;jz	short insert_formal_str
 
 	cmp	edx, eax
-	jna	short conv_f_fs_15
+	jna	short conv_f_fs_17
 	mov	edx, eax
-conv_f_fs_15:
+conv_f_fs_17:
 	add	edi, edx
 
 insert_formal_str:
@@ -578,6 +583,14 @@ ins_formal_3:
 	jna	short ins_formal_4 ; ok.
 	dec	ebx
 	jmp	short ins_formal_3
+
+conv_f_fs_18:
+	; 25/05/2025
+	; edx <= 0  (from sub edx, ecx)
+	or	edx, edx
+	jz	short insert_formal_str
+	; edx < 0
+	;jmp	short use_only_formal_str
 
 	; 24/05/2025
 add_formal_str:
@@ -712,4 +725,4 @@ f_ext_count:	resd 1
 formal_size:	resd 1
 insert_fdtnum:	resb 1
 target_name:	resb 13
-		resb 1
+temp_name:	resb 65
