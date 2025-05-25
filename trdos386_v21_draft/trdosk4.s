@@ -6100,7 +6100,6 @@ convert_num_to_formalstr:
 	; OUTPUT:
 	;  [.......] = max. 10 digits between '[' & ']'
 	;  ecx = formal string size including '[' & ']'
-
 	;
 	; Modified registers: eax, ecx, edx
 
