@@ -527,7 +527,9 @@ conv_f_fs_14:
 	;	before formal string (*)
 
 	sub	edx, ecx
-	jna	short use_only_formal_str ; fdt only
+	;jna	short use_only_formal_str ; fdt only
+	jb	short use_only_formal_str
+	jz	short insert_formal_str
 
 	mov	eax, [f_base_count]
 	

@@ -5804,6 +5804,8 @@ convert_name_from_trfs:
 	;
 	; Modified registers: EAX, EBX, ECX
 
+	; temporary name space on stack frame
+
 	; 21/05/2025
 	mov	[fdt_number], eax
 	mov	[f_name_limit], edx
@@ -5929,7 +5931,7 @@ dot_first:
 	inc	byte [insert_fdtnum]
 	call	check_fn_limit
 	;dec	ecx
-	;jmp	short conv_f_fs_8	
+	;jmp	short conv_f_fs_8
 	jmp	short conv_f_fs_9
 
 	; 23/05/2025
@@ -6021,10 +6023,12 @@ conv_f_fs_14:
 	;	before formal string (*)
 
 	sub	edx, ecx
-	jna	short use_only_formal_str ; fdt only
+	;jna	short use_only_formal_str ; fdt only
+	jb	short use_only_formal_str
+	jz	short insert_formal_str
 
 	mov	eax, [f_base_count]
-	
+
 	;and	eax, eax
 	;jz	short insert_formal_str
 
