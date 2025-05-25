@@ -182,10 +182,13 @@ FDE_AttrMask:	   resw 1 ; DIR.ASM
 AmbiguousFileName: resb 1
 PreviousAttr:	   resb 1 ; DIR.ASM
 ;
+resb 1 ; 25/05/2025
 LongNameFound:	 resb 1	  ; DIR.ASM
 LFN_EntryLength: resb 1   ; DIR.ASM
 LFN_CheckSum:	 resb 1   ; DIR.ASM
-LongFileName:	 resb 132 ; DIR.ASM
+;LongFileName:	 resb 132 ; DIR.ASM
+; 25/05/2025 - TRDOS 386 v2.0.10
+LongFileName:	 resb 260 ; 130 UNICODE (2-byte) chars
 
 ;PATH_Array_Ptr: resw 1 ; DIR.ASM
 PATH_CDLevel:	 resb 1 ; DIR.ASM
@@ -229,6 +232,8 @@ FindFile_LongNameYes: 	  resb 1 ; Sign for longname procedures
 FindFile_DirEntryName:	  resb 13 ; 18/05/2025
 ;FindFile_Reserved3:	  resb 1 ; 18/05/2025
 ; 184 bytes ; 19/05/2025
+; 25/05/2025
+FindFile_LongName:	  resb 129 ; ASCIIZ (max. 128+NUL)
 
 First_Path_Pos: resd 1	; DIR.ASM ; 09/10/2011
 Last_Slash_Pos: resd 1	; DIR.ASM

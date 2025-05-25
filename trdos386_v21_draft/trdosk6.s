@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 20/05/2025  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 25/05/2025  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -11823,7 +11823,7 @@ sysexec:
 	;	argp1... argpn - table of argument pointers
 	;	argp1:<...0> ... argpn:<...0> - argument strings
 	; Inputs: (arguments)
-	; Outputs: -	
+	; Outputs: -
 	; ...............................................................
 	;
 	; Retro UNIX 386 v1 modification:
@@ -11846,7 +11846,7 @@ sysexec:
 	;	      in 'u.namep' and the 2nd argument
 	;	      on top of stack. (1st argument is offset of the
 	;	      file/path name in the user's program segment.)
-	
+
 	;call	arg2
 	; * name - 'u.namep' points to address of file/path name
 	;          in the user's program segment ('u.segmnt')
@@ -11892,7 +11892,7 @@ sysexec_0:
 	; (attribute bits = 00ADVSHR) ; 18h = Directory+Volume
 	; BL = Attributes byte
 	
-        test	bl, 6  ; system file or hidden file (S+H) 
+        test	bl, 6  ; system file or hidden file (S+H)
 	;jz	short sysexec_0ext
 	jz	short sysexec_1 ; yes
 
@@ -11925,7 +11925,7 @@ sysexec_1:
 	; ('.PRG' for current TRDOS version)
 	call	check_prg_filename_ext
 	jc	short sysexec_not_exf
-	
+
 	; 18/11/2017
 	cmp	al, 'P'
 	jne	short sysexec_not_exf
@@ -14844,6 +14844,7 @@ tfub_2:
 ;	jmp	short tfub_3
 
 sysfff: ; <Find First File>
+	; 25/05/2025
 	; 18/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/08/2024 (TRDOS 386 Kernel v2.0.9)
 	; 08/08/2022
@@ -14915,21 +14916,21 @@ sysfff: ; <Find First File>
 	; TR-DOS FindFile (FFF) Structure (128 bytes):
 	; 09/10/2011 (DIR.ASM) - 10/02/2016 (trdoskx.s)
 	;
-	; Offset	Parameter		Size
-	; ------	------------------	--------
-	; 0		FindFile_Drv		1 byte
-	; 1		FindFile_Directory	65 bytes
-	; 66		FindFile_Name		13 bytes
-	; 79		FindFile_LongNameEntryLength 1 byte
+	; Offset   Parameter			Size
+	; ------   ------------------		--------
+	; 0	   FindFile_Drv			1 byte
+	; 1	   FindFile_Directory		65 bytes
+	; 66	   FindFile_Name		13 bytes
+	; 79	   FindFile_LongNameEntryLength 1 byte
 	;Above 80 bytes form
 	;TR-DOS Source/Destination File FullName Format/Structure
-	; 80		FindFile_AttributesMask 1 word
-	; 82		FindFile_DirEntry	32 bytes (*)
-	; 114		FindFile_DirFirstCluster 1 double word
-	; 118		FindFile_DirCluster	1 double word
-	; 122		FindFile_DirEntryNumber 1 word
-	; 124		FindFile_MatchCounter	1 word
-	; 126		FindFile_Reserved	1 word
+	; 80	   FindFile_AttributesMask	1 word
+	; 82	   FindFile_DirEntry		32 bytes (*)
+	; 114	   FindFile_DirFirstCluster	1 double word
+	; 118	   FindFile_DirCluster		1 double word
+	; 122	   FindFile_DirEntryNumber	1 word
+	; 124	   FindFile_MatchCounter	1 word
+	; 126	   FindFile_Reserved		1 word
    	; (*) MS-DOS, FAT 12-16-32 classic directory entry (32 bytes)
 	;
 	; ***********************************************************
@@ -14938,33 +14939,39 @@ sysfff: ; <Find First File>
 	; ------ TR-DOS 386 v2.0.10 --------
 	; FindFile - SysFFF/SysFNF Structure (<=281 bytes):
 	;
-	; Offset	Parameter		Size
-	; ------	------------------	--------
-	; 0		FindFile_DirEntry	32 bytes (*)
-	; 32		FindFile_Drv		1 byte
-	; 33		FindFile_Directory	65 bytes (104 bytes)
-	; 98		FindFile_Name		13 bytes
-	; 111		FindFile_LongNameEntryLength 1 byte
-	; 112		FindFile_Longname	128 bytes (max.)
+	; Offset   Parameter			Size
+	; ------   ------------------		--------
+	; 0	   FindFile_DirEntry		32 bytes (*)
+	; 32	   FindFile_Drv			1 byte
+	; 33	   FindFile_Directory		65 bytes (104 bytes)
+	; 98	   FindFile_Name		13 bytes
+	; 111	   FindFile_LongNameEntryLength 1 byte
+	; 112	   FindFile_Longname		129 bytes (max.) (**)
 	;
-	; Parameters table/structure size: max. 279 bytes
+	; Parameters table/structure size: max. 280 bytes (**)
 	;
+	;		; 25/05/2025 (**)
 	; Return Options:
 	;	CH = 0 -> basic (24 bytes)
 	;	CH bits
-	;		bit 0 - FindFile_DirEntry
-	;		bit 1 - FindFile_Drv
-	;		bit 2 - FindFile_Directory (65 bytes)
-	;		bit 3 - FindFile_Name
-	;		bit 4 - FindFile_LongNameEntryLength
-	;		bit 5 - FindFile_Longname (66 bytes)
-	;		bit 6 -	use 104 bytes buf for directory
-	;		bit 7 - use 128 bytes buf for longname
+	;	   bit 0 - FindFile_DirEntry
+	;	   bit 1 - FindFile_Drv
+	;	   bit 2 - FindFile_Directory (65 bytes)
+	;	   bit 3 - FindFile_Name
+	;	   bit 4 - FindFile_LongNameEntryLength
+	;	   bit 5 - FindFile_Longname (65 bytes) (ASCIIZ)
+	;	   bit 6 - use 104 bytes buf for directory
+	;	   bit 7 - use 128+1 bytes buf for longname (**)
 	; 	examples:
 	;	  1Fh -	00011111b needs 112 bytes buffer
 	;	  0Fh -	01001111b needs 150 bytes buffer
-	;	 0EFh -	11101111b needs 278 bytes buffer
-	;	 0FFh -	11111111b needs 279 bytes buffer
+	;	 0EFh -	11101111b needs 279 bytes buffer
+	;	 0FFh -	11111111b needs 280 bytes buffer (**)
+	;	 07Fh - 01111111b needs 216 bytes buffer (**)
+	;	 03Fh - 00111111b needs 177 bytes buffer (**)
+	;
+	; (**) ASCIIZ (not UNICODE) long name (max. 128+NUL bytes)
+	;
 	; Note:
 	;	if EDX input is 0
 	;		Only File Size will be returned in EAX (*)
@@ -15206,7 +15213,8 @@ sysfff_10:
 	; 20/05/2025
 	push	edi ; *!*
 	mov	edi, TextBuffer ; temporary buffer
-			; max. 279-32 bytes
+			; 25/05/2025
+			; max. 280-32 bytes
 	test	ch, 2	; bit 1 - FindFile_Drv
 	jz	short sysfff_11 ; skip
 	mov	esi, FindFile_Drv
@@ -15296,18 +15304,58 @@ sysfff_20:
 
 	;mov	esi, FindFile_LongName
 	; 20/05/2025
-	mov	esi, LongFileName ; asciiz
-			; (130 bytes)
-			; ((space: 132 bytes))
+	mov	esi, LongFileName
+			;; asciiz
+			;; (130 bytes)
+			;; ((space: 132 bytes))
+	; 25/05/2025
+	; esi = UNICODE long name buffer address
+	;	(max. 260 2-byte chars)
+
+	push	edi ; **1**
+
+	mov	edi, FindFile_LongName
+			; 129 bytes buffer
+	push	edi ; **2**		
 
 	test	ch, 80h	; bit 6 - use 128 bytes
-	mov	ecx, 127
+	;mov	ecx, 127
+	; 25/05/2025
+	mov	ecx, 128
 	jnz	short sysfff_21
-	mov	cl, 65
+	; 25/05/2025
+	;;mov	cl, 65
+	;mov	cl, 64
+	shr	ecx, 1
 sysfff_21:
+	;rep	movsb
+	; 25/05/2025
+	; ecx = byte count
+	; esi = source (UNICODE)
+	; edi = destination (ASCII)
+	push	ecx ; **3**
+	call	unicode_to_ascii
+	; edi = the last char address + 1
+	; (the last char is zero or not)
+	; ecx = 0 -> the last char is not zero
+	;  al = the last character converted
+
+	; 25/05/2025
+	pop	ecx ; **3**
+	;mov	esi, FindFile_LongName
+	pop	esi ; **2**
+	pop	edi ; **1**
+
+	; copy long name to temporary buffer
+	; (ecx value is 64 or 128)
+
+	shr	ecx, 2 ; dword count
 	rep	movsb
+
+	; ensure the last byte of the str is zero
+	; (65th or 129th character must be NUL)
+
 	sub	al, al ; 0
-	; 66th or 128th byte is zero
 sysfff_22:
 	stosb
 
@@ -15316,7 +15364,7 @@ sysfff_23:
 	mov	ecx, edi
 	mov	esi, TextBuffer
 	sub	ecx, esi
-	; ecx  <= 247 (279-32)
+	; ecx <= 248 (280-32) ; 25/05/2025
 	mov	[FFF_valid], cl
 	; 20/05/2025
 	pop	edi ; *!*
@@ -15336,6 +15384,7 @@ sysfnf_11:
 %endif
 
 sysfnf: ; <Find Next File>
+	; 25/05/2025
 	; 19/05/2025
 	; 18/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/08/2024 (TRDOS 386 Kernel v2.0.9)
@@ -15393,33 +15442,39 @@ sysfnf: ; <Find Next File>
 	; ------ TR-DOS 386 v2.0.10 --------
 	; FindFile - SysFFF/SysFNF Structure (<=281 bytes):
 	;
-	; Offset	Parameter		Size
-	; ------	------------------	--------
-	; 0		FindFile_DirEntry	32 bytes (*)
-	; 32		FindFile_Drv		1 byte
-	; 33		FindFile_Directory	65 bytes (104 bytes)
-	; 98		FindFile_Name		13 bytes
-	; 111		FindFile_LongNameEntryLength 1 byte
-	; 112		FindFile_Longname	128 bytes (max.)
+	; Offset   Parameter			Size
+	; ------   ------------------		--------
+	; 0	   FindFile_DirEntry		32 bytes (*)
+	; 32	   FindFile_Drv			1 byte
+	; 33	   FindFile_Directory		65 bytes (104 bytes)
+	; 98	   FindFile_Name		13 bytes
+	; 111	   FindFile_LongNameEntryLength 1 byte
+	; 112	   FindFile_Longname		129 bytes (max.) (**)
 	;
-	; Parameters table/structure size: max. 279 bytes
+	; Parameters table/structure size: max. 280 bytes (**)
 	;
+	;		; 25/05/2025 (**)
 	; Return Options:
 	;	CH = 0 -> basic (24 bytes)
 	;	CH bits
-	;		bit 0 - FindFile_DirEntry
-	;		bit 1 - FindFile_Drv
-	;		bit 2 - FindFile_Directory (65 bytes)
-	;		bit 3 - FindFile_Name
-	;		bit 4 - FindFile_LongNameEntryLength
-	;		bit 5 - FindFile_Longname (66 bytes)
-	;		bit 6 -	use 104 bytes buf for directory
-	;		bit 7 - use 128 bytes buf for longname
+	;	   bit 0 - FindFile_DirEntry
+	;	   bit 1 - FindFile_Drv
+	;	   bit 2 - FindFile_Directory (65 bytes)
+	;	   bit 3 - FindFile_Name
+	;	   bit 4 - FindFile_LongNameEntryLength
+	;	   bit 5 - FindFile_Longname (65 bytes) (ASCIIZ)
+	;	   bit 6 - use 104 bytes buf for directory
+	;	   bit 7 - use 128+1 bytes buf for longname (**)
 	; 	examples:
 	;	  1Fh -	00011111b needs 112 bytes buffer
 	;	  0Fh -	01001111b needs 150 bytes buffer
-	;	 0EFh -	11101111b needs 278 bytes buffer
-	;	 0FFh -	11111111b needs 279 bytes buffer
+	;	 0EFh -	11101111b needs 279 bytes buffer
+	;	 0FFh -	11111111b needs 280 bytes buffer (**)
+	;	 07Fh - 01111111b needs 216 bytes buffer (**)
+	;	 03Fh - 00111111b needs 177 bytes buffer (**)
+	;
+	; (**) ASCIIZ (not UNICODE) long name (max. 128+NUL bytes)
+	;
 	; Note:
 	;	if EDX input is 0
 	;		Only File Size will be returned in EAX (*)

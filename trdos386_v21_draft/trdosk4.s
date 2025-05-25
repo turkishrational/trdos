@@ -1475,18 +1475,35 @@ save_longname_sub_component:
 	;	According to
 	;	Microsoft FAT32 File System Specification
 	;   ... Long names are limited to 255 chars,
+	;	(UCS-2, 2-byte character set)
 	;	not including the trailing NUL. ...
 	;   ... Total path length of can not exceed
 	;	260 chars including the trailing NUL. ...
+	;	(520 bytes)
 	;   So, in this version of TRDOS 386
 	;	UNICODE chars (two bytes) wil be converted
 	;	to ASCII chars only using low bytes of
 	;	of two byte UNICODE chars,
 	;	as a very simple method.
+	,	(if the high byte is not zero,
+	;	 low byte will be returned as '_')
 	;
-	;	ASCIIZ longname length limit is 127+NUL.
-	;	(but string buffer size will be 130)
-	;	((10*13 chars))
+	;	! 25/05/2025 !
+	;	TRDOS 386 v2.1 (v2.0.10) will use only
+	;	260 bytes (130 2-byte characters) buffer
+	;	for FAT LFN type long names. And TRDOS 386
+	;	kernel will ignore long file names if the
+	;	length is longer/more than 260 bytes.
+	,	(in other words: more than 10 LFN entries)
+	;	And the kernel will use unicode to ascii
+	;	conversion.. As result of the conversion,
+	;	ASCIIZ equivalent of the long name
+	;	will be returned with max. 128+NUL chars.
+	;	(260 byte limit -> LDIR_Ord byte,
+	;	"Last Long Entry" mark is 41h to 4Ah.)
+	;
+	;	(ASCIIZ name buffer size will be 129 bytes)
+	;	((unicode LFN buffer will be 260 bytes))
 	;
 	; Modified registers: ECX ; 20/05/2025
 	;
@@ -1500,10 +1517,10 @@ save_longname_sub_component:
 
 	sub	ecx, ecx
 	;sub	eax, eax
-	;mov	cl, 26
-	; 20/05/2025
-	mov	cl, 13 ; 26/2
-
+	
+	; 25/05/2025
+	mov	cl, 26
+	
 	movzx	eax, byte [edi] ; LDIR_Order
 	
 	;cmp	al, 41h  ; 40h (last long entry sign) + 1
@@ -1532,19 +1549,21 @@ save_longname_sub_component:
 	mov	[LongNameFound], al
 
 	dec	al
-	;;mov	cl, 26
-	; 20/05/2025
-	;mov	cl, 13 ; 26/2
+	; 25/05/2025
+	;mov	cl, 26
 	mul	cl
 
-	mov	esi, eax
-	add	esi, ecx
-		; to make is an ASCIIZ string
-		; with ax+26 bytes length
-	add	esi, LongFileName
+	; 25/05/2025
+	;mov	esi, eax
+	;add	esi, ecx
+	;	; to make is an ASCIIZ string
+	;	; with eax+26 bytes length
+	;add	esi, LongFileName
 	;mov	word [esi], 0
-	; 20/05/2025
-	mov	byte [esi], 0
+	
+	; 25/05/2025
+	; eax = offset from beginning of LongFileName 
+
 	jmp	short loc_pslsc_move_ldir_name2
 
 pass_pslnsc_last_long_entry:
@@ -1558,54 +1577,28 @@ pass_pslnsc_last_long_entry:
 
 loc_pslsc_move_ldir_name1:
 	dec	al
-	;;mov	cl, 26
-	; 20/05/2025
-	;mov	cl, 13 ; 26/2
+	; 25/05/2025
+	;mov	cl, 26
 	mul	cl
 
 loc_pslsc_move_ldir_name2:
 	mov	cl, [edi+0Dh] ; long name checksum
 	mov	[LFN_CheckSum], cl
-
 	mov	esi, edi ; LDIR_Order
 	mov	edi, LongFileName
 	add	edi, eax
 	inc	esi
 	mov	cl, 5 ; chars 1 to 5
-	;rep	movsw
-	; 20/05/2025 - TRDOS 386 v2.0.10
-loc_pslsc_move_ldir_name3:
-	;lodsw
-	; 25/05/2025
-	call	unicode_to_ascii
-	stosb
-	loop	loc_pslsc_move_ldir_name3
+	rep	movsw
 	
 	add	esi, 3
-	; 20/05/2025
-	;movsd	; char 6 & 7
-	;movsd	; char 8 & 9
-	;movsd	; char 10 & 11
-	mov	cl, 6
-loc_pslsc_move_ldir_name4:
-	;lodsw
-	; 25/05/2025
-	call	unicode_to_ascii
-	stosb
-	loop	loc_pslsc_move_ldir_name4
 
+	movsd	; char 6 & 7
+	movsd	; char 8 & 9
+	movsd	; char 10 & 11
 	inc	esi
 	inc	esi
-	;movsd	; char 12 & 13 
-	; 20/05/2025	
-	;lodsw
-	; 25/05/2025
-	call	unicode_to_ascii
-	stosb
-	;lodsw
-	; 25/05/2025
-	call	unicode_to_ascii
-	stosb
+	movsd   ; char 12 & 13
 
 loc_pslnsc_retn:
  	pop	eax
@@ -6168,11 +6161,12 @@ cntfs_@:
 	retn
 
 find_last_dot:
+	; 25/05/2025
 	; 20/05/2025 - TRDOS 386 v2.0.10
 	;
 	; INPUT:
 	;  ESI = file name
-	;  ECX = search limit (64 bytes or 130 bytes)
+	;  ECX = search limit (64 bytes or 128 bytes)
 	; OUTPUT:
 	;  EBX = position (-1 = not found)
 	;  ECX = asciiz (file name) string length,
@@ -6184,8 +6178,8 @@ find_last_dot:
 	push	esi
 
 	xor	ebx, ebx
-	
-	;cmp	ecx, 130 
+
+	;cmp	ecx, 128
 	;jnb	short f_l_dot_ok
 	;or	ecx, ecx
 	;jz	short f_l_dot_ok
@@ -6260,13 +6254,62 @@ cic_4:
 	retn
 
 	; 25/05/2025 - TRDOS 386 v2.0.10
-	; (temporary code before version 2.1)
 unicode_to_ascii:
+	; Convert UNICODE long name
+	;	  to ASCIIZ long name
+	; Input:
+	;  esi = UNICODE file name buffer
+	;	(max 260 bytes)
+	;  ecx = ASCIIZ buffer size (64 or 128)
+	;  edi = ASCIIZ file name buffer
+	;	(max. ECX+1 bytes)
+	;
+	; Output:
+	;  ecx = remain bytes in buffer
+	;	  (after the last zero)
+	;   al = the last char converted
+	;  edi = next byte posion
+	;	  in ASCIIZ string/name buffer
+	;
+	; Modified registers: eax, ecx, esi, edi
+	;
+
+	; Note: if the last char is not NUL
+	;	ASCIIZ string will be done
+	;	by puting a NUL/ZERO at
+	;	65th or 129th char position.
+	;	(by the caller procedure)
+	;    EDI points to that.
+	;     AL contains the last character
+
+	; 25/05/2025
+	; (temporary code before version 2.1)
+u_to_a_@:
 	lodsw
 	or	ah, ah
-	jz	short u_to_a_ok
-	mov	al, '-'
+	jz	short u_to_a_next ; ascii char
+
+	; here.. unicode to ascii table
+	; conversion will be used
+	;	in TRDOS 386 version 2.1
+	; the unicode char will be searched in a table
+	; ((which will be prepared by using indexes
+	;	0 to 127 for ascii chars 128 to 255))
+	; (((the table will contain 128 words)))
+
+	; put default character instead of
+	; non-ascii unicode character
+
+	mov	al, '-'	; (temporary!)
+u_to_a_next:
+	stosb
+	and	al, al
+	jz	short u_to_a_ok ; ecx > 0
+	loop	u_to_a_@
+	; the last char is not NUL/zero
+	retn
 u_to_a_ok:
+	dec	ecx
 	retn
 
 	; 24/05/2025 - TRDOS 386 v2.0.10
@@ -6321,6 +6364,7 @@ mfn_@:
 mfn_skip:
 	pop esi
 	retn
+
 			 
 ; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 
