@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 20/05/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 25/05/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -859,3 +859,19 @@ SECCLUSPOS:	resb 1	; (MSDOS -> SECCLUSPOS)
 NXTCLUSNUM:	resd 1	; (MSDOS -> NXTCLUSNUM)
 SRCH_CLUSTER:	resd 1	; (MSDOS -> SRCH_CLUSTER)
 LASTENT:	resd 1	; (MSDOS -> LASTENT)
+
+; 25/05/2025 - TRDOS 386 v2.0.10
+; Singlix FS file name conversion parameters
+
+fdt_number:	resd 1
+f_name_limit:	resd 1
+;f_base_start:	resd 1
+f_target:	resd 1
+f_base_count:	resd 1
+f_ext_start:	resd 1
+f_ext_count:	resd 1
+;f_name_count:	resd 1
+formal_size:	resd 1
+insert_fdtnum:	resb 1
+target_name:	resb 13
+		resb 1
