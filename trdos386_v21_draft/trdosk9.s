@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - INITIALIZED DATA : trdosk9.s
 ; ----------------------------------------------------------------------------
-; Last Update: 25/05/2025 (Previous: 29/12/2024 - Kernel v2.0.9)
+; Last Update: 27/05/2025 (Previous: 29/12/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -31,7 +31,7 @@ Magic_Bytes:
 		db 1
 mainprog_Version:
 		db 7
-		db "[TRDOS] Main Program v2.1.0 (25/05/2025)"
+		db "[TRDOS] Main Program v2.1.0 (27/05/2025)"
 		db 0Dh, 0Ah
 		db "(c) Erdogan Tan 2005-2025"
 		db 0Dh, 0Ah, 0
@@ -110,14 +110,67 @@ Cmd_Beep:	db "BEEP", 0
 invalid_fname_chars_@:
 	;db 20h ; SPACE
 	db 2Eh ; .
+
+; 26/05/2025 - TRDOS 386 v2.0.10 (v2.1)
+; Invalid File Name Chars for Singlix FS (FDT and DDT)
+invalid_fs_fname_chars: 
 	; 20/05/2025
 invalid_fname_chars:
 	;   "   *   +   ,   /   :   ;   <   =   >   ?   \   [   ]   |
 	db 22h,2Ah,2Bh,2Ch,2Fh,3Ah,3Bh,3Ch,3Dh,3Eh,3Fh,5Ch,5Bh,5Dh,7Ch
 
 sizeInvFnChars  equ ($ - invalid_fname_chars)
+sizeInvFSfnChars equ sizeInvFnChars
 
-sizeInvFnChars@  equ ($ - invalid_fname_chars_@) ; 20/05/2025
+sizeInvFnChars@ equ ($ - invalid_fname_chars_@) ; 20/05/2025
+
+; 26/05/2025 - TRDOS 386 v2.1
+%if 0
+; 26/05/2025 - TRDOS 386 v2.0.10
+;
+; Invalid Long File Name Chars - Windows
+;
+; ref: https://stackoverflow.com/questions/1976007/
+; what-characters-are-forbidden-in-windows-and-linux-directory-names
+;
+; 1. The forbidden printable ASCII characters are:
+;
+; < (less than)
+; > (greater than)
+; : (colon - sometimes works, but is actually NTFS Alternate Data Streams)
+; " (double quote)
+; / (forward slash)
+; \ (backslash)
+; | (vertical bar or pipe)
+; ? (question mark)
+; * (asterisk)
+;
+; 2. Non-printable characters:
+;
+; 0-31 (ASCII control characters)
+; 
+; 3. Reserved file names:
+;
+; CON, PRN, AUX, NUL 
+; COM1, COM2, COM3, COM4, COM5, COM6, COM7, COM8, COM9
+; LPT1, LPT2, LPT3, LPT4, LPT5, LPT6, LPT7, LPT8, LPT9
+; 
+; (both on their own and with arbitrary file extensions, e.g. LPT1.txt).
+
+; 27/05/2025
+;invalid_lfname_chars_@:
+;	db 7Fh ; DEL
+
+invalid_lfname_chars:
+	;   "   *   /   :   <   >   ?   \   |
+	db 22h,2Ah,2Fh,3Ah,3Ch,3Eh,3Fh,5Ch,7Ch
+
+sizeInvLfnChars  equ ($ - invalid_lfname_chars)
+
+;sizeInvLfnChars@ equ ($ - invalid_lfname_chars_@)
+
+%endif
+
 
 Msg_Enter_Date:
                 db 'Enter new date (dd-mm-yy): '

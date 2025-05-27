@@ -217,6 +217,14 @@ mfn_skip:
 	pop	esi
 	retn
 
+convert_invalid_chars_@:
+	; 27/05/2025 - TRDOS 386 v2.0.10
+
+	cmp	al, '.'
+	jne	short convert_invalid_chars
+	mov	ah, al
+	jmp	short cic_2
+
 convert_invalid_chars:
 	; 27/05/2025
 	; 20/05/2025 - TRDOS 386 v2.0.10
@@ -251,8 +259,11 @@ convert_invalid_chars:
 cic_1:
 	push	edi
 	push	ecx
-	mov	edi, invalid_fname_chars_@
- 	mov	ecx, sizeInvFnChars@
+	;mov	edi, invalid_fname_chars_@
+ 	;mov	ecx, sizeInvFnChars@
+	; 27/05/2025
+	mov	edi, invalid_fname_chars
+ 	mov	ecx, sizeInvFnChars
 	repne	scasb
 	pop	ecx
 	pop	edi
@@ -270,6 +281,7 @@ cic_4:
 	retn
 
 convert_name_from_trfs:
+	; 27/05/2025
 	; 25/05/2025
 	; 24/05/2025
 	; 23/05/2025
@@ -450,7 +462,9 @@ conv_f_fs_7:
 	mov	ecx, [f_base_count]
 conv_f_fs_8:
 	lodsb
-	call	convert_invalid_chars
+	;call	convert_invalid_chars
+	; 27/05/2025
+	call	convert_invalid_chars_@
 	stosb
 	cmp	ah, al
 	je	short conv_f_fs_9
@@ -469,7 +483,9 @@ conv_f_fs_10:
 	mov	[f_ext_start], edi
 conv_f_fs_11:
 	lodsb
-	call	convert_invalid_chars
+	;call	convert_invalid_chars
+	; 27/05/2025
+	call	convert_invalid_chars_@
 	stosb
 	cmp	ah, al
 	je	short conv_f_fs_12
