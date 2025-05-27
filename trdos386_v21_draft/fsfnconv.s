@@ -7,7 +7,7 @@
 ;
 ; Derived from 'args386.s' source code for TRDOS 386 v2.0 (11/05/2016)
 ;
-; [ Last Modification: 25/05/2025 ]
+; [ Last Modification: 27/05/2025 ]
 ;
 ; ****************************************************************************
 
@@ -218,6 +218,7 @@ mfn_skip:
 	retn
 
 convert_invalid_chars:
+	; 27/05/2025
 	; 20/05/2025 - TRDOS 386 v2.0.10
 	;
 	; INPUT:
@@ -234,7 +235,7 @@ convert_invalid_chars:
 
 	cmp	al, 128
 	jnb	short cic_3
-	
+
 	;cmp	al, 20h
 	;jb	short cic_3
 
@@ -252,10 +253,10 @@ cic_1:
 	push	ecx
 	mov	edi, invalid_fname_chars_@
  	mov	ecx, sizeInvFnChars@
-	rep	scasb
+	repne	scasb
 	pop	ecx
 	pop	edi
-	jnz	short cic_2
+	jnz	short cic_3 ; 27/05/2025
 	; invalid char
 cic_2:
 	mov	al, '_'
@@ -663,9 +664,9 @@ cntfs_@:
 ;  Numbers 0-9
 ;  Space (20h)
 ;  !, #, $, %, &, ', (, ), -, @, ^, _, `, {, }, ~
-;  Values 128–255	
+;  Values 128–255
 ;
-; This excludes the following ASCII characters: 
+; This excludes the following ASCII characters:
 ;  ", *, +, ,, /, :, ;, <, =, >, ?, \, [, ], |
 ;  . (DOT) within name and extension fields,
 ;			 except in . and .. entries
@@ -691,7 +692,7 @@ version:
 	db 0Dh, 0Ah
 	db 'Test Program for Singlix FS file name to TRDOS 386 short name conversion'
 	db 0Dh, 0Ah
-	db 'by Erdogan Tan - 25/05/2025'
+	db 'by Erdogan Tan - 27/05/2025'
 	db 0Dh, 0Ah, 0
 usage:
 	db 0Dh, 0Ah

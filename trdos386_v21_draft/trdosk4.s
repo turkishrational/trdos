@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 25/05/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 27/05/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -6203,6 +6203,7 @@ f_l_dot_ok:
 	retn
 
 convert_invalid_chars:
+	; 27/05/2025
 	; 20/05/2025 - TRDOS 386 v2.0.10
 	;
 	; INPUT:
@@ -6214,12 +6215,12 @@ convert_invalid_chars:
 	;  (lowercase char will be converted to uppercase)
 	;
 	; Modified registers: EAX
-	
+
 	mov	ah, al
 
 	cmp	al, 128
 	jnb	short cic_3
-	
+
 	;cmp	al, 20h
 	;jb	short cic_3
 
@@ -6237,10 +6238,10 @@ cic_1:
 	push	ecx
 	mov	edi, invalid_fname_chars_@
  	mov	ecx, sizeInvFnChars@
-	rep	scasb
+	repne	scasb
 	pop	ecx
 	pop	edi
-	jnz	short cic_2
+	jnz	short cic_3 ; 27/05/2025
 	; invalid char
 cic_2:
 	mov	al, '_'
@@ -6268,7 +6269,7 @@ unicode_to_ascii:
 	;  ecx = remain bytes in buffer
 	;	  (after the last zero)
 	;   al = the last char converted
-	;  edi = next byte posion
+	;  edi = next byte position
 	;	  in ASCIIZ string/name buffer
 	;
 	; Modified registers: eax, ecx, esi, edi
