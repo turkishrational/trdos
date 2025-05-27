@@ -7,7 +7,7 @@
 ;
 ; Modified from 'fsfnconv.s' source code (25/05/2025)
 ;
-; [ Last Modification: 27/05/2025 ]
+; [ Last Modification: 28/05/2025 ]
 ;
 ; ****************************************************************************
 
@@ -104,7 +104,9 @@ START_CODE:
 	jne	short nextarg
 	dec	ebp
 	jz	short show_usage
+	inc	ebx ; skip tilde
 	call	convert_to_order_number
+	lodsd	; skip  order number
 nextarg:
 	mov	edi, lfn_name ; long file name
 	mov	ecx, 128 ; long name limit
@@ -137,7 +139,9 @@ put_zero:
 	cmp	byte [lossy_conversion], 0
 	jna	short show_name
 
-	mov	edi, order_num_str
+	; 28/05/2025
+	;mov	edi, target_name
+	
 	call	change_tilde_number
 show_name:
 	call	print_short_name
@@ -158,7 +162,8 @@ inv_file_name:
 
 print_short_name:
 	sys	_msg, nexline, 2, 07h
-	sys	_msg, edi, 255, 0Fh
+	; 28/05/2025
+	sys	_msg, target_name, 255, 0Fh
 
 	cmp	byte [conv_ucase], 0
 	ja	short skip_special_status
@@ -265,8 +270,11 @@ convert_invalid_chars:
 cic_1:
 	push	edi
 	push	ecx
-	mov	edi, invalid_fname_chars_@
- 	mov	ecx, sizeInvFnChars@
+	;mov	edi, invalid_fname_chars_@
+ 	;mov	ecx, sizeInvFnChars@
+	; 27/05/2025
+	mov	edi, invalid_fname_chars
+ 	mov	ecx, sizeInvFnChars
 	repne	scasb
 	pop	ecx
 	pop	edi
@@ -337,7 +345,7 @@ cic_4:
 ;	Windows 7 sets DIR_NTRes (directory entry) byte to 08h.
 ;       For example: The created file name "denemefn" is written into
 ;	the directory as the short name "DENEMEFN" without the long name entry,
-;	but 'DIR_NTrEs' byte (reserved and suggested -by microsoft-
+;	but 'DIR_NTRes' byte (reserved and suggested -by microsoft-
 ;	to set it as zero) is set to 08h.)
 ; 	((DIR_NTRes byte is at offset 12 of a directory entry.))
 
@@ -408,6 +416,7 @@ conv_f_lfn_3:
 	;stosb
 
 	; ebx = the last dot position (index)
+
 	sub	ecx, esi ; number of chars
 	 	 ; (without spaces)
 	jz	nul_name  ; invalid file name !
@@ -416,7 +425,7 @@ conv_f_lfn_3:
 
 	mov	edi, [f_target] ; (*)
 
-	; eax = 0
+	;; eax = 0
 
 	and	ebx, ebx
 	jz	short check_base ; ecx > 0 ; not dot
@@ -454,7 +463,6 @@ proper_base:
 	mov	al, '.' ; insert DOT
 	stosb
 	mov	esi, [f_ext_start]
-	mov	[f_ext_start], edi
 	rep	movsb
 skip_extension:
 	xor	al, al	; put zero/NUL at the end
@@ -480,6 +488,7 @@ conv_f_lfn_4:
 
 conv_f_lfn_5:
 	inc	edi
+	mov	[f_ext_start], edi
 	jmp	short conv_f_lfn_4
 
 conv_f_lfn_6:
@@ -525,6 +534,7 @@ conv_f_lfn_10:
 	pop	edi ; *
 	retn
 
+	; 28/05/2025
 	; 27/05/2025
 	; 26/05/2025 - TRDOS 386 v2.0.10
 change_tilde_number:
@@ -565,7 +575,7 @@ ctn_1:
 
 	push	esi ; +
 
-	mov	esi, edi 
+	mov	esi, edi
 
 	push	edi ; *
 
@@ -581,6 +591,8 @@ ctn_1:
 	;mov	esi, [esp] ; *
 
 	xor	ebx, ebx
+	xor	edx, edx
+
 	push	ecx ; **
 	; ecx <= 5
 	mov	cl, 6
@@ -598,16 +610,17 @@ ctn_2:
 	inc	esi
 	loop	ctn_gfnc
 	xor	eax, eax ; 0
-	jmp	short ctn_eofn
+	;jmp	short ctn_eofn
 ctn_dotpos:
-	;mov	eax, [esi] ; save extension
+	mov	edx, eax ; save extension
 ctn_eofn:
 	pop	ecx ; **
 	mov	edi, [esp] ; *
-	mov	edx, 8
+	add	edi, 8
 	inc	ecx ; + tilde (2 to 6)
-	sub	edx, ecx
-	add	edi, edx ; required tilde position
+	sub	edi, ecx ; required tilde position
+
+	mov	eax, edx
 
 	or	ebx, ebx
 	jz	short ctn_3 ; no previous tilde
@@ -618,8 +631,19 @@ ctn_3:
 	mov	esi, tilde_string
 	; ecx = numeric digits + 1
 	; edi = tilde position
-	rep	movsb	
-	mov	[edi], eax ; 0 or '.ext'
+	rep	movsb
+	;mov	[edi], eax ; 0 or '.ext'
+	; al = '.' or 0
+	stosd
+	xor	eax, eax
+	stosb	; 0	
+;ctn_4:
+	;stosb
+	;and	al, al
+	;jz	short ctn_5
+	;shr	eax, 8	; next .ext char
+	;jmp	short ctn_4
+;ctn_5:
 	pop	edi ; *
 	pop	esi ; +
 	retn
@@ -730,6 +754,7 @@ cnvtnstr_@:
 	pop	ebp ; *	
 	retn
 
+; 27/05/2025
 ; 20/05/2025 - TRDOS 386 v2.0.10
 ; Ref: https://en.wikipedia.org/wiki/8.3_filename#Directory_table
 ;
@@ -748,10 +773,12 @@ cnvtnstr_@:
 ;  Control characters 0–31
 ;  Value 127 (DEL)
 
+; 27/05/2025
 	; 20/05/2025
-invalid_fname_chars_@:
-	;db 20h ; SPACE
-	db 2Eh ; .
+;invalid_fname_chars_@:
+;	;db 20h ; SPACE
+;	db 2Eh ; .
+
 	; 20/05/2025
 invalid_fname_chars:
 	;   "   *   +   ,   /   :   ;   <   =   >   ?   \   [   ]   |
@@ -759,14 +786,13 @@ invalid_fname_chars:
 
 sizeInvFnChars  equ ($ - invalid_fname_chars)
 
-sizeInvFnChars@  equ ($ - invalid_fname_chars_@) ; 20/05/2025
-
+;sizeInvFnChars@  equ ($ - invalid_fname_chars_@) ; 20/05/2025
 
 version:
 	db 0Dh, 0Ah
 	db 'Test Program for ASCIIZ long file name to DOS short name conversion'
 	db 0Dh, 0Ah
-	db 'by Erdogan Tan - 27/05/2025'
+	db 'by Erdogan Tan - 28/05/2025'
 	db 0Dh, 0Ah, 0
 usage:
 	db 0Dh, 0Ah
