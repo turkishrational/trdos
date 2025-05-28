@@ -95,7 +95,7 @@
     68                              <1> 
     69                              <1> 
     70                              <1>  %if %0 >= 2
-    71 00000000 BB[BE030000]        <1>  mov ebx, %2
+    71 00000000 BB[04040000]        <1>  mov ebx, %2
     72                              <1>  %if %0 >= 3
     73 00000005 B9FF000000          <1>  mov ecx, %3
     74                              <1>  %if %0 = 4
@@ -109,9 +109,9 @@
     93 00000016 89E6                    	mov	esi, esp
     94 00000018 AD                      	lodsd
     95 00000019 21C0                    	and	eax, eax
-    96 0000001B 745F                    	jz	short terminate
+    96 0000001B 746C                    	jz	short terminate
     97 0000001D 83F802                  	cmp	eax, 2	; number of arguments
-    98 00000020 7263                    	jb	short show_usage
+    98 00000020 7270                    	jb	short show_usage
     99 00000022 89C5                    	mov	ebp, eax
    100 00000024 AD                      	lodsd	; skip program file name
    101 00000025 4D                      	dec	ebp
@@ -119,51 +119,61 @@
    103 00000028 803B7E                  	cmp	byte [ebx], '~'
    104 0000002B 750A                    	jne	short nextarg
    105 0000002D 4D                      	dec	ebp
-   106 0000002E 7455                    	jz	short show_usage
+   106 0000002E 7462                    	jz	short show_usage
    107 00000030 43                      	inc	ebx ; skip tilde
-   108 00000031 E8E1000000              	call	convert_to_order_number
+   108 00000031 E8EE000000              	call	convert_to_order_number
    109 00000036 AD                      	lodsd	; skip  order number
    110                                  nextarg:
-   111 00000037 BF[7A040000]            	mov	edi, lfn_name ; long file name
+   111 00000037 BF[C0040000]            	mov	edi, lfn_name ; long file name
    112 0000003C B980000000              	mov	ecx, 128 ; long name limit
-   113                                  next_word:
-   114 00000041 AD                      	lodsd
-   115 00000042 E81A010000              	call	move_file_name
-   116 00000047 67E303                  	jcxz	put_zero
-   117 0000004A 4D                      	dec	ebp
-   118 0000004B 75F4                    	jnz	short next_word
-   119                                  put_zero:
-   120 0000004D 31C0                    	xor	eax, eax
-   121 0000004F AA                      	stosb
-   122                                  
-   123 00000050 BE[7A040000]            	mov	esi, lfn_name
-   124 00000055 BF[27050000]            	mov	edi, target_name
-   125                                  
-   126 0000005A E845010000              	call	convert_name_from_lfn
-   127                                  	
-   128 0000005F 40                      	inc	eax ; -1 -> 0
-   129 00000060 743B                    	jz	short inv_file_name
-   130 00000062 48                      	dec	eax ; 1 -> 0
-   131 00000063 7412                    	jz	short show_name
-   132                                  		; exact short name without tilde
-   133                                  	
-   134 00000065 A1[6F040000]            	mov	eax, [order_number]
-   135 0000006A 21C0                    	and	eax, eax
-   136 0000006C 7409                    	jz	short show_name
+   113                                  	;mov	[lossy_conversion], ch ; 0
+   114                                  next_word:
+   115 00000041 AD                      	lodsd
+   116 00000042 E827010000              	call	move_file_name
+   117 00000047 67E30B                  	jcxz	put_zero
+   118 0000004A 4D                      	dec	ebp
+   119                                  	;jnz	short next_word
+   120 0000004B 7408                    	jz	short put_zero
+   121                                  	; 28/05/2025
+   122 0000004D 49                      	dec	ecx
+   123 0000004E 7405                    	jz	short put_zero
+   124                                  	; 28/05/2025
+   125                                  	; insert a space just before the next word
+   126 00000050 B020                    	mov	al, 20h ; ' '	
+   127 00000052 AA                      	stosb
+   128 00000053 EBEC                     	jmp	short next_word
+   129                                  put_zero:
+   130 00000055 31C0                    	xor	eax, eax
+   131 00000057 AA                      	stosb
+   132                                  
+   133 00000058 BE[C0040000]            	mov	esi, lfn_name
+   134 0000005D BF[6D050000]            	mov	edi, target_name
+   135                                  
+   136 00000062 E84A010000              	call	convert_name_from_lfn
    137                                  
-   138                                  	; 27/05/2025
-   139 0000006E 803D[26050000]00        	cmp	byte [lossy_conversion], 0
-   140 00000075 7600                    	jna	short show_name
-   141                                  
-   142                                  	; 28/05/2025
-   143                                  	;mov	edi, target_name
-   144                                  	
-   145                                  	;call	change_tilde_number
-   146                                  show_name:
-   147 00000077 E839000000              	call	print_short_name
-   148                                  
-   149                                  terminate: 
-   150                                  	sys	_exit
+   138 00000067 40                      	inc	eax ; -1 -> 0
+   139 00000068 7440                    	jz	short inv_file_name
+   140 0000006A 48                      	dec	eax ; 1 -> 0
+   141 0000006B 7417                    	jz	short show_name
+   142                                  		; exact short name without tilde
+   143                                  
+   144 0000006D A1[B5040000]            	mov	eax, [order_number]
+   145 00000072 21C0                    	and	eax, eax
+   146 00000074 740E                    	jz	short show_name
+   147                                  
+   148                                  	; 27/05/2025
+   149 00000076 803D[6C050000]00        	cmp	byte [lossy_conversion], 0
+   150 0000007D 7605                    	jna	short show_name
+   151                                  
+   152                                  	; 28/05/2025
+   153                                  	;mov	edi, target_name
+   154                                  
+   155 0000007F E8A9020000              	call	change_tilde_number
+   156                                  show_name:
+   157 00000084 E839000000              	call	print_short_name
+   158                                  
+   159                                  terminate: 
+   160                                  	sys	_exit
     66                              <1> 
     67                              <1> 
     68                              <1> 
@@ -177,814 +187,860 @@
     76                              <1>  %endif
     77                              <1>  %endif
     78                              <1>  %endif
-    79 0000007C B801000000          <1>  mov eax, %1
+    79 00000089 B801000000          <1>  mov eax, %1
     80                              <1> 
-    81 00000081 CD40                <1>  int 40h
-   151                                  halt:
-   152 00000083 EBFE                    	jmp	short halt
-   153                                  
-   154                                  show_usage:
-   155                                  	sys	_msg, usage, 255, 0Fh
+    81 0000008E CD40                <1>  int 40h
+   161                                  halt:
+   162 00000090 EBFE                    	jmp	short halt
+   163                                  
+   164                                  show_usage:
+   165                                  	sys	_msg, usage, 255, 0Fh
     66                              <1> 
     67                              <1> 
     68                              <1> 
     69                              <1> 
     70                              <1>  %if %0 >= 2
-    71 00000085 BB[23040000]        <1>  mov ebx, %2
+    71 00000092 BB[69040000]        <1>  mov ebx, %2
     72                              <1>  %if %0 >= 3
-    73 0000008A B9FF000000          <1>  mov ecx, %3
+    73 00000097 B9FF000000          <1>  mov ecx, %3
     74                              <1>  %if %0 = 4
-    75 0000008F BA0F000000          <1>  mov edx, %4
+    75 0000009C BA0F000000          <1>  mov edx, %4
     76                              <1>  %endif
     77                              <1>  %endif
     78                              <1>  %endif
-    79 00000094 B823000000          <1>  mov eax, %1
+    79 000000A1 B823000000          <1>  mov eax, %1
     80                              <1> 
-    81 00000099 CD40                <1>  int 40h
-   156 0000009B EBDF                    	jmp	short terminate
-   157                                  
-   158                                  nul_name:
-   159                                  inv_file_name:
-   160                                  	sys	_msg, msg_invalid_fn, 255, 07h
-    66                              <1> 
-    67                              <1> 
-    68                              <1> 
-    69                              <1> 
-    70                              <1>  %if %0 >= 2
-    71 0000009D BB[57040000]        <1>  mov ebx, %2
-    72                              <1>  %if %0 >= 3
-    73 000000A2 B9FF000000          <1>  mov ecx, %3
-    74                              <1>  %if %0 = 4
-    75 000000A7 BA07000000          <1>  mov edx, %4
-    76                              <1>  %endif
-    77                              <1>  %endif
-    78                              <1>  %endif
-    79 000000AC B823000000          <1>  mov eax, %1
-    80                              <1> 
-    81 000000B1 CD40                <1>  int 40h
-   161 000000B3 EBC7                    	jmp	short terminate
-   162                                  
-   163                                  print_short_name:
-   164                                  	sys	_msg, nexline, 2, 07h
-    66                              <1> 
-    67                              <1> 
-    68                              <1> 
-    69                              <1> 
-    70                              <1>  %if %0 >= 2
-    71 000000B5 BB[54040000]        <1>  mov ebx, %2
-    72                              <1>  %if %0 >= 3
-    73 000000BA B902000000          <1>  mov ecx, %3
-    74                              <1>  %if %0 = 4
-    75 000000BF BA07000000          <1>  mov edx, %4
-    76                              <1>  %endif
-    77                              <1>  %endif
-    78                              <1>  %endif
-    79 000000C4 B823000000          <1>  mov eax, %1
-    80                              <1> 
-    81 000000C9 CD40                <1>  int 40h
-   165                                  	; 28/05/2025
-   166                                  	sys	_msg, target_name, 255, 0Fh
-    66                              <1> 
-    67                              <1> 
-    68                              <1> 
-    69                              <1> 
-    70                              <1>  %if %0 >= 2
-    71 000000CB BB[27050000]        <1>  mov ebx, %2
-    72                              <1>  %if %0 >= 3
-    73 000000D0 B9FF000000          <1>  mov ecx, %3
-    74                              <1>  %if %0 = 4
-    75 000000D5 BA0F000000          <1>  mov edx, %4
-    76                              <1>  %endif
-    77                              <1>  %endif
-    78                              <1>  %endif
-    79 000000DA B823000000          <1>  mov eax, %1
-    80                              <1> 
-    81 000000DF CD40                <1>  int 40h
+    81 000000A6 CD40                <1>  int 40h
+   166 000000A8 EBDF                    	jmp	short terminate
    167                                  
-   168 000000E1 803D[B5050000]00        	cmp	byte [conv_ucase], 0
-   169 000000E8 7716                    	ja	short skip_special_status
-   170                                  
-   171                                  	; 26/05/2025 - Erdogan Tan
-   172                                  	; Windows note:
-   173                                  	; If lfn 'filename' is converted to
-   174                                  	; DOS 8.3 file name as 'FILENAME'
-   175                                  	; it will be shown as 'filename' (by Windows)
-   176                                  	; without using long name entry.
-   177                                  	; In this case, [DIR_NTRes] byte will be set to 08h.
-   178                                  	;
-   179                                  	; Ref: FAT32 File System Specification, v1.03, Page 23
-   180                                  	;      (FAT 32 byte directory entry structure)
-   181                                  
-   182                                  	sys	_msg, special_status, 255, 07h
+   168                                  inv_file_name:
+   169                                  	sys	_msg, msg_invalid_fn, 255, 07h
     66                              <1> 
     67                              <1> 
     68                              <1> 
     69                              <1> 
     70                              <1>  %if %0 >= 2
-    71 000000EA BB[FB040000]        <1>  mov ebx, %2
+    71 000000AA BB[9D040000]        <1>  mov ebx, %2
     72                              <1>  %if %0 >= 3
-    73 000000EF B9FF000000          <1>  mov ecx, %3
+    73 000000AF B9FF000000          <1>  mov ecx, %3
     74                              <1>  %if %0 = 4
-    75 000000F4 BA07000000          <1>  mov edx, %4
+    75 000000B4 BA07000000          <1>  mov edx, %4
     76                              <1>  %endif
     77                              <1>  %endif
     78                              <1>  %endif
-    79 000000F9 B823000000          <1>  mov eax, %1
+    79 000000B9 B823000000          <1>  mov eax, %1
     80                              <1> 
-    81 000000FE CD40                <1>  int 40h
-   183                                  
-   184                                  skip_special_status:
-   185                                  	sys	_msg, nexline, 2, 07h
+    81 000000BE CD40                <1>  int 40h
+   170 000000C0 EBC7                    	jmp	short terminate
+   171                                  
+   172                                  print_short_name:
+   173                                  	sys	_msg, nexline, 2, 07h
     66                              <1> 
     67                              <1> 
     68                              <1> 
     69                              <1> 
     70                              <1>  %if %0 >= 2
-    71 00000100 BB[54040000]        <1>  mov ebx, %2
+    71 000000C2 BB[9A040000]        <1>  mov ebx, %2
     72                              <1>  %if %0 >= 3
-    73 00000105 B902000000          <1>  mov ecx, %3
+    73 000000C7 B902000000          <1>  mov ecx, %3
     74                              <1>  %if %0 = 4
-    75 0000010A BA07000000          <1>  mov edx, %4
+    75 000000CC BA07000000          <1>  mov edx, %4
     76                              <1>  %endif
     77                              <1>  %endif
     78                              <1>  %endif
-    79 0000010F B823000000          <1>  mov eax, %1
+    79 000000D1 B823000000          <1>  mov eax, %1
     80                              <1> 
-    81 00000114 CD40                <1>  int 40h
-   186 00000116 C3                      	retn
-   187                                  
-   188                                  convert_to_order_number:
-   189                                  	; ebx = order number
-   190                                  	;    (which will be used after tilde)
-   191 00000117 B905000000              	mov	ecx, 5 ; max. 5 chars/digits
-   192 0000011C 31C0                    	xor	eax, eax ; 0
-   193 0000011E A3[6F040000]            	mov	[order_number], eax
-   194                                  ctordn_1:
-   195 00000123 8A03                    	mov	al, [ebx]
-   196 00000125 3C39                    	cmp	al, '9'
-   197 00000127 772C                    	ja	short ctordn_2
-   198 00000129 3C30                    	cmp	al, '0'
-   199 0000012B 7228                    	jb	short ctordn_2
-   200 0000012D 2C30                    	sub	al, '0'
-   201 0000012F 50                      	push	eax
-   202 00000130 B00A                    	mov	al, 10
-   203 00000132 F725[6F040000]          	mul	dword [order_number]
-   204 00000138 A3[6F040000]            	mov	[order_number], eax
-   205 0000013D 58                      	pop	eax
-   206 0000013E 0105[6F040000]          	add	[order_number], eax
-   207 00000144 31C0                    	xor	eax, eax
-   208 00000146 43                      	inc	ebx
-   209 00000147 E2DA                    	loop	ctordn_1
-   210 00000149 813D[6F040000]FFFF-     	cmp	dword [order_number], 65535
-   210 00000151 0000               
-   211 00000153 7701                    	ja	short ctordn_3
-   212                                  ctordn_2:
-   213 00000155 C3                      	retn
-   214                                  ctordn_3:
-   215 00000156 C705[6F040000]FFFF-     	mov	dword [order_number], 65535
-   215 0000015E 0000               
-   216 00000160 C3                      	retn
-   217                                  
-   218                                  move_file_name:
-   219                                  	; eax = argument, fs file name text
-   220                                  	; ecx = remain byte count
-   221 00000161 56                      	push	esi
-   222 00000162 89C6                    	mov	esi, eax
-   223                                  mfn_@:
-   224 00000164 AC                      	lodsb
-   225 00000165 3C20                    	cmp	al, 20h
-   226 00000167 7203                    	jb	short mfn_skip
-   227 00000169 AA                      	stosb
-   228 0000016A E2F8                    	loop	mfn_@
-   229                                  	; ecx = 0
-   230                                  	;xor	eax, eax
-   231                                  	;stosb
-   232                                  mfn_skip:
-   233 0000016C 5E                      	pop	esi
-   234 0000016D C3                      	retn
-   235                                  
-   236                                  convert_invalid_chars:
-   237                                  	; 27/05/2025
-   238                                  	; 26/05/2025
-   239                                  	;   upper case conversion counter is added
-   240                                  	;
-   241                                  	; 20/05/2025 - TRDOS 386 v2.0.10
-   242                                  	;
-   243                                  	; INPUT:
-   244                                  	;  al = character
-   245                                  	; OUTPUT:
-   246                                  	;  al = converted character
-   247                                  	;  ah = uppercase of AL input
-   248                                  	;  (invalid char will be converted to '_')
-   249                                  	;  (lowercase char will be converted to uppercase)
-   250                                  	;
-   251                                  	; Modified registers: EAX, EDX
-   252                                  
-   253 0000016E 88C4                    	mov	ah, al
-   254                                  
-   255 00000170 3C80                    	cmp	al, 128
-   256 00000172 7324                    	jnb	short cic_3
-   257                                  	
-   258                                  	;cmp	al, 20h
-   259                                  	;jb	short cic_3
-   260                                  
-   261                                  	;cmp	al, 'A'
-   262 00000174 3C40                    	cmp	al, '@'
-   263 00000176 720C                    	jb	short cic_1
-   264 00000178 3C5A                    	cmp	al, 'Z'
-   265 0000017A 761C                    	jna	short cic_3
-   266 0000017C 3C61                    	cmp	al, 'a'
-   267 0000017E 7204                    	jb	short cic_1
-   268 00000180 3C7A                    	cmp	al, 'z'
-   269 00000182 7615                    	jna	short cic_4 ; convert to upper case
-   270                                  cic_1:
-   271 00000184 57                      	push	edi
-   272 00000185 51                      	push	ecx
-   273                                  	;mov	edi, invalid_fname_chars_@
-   274                                   	;mov	ecx, sizeInvFnChars@
-   275                                  	; 27/05/2025
-   276 00000186 BF[AF030000]            	mov	edi, invalid_fname_chars
-   277 0000018B B90F000000               	mov	ecx, sizeInvFnChars
-   278 00000190 F2AE                    	repne	scasb
-   279 00000192 59                      	pop	ecx
-   280 00000193 5F                      	pop	edi
-   281 00000194 7502                    	jnz	short cic_3 ; 27/05/2025
-   282                                  	; invalid char
-   283                                  cic_2:
-   284 00000196 B05F                    	mov	al, '_'
-   285                                  cic_3:
-   286 00000198 C3                      	retn
-   287                                  cic_4:
-   288                                  	; simple ucase
-   289 00000199 FE05[B5050000]          	inc	byte [conv_ucase]
-   290 0000019F 24DF                    	and	al, 0DFh
-   291                                  	;and	al, 5Fh
-   292 000001A1 88C4                    	mov	ah, al
-   293 000001A3 C3                      	retn
-   294                                  
-   295                                  ; 26/05/2025
-   296                                  ; TRDOS 386 v2.0.10 - Long to short file name conversion
-   297                                  ;
-   298                                  ; REF:
-   299                                  ; Microsoft - Long Filename Specification
-   300                                  ; Version 0.5, December 4, 1992
-   301                                  ;
-   302                                  ; The following steps are used to form an 8.3 basis from a long name.
-   303                                  ;
-   304                                  ; 1. Remove all spaces. For example "My File" becomes "MyFile".
-   305                                  ;
-   306                                  ; 2. Initial periods, trailing periods, and extra periods prior to 
-   307                                  ;    the last embedded period are removed.
-   308                                  ;
-   309                                  ;    For example ".logon" becomes "logon", "junk.c.o" becomes "junkc.o",
-   310                                  ;    and "main." becomes "main".
-   311                                  ;
-   312                                  ; 3. Translate all illegal 8.3 characters into "_" (underscore).
-   313                                  ;    
-   314                                  ;    For example, "The[First]Folder" becomes "The_First_Folder".
-   315                                  ;
-   316                                  ; 4. If the name does not contain an extension then truncate it to 6 characters.
-   317                                  ;    If the names does contain an extension, then truncate the first part 
-   318                                  ;    to 6 characters and the extension to 3 characters.
-   319                                  ;
-   320                                  ;    For example, "I Am A Dingbat" becomes "IAmADi" and not "IAmADing.bat",
-   321                                  ;    and "Super Duper Editor.Exe" becomes "SuperD.Exe".
-   322                                  ;
-   323                                  ; 5. If the name does not contain an extension then a "~1" is appended to
-   324                                  ;    the name. If the name does contain an extension, then a "~1" is appended
-   325                                  ;    to the first part of the name, prior to the extension.
-   326                                  ;
-   327                                  ;    For example, "MyFile" becomes "MyFile~1, and "Junk.bat" becomes "Junk~1.bat".
+    81 000000D6 CD40                <1>  int 40h
+   174                                  	; 28/05/2025
+   175                                  	sys	_msg, target_name, 255, 0Fh
+    66                              <1> 
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1>  %if %0 >= 2
+    71 000000D8 BB[6D050000]        <1>  mov ebx, %2
+    72                              <1>  %if %0 >= 3
+    73 000000DD B9FF000000          <1>  mov ecx, %3
+    74                              <1>  %if %0 = 4
+    75 000000E2 BA0F000000          <1>  mov edx, %4
+    76                              <1>  %endif
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79 000000E7 B823000000          <1>  mov eax, %1
+    80                              <1> 
+    81 000000EC CD40                <1>  int 40h
+   176                                  
+   177 000000EE 803D[FB050000]00        	cmp	byte [conv_ucase], 0
+   178 000000F5 7716                    	ja	short skip_special_status
+   179                                  
+   180                                  	; 26/05/2025 - Erdogan Tan
+   181                                  	; Windows note:
+   182                                  	; If lfn 'filename' is converted to
+   183                                  	; DOS 8.3 file name as 'FILENAME'
+   184                                  	; it will be shown as 'filename' (by Windows)
+   185                                  	; without using long name entry.
+   186                                  	; In this case, [DIR_NTRes] byte will be set to 08h.
+   187                                  	;
+   188                                  	; Ref: FAT32 File System Specification, v1.03, Page 23
+   189                                  	;      (FAT 32 byte directory entry structure)
+   190                                  
+   191                                  	sys	_msg, special_status, 255, 07h
+    66                              <1> 
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1>  %if %0 >= 2
+    71 000000F7 BB[41050000]        <1>  mov ebx, %2
+    72                              <1>  %if %0 >= 3
+    73 000000FC B9FF000000          <1>  mov ecx, %3
+    74                              <1>  %if %0 = 4
+    75 00000101 BA07000000          <1>  mov edx, %4
+    76                              <1>  %endif
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79 00000106 B823000000          <1>  mov eax, %1
+    80                              <1> 
+    81 0000010B CD40                <1>  int 40h
+   192                                  
+   193                                  skip_special_status:
+   194                                  	sys	_msg, nexline, 2, 07h
+    66                              <1> 
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1>  %if %0 >= 2
+    71 0000010D BB[9A040000]        <1>  mov ebx, %2
+    72                              <1>  %if %0 >= 3
+    73 00000112 B902000000          <1>  mov ecx, %3
+    74                              <1>  %if %0 = 4
+    75 00000117 BA07000000          <1>  mov edx, %4
+    76                              <1>  %endif
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79 0000011C B823000000          <1>  mov eax, %1
+    80                              <1> 
+    81 00000121 CD40                <1>  int 40h
+   195 00000123 C3                      	retn
+   196                                  
+   197                                  convert_to_order_number:
+   198                                  	; ebx = order number
+   199                                  	;    (which will be used after tilde)
+   200 00000124 B905000000              	mov	ecx, 5 ; max. 5 chars/digits
+   201 00000129 31C0                    	xor	eax, eax ; 0
+   202 0000012B A3[B5040000]            	mov	[order_number], eax
+   203                                  ctordn_1:
+   204 00000130 8A03                    	mov	al, [ebx]
+   205 00000132 3C39                    	cmp	al, '9'
+   206 00000134 772C                    	ja	short ctordn_2
+   207 00000136 3C30                    	cmp	al, '0'
+   208 00000138 7228                    	jb	short ctordn_2
+   209 0000013A 2C30                    	sub	al, '0'
+   210 0000013C 50                      	push	eax
+   211 0000013D B00A                    	mov	al, 10
+   212 0000013F F725[B5040000]          	mul	dword [order_number]
+   213 00000145 A3[B5040000]            	mov	[order_number], eax
+   214 0000014A 58                      	pop	eax
+   215 0000014B 0105[B5040000]          	add	[order_number], eax
+   216 00000151 31C0                    	xor	eax, eax
+   217 00000153 43                      	inc	ebx
+   218 00000154 E2DA                    	loop	ctordn_1
+   219 00000156 813D[B5040000]FFFF-     	cmp	dword [order_number], 65535
+   219 0000015E 0000               
+   220 00000160 7701                    	ja	short ctordn_3
+   221                                  ctordn_2:
+   222 00000162 C3                      	retn
+   223                                  ctordn_3:
+   224 00000163 C705[B5040000]FFFF-     	mov	dword [order_number], 65535
+   224 0000016B 0000               
+   225 0000016D C3                      	retn
+   226                                  
+   227                                  move_file_name:
+   228                                  	; eax = argument, fs file name text
+   229                                  	; ecx = remain byte count
+   230 0000016E 56                      	push	esi
+   231 0000016F 89C6                    	mov	esi, eax
+   232                                  mfn_@:
+   233 00000171 AC                      	lodsb
+   234 00000172 3C20                    	cmp	al, 20h
+   235 00000174 7203                    	jb	short mfn_skip
+   236 00000176 AA                      	stosb
+   237 00000177 E2F8                    	loop	mfn_@
+   238                                  	; ecx = 0
+   239                                  	;xor	eax, eax
+   240                                  	;stosb
+   241                                  mfn_skip:
+   242 00000179 5E                      	pop	esi
+   243 0000017A C3                      	retn
+   244                                  
+   245                                  convert_invalid_chars:
+   246                                  	; 27/05/2025
+   247                                  	; 26/05/2025
+   248                                  	;   upper case conversion counter is added
+   249                                  	;
+   250                                  	; 20/05/2025 - TRDOS 386 v2.0.10
+   251                                  	;
+   252                                  	; INPUT:
+   253                                  	;  al = character
+   254                                  	; OUTPUT:
+   255                                  	;  al = converted character
+   256                                  	;  ah = uppercase of AL input
+   257                                  	;  (invalid char will be converted to '_')
+   258                                  	;  (lowercase char will be converted to uppercase)
+   259                                  	;
+   260                                  	; Modified registers: EAX, EDX
+   261                                  
+   262 0000017B 88C4                    	mov	ah, al
+   263                                  
+   264 0000017D 3C80                    	cmp	al, 128
+   265 0000017F 7324                    	jnb	short cic_3
+   266                                  	
+   267                                  	;cmp	al, 20h
+   268                                  	;jb	short cic_3
+   269                                  
+   270                                  	;cmp	al, 'A'
+   271 00000181 3C40                    	cmp	al, '@'
+   272 00000183 720C                    	jb	short cic_1
+   273 00000185 3C5A                    	cmp	al, 'Z'
+   274 00000187 761C                    	jna	short cic_3
+   275 00000189 3C61                    	cmp	al, 'a'
+   276 0000018B 7204                    	jb	short cic_1
+   277 0000018D 3C7A                    	cmp	al, 'z'
+   278 0000018F 7615                    	jna	short cic_4 ; convert to upper case
+   279                                  cic_1:
+   280 00000191 57                      	push	edi
+   281 00000192 51                      	push	ecx
+   282                                  	;mov	edi, invalid_fname_chars_@
+   283                                   	;mov	ecx, sizeInvFnChars@
+   284                                  	; 27/05/2025
+   285 00000193 BF[F5030000]            	mov	edi, invalid_fname_chars
+   286 00000198 B90F000000               	mov	ecx, sizeInvFnChars
+   287 0000019D F2AE                    	repne	scasb
+   288 0000019F 59                      	pop	ecx
+   289 000001A0 5F                      	pop	edi
+   290 000001A1 7502                    	jnz	short cic_3 ; 27/05/2025
+   291                                  	; invalid char
+   292                                  cic_2:
+   293 000001A3 B05F                    	mov	al, '_'
+   294                                  cic_3:
+   295 000001A5 C3                      	retn
+   296                                  cic_4:
+   297                                  	; simple ucase
+   298 000001A6 FE05[FB050000]          	inc	byte [conv_ucase]
+   299 000001AC 24DF                    	and	al, 0DFh
+   300                                  	;and	al, 5Fh
+   301 000001AE 88C4                    	mov	ah, al
+   302 000001B0 C3                      	retn
+   303                                  
+   304                                  ; 26/05/2025
+   305                                  ; TRDOS 386 v2.0.10 - Long to short file name conversion
+   306                                  ;
+   307                                  ; REF:
+   308                                  ; Microsoft - Long Filename Specification
+   309                                  ; Version 0.5, December 4, 1992
+   310                                  ;
+   311                                  ; The following steps are used to form an 8.3 basis from a long name.
+   312                                  ;
+   313                                  ; 1. Remove all spaces. For example "My File" becomes "MyFile".
+   314                                  ;
+   315                                  ; 2. Initial periods, trailing periods, and extra periods prior to 
+   316                                  ;    the last embedded period are removed.
+   317                                  ;
+   318                                  ;    For example ".logon" becomes "logon", "junk.c.o" becomes "junkc.o",
+   319                                  ;    and "main." becomes "main".
+   320                                  ;
+   321                                  ; 3. Translate all illegal 8.3 characters into "_" (underscore).
+   322                                  ;    
+   323                                  ;    For example, "The[First]Folder" becomes "The_First_Folder".
+   324                                  ;
+   325                                  ; 4. If the name does not contain an extension then truncate it to 6 characters.
+   326                                  ;    If the names does contain an extension, then truncate the first part 
+   327                                  ;    to 6 characters and the extension to 3 characters.
    328                                  ;
-   329                                  ;    This numeric value is always added to help reduce the conflicts
-   330                                  ;    in the 8.3 name space for automatic generated names.
+   329                                  ;    For example, "I Am A Dingbat" becomes "IAmADi" and not "IAmADing.bat",
+   330                                  ;    and "Super Duper Editor.Exe" becomes "SuperD.Exe".
    331                                  ;
-   332                                  ; 6. This step is optional dependent on the name colliding with an existing file.
-   333                                  ;    To resolve collisions the decimal number, that was set to 1, is incremented
-   334                                  ;    until the name is unique. The number of characters needed to store the number
-   335                                  ;    will grow as necessary from 1 digit to 2 digits and so on.
-   336                                  ;    If the  length of the basis (ignoring the extension) plus the dash and number
-   337                                  ;    exceeds 8 characters then the length of the basis is shortened until
-   338                                  ;    the new name fits in 8 characters.
-   339                                  ;
-   340                                  ;    For example, if "FILENA~1.EXE" conflicts the next names tried are
-   341                                  ;    "FILENA~2.EXE", "FILENA~3.EXE", ..., "FILEN~10.EXE", "FILEN~11.EXE", etc
-   342                                  ;
-   343                                  ; 26/05/2025 - Erdogan Tan
-   344                                  ; Note: If the long name is the same as it's short name converted to lower case,
-   345                                  ;	Windows 7 sets DIR_NTRes (directory entry) byte to 08h.
-   346                                  ;       For example: The created file name "denemefn" is written into
-   347                                  ;	the directory as the short name "DENEMEFN" without the long name entry,
-   348                                  ;	but 'DIR_NTRes' byte (reserved and suggested -by microsoft-
-   349                                  ;	to set it as zero) is set to 08h.)
-   350                                  ; 	((DIR_NTRes byte is at offset 12 of a directory entry.))
-   351                                  
-   352                                  convert_name_from_lfn:
-   353                                  	; 27/05/2025
-   354                                  	; 26/05/2025 - TRDOS 386 v2.0.10
-   355                                  	;
-   356                                  	; INPUT:
-   357                                  	;	ESI = long file name (asciiz format)
-   358                                  	; 	      (max. 128 chars)
-   359                                  	;	EDI = target file name address
-   360                                  	;
-   361                                  	; OUTPUT:
-   362                                  	;	EDI = target file name address of
-   363                                  	;	      dos 8.3 file name
-   364                                  	;	EAX = 0 if the name does not contain tilde
-   365                                  	;	    = tilde position (if > 0)
-   366                                  	;	if EAX = -1 -> Invalid file name error !
-   367                                  	;
-   368                                  	; Modified registers: EAX, EBX, ECX, EDX
-   369                                  
-   370                                  	;mov	[f_base_start], edi
-   371 000001A4 893D[12050000]          	mov	[f_target], edi
-   372 000001AA 31DB                    	xor	ebx, ebx
-   373 000001AC 891D[16050000]          	mov	[f_base_count], ebx ; 0
-   374 000001B2 891D[1A050000]          	mov	[f_ext_start], ebx ; 0
-   375 000001B8 891D[1E050000]          	mov	[f_ext_count], ebx ; 0
-   376 000001BE 881D[26050000]          	mov	[lossy_conversion], bl ; 0
-   377 000001C4 881D[B5050000]          	mov	[conv_ucase], bl ; 0
-   378                                  
-   379 000001CA 57                      	push	edi ; *
-   380 000001CB 56                      	push	esi ; **
-   381                                  
-   382                                  	; temporary name space on bss section
-   383 000001CC BF[34050000]            	mov	edi, temp_name ; max. 128 bytes + zero
-   384                                  
-   385 000001D1 B980000000              	mov	ecx, 128
-   386                                  
-   387                                  	;xor	ebx, ebx
+   332                                  ; 5. If the name does not contain an extension then a "~1" is appended to
+   333                                  ;    the name. If the name does contain an extension, then a "~1" is appended
+   334                                  ;    to the first part of the name, prior to the extension.
+   335                                  ;
+   336                                  ;    For example, "MyFile" becomes "MyFile~1, and "Junk.bat" becomes "Junk~1.bat".
+   337                                  ;
+   338                                  ;    This numeric value is always added to help reduce the conflicts
+   339                                  ;    in the 8.3 name space for automatic generated names.
+   340                                  ;
+   341                                  ; 6. This step is optional dependent on the name colliding with an existing file.
+   342                                  ;    To resolve collisions the decimal number, that was set to 1, is incremented
+   343                                  ;    until the name is unique. The number of characters needed to store the number
+   344                                  ;    will grow as necessary from 1 digit to 2 digits and so on.
+   345                                  ;    If the  length of the basis (ignoring the extension) plus the dash and number
+   346                                  ;    exceeds 8 characters then the length of the basis is shortened until
+   347                                  ;    the new name fits in 8 characters.
+   348                                  ;
+   349                                  ;    For example, if "FILENA~1.EXE" conflicts the next names tried are
+   350                                  ;    "FILENA~2.EXE", "FILENA~3.EXE", ..., "FILEN~10.EXE", "FILEN~11.EXE", etc
+   351                                  ;
+   352                                  ; 26/05/2025 - Erdogan Tan
+   353                                  ; Note: If the long name is the same as it's short name converted to lower case,
+   354                                  ;	Windows 7 sets DIR_NTRes (directory entry) byte to 08h.
+   355                                  ;       For example: The created file name "denemefn" is written into
+   356                                  ;	the directory as the short name "DENEMEFN" without the long name entry,
+   357                                  ;	but 'DIR_NTRes' byte (reserved and suggested -by microsoft-
+   358                                  ;	to set it as zero) is set to 08h.)
+   359                                  ; 	((DIR_NTRes byte is at offset 12 of a directory entry.))
+   360                                  
+   361                                  convert_name_from_lfn:
+   362                                  	; 28/05/2025
+   363                                  	; 27/05/2025
+   364                                  	; 26/05/2025 - TRDOS 386 v2.0.10
+   365                                  	;
+   366                                  	; INPUT:
+   367                                  	;	ESI = long file name (asciiz format)
+   368                                  	; 	      (max. 128 chars)
+   369                                  	;	EDI = target file name address
+   370                                  	;
+   371                                  	; OUTPUT:
+   372                                  	;	EDI = target file name address of
+   373                                  	;	      dos 8.3 file name
+   374                                  	;	EAX = 0 if the name does not contain tilde
+   375                                  	;	    = tilde position (if > 0)
+   376                                  	;	if EAX = -1 -> Invalid file name error !
+   377                                  	;
+   378                                  	; Modified registers: EAX, EBX, ECX, EDX
+   379                                  
+   380                                  	;mov	[f_base_start], edi
+   381 000001B1 893D[58050000]          	mov	[f_target], edi
+   382 000001B7 31DB                    	xor	ebx, ebx
+   383 000001B9 891D[5C050000]          	mov	[f_base_count], ebx ; 0
+   384 000001BF 891D[60050000]          	mov	[f_ext_start], ebx ; 0
+   385 000001C5 891D[64050000]          	mov	[f_ext_count], ebx ; 0
+   386 000001CB 881D[6C050000]          	mov	[lossy_conversion], bl ; 0
+   387 000001D1 881D[FB050000]          	mov	[conv_ucase], bl ; 0
    388                                  
-   389                                  	; remove spaces and dots at first
-   390                                  	; and save the last dot position
-   391                                  	; (if the last dot is not the end of file
-   392                                  	;  it will be inserted in same position)
-   393                                  
-   394 000001D6 89FA                    	mov	edx, edi ; *
-   395                                  	;mov	[f_base_start], edi
-   396                                  conv_f_lfn_0:	; remove spaces & dots
-   397 000001D8 AC                      	lodsb
-   398 000001D9 3C20                    	cmp	al, 20h
-   399 000001DB 740D                    	je	short conv_f_lfn_2
-   400 000001DD 720D                    	jb	short conv_f_lfn_3
-   401 000001DF 3C2E                    	cmp	al, '.'
-   402 000001E1 7506                    	jne	short conv_f_lfn_1
-   403 000001E3 89FB                    	mov	ebx, edi ; the last dot
-   404 000001E5 29D3                    	sub	ebx, edx
-   405 000001E7 EB01                    	jmp	short conv_f_lfn_2
-   406                                  conv_f_lfn_1:	; not_dot
-   407 000001E9 AA                      	stosb
-   408                                  conv_f_lfn_2:
-   409 000001EA E2EC                    	loop	conv_f_lfn_0
-   410                                  conv_f_lfn_3:
-   411 000001EC 89D6                    	mov	esi, edx ; *
-   412 000001EE 89F9                    	mov	ecx, edi
-   413                                  
-   414                                  	; zero tail
-   415                                  	;xor	eax, eax ; 0
-   416                                  	;stosb
-   417                                  
-   418                                  	; ebx = the last dot position (index)
-   419                                  
-   420 000001F0 29F1                    	sub	ecx, esi ; number of chars
-   421                                  	 	 ; (without spaces)
-   422 000001F2 0F84A5FEFFFF            	jz	nul_name  ; invalid file name !
-   423                                  
-   424 000001F8 890D[16050000]          	mov	[f_base_count], ecx
-   425                                  
-   426 000001FE 8B3D[12050000]          	mov	edi, [f_target] ; (*)
-   427                                  
-   428                                  	;; eax = 0
-   429                                  
-   430 00000204 21DB                    	and	ebx, ebx
-   431 00000206 742E                    	jz	short check_base ; ecx > 0 ; not dot
-   432                                  
-   433 00000208 39D9                    	cmp	ecx, ebx
-   434 0000020A 7452                    	je	short skip_extension
-   435                                  		; the last char of the LFN is dot
-   436                                  
-   437 0000020C 29D9                    	sub	ecx, ebx ; base count - dot position
-   438 0000020E 87D9                    	xchg	ecx, ebx
-   439 00000210 891D[1E050000]          	mov	[f_ext_count], ebx
-   440 00000216 890D[16050000]          	mov	[f_base_count], ecx
-   441                                  
-   442 0000021C 01CA                    	add	edx, ecx ; temp_name + dot pos
-   443 0000021E 8915[1A050000]          	mov	[f_ext_start], edx
-   444                                  
-   445 00000224 83FB03                  	cmp	ebx, 3 ; extension length > 3
-   446 00000227 760D                    	jna	short check_base
-   447                                  
-   448 00000229 FE05[26050000]          	inc	byte [lossy_conversion]
-   449 0000022F C605[1E050000]03        	mov	byte [f_ext_count], 3
-   450                                  check_base:
-   451 00000236 83F908                  	cmp	ecx, 8 ; basis length > 8
-   452 00000239 760E                    	jna	short proper_base
-   453                                  
-   454 0000023B FE05[26050000]          	inc	byte [lossy_conversion]
+   389                                  	; 28/05/2025 - Erdogan Tan
+   390                                  	; if the long name contains space(s) between words
+   391                                  	;    it must be accepted as 'lossy conversion'.
+   392                                  	; for example:
+   393                                  	;  'de ne me.txt' is not same with 'deneme.txt';
+   394                                  	;  so, short name of 'de ne me.txt' must
+   395                                  	;  be 'DENEME~1.TXT', not 'DENEME.TXT'.
+   396                                  	
+   397 000001D7 57                      	push	edi ; *
+   398 000001D8 56                      	push	esi ; **
+   399                                  
+   400                                  	; temporary name space on bss section
+   401 000001D9 BF[7A050000]            	mov	edi, temp_name ; max. 128 bytes + zero
+   402                                  
+   403 000001DE B980000000              	mov	ecx, 128
+   404                                  
+   405                                  	;xor	ebx, ebx
+   406                                  
+   407                                  	; remove spaces and dots at first
+   408                                  	; and save the last dot position
+   409                                  	; (if the last dot is not the end of file
+   410                                  	;  it will be inserted in same position)
+   411                                  
+   412 000001E3 89FA                    	mov	edx, edi ; *
+   413                                  	;mov	[f_base_start], edi
+   414                                  conv_f_lfn_1:	; remove spaces & dots
+   415 000001E5 AC                      	lodsb
+   416 000001E6 3C20                    	cmp	al, 20h
+   417 000001E8 7233                    	jb	short conv_f_lfn_6
+   418 000001EA 7709                    	ja	short conv_f_lfn_2
+   419 000001EC 800D[6C050000]01        	or	byte [lossy_conversion], 1
+   420 000001F3 EB26                    	jmp	short conv_f_lfn_5
+   421                                  conv_f_lfn_2:
+   422 000001F5 3C2E                    	cmp	al, '.'
+   423 000001F7 7521                    	jne	short conv_f_lfn_4
+   424 000001F9 88D8                    	mov	al, bl
+   425 000001FB 89FB                    	mov	ebx, edi ; the last dot
+   426 000001FD 29D3                    	sub	ebx, edx
+   427 000001FF 7404                    	jz	short conv_f_lfn_3 ; .fname
+   428 00000201 20C0                    	and	al, al
+   429 00000203 7416                    	jz	short conv_f_lfn_5 ; the 1st dot
+   430                                  conv_f_lfn_3:
+   431 00000205 800D[6C050000]01        	or	byte [lossy_conversion], 1
+   432 0000020C EB0D                    	jmp	short conv_f_lfn_5
+   433                                  
+   434                                  	; 28/05/2025
+   435                                  nul_name:
+   436 0000020E 5E                      	pop	esi ; **
+   437 0000020F 5F                      	pop	edi ; *
+   438 00000210 C60700                  	mov	byte [edi], 0
+   439                                  	; Invalid file name error !
+   440 00000213 B8FFFFFFFF              	mov	eax, -1
+   441 00000218 F9                      	stc	; cf = 1
+   442 00000219 C3                      	retn
+   443                                  
+   444                                  conv_f_lfn_4:	; not_dot
+   445 0000021A AA                      	stosb
+   446                                  conv_f_lfn_5:
+   447 0000021B E2C8                    	loop	conv_f_lfn_1
+   448                                  conv_f_lfn_6:
+   449 0000021D 89D6                    	mov	esi, edx ; *
+   450 0000021F 89F9                    	mov	ecx, edi
+   451                                  
+   452                                  	; zero tail
+   453                                  	;xor	eax, eax ; 0
+   454                                  	;stosb
    455                                  
-   456 00000241 B108                    	mov	cl, 8
-   457 00000243 880D[16050000]          	mov	[f_base_count], cl
-   458                                  
-   459                                  proper_base:
-   460 00000249 F3A4                    	rep	movsb	; copy/move basis
-   461 0000024B 8A0D[1E050000]          	mov	cl, [f_ext_count]
-   462 00000251 E30B                    	jecxz	skip_extension
-   463 00000253 B02E                    	mov	al, '.' ; insert DOT
-   464 00000255 AA                      	stosb
-   465 00000256 8B35[1A050000]          	mov	esi, [f_ext_start]
-   466 0000025C F3A4                    	rep	movsb
-   467                                  skip_extension:
-   468 0000025E 30C0                    	xor	al, al	; put zero/NUL at the end
-   469 00000260 AA                      	stosb
+   456                                  	; ebx = the last dot position (index)
+   457                                  
+   458 00000221 29F1                    	sub	ecx, esi ; number of chars
+   459                                  	 	 ; (without spaces)
+   460 00000223 74E9                    	jz	nul_name  ; invalid file name !
+   461                                  
+   462 00000225 890D[5C050000]          	mov	[f_base_count], ecx
+   463                                  
+   464 0000022B 8B3D[58050000]          	mov	edi, [f_target] ; (*)
+   465                                  
+   466                                  	;; eax = 0
+   467                                  
+   468 00000231 21DB                    	and	ebx, ebx
+   469 00000233 7437                    	jz	short check_base ; ecx > 0 ; not dot
    470                                  
-   471                                  	; Translate all illegal 8.3 characters into "_".
-   472                                  
-   473 00000261 8B3D[12050000]          	mov	edi, [f_target] ; (*)
-   474 00000267 89FE                    	mov	esi, edi
-   475                                  conv_f_lfn_4:
-   476 00000269 AC                      	lodsb
-   477 0000026A 20C0                    	and	al, al
-   478 0000026C 7425                    	jz	short conv_f_lfn_6
-   479 0000026E 3C2E                    	cmp	al, '.'
-   480 00000270 7418                    	je	short conv_f_lfn_5
-   481 00000272 FE0D[B5050000]          	dec	byte [conv_ucase] 
-   482 00000278 E8F1FEFFFF              	call	convert_invalid_chars
-   483 0000027D AA                      	stosb
-   484 0000027E 38C4                    	cmp	ah, al
-   485 00000280 74E7                    	je	short conv_f_lfn_4
-   486 00000282 FE05[26050000]          	inc	byte [lossy_conversion]
-   487 00000288 EBDF                    	jmp	short conv_f_lfn_4
+   471 00000235 39D9                    	cmp	ecx, ebx
+   472                                  	;je	short skip_extension
+   473                                  		; the last char of the LFN is dot
+   474 00000237 7709                    	ja	short conv_f_lfn_7
+   475                                  
+   476                                  	; the last char of the LFN is dot
+   477 00000239 800D[6C050000]01        	or	byte [lossy_conversion], 1
+   478 00000240 EB52                    	jmp	short skip_extension
+   479                                  
+   480                                  conv_f_lfn_7:
+   481 00000242 29D9                    	sub	ecx, ebx ; base count - dot position
+   482 00000244 87D9                    	xchg	ecx, ebx
+   483 00000246 891D[64050000]          	mov	[f_ext_count], ebx
+   484 0000024C 890D[5C050000]          	mov	[f_base_count], ecx
+   485                                  
+   486 00000252 01CA                    	add	edx, ecx ; temp_name + dot pos
+   487 00000254 8915[60050000]          	mov	[f_ext_start], edx
    488                                  
-   489                                  conv_f_lfn_5:
-   490 0000028A 47                      	inc	edi
-   491 0000028B 893D[1A050000]          	mov	[f_ext_start], edi
-   492 00000291 EBD6                    	jmp	short conv_f_lfn_4
-   493                                  
-   494                                  conv_f_lfn_6:
-   495                                  	;stosb 	; NUL
-   496                                  
-   497 00000293 803D[26050000]00        	cmp	byte [lossy_conversion], 0
-   498 0000029A 764C                    	jna	short conv_f_lfn_10 ; exact 8.3 name
+   489 0000025A 83FB03                  	cmp	ebx, 3 ; extension length > 3
+   490 0000025D 760D                    	jna	short check_base
+   491                                  
+   492 0000025F FE05[6C050000]          	inc	byte [lossy_conversion]
+   493 00000265 C605[64050000]03        	mov	byte [f_ext_count], 3
+   494                                  check_base:
+   495 0000026C 83F908                  	cmp	ecx, 8 ; basis length > 8
+   496 0000026F 760E                    	jna	short proper_base
+   497                                  
+   498 00000271 FE05[6C050000]          	inc	byte [lossy_conversion]
    499                                  
-   500                                  	; mark for it is not a lower case 8.3 name 
-   501 0000029C C605[B5050000]FF        	mov	byte [conv_ucase], -1
+   500 00000277 B108                    	mov	cl, 8
+   501 00000279 880D[5C050000]          	mov	[f_base_count], cl
    502                                  
-   503                                  	; 27/05/2025
-   504                                  	; put '~1' at the end of the base name
-   505 000002A3 8B1D[1A050000]          	mov	ebx, [f_ext_start] ; '.ext' possible
-   506 000002A9 8B13                    	mov	edx, [ebx]
-   507 000002AB B806000000              	mov	eax, 6 ; char 7 ('~') and 8 ('1')
-   508 000002B0 3B05[16050000]          	cmp	eax, [f_base_count]
-   509 000002B6 7605                    	jna	short conv_f_lfn_7
-   510 000002B8 A1[16050000]            	mov	eax, [f_base_count]
-   511                                  conv_f_lfn_7:
-   512 000002BD 8B3D[12050000]          	mov	edi, [f_target] ; [f_base_start]
-   513 000002C3 01C7                    	add	edi, eax
-   514                                  	; default !
-   515 000002C5 66B87E31                	mov	ax, '~1'
-   516                                  		; base name (<=6 bytes) + '~1'
-   517 000002C9 66AB                    	stosw
-   518 000002CB 803D[1E050000]00        	cmp	byte [f_ext_count], 0
-   519 000002D2 7611                    	jna	short conv_f_lfn_9
-   520 000002D4 B02E                    	mov	al, '.'
-   521 000002D6 AA                      	stosb
-   522 000002D7 8A0D[1E050000]          	mov	cl, [f_ext_count]
-   523                                  conv_f_lfn_8:
-   524 000002DD 88D0                    	mov	al, dl
-   525 000002DF AA                      	stosb
-   526 000002E0 C1EA08                  	shr	edx, 8
-   527 000002E3 E2F8                    	loop	conv_f_lfn_8
-   528                                  conv_f_lfn_9:
-   529 000002E5 28C0                    	sub	al, al ; 0
-   530                                  		; '.ext+'0 or '.ex'+ or '.e'+0
-   531 000002E7 AA                      	stosb
-   532                                  conv_f_lfn_10:
-   533 000002E8 5E                      	pop	esi ; **
-   534 000002E9 5F                      	pop	edi ; *
-   535 000002EA C3                      	retn
-   536                                  
-   537                                  	; 28/05/2025
-   538                                  	; 27/05/2025
-   539                                  	; 26/05/2025 - TRDOS 386 v2.0.10
-   540                                  change_tilde_number:
-   541                                  	; Input:
-   542                                  	;    eax = tilde/order number
-   543                                  	;	 = 0 for default ('~1')
-   544                                  	;    edi = file name address (12 bytes)
-   545                                  	; Output:
-   546                                  	;    file name will have '~n' at the
-   547                                  	;    end of the basis (base name)
-   548                                  	;
-   549                                  	; Modified registers: eax, ebx, ecx, edx
-   550                                  
-   551                                  	; Note: In fact, if the filename
-   552                                  	; already contains '~n', the number n
-   553                                  	; after the tilde ('~n') should be increased;
-   554                                  	; decreasing may cause unnecessary loss
-   555                                  	; of filename characters
-   556                                  	; (if the number of digits is decreased).
-   557                                  	; (But there is no problem for a test only.)
-   558                                  	;
-   559                                  	; For normal use of this subroutine,
-   560                                  	; if the previous variant of the (translated)
-   561                                  	; short name already exists, the tilde number
-   562                                  	; will be incremented on subsequent calls.
-   563                                  
-   564                                  	;mov	eax, [order_number]
-   565                                  
-   566 000002EB 09C0                    	or	eax, eax
-   567 000002ED 7502                    	jnz	short ctn_1 ; skip
-   568                                  
-   569 000002EF B001                    	mov	al, 1	; default ('~1')
-   570                                  ctn_1:
-   571                                  	;cmp	eax, 65535
-   572                                  	;jna	short skip_num_limit
-   573                                  	;mov	eax, 65535
-   574                                  ;skip_num_limit:
-   575                                  
-   576 000002F1 56                      	push	esi ; +
-   577                                  
-   578 000002F2 89FE                    	mov	esi, edi
+   503                                  proper_base:
+   504 0000027F F3A4                    	rep	movsb	; copy/move basis
+   505 00000281 8A0D[64050000]          	mov	cl, [f_ext_count]
+   506 00000287 E30B                    	jecxz	skip_extension
+   507 00000289 B02E                    	mov	al, '.' ; insert DOT
+   508 0000028B AA                      	stosb
+   509 0000028C 8B35[60050000]          	mov	esi, [f_ext_start]
+   510                                  	;mov	[f_ext_start], edi ; 28/05/2025
+   511 00000292 F3A4                    	rep	movsb
+   512                                  skip_extension:
+   513 00000294 30C0                    	xor	al, al	; put zero/NUL at the end
+   514 00000296 AA                      	stosb
+   515                                  
+   516                                  	; Translate all illegal 8.3 characters into "_".
+   517                                  
+   518 00000297 8B3D[58050000]          	mov	edi, [f_target] ; (*)
+   519 0000029D 89FE                    	mov	esi, edi
+   520                                  conv_f_lfn_8:
+   521 0000029F AC                      	lodsb
+   522 000002A0 20C0                    	and	al, al
+   523 000002A2 7425                    	jz	short conv_f_lfn_10
+   524 000002A4 3C2E                    	cmp	al, '.'
+   525 000002A6 7418                    	je	short conv_f_lfn_9
+   526 000002A8 FE0D[FB050000]          	dec	byte [conv_ucase] 
+   527 000002AE E8C8FEFFFF              	call	convert_invalid_chars
+   528 000002B3 AA                      	stosb
+   529 000002B4 38C4                    	cmp	ah, al
+   530 000002B6 74E7                    	je	short conv_f_lfn_8
+   531 000002B8 FE05[6C050000]          	inc	byte [lossy_conversion]
+   532 000002BE EBDF                    	jmp	short conv_f_lfn_8
+   533                                  
+   534                                  conv_f_lfn_9:
+   535 000002C0 47                      	inc	edi
+   536 000002C1 893D[60050000]          	mov	[f_ext_start], edi
+   537 000002C7 EBD6                    	jmp	short conv_f_lfn_8
+   538                                  
+   539                                  conv_f_lfn_10:
+   540                                  	;stosb 	; NUL
+   541                                  
+   542 000002C9 803D[6C050000]00        	cmp	byte [lossy_conversion], 0
+   543 000002D0 7651                    	jna	short conv_f_lfn_14 ; exact 8.3 name
+   544                                  
+   545                                  	; mark for it is not a lower case 8.3 name 
+   546 000002D2 C605[FB050000]FF        	mov	byte [conv_ucase], -1
+   547                                  
+   548                                  	; 27/05/2025
+   549                                  	; put '~1' at the end of the base name
+   550 000002D9 8B1D[60050000]          	mov	ebx, [f_ext_start] ; '.ext' possible
+   551 000002DF 8B13                    	mov	edx, [ebx]
+   552 000002E1 B806000000              	mov	eax, 6 ; char 7 ('~') and 8 ('1')
+   553 000002E6 3B05[5C050000]          	cmp	eax, [f_base_count]
+   554 000002EC 7605                    	jna	short conv_f_lfn_11
+   555 000002EE A1[5C050000]            	mov	eax, [f_base_count]
+   556                                  conv_f_lfn_11:
+   557 000002F3 8B3D[58050000]          	mov	edi, [f_target] ; [f_base_start]
+   558 000002F9 01C7                    	add	edi, eax
+   559                                  	; 28/05/2025
+   560                                  	; default !
+   561 000002FB A2[6C050000]            	mov	[lossy_conversion], al ; tilde pos
+   562 00000300 66B87E31                	mov	ax, '~1'
+   563                                  		; base name (<=6 bytes) + '~1'
+   564 00000304 66AB                    	stosw
+   565 00000306 803D[64050000]00        	cmp	byte [f_ext_count], 0
+   566 0000030D 7611                    	jna	short conv_f_lfn_13
+   567 0000030F B02E                    	mov	al, '.'
+   568 00000311 AA                      	stosb
+   569 00000312 8A0D[64050000]          	mov	cl, [f_ext_count]
+   570                                  conv_f_lfn_12:
+   571 00000318 88D0                    	mov	al, dl
+   572 0000031A AA                      	stosb
+   573 0000031B C1EA08                  	shr	edx, 8
+   574 0000031E E2F8                    	loop	conv_f_lfn_12
+   575                                  conv_f_lfn_13:
+   576 00000320 28C0                    	sub	al, al ; 0
+   577                                  		; '.ext+'0 or '.ex'+ or '.e'+0
+   578 00000322 AA                      	stosb
    579                                  
-   580 000002F4 57                      	push	edi ; *
-   581                                  
-   582 000002F5 BF[74040000]            	mov	edi, order_num_str
-   583                                  
-   584 000002FA E890000000              	call	convert_num_to_str
-   585                                  	; ecx = cl = numeric string chars/digits
-   586                                  	;    	minimum: 1, maximum: 5 (for 65535)
-   587                                  
-   588                                  	; find the dot position
-   589                                  	; or the end of the file name
-   590                                  
-   591                                  	;mov	esi, [esp] ; *
-   592                                  
-   593 000002FF 31DB                    	xor	ebx, ebx
-   594 00000301 31D2                    	xor	edx, edx
-   595                                  
-   596 00000303 51                      	push	ecx ; **
-   597                                  	; ecx <= 5
-   598 00000304 B106                    	mov	cl, 6
-   599                                  ctn_gfnc:
-   600                                  	;mov	al, [esi]
-   601 00000306 8B06                    	mov	eax, [esi]
-   602 00000308 20C0                    	and	al, al
-   603 0000030A 7413                    	jz	short ctn_eofn
-   604 0000030C 3C2E                    	cmp	al, '.'
-   605 0000030E 740D                    	je	short ctn_dotpos
-   606 00000310 3C7E                    	cmp	al, '~'
-   607 00000312 7502                    	jne	short ctn_2
-   608 00000314 89F3                    	mov	ebx, esi ; previous tilde position
-   609                                  ctn_2:
-   610 00000316 46                      	inc	esi
-   611 00000317 E2ED                    	loop	ctn_gfnc
-   612 00000319 31C0                    	xor	eax, eax ; 0
-   613 0000031B EB02                    	jmp	short ctn_eofn
-   614                                  ctn_dotpos:
-   615 0000031D 89C2                    	mov	edx, eax ; save extension
-   616                                  ctn_eofn:
-   617 0000031F 59                      	pop	ecx ; **
-   618 00000320 8B3C24                  	mov	edi, [esp] ; *
-   619 00000323 83C708                  	add	edi, 8
-   620 00000326 41                      	inc	ecx ; + tilde (2 to 6)
-   621 00000327 29CF                    	sub	edi, ecx ; required tilde position
-   622                                  
-   623 00000329 89D0                    	mov	eax, edx
-   624                                  
-   625 0000032B 09DB                    	or	ebx, ebx
-   626 0000032D 7406                    	jz	short ctn_3 ; no previous tilde
-   627 0000032F 39FB                    	cmp	ebx, edi
-   628 00000331 7302                    	jnb	short ctn_3
-   629 00000333 89DF                    	mov	edi, ebx  ; previous tilde
-   630                                  ctn_3:
-   631 00000335 BE[73040000]            	mov	esi, tilde_string
-   632                                  	; ecx = numeric digits + 1
-   633                                  	; edi = tilde position
-   634 0000033A F3A4                    	rep	movsb
-   635                                  	;mov	[edi], eax ; 0 or '.ext'
-   636                                  	; al = '.' or 0
-   637 0000033C AB                      	stosd
-   638 0000033D 31C0                    	xor	eax, eax
-   639 0000033F AA                      	stosb	; 0	
-   640                                  ;ctn_4:
-   641                                  	;stosb
-   642                                  	;and	al, al
-   643                                  	;jz	short ctn_5
-   644                                  	;shr	eax, 8	; next .ext char
-   645                                  	;jmp	short ctn_4
-   646                                  ;ctn_5:
-   647 00000340 5F                      	pop	edi ; *
-   648 00000341 5E                      	pop	esi ; +
-   649 00000342 C3                      	retn
-   650                                  
-   651                                  	; 27/05/2025 - TRDOS 386 v2.0.10
-   652                                  increase_tilde_number:
-   653                                  	; Increase tilde number
-   654                                  	;
-   655                                  	; Input:
-   656                                  	;    edi = file name address (12 bytes)
-   657                                  	; Output:
-   658                                  	;    file name will have '~n+1' at the
-   659                                  	;    end of the basis (base name)
-   660                                  	;
-   661                                  	;    [order_number] = previous tilde num
-   662                                  	;
-   663                                  	;    cf = 1 -> failed
-   664                                  	;
-   665                                  	;   eax = previous tilde number (0-98)
-   666                                  	;
-   667                                  	; Modified registers: eax, ebx, ecx, edx
-   668                                  
-   669                                  	; find the tilde position
-   670                                  
-   671 00000343 56                      	push	esi ; *
-   672 00000344 57                      	push	edi ; **
-   673 00000345 89FE                    	mov	esi, edi
-   674 00000347 B908000000              	mov	ecx, 8
-   675 0000034C 31C0                    	xor	eax, eax
-   676 0000034E 31DB                    	xor 	ebx, ebx
-   677                                  itn_1:
-   678 00000350 AC                      	lodsb
-   679 00000351 20C0                    	and	al, al
-   680 00000353 7426                    	jz	short itn_eofn
-   681 00000355 3C2E                    	cmp	al, '.'
-   682 00000357 7422                    	je	short itn_dotpos
-   683 00000359 3C7E                    	cmp	al, '~'
-   684 0000035B 7503                    	jne	short itn_2
-   685 0000035D 89F7                    	mov	edi, esi
-   686 0000035F 4F                      	dec	edi
-   687                                  itn_2:
-   688                                  	; check for numeric character
-   689 00000360 803F7E                  	cmp	byte [edi], '~'
-   690 00000363 7514                    	jne	short itn_3
-   691 00000365 3C30                    	cmp	al, '0'
-   692 00000367 7222                    	jb	short itn_4 ; improper
-   693 00000369 3C39                    	cmp	al, '9'
-   694 0000036B 771E                    	ja	short itn_4 ; improper
-   695 0000036D 2C30                    	sub	al, '0'
-   696 0000036F 50                      	push	eax
-   697 00000370 B00A                    	mov	al, 10
-   698 00000372 F7E3                    	mul	ebx ; [order_number]
-   699 00000374 5B                      	pop	ebx
-   700 00000375 01C3                    	add	ebx, eax
-   701 00000377 31C0                    	xor	eax, eax
-   702                                  itn_3:
-   703 00000379 E2D5                    	loop	itn_1
-   704                                  itn_eofn:
-   705                                  itn_dotpos:
-   706 0000037B 89D8                    	mov	eax, ebx
-   707 0000037D 891D[6F040000]          	mov	[order_number], ebx
-   708 00000383 40                      	inc	eax
-   709 00000384 5F                      	pop	edi ; **
-   710 00000385 5E                      	pop	esi ; *
-   711 00000386 E966FFFFFF              	jmp	ctn_1 ; change tilde number
-   712                                  itn_4:
-   713 0000038B 29DB                    	sub	ebx, ebx
-   714 0000038D EBEA                    	jmp	short itn_3
-   715                                  
-   716                                  convert_num_to_str:
-   717                                  	; 27/05/2025
-   718                                  	; 26/05/2025 - TRDOS 386 v2.0.10
-   719                                  	;
-   720                                  	; INPUT:
-   721                                  	;  eax = number
-   722                                  	;  edi = numeric string address
-   723                                  	;
-   724                                  	;  (if ecx = 65535 -> string length is 5 bytes) 
-   725                                  	;
-   726                                  	; OUTPUT:
-   727                                  	;  ecx = numeric string chars/digits
-   728                                  	;
-   729                                  	;  (if ecx input = 65535 -> ecx = 5) 
-   730                                  	;
-   731                                  	; Modified registers: eax, ecx, edx
-   732                                  
-   733 0000038F 55                      	push	ebp ; *
-   734 00000390 57                      	push	edi ; **
-   735 00000391 89E5                    	mov	ebp, esp
-   736 00000393 B90A000000              	mov	ecx, 10
-   737                                  cnvtnstr_next:
-   738 00000398 31D2                    	xor	edx, edx
-   739 0000039A F7F1                    	div	ecx
-   740 0000039C 52                      	push	edx ; *#*
-   741 0000039D 21C0                    	and	eax, eax
-   742 0000039F 75F7                    	jnz	short cnvtnstr_next
-   743 000003A1 31C9                    	xor	ecx, ecx ; 0
-   744                                  cnvtnstr_@:
-   745 000003A3 58                      	pop	eax ; *#*
-   746 000003A4 0430                    	add	al, '0' ; convert to numeric char
-   747 000003A6 AA                      	stosb
-   748 000003A7 41                      	inc	ecx
-   749 000003A8 39EC                    	cmp	esp, ebp
-   750 000003AA 72F7                    	jb	short cnvtnstr_@
-   751                                  	;xor	al, al
-   752                                  	;stosb
-   753 000003AC 5F                      	pop	edi ; **
-   754 000003AD 5D                      	pop	ebp ; *	
-   755 000003AE C3                      	retn
-   756                                  
-   757                                  ; 27/05/2025
-   758                                  ; 20/05/2025 - TRDOS 386 v2.0.10
-   759                                  ; Ref: https://en.wikipedia.org/wiki/8.3_filename#Directory_table
-   760                                  ;
-   761                                  ; DOS filenames include the following:
-   762                                  ;  UpperCase letters A-Z
-   763                                  ;  Numbers 0-9
-   764                                  ;  Space (20h)
-   765                                  ;  !, #, $, %, &, ', (, ), -, @, ^, _, `, {, }, ~
-   766                                  ;  Values 128–255
-   767                                  ;
-   768                                  ; This excludes the following ASCII characters:
-   769                                  ;  ", *, +, ,, /, :, ;, <, =, >, ?, \, [, ], |
-   770                                  ;  . (DOT) within name and extension fields,
-   771                                  ;			 except in . and .. entries
-   772                                  ;  Lowercase letters a–z, stored as A–Z on FAT12/FAT16/FAT32
-   773                                  ;  Control characters 0–31
-   774                                  ;  Value 127 (DEL)
-   775                                  
-   776                                  ; 27/05/2025
-   777                                  	; 20/05/2025
-   778                                  ;invalid_fname_chars_@:
-   779                                  ;	;db 20h ; SPACE
-   780                                  ;	db 2Eh ; .
-   781                                  
-   782                                  	; 20/05/2025
-   783                                  invalid_fname_chars:
-   784                                  	;   "   *   +   ,   /   :   ;   <   =   >   ?   \   [   ]   |
-   785 000003AF 222A2B2C2F3A3B3C3D-     	db 22h,2Ah,2Bh,2Ch,2Fh,3Ah,3Bh,3Ch,3Dh,3Eh,3Fh,5Ch,5Bh,5Dh,7Ch
-   785 000003B8 3E3F5C5B5D7C       
-   786                                  
-   787                                  sizeInvFnChars  equ ($ - invalid_fname_chars)
+   580                                  conv_f_lfn_14:
+   581                                  	; 28/05/2025
+   582 00000323 31C0                    	xor 	eax, eax ; clc
+   583 00000325 A0[6C050000]            	mov	al, [lossy_conversion]
+   584                                  	; eax = tilde position (0 to 6)
+   585 0000032A 5E                      	pop	esi ; **
+   586 0000032B 5F                      	pop	edi ; *
+   587 0000032C C3                      	retn
+   588                                  
+   589                                  	; 28/05/2025
+   590                                  	; 27/05/2025
+   591                                  	; 26/05/2025 - TRDOS 386 v2.0.10
+   592                                  change_tilde_number:
+   593                                  	; Input:
+   594                                  	;    eax = tilde/order number
+   595                                  	;	 = 0 for default ('~1')
+   596                                  	;    edi = file name address (12 bytes)
+   597                                  	; Output:
+   598                                  	;    file name will have '~n' at the
+   599                                  	;    end of the basis (base name)
+   600                                  	;
+   601                                  	; Modified registers: eax, ebx, ecx, edx
+   602                                  
+   603                                  	; Note: In fact, if the filename
+   604                                  	; already contains '~n', the number n
+   605                                  	; after the tilde ('~n') should be increased;
+   606                                  	; decreasing may cause unnecessary loss
+   607                                  	; of filename characters
+   608                                  	; (if the number of digits is decreased).
+   609                                  	; (But there is no problem for a test only.)
+   610                                  	;
+   611                                  	; For normal use of this subroutine,
+   612                                  	; if the previous variant of the (translated)
+   613                                  	; short name already exists, the tilde number
+   614                                  	; will be incremented on subsequent calls.
+   615                                  
+   616                                  	;mov	eax, [order_number]
+   617                                  
+   618 0000032D 09C0                    	or	eax, eax
+   619 0000032F 7502                    	jnz	short ctn_1 ; skip
+   620                                  
+   621 00000331 B001                    	mov	al, 1	; default ('~1')
+   622                                  ctn_1:
+   623                                  	;cmp	eax, 65535
+   624                                  	;jna	short skip_num_limit
+   625                                  	;mov	eax, 65535
+   626                                  ;skip_num_limit:
+   627                                  
+   628 00000333 56                      	push	esi ; +
+   629                                  
+   630 00000334 89FE                    	mov	esi, edi
+   631                                  
+   632 00000336 57                      	push	edi ; *
+   633                                  
+   634 00000337 BF[BA040000]            	mov	edi, order_num_str
+   635                                  
+   636 0000033C E894000000              	call	convert_num_to_str
+   637                                  	; ecx = cl = numeric string chars/digits
+   638                                  	;    	minimum: 1, maximum: 5 (for 65535)
+   639                                  
+   640                                  	; find the dot position
+   641                                  	; or the end of the file name
+   642                                  
+   643                                  	;mov	esi, [esp] ; *
+   644                                  
+   645 00000341 31DB                    	xor	ebx, ebx
+   646 00000343 31D2                    	xor	edx, edx
+   647                                  
+   648 00000345 51                      	push	ecx ; **
+   649                                  	; ecx <= 5
+   650 00000346 B108                    	mov	cl, 8
+   651                                  ctn_gfnc:
+   652                                  	;mov	al, [esi]
+   653 00000348 8B06                    	mov	eax, [esi]
+   654 0000034A 20C0                    	and	al, al
+   655 0000034C 7417                    	jz	short ctn_eofn
+   656 0000034E 3C2E                    	cmp	al, '.'
+   657 00000350 7411                    	je	short ctn_dotpos
+   658 00000352 3C7E                    	cmp	al, '~'
+   659 00000354 7502                    	jne	short ctn_2
+   660 00000356 89F3                    	mov	ebx, esi ; previous tilde position
+   661                                  ctn_2:
+   662 00000358 46                      	inc	esi
+   663 00000359 E2ED                    	loop	ctn_gfnc
+   664                                  	; 28/05/2025
+   665 0000035B 8B06                    	mov	eax, [esi]
+   666 0000035D 3C2E                    	cmp	al, '.'
+   667 0000035F 7402                    	je	short ctn_dotpos
+   668 00000361 31C0                    	xor	eax, eax ; 0
+   669                                  	;jmp	short ctn_eofn
+   670                                  ctn_dotpos:
+   671 00000363 89C2                    	mov	edx, eax ; save extension
+   672                                  ctn_eofn:
+   673 00000365 59                      	pop	ecx ; **
+   674 00000366 8B3C24                  	mov	edi, [esp] ; *
+   675 00000369 83C708                  	add	edi, 8
+   676 0000036C 41                      	inc	ecx ; + tilde (2 to 6)
+   677 0000036D 29CF                    	sub	edi, ecx ; required tilde position
+   678                                  
+   679 0000036F 89D0                    	mov	eax, edx
+   680                                  
+   681 00000371 09DB                    	or	ebx, ebx
+   682 00000373 7406                    	jz	short ctn_3 ; no previous tilde
+   683 00000375 39FB                    	cmp	ebx, edi
+   684 00000377 7302                    	jnb	short ctn_3
+   685 00000379 89DF                    	mov	edi, ebx  ; previous tilde
+   686                                  ctn_3:
+   687 0000037B BE[B9040000]            	mov	esi, tilde_string
+   688                                  	; ecx = numeric digits + 1
+   689                                  	; edi = tilde position
+   690 00000380 F3A4                    	rep	movsb
+   691                                  	;mov	[edi], eax ; 0 or '.ext'
+   692                                  	; al = '.' or 0
+   693 00000382 AB                      	stosd
+   694 00000383 31C0                    	xor	eax, eax
+   695 00000385 AA                      	stosb	; 0
+   696                                  ;ctn_4:
+   697                                  	;stosb
+   698                                  	;and	al, al
+   699                                  	;jz	short ctn_5
+   700                                  	;shr	eax, 8	; next .ext char
+   701                                  	;jmp	short ctn_4
+   702                                  ;ctn_5:
+   703 00000386 5F                      	pop	edi ; *
+   704 00000387 5E                      	pop	esi ; +
+   705 00000388 C3                      	retn
+   706                                  
+   707                                  	; 27/05/2025 - TRDOS 386 v2.0.10
+   708                                  increase_tilde_number:
+   709                                  	; Increase tilde number
+   710                                  	;
+   711                                  	; Input:
+   712                                  	;    edi = file name address (12 bytes)
+   713                                  	; Output:
+   714                                  	;    file name will have '~n+1' at the
+   715                                  	;    end of the basis (base name)
+   716                                  	;
+   717                                  	;    [order_number] = previous tilde num
+   718                                  	;
+   719                                  	;    cf = 1 -> failed
+   720                                  	;
+   721                                  	;   eax = previous tilde number (0-98)
+   722                                  	;
+   723                                  	; Modified registers: eax, ebx, ecx, edx
+   724                                  
+   725                                  	; find the tilde position
+   726                                  
+   727 00000389 56                      	push	esi ; *
+   728 0000038A 57                      	push	edi ; **
+   729 0000038B 89FE                    	mov	esi, edi
+   730 0000038D B908000000              	mov	ecx, 8
+   731 00000392 31C0                    	xor	eax, eax
+   732 00000394 31DB                    	xor 	ebx, ebx
+   733                                  itn_1:
+   734 00000396 AC                      	lodsb
+   735 00000397 20C0                    	and	al, al
+   736 00000399 7426                    	jz	short itn_eofn
+   737 0000039B 3C2E                    	cmp	al, '.'
+   738 0000039D 7422                    	je	short itn_dotpos
+   739 0000039F 3C7E                    	cmp	al, '~'
+   740 000003A1 7503                    	jne	short itn_2
+   741 000003A3 89F7                    	mov	edi, esi
+   742 000003A5 4F                      	dec	edi
+   743                                  itn_2:
+   744                                  	; check for numeric character
+   745 000003A6 803F7E                  	cmp	byte [edi], '~'
+   746 000003A9 7514                    	jne	short itn_3
+   747 000003AB 3C30                    	cmp	al, '0'
+   748 000003AD 7222                    	jb	short itn_4 ; improper
+   749 000003AF 3C39                    	cmp	al, '9'
+   750 000003B1 771E                    	ja	short itn_4 ; improper
+   751 000003B3 2C30                    	sub	al, '0'
+   752 000003B5 50                      	push	eax
+   753 000003B6 B00A                    	mov	al, 10
+   754 000003B8 F7E3                    	mul	ebx ; [order_number]
+   755 000003BA 5B                      	pop	ebx
+   756 000003BB 01C3                    	add	ebx, eax
+   757 000003BD 31C0                    	xor	eax, eax
+   758                                  itn_3:
+   759 000003BF E2D5                    	loop	itn_1
+   760                                  itn_eofn:
+   761                                  itn_dotpos:
+   762 000003C1 89D8                    	mov	eax, ebx
+   763 000003C3 891D[B5040000]          	mov	[order_number], ebx
+   764 000003C9 40                      	inc	eax
+   765 000003CA 5F                      	pop	edi ; **
+   766 000003CB 5E                      	pop	esi ; *
+   767 000003CC E962FFFFFF              	jmp	ctn_1 ; change tilde number
+   768                                  itn_4:
+   769 000003D1 29DB                    	sub	ebx, ebx
+   770 000003D3 EBEA                    	jmp	short itn_3
+   771                                  
+   772                                  convert_num_to_str:
+   773                                  	; 27/05/2025
+   774                                  	; 26/05/2025 - TRDOS 386 v2.0.10
+   775                                  	;
+   776                                  	; INPUT:
+   777                                  	;  eax = number
+   778                                  	;  edi = numeric string address
+   779                                  	;
+   780                                  	;  (if ecx = 65535 -> string length is 5 bytes) 
+   781                                  	;
+   782                                  	; OUTPUT:
+   783                                  	;  ecx = numeric string chars/digits
+   784                                  	;
+   785                                  	;  (if ecx input = 65535 -> ecx = 5) 
+   786                                  	;
+   787                                  	; Modified registers: eax, ecx, edx
    788                                  
-   789                                  ;sizeInvFnChars@  equ ($ - invalid_fname_chars_@) ; 20/05/2025
-   790                                  
-   791                                  version:
-   792 000003BE 0D0A                    	db 0Dh, 0Ah
-   793 000003C0 546573742050726F67-     	db 'Test Program for ASCIIZ long file name to DOS short name conversion'
-   793 000003C9 72616D20666F722041-
-   793 000003D2 534349495A206C6F6E-
-   793 000003DB 672066696C65206E61-
-   793 000003E4 6D6520746F20444F53-
-   793 000003ED 2073686F7274206E61-
-   793 000003F6 6D6520636F6E766572-
-   793 000003FF 73696F6E           
-   794 00000403 0D0A                    	db 0Dh, 0Ah
-   795 00000405 6279204572646F6761-     	db 'by Erdogan Tan - 28/05/2025'
-   795 0000040E 6E2054616E202D2032-
-   795 00000417 382F30352F32303235 
-   796 00000420 0D0A00                  	db 0Dh, 0Ah, 0
-   797                                  usage:
-   798 00000423 0D0A                    	db 0Dh, 0Ah
-   799 00000425 55736167653A206C66-     	db 'Usage: lfnconv <test file name, max. 128 bytes>'
-   799 0000042E 6E636F6E76203C7465-
-   799 00000437 73742066696C65206E-
-   799 00000440 616D652C206D61782E-
-   799 00000449 203132382062797465-
-   799 00000452 733E               
-   800                                  nexline:
-   801 00000454 0D0A00                  	db 0Dh, 0Ah, 0
-   802                                  
-   803                                  msg_invalid_fn:
-   804 00000457 0D0A                    	db 0Dh, 0Ah
-   805 00000459 496E76616C69642066-     	db 'Invalid file name !'
-   805 00000462 696C65206E616D6520-
-   805 0000046B 21                 
-   806 0000046C 0D0A00                  	db 0Dh, 0Ah, 0
-   807                                  
-   808                                  order_number:
-   809 0000046F 01000000                	dd 1
-   810                                  
-   811                                  tilde_string:
-   812 00000473 7E                      	db '~'
-   813                                  order_num_str: ; max. 5 bytes + NUL
-   814 00000474 31                      	db '1'
-   815 00000475 00000000                	dd 0 ; 4 bytes
-   816 00000479 00                      	db 0
-   817                                  
-   818                                  lfn_name:
-   819 0000047A 00<rep 80h>             	times 128 db 0
-   820 000004FA 00                      	db 0
-   821                                  
-   822                                  special_status:
-   823 000004FB 202E2E2E20285B4449-     	db ' ... ([DIR_NTRes]=08h)'
-   823 00000504 525F4E545265735D3D-
-   823 0000050D 30386829           
-   824 00000511 00                      	db 0
-   825                                  
-   826                                  bss:
-   827                                  
-   828                                  ABSOLUTE bss
-   829                                  
-   830                                  ;f_base_start:	resd 1
-   831 00000512 ????????                f_target:	resd 1
-   832 00000516 ????????                f_base_count:	resd 1
-   833 0000051A ????????                f_ext_start:	resd 1
-   834 0000051E ????????                f_ext_count:	resd 1
-   835                                  ;f_name_count:	resd 1
-   836 00000522 ????????                formal_size:	resd 1
-   837                                  lossy_conversion:
-   838 00000526 ??                      		resb 1
-   839 00000527 <res Dh>                target_name:	resb 13
-   840 00000534 <res 81h>               temp_name:	resb 129
-   841 000005B5 ??                      conv_ucase:	resb 1
+   789 000003D5 55                      	push	ebp ; *
+   790 000003D6 57                      	push	edi ; **
+   791 000003D7 89E5                    	mov	ebp, esp
+   792 000003D9 B90A000000              	mov	ecx, 10
+   793                                  cnvtnstr_next:
+   794 000003DE 31D2                    	xor	edx, edx
+   795 000003E0 F7F1                    	div	ecx
+   796 000003E2 52                      	push	edx ; *#*
+   797 000003E3 21C0                    	and	eax, eax
+   798 000003E5 75F7                    	jnz	short cnvtnstr_next
+   799 000003E7 31C9                    	xor	ecx, ecx ; 0
+   800                                  cnvtnstr_@:
+   801 000003E9 58                      	pop	eax ; *#*
+   802 000003EA 0430                    	add	al, '0' ; convert to numeric char
+   803 000003EC AA                      	stosb
+   804 000003ED 41                      	inc	ecx
+   805 000003EE 39EC                    	cmp	esp, ebp
+   806 000003F0 72F7                    	jb	short cnvtnstr_@
+   807                                  	;xor	al, al
+   808                                  	;stosb
+   809 000003F2 5F                      	pop	edi ; **
+   810 000003F3 5D                      	pop	ebp ; *	
+   811 000003F4 C3                      	retn
+   812                                  
+   813                                  ; 27/05/2025
+   814                                  ; 20/05/2025 - TRDOS 386 v2.0.10
+   815                                  ; Ref: https://en.wikipedia.org/wiki/8.3_filename#Directory_table
+   816                                  ;
+   817                                  ; DOS filenames include the following:
+   818                                  ;  UpperCase letters A-Z
+   819                                  ;  Numbers 0-9
+   820                                  ;  Space (20h)
+   821                                  ;  !, #, $, %, &, ', (, ), -, @, ^, _, `, {, }, ~
+   822                                  ;  Values 128–255
+   823                                  ;
+   824                                  ; This excludes the following ASCII characters:
+   825                                  ;  ", *, +, ,, /, :, ;, <, =, >, ?, \, [, ], |
+   826                                  ;  . (DOT) within name and extension fields,
+   827                                  ;			 except in . and .. entries
+   828                                  ;  Lowercase letters a–z, stored as A–Z on FAT12/FAT16/FAT32
+   829                                  ;  Control characters 0–31
+   830                                  ;  Value 127 (DEL)
+   831                                  
+   832                                  ; 27/05/2025
+   833                                  	; 20/05/2025
+   834                                  ;invalid_fname_chars_@:
+   835                                  ;	;db 20h ; SPACE
+   836                                  ;	db 2Eh ; .
+   837                                  
+   838                                  	; 20/05/2025
+   839                                  invalid_fname_chars:
+   840                                  	;   "   *   +   ,   /   :   ;   <   =   >   ?   \   [   ]   |
+   841 000003F5 222A2B2C2F3A3B3C3D-     	db 22h,2Ah,2Bh,2Ch,2Fh,3Ah,3Bh,3Ch,3Dh,3Eh,3Fh,5Ch,5Bh,5Dh,7Ch
+   841 000003FE 3E3F5C5B5D7C       
+   842                                  
+   843                                  sizeInvFnChars  equ ($ - invalid_fname_chars)
+   844                                  
+   845                                  ;sizeInvFnChars@  equ ($ - invalid_fname_chars_@) ; 20/05/2025
+   846                                  
+   847                                  version:
+   848 00000404 0D0A                    	db 0Dh, 0Ah
+   849 00000406 546573742050726F67-     	db 'Test Program for ASCIIZ long file name to DOS short name conversion'
+   849 0000040F 72616D20666F722041-
+   849 00000418 534349495A206C6F6E-
+   849 00000421 672066696C65206E61-
+   849 0000042A 6D6520746F20444F53-
+   849 00000433 2073686F7274206E61-
+   849 0000043C 6D6520636F6E766572-
+   849 00000445 73696F6E           
+   850 00000449 0D0A                    	db 0Dh, 0Ah
+   851 0000044B 6279204572646F6761-     	db 'by Erdogan Tan - 28/05/2025'
+   851 00000454 6E2054616E202D2032-
+   851 0000045D 382F30352F32303235 
+   852 00000466 0D0A00                  	db 0Dh, 0Ah, 0
+   853                                  usage:
+   854 00000469 0D0A                    	db 0Dh, 0Ah
+   855 0000046B 55736167653A206C66-     	db 'Usage: lfnconv <test file name, max. 128 bytes>'
+   855 00000474 6E636F6E76203C7465-
+   855 0000047D 73742066696C65206E-
+   855 00000486 616D652C206D61782E-
+   855 0000048F 203132382062797465-
+   855 00000498 733E               
+   856                                  nexline:
+   857 0000049A 0D0A00                  	db 0Dh, 0Ah, 0
+   858                                  
+   859                                  msg_invalid_fn:
+   860 0000049D 0D0A                    	db 0Dh, 0Ah
+   861 0000049F 496E76616C69642066-     	db 'Invalid file name !'
+   861 000004A8 696C65206E616D6520-
+   861 000004B1 21                 
+   862 000004B2 0D0A00                  	db 0Dh, 0Ah, 0
+   863                                  
+   864                                  order_number:
+   865 000004B5 00000000                	dd 0
+   866                                  
+   867                                  tilde_string:
+   868 000004B9 7E                      	db '~'
+   869                                  order_num_str: ; max. 5 bytes + NUL
+   870 000004BA 31                      	db '1'
+   871 000004BB 00000000                	dd 0 ; 4 bytes
+   872 000004BF 00                      	db 0
+   873                                  
+   874                                  lfn_name:
+   875 000004C0 00<rep 80h>             	times 128 db 0
+   876 00000540 00                      	db 0
+   877                                  
+   878                                  special_status:
+   879 00000541 202E2E2E20285B4449-     	db ' ... ([DIR_NTRes]=08h)'
+   879 0000054A 525F4E545265735D3D-
+   879 00000553 30386829           
+   880 00000557 00                      	db 0
+   881                                  
+   882                                  bss:
+   883                                  
+   884                                  ABSOLUTE bss
+   885                                  
+   886                                  ;f_base_start:	resd 1
+   887 00000558 ????????                f_target:	resd 1
+   888 0000055C ????????                f_base_count:	resd 1
+   889 00000560 ????????                f_ext_start:	resd 1
+   890 00000564 ????????                f_ext_count:	resd 1
+   891                                  ;f_name_count:	resd 1
+   892 00000568 ????????                formal_size:	resd 1
+   893                                  lossy_conversion:
+   894 0000056C ??                      		resb 1
+   895 0000056D <res Dh>                target_name:	resb 13
+   896 0000057A <res 81h>               temp_name:	resb 129
+   897 000005FB ??                      conv_ucase:	resb 1

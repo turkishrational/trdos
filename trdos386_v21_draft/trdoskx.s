@@ -877,6 +877,9 @@ f_ext_start:	resd 1
 f_ext_count:	resd 1
 ;f_name_count:	resd 1
 formal_size:	resd 1
+lossy_conversion: ; 28/05/2025	
 insert_fdtnum:	resb 1
 target_name:	resb 13
-temp_name:	resb 65
+;temp_name:	resb 65
+temp_name:	resb 129
+conv_ucase:	resb 1

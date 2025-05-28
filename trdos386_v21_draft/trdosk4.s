@@ -5767,9 +5767,586 @@ loc_createfile_retn_fcluster:
 loc_createfile_retn:
 	retn
 
+; 28/05/2025 - TRDOS 386 v2.0.10
+;----------------------------------------------------------
+; (Windows) FAT long file name (LFN) to DOS short file name
+; conversion
 
-; 22/02/2025 burada kaldým...
-düzeltme ve doðrulama lazým.
+; 26/05/2025
+; TRDOS 386 v2.0.10 - Long to short file name conversion
+;
+; REF:
+; Microsoft - Long Filename Specification
+; Version 0.5, December 4, 1992
+;
+; The following steps are used to form an 8.3 basis from a long name.
+;
+; 1. Remove all spaces. For example "My File" becomes "MyFile".
+;
+; 2. Initial periods, trailing periods, and extra periods prior to 
+;    the last embedded period are removed.
+;
+;    For example ".logon" becomes "logon", "junk.c.o" becomes "junkc.o",
+;    and "main." becomes "main".
+;
+; 3. Translate all illegal 8.3 characters into "_" (underscore).
+;    
+;    For example, "The[First]Folder" becomes "The_First_Folder".
+;
+; 4. If the name does not contain an extension then truncate it to 6 characters.
+;    If the names does contain an extension, then truncate the first part 
+;    to 6 characters and the extension to 3 characters.
+;
+;    For example, "I Am A Dingbat" becomes "IAmADi" and not "IAmADing.bat",
+;    and "Super Duper Editor.Exe" becomes "SuperD.Exe".
+;
+; 5. If the name does not contain an extension then a "~1" is appended to
+;    the name. If the name does contain an extension, then a "~1" is appended
+;    to the first part of the name, prior to the extension.
+;
+;    For example, "MyFile" becomes "MyFile~1, and "Junk.bat" becomes "Junk~1.bat".
+;
+;    This numeric value is always added to help reduce the conflicts
+;    in the 8.3 name space for automatic generated names.
+;
+; 6. This step is optional dependent on the name colliding with an existing file.
+;    To resolve collisions the decimal number, that was set to 1, is incremented
+;    until the name is unique. The number of characters needed to store the number
+;    will grow as necessary from 1 digit to 2 digits and so on.
+;    If the  length of the basis (ignoring the extension) plus the dash and number
+;    exceeds 8 characters then the length of the basis is shortened until
+;    the new name fits in 8 characters.
+;
+;    For example, if "FILENA~1.EXE" conflicts the next names tried are
+;    "FILENA~2.EXE", "FILENA~3.EXE", ..., "FILEN~10.EXE", "FILEN~11.EXE", etc
+;
+; 26/05/2025 - Erdogan Tan
+; Note: If the long name is the same as it's short name converted to lower case,
+;	Windows 7 sets DIR_NTRes (directory entry) byte to 08h.
+;       For example: The created file name "denemefn" is written into
+;	the directory as the short name "DENEMEFN" without the long name entry,
+;	but 'DIR_NTRes' byte (reserved and suggested -by microsoft-
+;	to set it as zero) is set to 08h.)
+; 	((DIR_NTRes byte is at offset 12 of a directory entry.))
+
+convert_name_from_lfn:
+	; 28/05/2025
+	; 27/05/2025
+	; 26/05/2025 - TRDOS 386 v2.0.10
+	;
+	; INPUT:
+	;	ESI = long file name (asciiz format)
+	; 	      (max. 128 chars)
+	;	EDI = target file name address
+	;
+	; OUTPUT:
+	;	EDI = target file name address of
+	;	      dos 8.3 file name
+	;	EAX = 0 if the name does not contain tilde
+	;	    = tilde position (if > 0)
+	;	if EAX = -1 -> Invalid file name error !
+	;
+	; Modified registers: EAX, EBX, ECX, EDX
+
+	;mov	[f_base_start], edi
+	mov	[f_target], edi
+	xor	ebx, ebx
+	mov	[f_base_count], ebx ; 0
+	mov	[f_ext_start], ebx ; 0
+	mov	[f_ext_count], ebx ; 0
+	mov	[lossy_conversion], bl ; 0
+	mov	[conv_ucase], bl ; 0
+
+	; 28/05/2025 - Erdogan Tan
+	; if the long name contains space(s) between words
+	;    it must be accepted as 'lossy conversion'.
+	; for example:
+	;  'de ne me.txt' is not same with 'deneme.txt';
+	;  so, short name of 'de ne me.txt' must
+	;  be 'DENEME~1.TXT', not 'DENEME.TXT'.
+	
+	push	edi ; *
+	push	esi ; **
+
+	; temporary name space on bss section
+	mov	edi, temp_name ; max. 128 bytes + zero
+
+	mov	ecx, 128
+
+	;xor	ebx, ebx
+
+	; remove spaces and dots at first
+	; and save the last dot position
+	; (if the last dot is not the end of file
+	;  it will be inserted in same position)
+
+	mov	edx, edi ; *
+	;mov	[f_base_start], edi
+conv_f_lfn_1:	; remove spaces & dots
+	lodsb
+	cmp	al, 20h
+	jb	short conv_f_lfn_6
+	ja	short conv_f_lfn_2
+	or	byte [lossy_conversion], 1
+	jmp	short conv_f_lfn_5
+conv_f_lfn_2:
+	cmp	al, '.'
+	jne	short conv_f_lfn_4
+	mov	al, bl
+	mov	ebx, edi ; the last dot
+	sub	ebx, edx
+	jz	short conv_f_lfn_3 ; .fname
+	and	al, al
+	jz	short conv_f_lfn_5 ; the 1st dot
+conv_f_lfn_3:
+	or	byte [lossy_conversion], 1
+	jmp	short conv_f_lfn_5
+
+	; 28/05/2025
+nul_name:
+	pop	esi ; **
+	pop	edi ; *
+	mov	byte [edi], 0
+	; Invalid file name error !
+	mov	eax, -1
+	stc	; cf = 1
+	retn
+
+conv_f_lfn_4:	; not_dot
+	stosb
+conv_f_lfn_5:
+	loop	conv_f_lfn_1
+conv_f_lfn_6:
+	mov	esi, edx ; *
+	mov	ecx, edi
+
+	; zero tail
+	;xor	eax, eax ; 0
+	;stosb
+
+	; ebx = the last dot position (index)
+
+	sub	ecx, esi ; number of chars
+	 	 ; (without spaces)
+	jz	nul_name  ; invalid file name !
+
+	mov	[f_base_count], ecx
+
+	mov	edi, [f_target] ; (*)
+
+	;; eax = 0
+
+	and	ebx, ebx
+	jz	short check_base ; ecx > 0 ; not dot
+
+	cmp	ecx, ebx
+	;je	short skip_extension
+		; the last char of the LFN is dot
+	ja	short conv_f_lfn_7
+
+	; the last char of the LFN is dot
+	or	byte [lossy_conversion], 1
+	jmp	short skip_extension
+
+conv_f_lfn_7:
+	sub	ecx, ebx ; base count - dot position
+	xchg	ecx, ebx
+	mov	[f_ext_count], ebx
+	mov	[f_base_count], ecx
+
+	add	edx, ecx ; temp_name + dot pos
+	mov	[f_ext_start], edx
+
+	cmp	ebx, 3 ; extension length > 3
+	jna	short check_base
+
+	inc	byte [lossy_conversion]
+	mov	byte [f_ext_count], 3
+check_base:
+	cmp	ecx, 8 ; basis length > 8
+	jna	short proper_base
+
+	inc	byte [lossy_conversion]
+
+	mov	cl, 8
+	mov	[f_base_count], cl
+
+proper_base:
+	rep	movsb	; copy/move basis
+	mov	cl, [f_ext_count]
+	jecxz	skip_extension
+	mov	al, '.' ; insert DOT
+	stosb
+	mov	esi, [f_ext_start]
+	;mov	[f_ext_start], edi ; 28/05/2025
+	rep	movsb
+skip_extension:
+	xor	al, al	; put zero/NUL at the end
+	stosb
+
+	; Translate all illegal 8.3 characters into "_".
+
+	mov	edi, [f_target] ; (*)
+	mov	esi, edi
+conv_f_lfn_8:
+	lodsb
+	and	al, al
+	jz	short conv_f_lfn_10
+	cmp	al, '.'
+	je	short conv_f_lfn_9
+	dec	byte [conv_ucase] 
+	call	convert_invalid_chars
+	stosb
+	cmp	ah, al
+	je	short conv_f_lfn_8
+	inc	byte [lossy_conversion]
+	jmp	short conv_f_lfn_8
+
+conv_f_lfn_9:
+	inc	edi
+	mov	[f_ext_start], edi
+	jmp	short conv_f_lfn_8
+
+conv_f_lfn_10:
+	;stosb 	; NUL
+
+	cmp	byte [lossy_conversion], 0
+	jna	short conv_f_lfn_14 ; exact 8.3 name
+
+	; mark for it is not a lower case 8.3 name 
+	mov	byte [conv_ucase], -1
+
+	; 27/05/2025
+	; put '~1' at the end of the base name
+	mov	ebx, [f_ext_start] ; '.ext' possible
+	mov	edx, [ebx]
+	mov	eax, 6 ; char 7 ('~') and 8 ('1')
+	cmp	eax, [f_base_count]
+	jna	short conv_f_lfn_11
+	mov	eax, [f_base_count]
+conv_f_lfn_11:
+	mov	edi, [f_target] ; [f_base_start]
+	add	edi, eax
+	; 28/05/2025
+	; default !
+	mov	[lossy_conversion], al ; tilde pos
+	mov	ax, '~1'
+		; base name (<=6 bytes) + '~1'
+	stosw
+	cmp	byte [f_ext_count], 0
+	jna	short conv_f_lfn_13
+	mov	al, '.'
+	stosb
+	mov	cl, [f_ext_count]
+conv_f_lfn_12:
+	mov	al, dl
+	stosb
+	shr	edx, 8
+	loop	conv_f_lfn_12
+conv_f_lfn_13:
+	sub	al, al ; 0
+		; '.ext+'0 or '.ex'+ or '.e'+0
+	stosb
+
+conv_f_lfn_14:
+	; 28/05/2025
+	xor 	eax, eax ; clc
+	mov	al, [lossy_conversion]
+	; eax = tilde position (0 to 6)
+	pop	esi ; **
+	pop	edi ; *
+	retn
+conv_f_lfn_14:
+	; 28/05/2025
+	xor 	eax, eax ; clc
+	mov	al, [lossy_conversion]
+	; eax = tilde position (0 to 6)
+	pop	esi ; **
+	pop	edi ; *
+	retn
+
+	; 28/05/2025
+	; 27/05/2025
+	; 26/05/2025 - TRDOS 386 v2.0.10
+change_tilde_number:
+	; Input:
+	;    eax = tilde/order number
+	;	 = 0 for default ('~1')
+	;    edi = file name address (12 bytes)
+	; Output:
+	;    file name will have '~n' at the
+	;    end of the basis (base name)
+	;
+	; Modified registers: eax, ebx, ecx, edx
+
+	; Note: In fact, if the filename
+	; already contains '~n', the number n
+	; after the tilde ('~n') should be increased;
+	; decreasing may cause unnecessary loss
+	; of filename characters
+	; (if the number of digits is decreased).
+	; (But there is no problem for a test only.)
+	;
+	; For normal use of this subroutine,
+	; if the previous variant of the (translated)
+	; short name already exists, the tilde number
+	; will be incremented on subsequent calls.
+
+	;mov	eax, [order_number]
+
+	or	eax, eax
+	jnz	short ctn_1 ; skip
+
+	mov	al, 1	; default ('~1')
+ctn_1:
+	;cmp	eax, 65535
+	;jna	short skip_num_limit
+	;mov	eax, 65535
+;skip_num_limit:
+
+	push	esi ; +
+
+	mov	esi, edi
+
+	push	edi ; *
+
+	mov	edi, order_num_str
+
+	call	convert_num_to_str
+	; ecx = cl = numeric string chars/digits
+	;    	minimum: 1, maximum: 5 (for 65535)
+
+	; find the dot position
+	; or the end of the file name
+
+	;mov	esi, [esp] ; *
+
+	xor	ebx, ebx
+	xor	edx, edx
+
+	push	ecx ; **
+	; ecx <= 5
+	mov	cl, 8
+ctn_gfnc:
+	;mov	al, [esi]
+	mov	eax, [esi]
+	and	al, al
+	jz	short ctn_eofn
+	cmp	al, '.'
+	je	short ctn_dotpos
+	cmp	al, '~'
+	jne	short ctn_2
+	mov	ebx, esi ; previous tilde position
+ctn_2:
+	inc	esi
+	loop	ctn_gfnc
+	; 28/05/2025
+	mov	eax, [esi]
+	cmp	al, '.'
+	je	short ctn_dotpos
+	xor	eax, eax ; 0
+	;jmp	short ctn_eofn
+ctn_dotpos:
+	mov	edx, eax ; save extension
+ctn_eofn:
+	pop	ecx ; **
+	mov	edi, [esp] ; *
+	add	edi, 8
+	inc	ecx ; + tilde (2 to 6)
+	sub	edi, ecx ; required tilde position
+
+	mov	eax, edx
+
+	or	ebx, ebx
+	jz	short ctn_3 ; no previous tilde
+	cmp	ebx, edi
+	jnb	short ctn_3
+	mov	edi, ebx  ; previous tilde
+ctn_3:
+	mov	esi, tilde_string
+	; ecx = numeric digits + 1
+	; edi = tilde position
+	rep	movsb
+	;mov	[edi], eax ; 0 or '.ext'
+	; al = '.' or 0
+	stosd
+	xor	eax, eax
+	stosb	; 0
+;ctn_4:
+	;stosb
+	;and	al, al
+	;jz	short ctn_5
+	;shr	eax, 8	; next .ext char
+	;jmp	short ctn_4
+;ctn_5:
+	pop	edi ; *
+	pop	esi ; +
+	retn
+
+	; 27/05/2025 - TRDOS 386 v2.0.10
+increase_tilde_number:
+	; Increase tilde number
+	;
+	; Input:
+	;    edi = file name address (12 bytes)
+	; Output:
+	;    file name will have '~n+1' at the
+	;    end of the basis (base name)
+	;
+	;    [order_number] = previous tilde num
+	;
+	;    cf = 1 -> failed
+	;
+	;   eax = previous tilde number (0-98)
+	;
+	; Modified registers: eax, ebx, ecx, edx
+
+	; find the tilde position
+
+	push	esi ; *
+	push	edi ; **
+	mov	esi, edi
+	mov	ecx, 8
+	xor	eax, eax
+	xor 	ebx, ebx
+itn_1:
+	lodsb
+	and	al, al
+	jz	short itn_eofn
+	cmp	al, '.'
+	je	short itn_dotpos
+	cmp	al, '~'
+	jne	short itn_2
+	mov	edi, esi
+	dec	edi
+itn_2:
+	; check for numeric character
+	cmp	byte [edi], '~'
+	jne	short itn_3
+	cmp	al, '0'
+	jb	short itn_4 ; improper
+	cmp	al, '9'
+	ja	short itn_4 ; improper
+	sub	al, '0'
+	push	eax
+	mov	al, 10
+	mul	ebx ; [order_number]
+	pop	ebx
+	add	ebx, eax
+	xor	eax, eax
+itn_3:
+	loop	itn_1
+itn_eofn:
+itn_dotpos:
+	mov	eax, ebx
+	mov	[order_number], ebx
+	inc	eax
+	pop	edi ; **
+	pop	esi ; *
+	jmp	ctn_1 ; change tilde number
+itn_4:
+	sub	ebx, ebx
+	jmp	short itn_3
+
+convert_num_to_str:
+	; 27/05/2025
+	; 26/05/2025 - TRDOS 386 v2.0.10
+	;
+	; INPUT:
+	;  eax = number
+	;  edi = numeric string address
+	;
+	;  (if ecx = 65535 -> string length is 5 bytes)
+	;
+	; OUTPUT:
+	;  ecx = numeric string chars/digits
+	;
+	;  (if ecx input = 65535 -> ecx = 5) 
+	;
+	; Modified registers: eax, ecx, edx
+
+	push	ebp ; *
+	push	edi ; **
+	mov	ebp, esp
+	mov	ecx, 10
+cnvtnstr_next:
+	xor	edx, edx
+	div	ecx
+	push	edx ; *#*
+	and	eax, eax
+	jnz	short cnvtnstr_next
+	xor	ecx, ecx ; 0
+cnvtnstr_@:
+	pop	eax ; *#*
+	add	al, '0' ; convert to numeric char
+	stosb
+	inc	ecx
+	cmp	esp, ebp
+	jb	short cnvtnstr_@
+	;xor	al, al
+	;stosb
+	pop	edi ; **
+	pop	ebp ; *	
+	retn
+
+	; 25/05/2025 - TRDOS 386 v2.0.10
+unicode_to_ascii:
+	; Convert UNICODE long name
+	;	  to ASCIIZ long name
+	; Input:
+	;  esi = UNICODE file name buffer
+	;	(max 260 bytes)
+	;  ecx = ASCIIZ buffer size (64 or 128)
+	;  edi = ASCIIZ file name buffer
+	;	(max. ECX+1 bytes)
+	;
+	; Output:
+	;  ecx = remain bytes in buffer
+	;	  (after the last zero)
+	;   al = the last char converted
+	;  edi = next byte position
+	;	  in ASCIIZ string/name buffer
+	;
+	; Modified registers: eax, ecx, esi, edi
+	;
+
+	; Note: if the last char is not NUL
+	;	ASCIIZ string will be done
+	;	by puting a NUL/ZERO at
+	;	65th or 129th char position.
+	;	(by the caller procedure)
+	;    EDI points to that.
+	;     AL contains the last character
+
+	; 25/05/2025
+	; (temporary code before version 2.1)
+u_to_a_@:
+	lodsw
+	or	ah, ah
+	jz	short u_to_a_next ; ascii char
+
+	; here.. unicode to ascii table
+	; conversion will be used
+	;	in TRDOS 386 version 2.1
+	; the unicode char will be searched in a table
+	; ((which will be prepared by using indexes
+	;	0 to 127 for ascii chars 128 to 255))
+	; (((the table will contain 128 words)))
+
+	; put default character instead of
+	; non-ascii unicode character
+
+	mov	al, '-'	; (temporary!)
+u_to_a_next:
+	stosb
+	and	al, al
+	jz	short u_to_a_ok ; ecx > 0
+	loop	u_to_a_@
+	; the last char is not NUL/zero
+	retn
+u_to_a_ok:
+	dec	ecx
+	retn
 
 ; 20/05/2025 - TRDOS 386 v2.0.10
 ;------------------------------------------------------
@@ -6270,65 +6847,6 @@ cic_4:
 	mov	ah, al
 	retn
 
-	; 25/05/2025 - TRDOS 386 v2.0.10
-unicode_to_ascii:
-	; Convert UNICODE long name
-	;	  to ASCIIZ long name
-	; Input:
-	;  esi = UNICODE file name buffer
-	;	(max 260 bytes)
-	;  ecx = ASCIIZ buffer size (64 or 128)
-	;  edi = ASCIIZ file name buffer
-	;	(max. ECX+1 bytes)
-	;
-	; Output:
-	;  ecx = remain bytes in buffer
-	;	  (after the last zero)
-	;   al = the last char converted
-	;  edi = next byte position
-	;	  in ASCIIZ string/name buffer
-	;
-	; Modified registers: eax, ecx, esi, edi
-	;
-
-	; Note: if the last char is not NUL
-	;	ASCIIZ string will be done
-	;	by puting a NUL/ZERO at
-	;	65th or 129th char position.
-	;	(by the caller procedure)
-	;    EDI points to that.
-	;     AL contains the last character
-
-	; 25/05/2025
-	; (temporary code before version 2.1)
-u_to_a_@:
-	lodsw
-	or	ah, ah
-	jz	short u_to_a_next ; ascii char
-
-	; here.. unicode to ascii table
-	; conversion will be used
-	;	in TRDOS 386 version 2.1
-	; the unicode char will be searched in a table
-	; ((which will be prepared by using indexes
-	;	0 to 127 for ascii chars 128 to 255))
-	; (((the table will contain 128 words)))
-
-	; put default character instead of
-	; non-ascii unicode character
-
-	mov	al, '-'	; (temporary!)
-u_to_a_next:
-	stosb
-	and	al, al
-	jz	short u_to_a_ok ; ecx > 0
-	loop	u_to_a_@
-	; the last char is not NUL/zero
-	retn
-u_to_a_ok:
-	dec	ecx
-	retn
-
 	; 24/05/2025 - TRDOS 386 v2.0.10
 convert_to_fdt_number:
 	; eax = FDT (or DDT) number text
@@ -6382,7 +6900,6 @@ mfn_skip:
 	pop esi
 	retn
 
-			 
 ; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 
 create_fs_file:

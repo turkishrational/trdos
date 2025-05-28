@@ -110,12 +110,22 @@ START_CODE:
 nextarg:
 	mov	edi, lfn_name ; long file name
 	mov	ecx, 128 ; long name limit
+	;mov	[lossy_conversion], ch ; 0
 next_word:
 	lodsd
 	call	move_file_name
 	jcxz	put_zero
 	dec	ebp
-	jnz	short next_word
+	;jnz	short next_word
+	jz	short put_zero
+	; 28/05/2025
+	dec	ecx
+	jz	short put_zero
+	; 28/05/2025
+	; insert a space just before the next word
+	mov	al, 20h ; ' '	
+	stosb
+ 	jmp	short next_word
 put_zero:
 	xor	eax, eax
 	stosb
@@ -124,13 +134,13 @@ put_zero:
 	mov	edi, target_name
 
 	call	convert_name_from_lfn
-	
+
 	inc	eax ; -1 -> 0
 	jz	short inv_file_name
 	dec	eax ; 1 -> 0
 	jz	short show_name
 		; exact short name without tilde
-	
+
 	mov	eax, [order_number]
 	and	eax, eax
 	jz	short show_name
@@ -141,7 +151,7 @@ put_zero:
 
 	; 28/05/2025
 	;mov	edi, target_name
-	
+
 	call	change_tilde_number
 show_name:
 	call	print_short_name
@@ -155,7 +165,6 @@ show_usage:
 	sys	_msg, usage, 255, 0Fh
 	jmp	short terminate
 
-nul_name:
 inv_file_name:
 	sys	_msg, msg_invalid_fn, 255, 07h
 	jmp	short terminate
@@ -350,6 +359,7 @@ cic_4:
 ; 	((DIR_NTRes byte is at offset 12 of a directory entry.))
 
 convert_name_from_lfn:
+	; 28/05/2025
 	; 27/05/2025
 	; 26/05/2025 - TRDOS 386 v2.0.10
 	;
@@ -376,6 +386,14 @@ convert_name_from_lfn:
 	mov	[lossy_conversion], bl ; 0
 	mov	[conv_ucase], bl ; 0
 
+	; 28/05/2025 - Erdogan Tan
+	; if the long name contains space(s) between words
+	;    it must be accepted as 'lossy conversion'.
+	; for example:
+	;  'de ne me.txt' is not same with 'deneme.txt';
+	;  so, short name of 'de ne me.txt' must
+	;  be 'DENEME~1.TXT', not 'DENEME.TXT'.
+	
 	push	edi ; *
 	push	esi ; **
 
@@ -393,21 +411,41 @@ convert_name_from_lfn:
 
 	mov	edx, edi ; *
 	;mov	[f_base_start], edi
-conv_f_lfn_0:	; remove spaces & dots
+conv_f_lfn_1:	; remove spaces & dots
 	lodsb
 	cmp	al, 20h
-	je	short conv_f_lfn_2
-	jb	short conv_f_lfn_3
+	jb	short conv_f_lfn_6
+	ja	short conv_f_lfn_2
+	or	byte [lossy_conversion], 1
+	jmp	short conv_f_lfn_5
+conv_f_lfn_2:
 	cmp	al, '.'
-	jne	short conv_f_lfn_1
+	jne	short conv_f_lfn_4
+	mov	al, bl
 	mov	ebx, edi ; the last dot
 	sub	ebx, edx
-	jmp	short conv_f_lfn_2
-conv_f_lfn_1:	; not_dot
-	stosb
-conv_f_lfn_2:
-	loop	conv_f_lfn_0
+	jz	short conv_f_lfn_3 ; .fname
+	and	al, al
+	jz	short conv_f_lfn_5 ; the 1st dot
 conv_f_lfn_3:
+	or	byte [lossy_conversion], 1
+	jmp	short conv_f_lfn_5
+
+	; 28/05/2025
+nul_name:
+	pop	esi ; **
+	pop	edi ; *
+	mov	byte [edi], 0
+	; Invalid file name error !
+	mov	eax, -1
+	stc	; cf = 1
+	retn
+
+conv_f_lfn_4:	; not_dot
+	stosb
+conv_f_lfn_5:
+	loop	conv_f_lfn_1
+conv_f_lfn_6:
 	mov	esi, edx ; *
 	mov	ecx, edi
 
@@ -431,9 +469,15 @@ conv_f_lfn_3:
 	jz	short check_base ; ecx > 0 ; not dot
 
 	cmp	ecx, ebx
-	je	short skip_extension
+	;je	short skip_extension
 		; the last char of the LFN is dot
+	ja	short conv_f_lfn_7
 
+	; the last char of the LFN is dot
+	or	byte [lossy_conversion], 1
+	jmp	short skip_extension
+
+conv_f_lfn_7:
 	sub	ecx, ebx ; base count - dot position
 	xchg	ecx, ebx
 	mov	[f_ext_count], ebx
@@ -463,6 +507,7 @@ proper_base:
 	mov	al, '.' ; insert DOT
 	stosb
 	mov	esi, [f_ext_start]
+	;mov	[f_ext_start], edi ; 28/05/2025
 	rep	movsb
 skip_extension:
 	xor	al, al	; put zero/NUL at the end
@@ -472,30 +517,30 @@ skip_extension:
 
 	mov	edi, [f_target] ; (*)
 	mov	esi, edi
-conv_f_lfn_4:
+conv_f_lfn_8:
 	lodsb
 	and	al, al
-	jz	short conv_f_lfn_6
+	jz	short conv_f_lfn_10
 	cmp	al, '.'
-	je	short conv_f_lfn_5
+	je	short conv_f_lfn_9
 	dec	byte [conv_ucase] 
 	call	convert_invalid_chars
 	stosb
 	cmp	ah, al
-	je	short conv_f_lfn_4
+	je	short conv_f_lfn_8
 	inc	byte [lossy_conversion]
-	jmp	short conv_f_lfn_4
+	jmp	short conv_f_lfn_8
 
-conv_f_lfn_5:
+conv_f_lfn_9:
 	inc	edi
 	mov	[f_ext_start], edi
-	jmp	short conv_f_lfn_4
+	jmp	short conv_f_lfn_8
 
-conv_f_lfn_6:
+conv_f_lfn_10:
 	;stosb 	; NUL
 
 	cmp	byte [lossy_conversion], 0
-	jna	short conv_f_lfn_10 ; exact 8.3 name
+	jna	short conv_f_lfn_14 ; exact 8.3 name
 
 	; mark for it is not a lower case 8.3 name 
 	mov	byte [conv_ucase], -1
@@ -506,30 +551,37 @@ conv_f_lfn_6:
 	mov	edx, [ebx]
 	mov	eax, 6 ; char 7 ('~') and 8 ('1')
 	cmp	eax, [f_base_count]
-	jna	short conv_f_lfn_7
+	jna	short conv_f_lfn_11
 	mov	eax, [f_base_count]
-conv_f_lfn_7:
+conv_f_lfn_11:
 	mov	edi, [f_target] ; [f_base_start]
 	add	edi, eax
+	; 28/05/2025
 	; default !
+	mov	[lossy_conversion], al ; tilde pos
 	mov	ax, '~1'
 		; base name (<=6 bytes) + '~1'
 	stosw
 	cmp	byte [f_ext_count], 0
-	jna	short conv_f_lfn_9
+	jna	short conv_f_lfn_13
 	mov	al, '.'
 	stosb
 	mov	cl, [f_ext_count]
-conv_f_lfn_8:
+conv_f_lfn_12:
 	mov	al, dl
 	stosb
 	shr	edx, 8
-	loop	conv_f_lfn_8
-conv_f_lfn_9:
+	loop	conv_f_lfn_12
+conv_f_lfn_13:
 	sub	al, al ; 0
 		; '.ext+'0 or '.ex'+ or '.e'+0
 	stosb
-conv_f_lfn_10:
+
+conv_f_lfn_14:
+	; 28/05/2025
+	xor 	eax, eax ; clc
+	mov	al, [lossy_conversion]
+	; eax = tilde position (0 to 6)
 	pop	esi ; **
 	pop	edi ; *
 	retn
@@ -595,7 +647,7 @@ ctn_1:
 
 	push	ecx ; **
 	; ecx <= 5
-	mov	cl, 6
+	mov	cl, 8
 ctn_gfnc:
 	;mov	al, [esi]
 	mov	eax, [esi]
@@ -609,6 +661,10 @@ ctn_gfnc:
 ctn_2:
 	inc	esi
 	loop	ctn_gfnc
+	; 28/05/2025
+	mov	eax, [esi]
+	cmp	al, '.'
+	je	short ctn_dotpos
 	xor	eax, eax ; 0
 	;jmp	short ctn_eofn
 ctn_dotpos:
@@ -636,7 +692,7 @@ ctn_3:
 	; al = '.' or 0
 	stosd
 	xor	eax, eax
-	stosb	; 0	
+	stosb	; 0
 ;ctn_4:
 	;stosb
 	;and	al, al
@@ -806,7 +862,7 @@ msg_invalid_fn:
 	db 0Dh, 0Ah, 0
 
 order_number:
-	dd 1
+	dd 0
 
 tilde_string:
 	db '~'
