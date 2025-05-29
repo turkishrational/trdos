@@ -706,7 +706,7 @@ locate_current_dir_file:
 	; Reset directory entry (index) counter
 	mov	[DirEntry_Counter], edx ; 0 
 	; 29/05/2025
-	mov	byte [PreviousAttr], dl ; 0
+	mov	[PreviousAttr], dl ; 0
 
 	mov	dh, [Current_Drv]
 
