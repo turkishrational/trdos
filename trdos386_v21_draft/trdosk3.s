@@ -3059,6 +3059,10 @@ loc_fff_mfn_ok:
 	mov	esi, edi ; offset Dir_Entry_Name
 	; esi = offset FindFile_DirEntryName
 
+	; 29/05/2025
+	;mov	word [FindFile_Reserved1], -1
+	mov	word [FindFile_LastEntryNumber], -1 ; 65535
+
 	mov	ax, [FindFile_AttributesMask]
 	;xor	ecx, ecx
 	xor	cl, cl
@@ -3068,6 +3072,13 @@ loc_fff_mfn_ok:
 	; EBX = Directory Buffer Entry Index/Number
 
 loc_fff_fnf_found:
+	; 29/05/2025
+	mov	ecx, [DirEntry_Counter]
+	;cmp	ecx, 65535
+	cmp	ecx, 65534
+	ja	short loc_fff_fnf_found_@
+	mov	[FindFile_LastEntryNumber], cx
+loc_fff_fnf_found_@:	
 	; 17/05/2025
 	mov	cl, [CLUSFAC]
 	mov	[FindFile_DirSectorCount], cl

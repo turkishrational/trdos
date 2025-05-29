@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 25/05/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 20/05/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -155,9 +155,11 @@ CCD_DriveDT:	resd 1 ; DIR.ASM ; (word)
 CCD_Level:	resb 1 ; DIR.ASM
 Last_Dir_Level:	resb 1 ; DIR.ASM
 ;
-CDLF_AttributesMask: resw 1 ; DIR.ASM
 CDLF_FNAddress:	resd 1 ; DIR.ASM (word)
+CDLF_AttributesMask: resw 1 ; DIR.ASM
 CDLF_DEType:	resw 1 ; DIR.ASM
+; 29/05/2025 - TRDOS 386 v2.0.10
+DirEntry_Counter: resd 1 ; directory entry index number
 ;
 CD_COMMAND:	resb 1 ; DIR.ASM
 
@@ -224,7 +226,8 @@ FindFile_DirSector:	  resd 1
 FindFile_DirEntryNumber:  resb 1
 FindFile_DirSectorCount:  resb 1
 FindFile_MatchCounter:	  resw 1
-FindFile_Reserved1:	  resw 1 ; 06/03/2016
+;FindFile_Reserved1:	  resw 1 ; 06/03/2016
+FinFile_LastEntryNumber:  resw 1 ; 29/05/2025
 FindFile_LongNameEntryLength:
 FindFile_LongNameYes: 	  resb 1 ; Sign for longname procedures
 ;FindFile_Reserved2:	  resb 1 ; 17/05/2025

@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 27/05/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 29/05/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -638,6 +638,7 @@ pass_ppdn_set_al_to_ah:
 	jmp	short pass_ppdn_convert_sub_dir_name
 
 locate_current_dir_file:
+	; 29/05/2025
 	; 18/05/2025
 	; 17/05/2025
 	; 16/05/2025 (TRDOS 386 v2.0.10)
@@ -686,12 +687,27 @@ locate_current_dir_file:
 	;	CL > 0 -> Entry not found, CH invalid
 	;	CF = 0 ->
 	;	EBX = Current Directory Entry Index/Number (BX)
-
+	;
+	;	; 29/05/2025
+	; 	If cf = 0 ->
+	; 	[DirEntry_Counter] = directory entry index number
+	,		from the start of the directory (found)
+	; 	If cf= 1 ->
+	;   	[DirEntry_Counter] = the last direntry index number
+	;		from the start of the directory (not found)
+	
 	;mov	word [DirBuff_EntryCounter], 0 ; Zero Based
 
 	; 17/05/2025
 	; 16/05/2025 - TRDOS 386 v2.0.10
 	xor	edx, edx
+
+	; 29/05/2025
+	; Reset directory entry (index) counter
+	mov	[DirEntry_Counter], edx ; 0 
+	; 29/05/2025
+	mov	byte [PreviousAttr], dl ; 0
+
 	mov	dh, [Current_Drv]
 
 	; 17/05/2025
@@ -706,8 +722,9 @@ locate_current_dir_file_@:
 	mov	[CDLF_DEType], cx
 
 	; 17/05/2025
-	xor	eax, eax
-	mov	[PreviousAttr], al ; 0  ; 13/02/2016
+	;xor	eax, eax
+	; 29/05/2025
+	;mov	[PreviousAttr], al ; 0  ; 13/02/2016
 
 	mov	eax, ebx
 	and	eax, eax
@@ -723,7 +740,7 @@ locate_current_dir_file_@:
 
 locate_current_dir_file_ns:
 	mov	cl, [edx+LD_PhyDrvNo]
-	jmp	short locate_current_dir_file_@
+	jmp	short locate_current_sub_dir_file_@
 
 loc_locatefile_next_cluster:
 	;mov	edx, esi	; LDRVT address
@@ -743,7 +760,7 @@ locate_current_sub_dir_file:
 
 	call	FIGREC
 
-locate_current_dir_file_@:
+locate_current_sub_dir_file_@:
 	; eax = physical sector number
 	;  cl = physical drive/disk number
 	;       (needed for GETBUFFER procedure)
@@ -760,7 +777,7 @@ loc_cdir_locatefile_search:
 	lea	edi, [esi+BUFINSIZ]
 
 	mov	esi, [CDLF_FNAddress]
-	mov	eax, [CDLF_AttributesMask]
+	mov	ax, [CDLF_AttributesMask] ; 29/05/2025
 	mov	cx, [CDLF_DEType]
 
 	;mov	byte [DirBuff_LastEntry], 16 ; 512/32
@@ -819,6 +836,7 @@ loc_cdir_locate_file_retn:
 	retn
 
 find_directory_entry:
+	; 29/05/2025
 	; 18/05/2025
 	; 17/05/2025
 	; 16/05/2025 (TRDOS 386 Kernel v2.0.10)	
@@ -836,7 +854,7 @@ find_directory_entry:
 	;	EDI = Directory Buffer Address (512 bytes, data)
 	;	;;;
 	;	ESI = Sub Dir or File Name Address
-	;	AL = Attributes Mask 
+	;	AL = Attributes Mask
 	;	(<AL AND EntryAttrib> must be equal to AL)
 	;	AH = Negative Attributes Mask (If AH>0)
 	;	(<AH AND EntryAttrib> must be ZERO)
@@ -851,10 +869,13 @@ find_directory_entry:
 	;	* = Every Chars
 	;	EBX = Current Dir Entry (BX) < 16 ; 17/05/2025
 	;
+	;	; 29/05/2025
+	;	[DirBuff_EntryCounter] = entry index from the start
+	;
 	; OUTPUT ->
 	;	EDI = Directory Entry Address (in DirectoryBuffer)
 	;	ESI = Sub Dir or File Name Address
-	;	CF = 0 -> No Error, Proper Entry,
+	;	CF = 0 -> No Error, Proper Entry
 	;	DL = Attributes
 	;	DH = Previous Entry Attr (LongName Check)
 	;	;AL > 0 -> Ambiguous filename wildcard "?" used
@@ -870,6 +891,10 @@ find_directory_entry:
 	;	CL = 0 and CH = 0 -> Free Entry (End Of Dir)
 	;	CL = 0 and CH = E5h -> Deleted Entry fits with filters
 	;	CL > 0 -> Entry not found, CH invalid
+	;
+	;	; 29/05/2025
+	;	[DirBuff_EntryCounter] = entry index from the start
+	;				(or the last entry found)
 	;
 	; (EAX, EBX, ECX, EDX, EDI, EBP will be changed)
 
@@ -947,6 +972,12 @@ loc_find_dir_next_entry:
 	mov	byte [PreviousAttr], dl ; LongName check
 loc_find_dir_next_entry_1:
 	pop	esi
+	; 
+	; 29/05/2025
+	; Directory entry index from the start of
+	; the directory (from the 1st cluster)
+	inc	dword [DirEntry_Counter]
+	;
 	add	edi, 32
 	;;inc	word [DirBuff_EntryCounter]
 	;inc	bx
