@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - DEFINITIONS : trdosk0.s
 ; ----------------------------------------------------------------------------
-; Last Update: 29/05/2025 (Previous: 29/02/2016, v2.0.0)
+; Last Update: 31/05/2025 (Previous: 29/02/2016, v2.0.0)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -423,3 +423,200 @@ struc FindFile
 ;.Reserved3:	  resb 1
 .size:		; 184 bytes
 endstruc
+
+; 31/05/2025 - TRDOS 386 v2.0.10
+; Ref: SINGLIX Operating System - Issue: 2
+;      Revision: 16 Date: 31/05/2025
+struc FDT ; File Description Table
+.Signature:	  resb 3 ; 'FDT'
+.Reserved1:	  resb 1 ; 0
+.SectorSize:	  resb 1
+.ExtentAllocType: resb 1
+.NumberOfLinks:	  resw 1
+.FileNumber:	  resd 1
+.SectorCount:	  resd 1
+.ParentDirNumber: resd 1
+.ParentDirSerial: resd 1
+.FileSize:	  resd 1
+.FileSizeHigh:	  resw 1
+.Attributes:	  resb 1
+.ExtendedAttribs: resb 1
+.OwnerCode:	  resd 1 ; TR-MULTIX
+.GroupCode:	  resd 1 ; TR-MULTIX
+.Country:	  resb 1
+.TimeZone:	  resb 1
+.CreatingYear:	  resb 1
+.CreatingMonth:   resb 1
+.CreatingDay:	  resb 1
+.CreatingHour:	  resb 1
+.CreatingMinute:  resb 1
+.LastAccessYear:  resb 1
+.LastAccessMonth: resb 1
+.LastAccessDay:	  resb 1
+.LastAccessHour:  resb 1
+.LastAccessMinute:resb 1
+.LastModifYear:   resb 1
+.LastModifMonth:  resb 1
+.LastModifDay:	  resb 1
+.LastModifHour:   resb 1
+.LastModifMinute: resb 1
+.LastModifSecond: resb 1
+.RsvrdDescriptor: resd 1 ; Reserved (Optional)
+.LongNameLength:  resb 1
+.FileNameType:	  resb 1
+.FileName:	  resb 64
+.ExtentsTable:	  resb 128
+.UnicodeFileName: resb 256
+.size:		; 512 bytes
+endstruc
+
+; 31/05/2025 - TRDOS 386 v2.0.10
+; Ref: SINGLIX Operating System - Issue: 3
+;      Revision: 16 Date: 31/05/2025
+struc DDT ; Sub Directory Description Table
+.Signature:	  resb 3 ; 'DDT'
+.Reserved1:	  resb 1 ; 0
+.SectorSize:	  resb 1
+.ExtentAllocType: resb 1
+.NumberOfLinks:	  resw 1
+.DirectoryNumber: resd 1
+.SectorCount:	  resd 1
+.ParentDirNumber: resd 1
+.ParentDirSerial: resd 1
+.DirectorySize:	  resd 1
+.SubDirLevel:	  resw 1
+.Attributes:	  resb 1
+.ExtendedAttribs: resb 1
+.OwnerCode:	  resd 1 ; TR-MULTIX
+.GroupCode:	  resd 1 ; TR-MULTIX
+.Country:	  resb 1
+.TimeZone:	  resb 1
+.CreatingYear:	  resb 1
+.CreatingMonth:   resb 1
+.CreatingDay:	  resb 1
+.CreatingHour:	  resb 1
+.CreatingMinute:  resb 1
+.LastAccessYear:  resb 1
+.LastAccessMonth: resb 1
+.LastAccessDay:	  resb 1
+.LastAccessHour:  resb 1
+.LastAccessMinute:resb 1
+.LastModifYear:   resb 1
+.LastModifMonth:  resb 1
+.LastModifDay:	  resb 1
+.LastModifHour:   resb 1
+.LastModifMinute: resb 1
+.LastModifSecond: resb 1
+.DirectorySerial: resd 1
+.LongNameLength:  resb 1
+.DirNameType:	  resb 1
+.DirectoryName:	  resb 64
+.ExtentsTable:	  resb 128
+.UnicodeDirName:  resb 256
+.size:		; 512 bytes
+endstruc
+
+; 31/05/2025 - TRDOS 386 v2.0.10
+; Ref: SINGLIX Operating System - Issue: 4
+;      Revision: 16 Date: 31/05/2025
+struc RDT ; Root Directory Description Table
+.Signature:	  resb 3 ; 'DDT'
+.Reserved1:	  resb 1 ; 0
+.SectorSize:	  resb 1
+.ExtentAllocType: resb 1
+.RootDirSign:	  resw 1 'RT'
+.DirectoryNumber: resd 1
+.SectorCount:	  resd 1
+.BeginningSector: resd 1
+.ParentDirSerial: resd 1 ; 0FFFFFFFFh
+.DirectorySize:	  resd 1
+.SubDirLevel:	  resw 1 ; 0
+.Attributes:	  resb 1
+.ExtendedAttribs: resb 1
+.OwnerCode:	  resd 1 ; TR-MULTIX
+.GroupCode:	  resd 1 ; TR-MULTIX
+.Country:	  resb 1
+.TimeZone:	  resb 1
+.CreatingYear:	  resb 1
+.CreatingMonth:   resb 1
+.CreatingDay:	  resb 1
+.CreatingHour:	  resb 1
+.CreatingMinute:  resb 1
+.LastAccessYear:  resb 1
+.LastAccessMonth: resb 1
+.LastAccessDay:	  resb 1
+.LastAccessHour:  resb 1
+.LastAccessMinute:resb 1
+.LastModifYear:   resb 1
+.LastModifMonth:  resb 1
+.LastModifDay:	  resb 1
+.LastModifHour:   resb 1
+.LastModifMinute: resb 1
+.LastModifSecond: resb 1
+.VolumeSerialNo:  resd 1
+.LongNameLength:  resb 1
+.VolumeNameType:  resb 1
+.VolumeName:	  resb 64
+.ExtentsTable:	  resb 128
+.Reserved2:	  resb 256
+.size:		; 512 bytes
+endstruc
+
+; 31/05/2025 - TRDOS 386 v2.0.10
+; Ref: SINGLIX Operating System - Issue: 5
+;      Revision: 5 Date: 07/01/2018
+struc MAT  ; Master Allocation Table
+.Signature:	  resb 3 ; 'MAT'
+.Version:	  resb 1 ; 0
+.VolumeSize:	  resd 1 ; number of sectors	
+.BeginningSector: resd 1 ; physical address
+.DiskAllocTable:  resd 1 ; offset address
+.DATSectors:	  resd 1
+.FreeSectors:	  resd 1
+.FirstFreeSector: resd 1 ; offset address
+.Reserved1:	  resd 1
+.Reserved2:	  resd 1
+.Reserved3:	  resd 1
+.Reserved4:	  resd 1
+.Reserved5:	  resd 1
+.Reserved6:	  resd 1
+.Reserved7:	  resd 1
+.Reserved8:	  resd 1
+.Reserved9:	  resd 1
+.Reserved10	  resb 448
+.size:		; 512 bytes
+endstruc
+
+; 31/05/2025 - TRDOS 386 v2.0.10
+; Ref: SINGLIX Operating System - Issue: 1
+;      Revision: 14 Date: 07/01/2018
+struc TRFS ; Singlix FS Boot Sector
+.Jmp:		  resb 2 ; EB3Fh
+.Nop:		  resb 1 ; 90h
+.FileSystemID:	  resb 2 ; 'FS'
+.Terminator:	  resb 1 ; 0
+.BytesPerSector:  resw 1
+.MediaAttributes: resb 1
+.PartitionID:	  resb 1 ; A1h (0 for floppy)
+.VersionMajor:	  resb 1 ; 1
+.VersionMinor:	  resb 1 ; 0
+.BeginningSector: resd 1 ; physical addr (LBA)	
+.VolumeSize:	  resd 1
+.StartupFileAddr: resd 1 ; offset/logical addr
+.MATLocation:	  resd 1 ; offset/logical addr
+.RootDirLocation: resd 1 ; offset/logical addr
+.RegistryFileAddr:resd 1
+.SwapFileAddress: resd 1
+.UndeleteDirAddr: resd 1
+.DriveNumber:	  resb 1 ; boot drive number
+.LBAyes:	  resb 1 ; 1 = LBA (0 = CHS)
+.CHS_MagicWord:	  resw 1 ; 01A1h
+.OperatingSystem: resb 16 ; "TR-SINGLIX v1.0b"
+.OpSysTerminator: resb 1 ; 0
+.BootCode:	  resb 445
+.BootSignature:	  resw 1
+.size:		; 512 bytes
+endstruc
+
+TRFS.CHS	equ TRFS.CHS_MagicWord
+TRFS.MagicWord	equ TRFS.CHS_MagicWord

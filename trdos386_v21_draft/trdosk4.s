@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 29/05/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 31/05/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -6930,6 +6930,458 @@ mfn_@:
 mfn_skip:
 	pop esi
 	retn
+
+
+	; 31/05/2025 - TRDOS 386 v2.0.10
+compare_fs_short_name:
+	; 
+	; INPUT:
+	;	esi = short name to be searched...
+	;	      d[...].ext
+	;	      d*.*
+	;	      d????.???
+	;	edi = short name of the name in the FDT/DDT
+	;
+	; OUTPUT:
+	;	if zf = 0 -> not same/match
+	;	if zf = 1 -> same/match
+	;
+	; Modified registers: eax, ecx, esi, edi
+
+	mov	ecx, 13 ; max 12 chars + NUL
+cfs_sn_1:
+	lodsb
+	scasb
+	je	short cfs_sn_2
+
+	cmp	al, '*'
+	je	short cfs_sn_4
+
+	cmp	al, '?'
+	je	short cfs_sn_3
+
+	; zf = 0
+	retn
+
+cfs_sn_2:
+	or	al, al
+	jz	short cfs_sn_5
+cfs_sn_3:
+	loop	cfs_sn_1
+
+	; if AL = '?' zf = 1
+	; if AL <> '?' zf = 0
+	retn
+
+cfs_sn_4:
+	cmp	byte [esi], '.'
+	je	short cfs_sn_0 ; *.* or *.ext
+	xor	eax, eax
+cfs_sn_5:
+	; zf = 1
+	retn
+
+	; 31/05/2025 - TRDOS 386 v2.0.10
+compare_fs_long_name:
+	; 
+	; INPUT:
+	;	esi = long name to be searched...
+	;	      d*.*
+	;	      d????.???
+	;	edi = the name in the FDT/DDT
+	;
+	; OUTPUT:
+	;	if zf = 0 -> not same/match
+	;	if zf = 1 -> same/match
+	;
+	; Modified registers: eax, ebx, ecx, esi, edi
+
+	mov	ecx, 64 ; max. 64 chars
+cfs_ln_1:
+	lodsb
+	scasb
+	jz	short cfs_ln_2
+
+	cmp	al, '*'
+	je	short cfs_ln_4
+
+	cmp	al, '?'
+	je	short cfs_ln_3
+
+	; zf = 0
+	retn
+
+cfs_ln_2:
+	or	al, al
+	jz	short cfs_ln_5
+cfs_ln_3:
+	loop	cfs_ln_1
+
+	; if AL = '?' zf = 1
+	; if AL <> '?' zf = 0
+	retn
+
+cfs_ln_4:
+	cmp	byte [esi], '.'
+	jne	short cfs_ln_5
+	; *.* or *.ext
+	push	esi
+	push	ecx
+	mov	esi, edi
+	call	find_last_dot
+	pop	ecx
+	pop	esi
+	inc	ebx ; -1 -> 0
+	jz	short cfs_ln_6 ; dot not found
+	dec	ebx
+	; ebx = the last dot position
+	mov	edi, ebx
+	jmp	short cfs_ln_3
+	
+cfs_ln_5:
+	xor	eax, eax
+	; zf = 1
+	retn
+
+cfs_ln_6:
+	inc	ebx ; 0 -> 1
+	; zf = 0
+	retn
+
+	; 31/05/2025 - TRDOS 386 v2.0.10
+get_fdt_number:
+	; Singlix FS (TRFS) function/subroutine
+	;
+	; INPUT:
+	;	eax = FDT (or DDT) number
+	;	  0 = any
+	;	 -1 = deleted
+	;	ebx = dir entry index number (< 65536)
+	;	esi = directory buffer address
+	;
+	; OUTPUT:
+	;	eax = 0 -> not found or
+	;		   end of directory
+	;	eax > 0 -> found
+	;
+	;	ecx = eax input
+	;	ebx = directory entry index number
+	;	esi = directory entry address
+	;
+	; Modified registers: eax, ebx, ecx, esi
+
+	mov	ecx, eax
+g_fdt_num_1:
+	inc	ebx
+
+	mov	eax, [esi]
+	cmp	eax, ecx
+	je	short g_fdt_num_2
+
+	or	eax, eax
+	jz	short g_fdt_num_2
+
+	test	bl, 127 ; the last directory entry
+			; in the fs directory buffer
+	jz	short g_fdt_num_2
+
+	add	esi, 4
+	jmp	short g_fdt_num_1
+
+g_fdt_num_2:
+	dec	ebx
+	retn
+
+	; 31/05/2025 - TRDOS 386 v2.0.10
+search_fdt_number:
+	; Singlix FS (TRFS) function/subroutine
+	;
+	; INPUT:
+	;	eax = FDT (or DDT) number
+	;	  0 = any
+	;	 -1 = deleted
+	;	ebx = dir entry index number (< 66536)
+	;	      (for all of the directory)
+	;	edx = Logical DOS Desc. Table Addr
+	;
+	; OUTPUT:
+	;	eax = 0 -> not found or
+	;		   end of directory
+	;	eax > 0 -> found
+	;
+	;	ecx = eax input
+	;	ebx = directory entry index number
+	;	esi = directory entry address
+	;
+	;    If cf = 1 -> Error code in EAX
+	;
+	; Modified registers:
+	;	eax, ebx, ecx, esi, edi, ebp
+	;
+
+	mov	[FDT_Number], eax
+	mov	[FS_Dir_Index], ebx
+	mov	dword [FS_DDT_Buffer], 0
+
+search_fdt_number_next:
+	mov	eax, [FS_CurrenDirectory]
+		; DDT number of the current dir
+	add	eax, [edx+LD_FS_BeginSector]
+		; start LBA of TRFS partition
+	mov	cl, [edx+LD_FS_PhyDrvNo]
+		; physical (rombios) drive number
+	
+	call	GETBUFFER
+	jc	short s_fdt_num_err
+
+	; esi = FS DDT buffer header address
+	;  cl = physical disk number
+	; edx = logical DOS drive table address
+
+	add	esi, BUFINSIZ ; + 24 bytes
+	; esi = FS directory buffer addres
+
+	cmp	esi, [FS_DDT_Buffer]
+	je	short search_fdt_number_next_@
+
+	mov	eax, [esi] ; [esi+DDT.Signature]
+
+	;and	eax, 0FFFFFFh
+	cmp	eax ,'DDT'
+	jne	short s_fdt_num_dnf
+	;mov	eax, [esi+8]
+	mov	eax, [esi+DDT.DirectoryNumber]
+	cmp	eax, [FS_CurrenDirectory]
+	jne	short s_fdt_num_dnf
+
+	mov	[FS_DDT_Buffer], esi
+
+search_fdt_number_next_@:
+	; esi = DDT buffer address
+	; ebx = directory entry index number
+	; edx = LDRVT address
+
+	call 	get_fs_sector
+
+	; eax = sector address
+
+	add	eax, [edx+LD_FS_BeginSector]
+		; start LBA of TRFS partition
+	mov	cl, [edx+LD_FS_PhyDrvNo]
+		; physical (rombios) drive number
+	call	GETBUFFER
+	jc	short s_fdt_num_err
+
+	add	esi, BUFINSIZ ; + 24 bytes
+	; esi = FS directory buffer (data start)
+
+	;mov	ebx, [FS_Dir_Index]
+	; ebx = directory entry index number
+	; (ebx < 65536) 
+
+	mov	eax, [FDT_Number]
+
+	call	get_fdt_number
+
+	; eax = 0 -> not found or end of directory
+	; eax > 0 -> found
+	; ecx = eax input
+	; ebx = directory entry index number
+	; esi = directory entry address
+
+	cmp	ecx, eax
+	je	short s_fdt_num_found
+
+	and	eax, eax
+	jz	short s_fdt_num_not_found
+
+	inc	ebx
+
+	mov	[FS_Dir_Index], ebx
+
+	;cmp	ebx, 65535
+	;ja	short s_fdt_num_not_found
+
+	jmp	short search_fdt_number_next
+
+s_fdt_num_not_found:
+	mov	eax, ERR_NOT_FOUND ; 'file not found !'
+	pop	ebx ; *
+s_fdt_num_err:
+	stc
+s_fdt_num_found:
+	retn
+
+s_fdt_num_dnf:
+	mov	eax, ERR_PATH_NOT_FOUND
+			; 'path not found !' error
+			; 'dir not found !'
+	pop	ebx ; *
+	stc
+	retn
+
+	; 31/05/2025 - TRDOS 386 v2.0.10
+get_fs_sector:
+	; INPUT:
+	;   esi = DDT buffer address
+	;   ebx = directory entry index number
+	;   edx = LDRVT address
+	;
+	; OUTPUT:
+	;   esi = DDT buffer address
+	;   ebx = directory entry index number
+	;   edx = LDRVT address
+	;   eax = sector address
+	;
+	; Modified registers: eax, ecx
+
+	push	ebx ; *
+	shr	ebx, 7 ; / 128
+	; ebx = sector sequence (index) number
+	cmp	ebx, [esi+DDT.SectorCount]
+	jnb	short s_fdt_num_not_found
+
+	mov	al, [esi+DDT.ExtentAllocType]
+	cmp	al, 3
+		; TRIPLE indirect tables are not usable
+		; for current TRDOS 386 version. (*)
+	jnb	short s_fdt_num_dnf ; (*)
+	
+	push	esi ; **	
+
+	cmp	al, 1
+	ja	short get_fs_sector_dblindirect
+			; double indirect extent tables
+	jb	short get_fs_sector_direct
+			; direct extents table in the DDT
+	; indirect extent tables
+get_fs_sector_indirect:
+	;push	esi ; **
+	add	esi, DDT.ExtentsTable ; +128
+	mov	ecx, 16 ; 16 indirect tables
+get_fs_sector_indirect_@:
+get_fs_sector_indirect_next:
+	lodsd
+	; eax = sector index/sequence number (base)
+	lodsd
+	and	eax, eax ; is this table address valid ?
+	jz	short gfssid_out ; no, end of file
+
+	dec	ecx
+	jz	short gfssid_ok ; the last table
+
+	; eax = table address
+
+	cmp	ebx, [esi]
+		; sector index num of the next table
+	jb	short gfssid_ok
+	jmp	short get_fs_sector_indirect_next
+gfssid_out:
+	pop	esi ; **
+	jmp	short s_fdt_num_dnf
+
+gfssid_ok:
+	; eax = indirect extent table address
+
+	add	eax, [edx+LD_FS_BeginSector]
+		; start LBA of TRFS partition
+	mov	cl, [edx+LD_FS_PhyDrvNo]
+		; physical (rombios) drive number
+	call	GETBUFFER
+	jc	short gfssid_err
+
+	add	esi, BUFINSIZ ; + 24 bytes
+	; esi = FS directory buffer (data start)
+	mov	ecx, 64 ; 512/8
+	jmp	short get_fs_sector_direct_@
+
+gfssdid_err:
+gfssid_err:
+	pop	esi ; **
+	pop	ebx ; *
+	retn
+		
+get_fs_sector_direct:
+	;push	esi ; **
+	add	esi, DDT.ExtentsTable ; +128
+	mov	ecx, 16 ; 16 direct extents
+get_fs_sector_direct_@:
+	push	edx ; ***
+get_fs_sector_direct_next:
+	lodsd
+	; eax = sector index/sequence number (base)
+	mov	edx, eax
+	lodsd
+	and	eax, eax ; is this extent address valid ?
+	jz	short gfssd_out ; no, end of file
+
+	dec	ecx
+	jz	short gfssd_ok ; the last extent
+
+	; eax = extent address
+	;cmp	ebx, edx
+	;jna	short gfssd_ok
+	cmp	ebx, [esi]
+		; sector index of the next extent
+	jb	short gfssd_ok
+	jmp	short get_fs_sector_direct_next
+gfssd_out:
+	pop	edx ; ***
+	pop	esi ; **
+	jmp	short s_fdt_num_dnf
+
+gfssd_ok:
+	; edx = beginning sector of the extent
+	; eax = extent address
+	; ebx = sector sequence (index) number
+	sub	ebx, edx 
+	; ebx = sector offset in the extent
+	add	eax, ebx
+	; eax = sector address
+	pop	edx ; ***
+	pop	esi ; **
+	pop	ebx ; *
+	retn
+
+get_fs_sector_dblindirect:
+	;push	esi ; **
+	add	esi, DDT.ExtentsTable ; +128
+	mov	ecx, 16 ; 16 double indirect tables
+get_fs_sector_dblindir_next:
+	lodsd
+	; eax = sector index/sequence number (base)
+	lodsd
+	and	eax, eax ; is this table address valid ?
+	jz	short gfssdid_out ; no, end of file
+
+	dec	ecx
+	jz	short gfssdid_ok ; the last table
+
+	; eax = table address
+
+	cmp	ebx, [esi]
+		; sector index num of the next table
+	jb	short gfssdid_ok
+	jmp	short get_fs_sector_dblindir_next
+gfssdid_out:
+	pop	esi ; **
+	jmp	short s_fdt_num_dnf
+
+gfssdid_ok:
+	; eax = double indirect table address
+	; ebx = sector index/sequence number
+
+	add	eax, [edx+LD_FS_BeginSector]
+		; start LBA of TRFS partition
+	mov	cl, [edx+LD_FS_PhyDrvNo]
+		; physical (rombios) drive number
+	call	GETBUFFER
+	jc	short gfssdid_err
+
+	add	esi, BUFINSIZ ; + 24 bytes
+	mov	ecx, 64 ; 64 indirect tables
+	jmp	short get_fs_sector_indirect_@
+
 
 ; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 

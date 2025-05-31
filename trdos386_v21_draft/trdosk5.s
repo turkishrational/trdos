@@ -1486,7 +1486,7 @@ loc_upd_fat32_c3:
 
 loc_upd_fat32_c4:
 	cmp	eax, 2
-	jb	short return_uc_fat32_stc ; 25/07/2022 
+	jb	short return_uc_fat32_stc ; 25/07/2022
 
 pass_uc_fat32_c_zero_check_2:
 	cmp	eax, [LastCluster]
@@ -2676,7 +2676,7 @@ GETBUFFER:
 	;	 cl = Physical Disk Number
 	;	edx = Logical DOS Drive Table address
 	; OUTPUT:
-	;	esi = Directory Buffer Header address
+	;	esi = Buffer Header address
 	;	 cl = Physical Disk Number
 	;	edx = Logical DOS Drive Table address
 	;
@@ -3796,14 +3796,14 @@ u_fat32_fsi_1:
 	mov	[ebx+FSINFO.Nxt_Free], eax ; BPB_Reserved+4 ; 56
 
 	mov	eax, [CFS_FAT32FSINFOSEC]
-	
+
 	;push	ebx
 	call	DWRITE
 	;pop	ebx
 	jc	short u_fat32_fsi_3
 
 	mov	eax, [CFS_FAT32FSINFOSEC]
-	
+
 	; flag/set the FSINFO sector data is valid and not-modified yet
 	; (modification procedure will reset it to zero again)
 
@@ -3942,7 +3942,7 @@ found_entry:
 	mov	esi, NAME1
 	mov	ecx, 11
 	rep	movsb	; find_buf.name
-	
+
 	mov	al, [ATTRIB]
 	stosb		; find_buf.sattr
 	mov	eax, [LASTENT]
@@ -4420,7 +4420,7 @@ FINDENTRY:
 
 	call	STARTSRCH
 	mov	al, [ATTRIB]
-	and	al, ~attr_ignore	; Ignore useless bits	
+	and	al, ~attr_ignore	; Ignore useless bits
 	cmp	al, attr_volume_id	; Looking for vol ID only ?
 	jne	short NotVolSrch	; No
 	call	SETROOTSRCH		; Yes force search of root

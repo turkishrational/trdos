@@ -2993,6 +2993,7 @@ rediv_tfs_hex:
 	jmp	print_msg
 
 find_first_file:
+	; 29/05/2025
 	; 19/05/2025
 	; 18/05/2025
 	; 17/05/2025
@@ -3044,7 +3045,7 @@ find_first_file:
 	mov	edi, FindFile_Name ; FFF structure, offset 105 ; 15/05/2025
 	cmp	esi, edi
 	je	short loc_fff_mfn_ok
-	mov	edx, edi 
+	mov	edx, edi
 	; move 13 bytes
 	movsd
 	movsd
@@ -3072,13 +3073,6 @@ loc_fff_mfn_ok:
 	; EBX = Directory Buffer Entry Index/Number
 
 loc_fff_fnf_found:
-	; 29/05/2025
-	mov	ecx, [DirEntry_Counter]
-	;cmp	ecx, 65535
-	cmp	ecx, 65534
-	ja	short loc_fff_fnf_found_@
-	mov	[FindFile_LastEntryNumber], cx
-loc_fff_fnf_found_@:	
 	; 17/05/2025
 	mov	cl, [CLUSFAC]
 	mov	[FindFile_DirSectorCount], cl
@@ -3111,6 +3105,16 @@ loc_fff_longname_no:
 	;mov	dx, ax ; Ambiguous Filename chars used sign > 0
 	; 28/07/2022
 	mov	edx, eax
+
+	;;;
+	; 29/05/2025
+	mov	eax, [DirEntry_Counter]
+	;cmp	eax, 65535
+	cmp	eax, 65534
+	ja	short loc_fff_fnf_chk_mc
+	mov	[FindFile_LastEntryNumber], ax
+loc_fff_fnf_chk_mc:
+	;;;
 
 	; 17/05/2025
 	cmp	word [FindFile_MatchCounter], 0
@@ -3151,6 +3155,7 @@ loc_fff_retn:
 	retn
 
 find_next_file:
+	; 29/05/2025
 	; 19/05/2025
 	; 18/05/2025
 	; 17/05/2025 (TRDOS 386 Kernel v2.0.10)
