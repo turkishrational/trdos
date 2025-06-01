@@ -6367,7 +6367,7 @@ u_to_a_@:
 	; put default character instead of
 	; non-ascii unicode character
 
-	mov	al, '-'	; (temporary!)
+	mov	al, '_'	; (temporary!)
 u_to_a_next:
 	stosb
 	and	al, al
