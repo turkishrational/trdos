@@ -7120,10 +7120,11 @@ search_fdt_number:
 	;
 
 	mov	[FDT_Number], eax
-	mov	[FS_Dir_Index], ebx
+	;mov	[FS_Dir_Index], ebx
 	mov	dword [FS_DDT_Buffer], 0
 
 search_fdt_number_next:
+	mov	[FS_Dir_Index], ebx
 	mov	eax, [FS_CurrenDirectory]
 		; DDT number of the current dir
 	add	eax, [edx+LD_FS_BeginSector]
@@ -7189,34 +7190,37 @@ search_fdt_number_next_@:
 	; ebx = directory entry index number
 	; esi = directory entry address
 
+	mov	[FS_Dir_Index], ebx
+
 	cmp	ecx, eax
 	je	short s_fdt_num_found
 
 	and	eax, eax
 	jz	short s_fdt_num_not_found
 
-	inc	ebx
-
-	mov	[FS_Dir_Index], ebx
+	inc	ebx ; next entry number
+	;mov	[FS_Dir_Index], ebx
 
 	;cmp	ebx, 65535
 	;ja	short s_fdt_num_not_found
 
 	jmp	short search_fdt_number_next
 
+s_fdt_num_not_found_@:
+	pop	ebx ; *
 s_fdt_num_not_found:
 	mov	eax, ERR_NOT_FOUND ; 'file not found !'
-	pop	ebx ; *
 s_fdt_num_err:
 	stc
 s_fdt_num_found:
 	retn
 
+s_fdt_num_dnf_@:
+	pop	ebx ; *
 s_fdt_num_dnf:
 	mov	eax, ERR_PATH_NOT_FOUND
 			; 'path not found !' error
 			; 'dir not found !'
-	pop	ebx ; *
 	stc
 	retn
 
@@ -7239,13 +7243,13 @@ get_fs_sector:
 	shr	ebx, 7 ; / 128
 	; ebx = sector sequence (index) number
 	cmp	ebx, [esi+DDT.SectorCount]
-	jnb	short s_fdt_num_not_found
+	jnb	short s_fdt_num_not_found_@
 
 	mov	al, [esi+DDT.ExtentAllocType]
 	cmp	al, 3
 		; TRIPLE indirect tables are not usable
 		; for current TRDOS 386 version. (*)
-	jnb	short s_fdt_num_dnf ; (*)
+	jnb	short s_fdt_num_dnf_@ ; (*)
 	
 	push	esi ; **	
 
@@ -7274,11 +7278,7 @@ get_fs_sector_indirect_next:
 
 	cmp	ebx, [esi]
 		; sector index num of the next table
-	jb	short gfssid_ok
-	jmp	short get_fs_sector_indirect_next
-gfssid_out:
-	pop	esi ; **
-	jmp	short s_fdt_num_dnf
+	jnb	short get_fs_sector_indirect_next
 
 gfssid_ok:
 	; eax = indirect extent table address
@@ -7300,6 +7300,13 @@ gfssid_err:
 	pop	esi ; **
 	pop	ebx ; *
 	retn
+
+gfssd_out:
+	pop	edx ; ***
+gfssid_out:
+gfssdid_out:
+	pop	esi ; **
+	jmp	short s_fdt_num_dnf_@
 		
 get_fs_sector_direct:
 	;push	esi ; **
@@ -7323,12 +7330,7 @@ get_fs_sector_direct_next:
 	;jna	short gfssd_ok
 	cmp	ebx, [esi]
 		; sector index of the next extent
-	jb	short gfssd_ok
-	jmp	short get_fs_sector_direct_next
-gfssd_out:
-	pop	edx ; ***
-	pop	esi ; **
-	jmp	short s_fdt_num_dnf
+	jnb	short get_fs_sector_direct_next
 
 gfssd_ok:
 	; edx = beginning sector of the extent
@@ -7361,11 +7363,7 @@ get_fs_sector_dblindir_next:
 
 	cmp	ebx, [esi]
 		; sector index num of the next table
-	jb	short gfssdid_ok
-	jmp	short get_fs_sector_dblindir_next
-gfssdid_out:
-	pop	esi ; **
-	jmp	short s_fdt_num_dnf
+	jnb	short get_fs_sector_dblindir_next
 
 gfssdid_ok:
 	; eax = double indirect table address
