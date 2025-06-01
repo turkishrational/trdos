@@ -6934,7 +6934,7 @@ mfn_skip:
 
 	; 31/05/2025 - TRDOS 386 v2.0.10
 compare_fs_short_name:
-	; 
+	;
 	; INPUT:
 	;	esi = short name to be searched...
 	;	      d[...].ext
@@ -7013,12 +7013,12 @@ cfs_ln_1:
 
 cfs_ln_2:
 	or	al, al
-	jz	short cfs_ln_5
+	jz	short cfs_ln_5 ; same (with NUL)
 cfs_ln_3:
-	loop	cfs_ln_1
+	dec	ecx
+	jnz	short cfs_ln_1
 
-	; if AL = '?' zf = 1
-	; if AL <> '?' zf = 0
+	; zf = 1 ; (same 64 bytes)
 	retn
 
 cfs_ln_4:
