@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - DRV INIT : trdosk2.s
 ; ----------------------------------------------------------------------------
-; Last Update: 08/05/2025 (Previous: 22/05/2024, v2.0.8)
+; Last Update: 13/05/2025 (Previous: 22/05/2024, v2.0.8)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -1705,6 +1705,7 @@ fd_init_FAT_sectors_no_load_error:
 %endif
 
 get_FAT_volume_name:
+	; 13/05/2025
 	; 08/05/2025
 	; 07/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -1756,10 +1757,12 @@ gfvn_load_FAT32_root_dir_nc:
 	call	load_FAT_sub_directory
 	jc	short loc_gfvn_dir_load_err
 
+	; 13/05/2025
 	; 08/05/2025
 	; eax = physical address of dir sector
 	; ebx = directory buffer (header) address
-	; ecx = next cluster
+	; 13/05/2025
+	; [CLUSNUM] = current cluster number
 	movzx	ebp, byte [esi+LD_BPB+SecPerClust]
 	; ebp = sectors per cluster
 	jmp	short check_root_volume_name_ns
@@ -1822,7 +1825,7 @@ loc_get_volume_name_retn_xor:
 	mov	ebp, ecx ; root dir sectors
 check_root_volume_name_ns: ; next sector
 	; ebx = directory buffer (header) address
-	; ebp = root directory sectors
+	; ebp = root directory sectors (remain)
 	; esi = LDRVT address (= edx)
 	; eax = root directory sector
 
@@ -1881,13 +1884,25 @@ check_fat32_nc_or_gvn_retn:
 	cmp	byte [esi+LD_FATType], 3
 	jb	short loc_get_volume_name_retn ; cf = 1
 
-	; FAT32
-	; ecx = next cluster
-	mov	eax, ecx
-	cmp	ecx, 0FFFFFF8h
-	jnb	short loc_get_volume_name_stc_retn
+	; 13/05/2025
+	mov	eax, [CLUSNUM]
+	call	get_next_cluster
+	jc	short loc_get_volume_name_retn
+			; EndOfClusterChain (eax = 0)
+			; or Error (eax = error number)	
+
+	; eax = next cluster (this is not EOCC)
+	
+	;; FAT32
+	;; ecx = next cluster
+	;mov	eax, ecx
+	;cmp	ecx, 0FFFFFF8h
+	;jnb	short loc_get_volume_name_stc_retn
+
+	mov	[CLUSNUM], eax
 	
 	jmp	gfvn_load_FAT32_root_dir_nc
+
 %endif
 
 get_media_change_status:

@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 17/05/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 02/06/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -33,6 +33,8 @@ get_next_cluster:
 	;	cf = 1 & EAX > 0 -> Error
 	;	ECX = Current/Previous cluster (if CF = 0)
 	;	EAX = Next Cluster Number (32 bit)
+	;
+	; 	EDX = ESI = Logical DOS Drive Parameters Table
 	;
 	; (Modified registers: EAX, ECX, EBX, EDX)
 
@@ -382,7 +384,7 @@ load_DirBuff_error:
 	mov	[DIRSEC], eax
 	; 13/05/2025
 	xor	ecx, ecx	
-	mov	[CLUSNUM], ecx , 0 ; root directory	
+	mov	[CLUSNUM], ecx ; 0 ; root directory	
 	mov	cx, [esi+LD_BPB+RootDirEnts]
 	; ecx = 512 or 224 or 112
 	dec	ecx
@@ -2575,7 +2577,7 @@ update_directory_entry:
 
 	lea	esi, [eax+OF_NAME]
 	push	edi
-	call	MetaCompare	; (MSDOS -> MetaCompare)
+	call	METACOMPARE	; (MSDOS -> MetaCompare)
 	pop	edi
 	jz	short ude_2
 
@@ -3286,6 +3288,7 @@ figrec_2:
 ; 27/04/2025 - TRDOS 386 v2.0.10
 
 DIRREAD:
+	; 01/06/2025
 	; 27/04/2025
 	; (MSDOS -> DIRREAD) - Ref: Retro DOS v5 - ibmdos7.s
 	; Read a directory sector (into [CurrentBuffer]).
@@ -3311,7 +3314,8 @@ DIRREAD:
 	cmp	[DIRSTART], ecx ; 0
 	jnz	short drd_subdir
 
-	xchg	eax, ecx
+	; 01/06/2025
+	mov	ebx, eax
 	jmp	short drd_doread2
 
 drd_subdir:
@@ -3876,6 +3880,7 @@ r_fat32_fsi_3:
 ; 11/05/2025 - TRDOS 386 v2.0.10
 
 DOS_SEARCH_FIRST:
+	; 02/06/2025
 	; 12/05/2025
 	; 11/05/2025
 	; (MSDOS -> DOS_SEARCH_FIRST) - Ref: Retro DOS v5 - ibmdos7.s
@@ -3936,7 +3941,9 @@ found_entry:
 	; ESI points to start of dir_first field in [CurrentBuffer]
 
 	mov	edi, FINDFILE_BUFFER
-	mov	al, [WFP_START]		; get pointer to beginning
+	; 02/06/2025
+	mov	esi, [WFP_START]		; get pointer to beginning
+	mov	al, [esi]
 	sub	al, 'A'-1		; logical drive
 	stosb		; find_buf.drive
 	mov	esi, NAME1
@@ -4207,7 +4214,7 @@ NOIDS:
 	
 	xor	ecx, ecx
 	mov	edi, NAME1
-	puh	edi
+	push	edi
 	mov	al, ' ' ; 20h ; space
 	mov	cl, 11
 	rep	stosb
@@ -4245,10 +4252,10 @@ _GetDone:
 	or	cl, 80h
 	pop	edi ; *			; Start of this element
 	cmp	esi, edi
-	jne	short FindFile
-	jmp	short _BadPath		; NUL parse (two delims most likely)
+	jne	short Find_File
+	jmp	_BadPath		; NUL parse (two delims most likely)
 
-FindFile:
+Find_File:
 	push	esi ; *			; Start of next element
 	push	edi ; **		; Start of this element
 	push	ecx ; ***
@@ -4258,7 +4265,7 @@ DIR_FOUND:
 	pop	ecx ; ***
 	pop	esi ; **
 	jnc	short LOAD_BUF
-	jmp	short BADPATHPOP
+	jmp	BADPATHPOP
 
 LOAD_BUF:
 	mov	edi, [CurrentBuffer]	; (MSDOS ->[CURBUF])
@@ -4329,7 +4336,7 @@ SKIP_GETB:
 	pop	ebx ; ++++
 	jnc	short SET_THE_BUF
 	pop	esi ; *			; Start of next element
-	jmp	short _BADPATH
+	jmp	short _BadPath
 
 SET_THE_BUF:
 	mov	edi, [CurrentBuffer]	; (MSDOS -> [CURBUF])
@@ -4348,7 +4355,7 @@ SET_THE_BUF:
 	;call	PATHCHRCMP ; (MSDOS)
 	cmp	al, '/'
 	jnz	short find_bad_name	; oops
-	jmp	short FINDPATH		; Next element
+	jmp	FINDPATH		; Next element
 
 find_bad_name:
 	dec	esi			; Undo above INC to get failure point
@@ -4385,6 +4392,7 @@ BADPRET:
 
 SEARCH:
 FINDENTRY:
+	; 02/06/2025
 	; 11/05/2025
 	; (MSDOS -> FINDENTRY) - Ref: Retro DOS v5 - ibmdos7.s
 	;
@@ -4457,7 +4465,7 @@ SRCH2:
 CHKFNAM:
 	mov	edi, ebx  ; no possible '?' ; directory entry
 	mov	esi, NAME1 ; possible '?'
-	call	MetaCompare
+	call	METACOMPARE
 	jz	short findentry_found
 NEXTENT:
 	;mov	edx, [THISDPB]
@@ -4529,9 +4537,13 @@ check_one_volume_id:
 	call	MATCHATTRIBUTES
 	jz	short SETESRET
 	test	byte [CREATING], -1	; Pass back mismatch if creating
-	jz	short NEXTENT		; Otherwise continue searching
-	; zf = 0
-	jmp	short SETESRET
+	;jz	short NEXTENT		; Otherwise continue searching
+	;; zf = 0
+	;jmp	short SETESRET
+	; 02/06/2025
+	jnz	short SETESRET
+	; zf = 1
+	jmp	NEXTENT
 
 ; --------------------------------------------------------------------
 
@@ -4701,4 +4713,13 @@ chk_lname_@:
 	and	al, ATTR_LONGNAME_MASK ; 3Fh
 	;cmp	al, 0Fh
 	cmp	al, ATTR_LONGNAME ; 0Fh
+	retn
+
+; --------------------------------------------------------------------
+
+; 02/06/2025 - TRDOS 386 v2.0.10
+; temporary !!!! 02/06/2025
+
+NEXTENTRY:
+	stc
 	retn

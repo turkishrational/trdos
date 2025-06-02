@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - INITIALIZED DATA : trdosk9.s
 ; ----------------------------------------------------------------------------
-; Last Update: 28/05/2025 (Previous: 29/12/2024 - Kernel v2.0.9)
+; Last Update: 02/06/2025 (Previous: 29/12/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -31,7 +31,7 @@ Magic_Bytes:
 		db 1
 mainprog_Version:
 		db 7
-		db "[TRDOS] Main Program v2.1.0 (28/05/2025)"
+		db "[TRDOS] Main Program v2.1.0 (02/06/2025)"
 		db 0Dh, 0Ah
 		db "(c) Erdogan Tan 2005-2025"
 		db 0Dh, 0Ah, 0
@@ -125,7 +125,7 @@ sizeInvFSfnChars equ sizeInvFnChars
 sizeInvFnChars@ equ ($ - invalid_fname_chars_@) ; 20/05/2025
 
 ; 26/05/2025 - TRDOS 386 v2.1
-%if 0
+%if 1
 ; 26/05/2025 - TRDOS 386 v2.0.10
 ;
 ; Invalid Long File Name Chars - Windows
@@ -165,7 +165,7 @@ invalid_lfname_chars:
 	;   "   *   /   :   <   >   ?   \   |
 	db 22h,2Ah,2Fh,3Ah,3Ch,3Eh,3Fh,5Ch,7Ch
 
-sizeInvLfnChars  equ ($ - invalid_lfname_chars)
+sizeInvLfnChars equ ($ - invalid_lfname_chars)
 
 ;sizeInvLfnChars@ equ ($ - invalid_lfname_chars_@)
 
@@ -708,4 +708,24 @@ dma_cnt:	db 1,3,5,7,0C2h,0C6h,0CAh,0CEh
 dma_page:	db 87h,83h,81h,82h,8Fh,8Bh,89h,8Ah ; 03/08/2017
 dma_mask:	db 0Ah,0Ah,0Ah,0Ah,0D4h,0D4h,0D4h,0D4h
 dma_mod:	db 0Bh,0Bh,0Bh,0Bh,0D6h,0D6h,0D6h,0D6h
-dma_flip:	db 0Ch,0Ch,0Ch,0Ch,0D8h,0D8h,0D8h,0D8h	
+dma_flip:	db 0Ch,0Ch,0Ch,0Ch,0D8h,0D8h,0D8h,0D8h
+
+; 02/06/2025 - TRDOS 386 v2.0.10
+; Singlix FS - short name - dir listing parms
+
+formal_string:
+	db '['
+;formal_number:
+	times 12 db 0
+	db ']'
+	db 0
+
+; 02/06/2025 - TRDOS 386 v2.0.10
+; Windows/DOS longname to shortname conversion parms
+
+tilde_string:
+	db '~'
+order_num_str: ; max. 5 bytes + NUL
+	db '1'
+	dd 0 ; 4 bytes
+	db 0

@@ -168,6 +168,7 @@ loc_change_current_drv3:
 	;retn
 
 restore_current_directory:
+	; 02/06/2025
 	; 16/05/2025
 	; 14/05/2025
 	; 09/05/2025 (TRDOS 386 Kernel v2.0.10)
@@ -219,7 +220,9 @@ loc_restore_FS_current_directory:
 	;jmp	load_current_FS_directory
 	; 09/05/2025
 	mov	eax, [esi+LD_FS_RootDirD] ; root directory DDT
-	jmp	short loc_ccdrv_check_rootdir_sign
+	;jmp	short loc_ccdrv_check_rootdir_sign
+	; 02/06/2025
+	jmp	short loc_ccdrv_reset_cdir_FAT_fcluster
 
 loc_ccdrv_reset_cdir_FAT_12_16_32_fcluster:
 	;cmp	al, 3
@@ -228,7 +231,9 @@ loc_ccdrv_reset_cdir_FAT_12_16_32_fcluster:
 	jb	short loc_ccdrv_reset_cdir_FAT_12_16_fcluster
 loc_ccdrv_reset_cdir_FAT32_fcluster:
 	mov	eax, [esi+LD_BPB+FAT32_RootFClust]
-	jmp	short loc_ccdrv_check_rootdir_sign
+	;jmp	short loc_ccdrv_check_rootdir_sign
+	; 02/06/2025
+	jmp	short loc_ccdrv_reset_cdir_FAT_fcluster
 
 loc_ccdrv_reset_cdir_FAT_12_16_fcluster:
 	;xor	al, al  ; xor eax, eax
@@ -2993,6 +2998,7 @@ rediv_tfs_hex:
 	jmp	print_msg
 
 find_first_file:
+	; 02/06/2025
 	; 29/05/2025
 	; 19/05/2025
 	; 18/05/2025
@@ -3092,6 +3098,10 @@ loc_fff_fnf_ln_check:
 	mov	[FindFile_LongNameYes], ch ; 0
 	jmp	short loc_fff_longname_no
 
+	; 02/06/2025
+loc_fff_retn:
+	retn
+
 loc_fff_longname_yes:
 	;inc	byte [FindFile_LongNameYes]
 	mov	cl, [LFN_EntryLength]
@@ -3151,7 +3161,6 @@ loc_fff_fnf_inc_mc:
 	;mov	cx, [FindFile_DirEntryNumber]
 	; ecx = 0
 
-loc_fff_retn:
 	retn
 
 find_next_file:
@@ -3306,7 +3315,7 @@ loc_fnf_load_next_dir_cluster:
 	xor	ecx, ecx ; 0
 	call	locate_current_dir_file_@
 	jc	short loc_fnf_check_err_reason
-	jmp	short loc_fff_fnf_found
+	jmp	loc_fff_fnf_found
 
 loc_fnf_check_err_reason:
 	cmp	eax, 2 ; file not found

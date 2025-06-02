@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 25/05/2025  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 02/06/2025  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -15007,7 +15007,7 @@ sysfff_err:
 
 sysfff_0:
 	; 18/05/2025 - TRDOS 386 v2.0.10
-	; [FFF_valid] = 0 (from set_working_path_x)
+	; [FFF_Valid] = 0 (from set_working_path_x)
 	mov	ax, [mpid]
 	mov	[FFF_mpid], ax	; save user process id/number
 			 	; (will be used by SysFNF)
@@ -15101,7 +15101,7 @@ sysfff_24:
 	; eax = file size
 	;mov	[u.r0], eax
 	mov	ecx, eax
-	mov	byte [FFF_valid], 24 ; basic/default
+	mov	byte [FFF_Valid], 24 ; basic/default
 	mov	byte [FFF_RType], 0  ; basic/default
 	jmp	short sysfff_9 ; reset working path & sysret
 sysfff_8:
@@ -15170,7 +15170,7 @@ sysfnf_4:	; 19/05/2025
 	mov	edi, [FFF_UBuffer] ; user's buffer address (edx)
 	; 20/05/2025 (jmp from 'sysfff_23:')
 sysfff_6:
-	; ecx = transfer byte count = byte [FFF_valid]
+	; ecx = transfer byte count = byte [FFF_Valid]
 
 	call	transfer_to_user_buffer
 
@@ -15207,7 +15207,7 @@ sysfnf_5:
 	add	edi, 32
 	; 20/05/2025 ; (*!*)
 	;mov	[FFF_UBuffer], edi
-	mov	[FFF_valid], al
+	mov	[FFF_Valid], al
 	pop	ecx
 sysfff_10:
 	; 20/05/2025
@@ -15365,10 +15365,10 @@ sysfff_23:
 	mov	esi, TextBuffer
 	sub	ecx, esi
 	; ecx <= 248 (280-32) ; 25/05/2025
-	mov	[FFF_valid], cl
+	mov	[FFF_Valid], cl
 	; 20/05/2025
 	pop	edi ; *!*
-	jmp	short sysfff_6
+	jmp	sysfff_6 ; 02/06/2025
 	;;;;
 	
 ; 18/05/2025
@@ -15667,7 +15667,7 @@ sysfnf_13:
 	;		 (may contain '?' wildcards)
 
 	; 19/05/2025
-	cmp	[FFF_FATtype], 0
+	cmp	byte [FFF_FATtype], 0
 	ja	short sysfnf_1
 
 	; SysFFF singlix fs procedure(s)

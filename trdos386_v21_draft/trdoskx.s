@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 20/05/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 02/06/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -183,8 +183,8 @@ FDE_AttrMask:	   resw 1 ; DIR.ASM
 ; 18/05/2025 - TRDOS 386 v2.0.10
 AmbiguousFileName: resb 1
 PreviousAttr:	   resb 1 ; DIR.ASM
-;
-resb 1 ; 25/05/2025
+; 01/06/2025
+LFN_level:	 resb 1   ; 25/05/2025
 LongNameFound:	 resb 1	  ; DIR.ASM
 LFN_EntryLength: resb 1   ; DIR.ASM
 LFN_CheckSum:	 resb 1   ; DIR.ASM
@@ -227,7 +227,7 @@ FindFile_DirEntryNumber:  resb 1
 FindFile_DirSectorCount:  resb 1
 FindFile_MatchCounter:	  resw 1
 ;FindFile_Reserved1:	  resw 1 ; 06/03/2016
-FinFile_LastEntryNumber:  resw 1 ; 29/05/2025
+FindFile_LastEntryNumber: resw 1 ; 29/05/2025
 FindFile_LongNameEntryLength:
 FindFile_LongNameYes: 	  resb 1 ; Sign for longname procedures
 ;FindFile_Reserved2:	  resb 1 ; 17/05/2025
@@ -867,10 +867,50 @@ SECCLUSPOS:	resb 1	; (MSDOS -> SECCLUSPOS)
 NXTCLUSNUM:	resd 1	; (MSDOS -> NXTCLUSNUM)
 SRCH_CLUSTER:	resd 1	; (MSDOS -> SRCH_CLUSTER)
 LASTENT:	resd 1	; (MSDOS -> LASTENT)
+; 02/06/2025
+WFP_START:	resd 1	; (MSDOS -> WFP_START)
+THISCDS:	resd 1	; (MSDOS -> THISCDS)
+CURR_DIR_END:	resd 1	; (MSDOS -> CURR_DIR_END)
+ATTRIB:		resb 1	; (MSDOS -> ATTRIB)
+SATTRIB:	resb 1	; (MSDOS -> SATTRIB)
+NAME1: 		resb 12	; (MSDOS -> NAME1)
+NoSetDir:	resb 1	; (MSDOS -> NoSetDir)
+CREATING:	resb 1	; (MSDOS -> CREATING)
+DELALL:		resb 1	; (MSDOS -> DELALL)
+VOLID:		resb 1	; (MSDOS -> VOLID)
+		resw 1
+ENTLAST:	resd 1	; (MSDOS -> ENTLAST)
+ENTFREE:	resd 1	; (MSDOS -> ENTFREE)
+ENTLAST_PREV:	resd 1	; (PCDOS 7.1 -> ? -LFN search-)
+LNE_COUNT:	resb 1	; (PCDOS 7.1 -> ? -LFN entry count-)
+
+; 02/06/2025 - TRDOS 386 v2.0.10
+; get_direntry parameters
+GDE_BINDEX:	resd 1
+GDE_INDEX:	resd 1
+;GDE_SPC:	resd 1
+GDE_SINDEX:	resd 1
+GDE_CINDEX:	resd 1
+GDE_SKIP:	resd 1
+GDE_DRVT:	resd 1
+GDE_FCLUST:	resd 1
+GDE_CCLUST:	resd 1
+
+; 02/06/2025 - TRDOS 386 v2.0.10
+; Windows/DOS long to short name conv. parms
+order_number:	resd 1
+
+; 02/06/2025 - TRDOS 386 v2.0.10
+; Singlix FS file name search parameters
+FS_DDT_Buffer:	resd 1
+FS_Dir_Index:	resd 1
+FS_CurrenDirectory:
+		resd 1
 
 ; 25/05/2025 - TRDOS 386 v2.0.10
 ; Singlix FS file name conversion parameters
 
+FDT_Number:	; 02/06/2025
 fdt_number:	resd 1
 f_name_limit:	resd 1
 ;f_base_start:	resd 1

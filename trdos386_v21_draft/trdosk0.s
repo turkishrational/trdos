@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - DEFINITIONS : trdosk0.s
 ; ----------------------------------------------------------------------------
-; Last Update: 31/05/2025 (Previous: 29/02/2016, v2.0.0)
+; Last Update: 02/06/2025 (Previous: 29/02/2016, v2.0.0)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -367,8 +367,8 @@ attr_all	EQU	attr_hidden+attr_system+attr_directory
 attr_changeable EQU	attr_read_only+attr_hidden+attr_system+attr_archive
 			; changeable via CHMOD
 ; 12/05/2025
-ATTR_LONG_NAME	EQU  attr_read_only+attr_hidden+attr_system+attr_volume_id
-ATTR_LONGNAME_MASK EQU ATTR_LONG_NAME+attr_directory+attr_archive
+ATTR_LONGNAME	EQU  attr_read_only+attr_hidden+attr_system+attr_volume_id
+ATTR_LONGNAME_MASK EQU ATTR_LONGNAME+attr_directory+attr_archive
 
 ; 03/05/2025 - TRDOS 386 v2.0.10
 ; 03/02/2024 - Retro DOS v5.0
@@ -524,7 +524,7 @@ struc RDT ; Root Directory Description Table
 .Reserved1:	  resb 1 ; 0
 .SectorSize:	  resb 1
 .ExtentAllocType: resb 1
-.RootDirSign:	  resw 1 'RT'
+.RootDirSign:	  resw 1 ; 'RT'
 .DirectoryNumber: resd 1
 .SectorCount:	  resd 1
 .BeginningSector: resd 1
@@ -620,3 +620,57 @@ endstruc
 
 TRFS.CHS	equ TRFS.CHS_MagicWord
 TRFS.MagicWord	equ TRFS.CHS_MagicWord
+
+; 02/06/2025 - temporary !
+%if 1
+; 02/06/2025 - Retro DOS v5.0 (PCDOS 7.1)
+; MSDOS (386 DOS v1.0)
+; Current Directory Structure
+
+DIRSTRLEN equ 67 ; 64+3
+
+struc curdir	; curdir_list
+.text:		resb DIRSTRLEN
+			; text of assignment and curdir
+.flags:		resw 1	; various flags
+.devptr:	resd 1	; local pointer to DPB or net device
+.ID:		resw 2	; cluster of current dir (net ID)
+.user_word:	resw 1
+.end:		resw 1	; index to ".." backup limit - see above
+.type:		resb 1	; IFS drive (2=ifs, 4=netuse)
+.ifs_hdr:	resd 1	; Ptr to File System Header
+.fsda:		resb 2	; File System Dependent Data Area
+.size:
+endstruc
+
+%endif
+
+; 02/06/2025 - TRDOS 386 v2.0.10
+; Retro DOS v5.0 (PCDOS 7.1)
+; (386 DOS v1.0)
+; Directory Entry Structure 
+
+struc dir_entry
+.dir_name:	resb 11	; file name (short file name)
+.dir_attr:	resb 1	; file attributes (*)
+.dir_nt_res:	resb 1	; reserved for use by Windows NT. 0
+.dir_pad:	;resb 7	; (creation time, last access date
+			;  for use by Windows) 
+.dir_crttime_tenth:
+		resb 1
+.dir_crttime:	resw 1
+.dir_crtdate:	resw 1
+.dir_lstaccdate:
+		resw 1
+.dir_fclus_hi:	resw 1	; FAT32	fs 
+			; high word of first cluster number
+.dir_time:	resw 1	; time of last write
+.dir_date:	resw 1	; date of last write
+.dir_fclus:				
+.dir_first:	resw 1	; first cluster (alloc. unit) of file
+.dir_file_size:
+.dir_size_l:	resw 1	; low 16 bits of file size
+.dir_size_h:	resw 1	; high 16 bits of file size
+.size:
+endstruc
+

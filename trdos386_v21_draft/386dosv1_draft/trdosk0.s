@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - DEFINITIONS : trdosk0.s
 ; ----------------------------------------------------------------------------
-; Last Update: 12/05/2025 (Previous: 29/02/2016, v2.0.0)
+; Last Update: 02/06/2025 (Previous: 29/02/2016, v2.0.0)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -38,18 +38,18 @@ Sectors       equ 13h
 Media         equ 15h
 FATSecs       equ 16h
 SecPerTrack   equ 18h
-Heads         equ 1Ah 
+Heads         equ 1Ah
 Hidden1       equ 1Ch
 Hidden2       equ 1Eh
 HugeSec1      equ 20h
 HugeSec2      equ 22h
 DriveNumber   equ 24h
 Reserved1     equ 25h
-bootsignature equ 26h                 
+bootsignature equ 26h
 VolumeID      equ 27h
 VolumeLabel   equ 2Bh
-FileSysType   equ 36h          
-Reserved2     equ 3Eh                           ; Starting cluster of P2000
+FileSysType   equ 36h
+Reserved2     equ 3Eh	; Starting cluster of P2000
 
 ; FAT32 BPB Structure
 FAT32_FAT_Size equ 36
@@ -88,7 +88,7 @@ DAP_LBA_Address equ 18h ; LBA=(C1*H0+H1)*S0+S1-1
                         ; S1= Selected Sector Number
                         ; QUAD WORD
 ; DAP_Flat_Destination equ 20h ; 64 bit address, if value in 4h is FFFF:FFFFh
-                             ; QUAD WORD (Also, value in 0h must be 18h) 
+                             ; QUAD WORD (Also, value in 0h must be 18h)
                              ; TR-DOS will not use 64 bit Flat Address
 
 ; INT 13h Function 48h "Get Enhanced Disk Drive Parameters"
@@ -182,7 +182,7 @@ FAT16EOC equ 0FFFFh
 FAT12BADC equ 0FF7h
 FAT16BADC equ 0FFF7h
 ;FAT32BADC equ 0FFFFFF7h ; It is not direct usable for 8086 code
-; MS-DOS FAT16 FS (Maximum Possible) Last Cluster Number= 0FFF6h 
+; MS-DOS FAT16 FS (Maximum Possible) Last Cluster Number= 0FFF6h
 
 ; TRFS
 
@@ -367,9 +367,8 @@ attr_all	EQU	attr_hidden+attr_system+attr_directory
 attr_changeable EQU	attr_read_only+attr_hidden+attr_system+attr_archive
 			; changeable via CHMOD
 ; 12/05/2025
-ATTR_LONG_NAME	EQU  attr_read_only+attr_hidden+attr_system+attr_volume_id
-ATTR_LONGNAME_MASK EQU ATTR_LONG_NAME+attr_directory+attr_archive
-
+ATTR_LONGNAME	EQU  attr_read_only+attr_hidden+attr_system+attr_volume_id
+ATTR_LONGNAME_MASK EQU ATTR_LONGNAME+attr_directory+attr_archive
 
 ; 03/05/2025 - TRDOS 386 v2.0.10
 ; 03/02/2024 - Retro DOS v5.0
@@ -397,21 +396,281 @@ FAT32_fsinfo_sector  equ BPB_Reserved+8 ; 60
 FAT_FreeClusters     equ 64
 FAT_FirstFreeClust   equ 68
 
+; 29/05/2025
+; 19/05/2025
+; 18/05/2025
+; 17/05/2025
 ; 11/05/2025 - TRDOS 386 v2.0.10
 struc FindFile
 .Drv:		  resb 1
-.Directory:	  resb 65
+.Directory:	  resb 104
 .Name:		  resb 13
-.LongNameEntryLength:
-.LongNameYes: 	  resb 1 ; Sign for longname procedures
-;Above 80 bytes form
-;TR-DOS Source/Destination File FullName Format/Structure
 .AttributesMask:  resw 1
 .DirEntry:	  resb 32
 .DirFirstCluster: resd 1
 .DirCluster:	  resd 1
-.DirEntryNumber:  resw 1
+.DirSector:	  resd 1
+.DirEntryNumber:  resb 1
+.DirSectorCount:  resb 1
 .MatchCounter:	  resw 1
-.Reserved:	  resw 1
-.size:		; 128 bytes
+;.Reserved1:	  resw 1
+.LastEntryNumber: resw 1 ; 29/05/2025
+.LongNameEntryLength:
+.LongNameYes: 	  resb 1 ; Sign for longname procedures
+;.Reserved2:	  resb 1
+;.DirBuffer:	  resd 1 ; 19/05/2025
+.DirEntryName:	  resb 13
+;.Reserved3:	  resb 1
+.size:		; 184 bytes
 endstruc
+
+; 31/05/2025 - TRDOS 386 v2.0.10
+; Ref: SINGLIX Operating System - Issue: 2
+;      Revision: 16 Date: 31/05/2025
+struc FDT ; File Description Table
+.Signature:	  resb 3 ; 'FDT'
+.Reserved1:	  resb 1 ; 0
+.SectorSize:	  resb 1
+.ExtentAllocType: resb 1
+.NumberOfLinks:	  resw 1
+.FileNumber:	  resd 1
+.SectorCount:	  resd 1
+.ParentDirNumber: resd 1
+.ParentDirSerial: resd 1
+.FileSize:	  resd 1
+.FileSizeHigh:	  resw 1
+.Attributes:	  resb 1
+.ExtendedAttribs: resb 1
+.OwnerCode:	  resd 1 ; TR-MULTIX
+.GroupCode:	  resd 1 ; TR-MULTIX
+.Country:	  resb 1
+.TimeZone:	  resb 1
+.CreatingYear:	  resb 1
+.CreatingMonth:   resb 1
+.CreatingDay:	  resb 1
+.CreatingHour:	  resb 1
+.CreatingMinute:  resb 1
+.LastAccessYear:  resb 1
+.LastAccessMonth: resb 1
+.LastAccessDay:	  resb 1
+.LastAccessHour:  resb 1
+.LastAccessMinute:resb 1
+.LastModifYear:   resb 1
+.LastModifMonth:  resb 1
+.LastModifDay:	  resb 1
+.LastModifHour:   resb 1
+.LastModifMinute: resb 1
+.LastModifSecond: resb 1
+.RsvrdDescriptor: resd 1 ; Reserved (Optional)
+.LongNameLength:  resb 1
+.FileNameType:	  resb 1
+.FileName:	  resb 64
+.ExtentsTable:	  resb 128
+.UnicodeFileName: resb 256
+.size:		; 512 bytes
+endstruc
+
+; 31/05/2025 - TRDOS 386 v2.0.10
+; Ref: SINGLIX Operating System - Issue: 3
+;      Revision: 16 Date: 31/05/2025
+struc DDT ; Sub Directory Description Table
+.Signature:	  resb 3 ; 'DDT'
+.Reserved1:	  resb 1 ; 0
+.SectorSize:	  resb 1
+.ExtentAllocType: resb 1
+.NumberOfLinks:	  resw 1
+.DirectoryNumber: resd 1
+.SectorCount:	  resd 1
+.ParentDirNumber: resd 1
+.ParentDirSerial: resd 1
+.DirectorySize:	  resd 1
+.SubDirLevel:	  resw 1
+.Attributes:	  resb 1
+.ExtendedAttribs: resb 1
+.OwnerCode:	  resd 1 ; TR-MULTIX
+.GroupCode:	  resd 1 ; TR-MULTIX
+.Country:	  resb 1
+.TimeZone:	  resb 1
+.CreatingYear:	  resb 1
+.CreatingMonth:   resb 1
+.CreatingDay:	  resb 1
+.CreatingHour:	  resb 1
+.CreatingMinute:  resb 1
+.LastAccessYear:  resb 1
+.LastAccessMonth: resb 1
+.LastAccessDay:	  resb 1
+.LastAccessHour:  resb 1
+.LastAccessMinute:resb 1
+.LastModifYear:   resb 1
+.LastModifMonth:  resb 1
+.LastModifDay:	  resb 1
+.LastModifHour:   resb 1
+.LastModifMinute: resb 1
+.LastModifSecond: resb 1
+.DirectorySerial: resd 1
+.LongNameLength:  resb 1
+.DirNameType:	  resb 1
+.DirectoryName:	  resb 64
+.ExtentsTable:	  resb 128
+.UnicodeDirName:  resb 256
+.size:		; 512 bytes
+endstruc
+
+; 31/05/2025 - TRDOS 386 v2.0.10
+; Ref: SINGLIX Operating System - Issue: 4
+;      Revision: 16 Date: 31/05/2025
+struc RDT ; Root Directory Description Table
+.Signature:	  resb 3 ; 'DDT'
+.Reserved1:	  resb 1 ; 0
+.SectorSize:	  resb 1
+.ExtentAllocType: resb 1
+.RootDirSign:	  resw 1 ; 'RT'
+.DirectoryNumber: resd 1
+.SectorCount:	  resd 1
+.BeginningSector: resd 1
+.ParentDirSerial: resd 1 ; 0FFFFFFFFh
+.DirectorySize:	  resd 1
+.SubDirLevel:	  resw 1 ; 0
+.Attributes:	  resb 1
+.ExtendedAttribs: resb 1
+.OwnerCode:	  resd 1 ; TR-MULTIX
+.GroupCode:	  resd 1 ; TR-MULTIX
+.Country:	  resb 1
+.TimeZone:	  resb 1
+.CreatingYear:	  resb 1
+.CreatingMonth:   resb 1
+.CreatingDay:	  resb 1
+.CreatingHour:	  resb 1
+.CreatingMinute:  resb 1
+.LastAccessYear:  resb 1
+.LastAccessMonth: resb 1
+.LastAccessDay:	  resb 1
+.LastAccessHour:  resb 1
+.LastAccessMinute:resb 1
+.LastModifYear:   resb 1
+.LastModifMonth:  resb 1
+.LastModifDay:	  resb 1
+.LastModifHour:   resb 1
+.LastModifMinute: resb 1
+.LastModifSecond: resb 1
+.VolumeSerialNo:  resd 1
+.LongNameLength:  resb 1
+.VolumeNameType:  resb 1
+.VolumeName:	  resb 64
+.ExtentsTable:	  resb 128
+.Reserved2:	  resb 256
+.size:		; 512 bytes
+endstruc
+
+; 31/05/2025 - TRDOS 386 v2.0.10
+; Ref: SINGLIX Operating System - Issue: 5
+;      Revision: 5 Date: 07/01/2018
+struc MAT  ; Master Allocation Table
+.Signature:	  resb 3 ; 'MAT'
+.Version:	  resb 1 ; 0
+.VolumeSize:	  resd 1 ; number of sectors	
+.BeginningSector: resd 1 ; physical address
+.DiskAllocTable:  resd 1 ; offset address
+.DATSectors:	  resd 1
+.FreeSectors:	  resd 1
+.FirstFreeSector: resd 1 ; offset address
+.Reserved1:	  resd 1
+.Reserved2:	  resd 1
+.Reserved3:	  resd 1
+.Reserved4:	  resd 1
+.Reserved5:	  resd 1
+.Reserved6:	  resd 1
+.Reserved7:	  resd 1
+.Reserved8:	  resd 1
+.Reserved9:	  resd 1
+.Reserved10	  resb 448
+.size:		; 512 bytes
+endstruc
+
+; 31/05/2025 - TRDOS 386 v2.0.10
+; Ref: SINGLIX Operating System - Issue: 1
+;      Revision: 14 Date: 07/01/2018
+struc TRFS ; Singlix FS Boot Sector
+.Jmp:		  resb 2 ; EB3Fh
+.Nop:		  resb 1 ; 90h
+.FileSystemID:	  resb 2 ; 'FS'
+.Terminator:	  resb 1 ; 0
+.BytesPerSector:  resw 1
+.MediaAttributes: resb 1
+.PartitionID:	  resb 1 ; A1h (0 for floppy)
+.VersionMajor:	  resb 1 ; 1
+.VersionMinor:	  resb 1 ; 0
+.BeginningSector: resd 1 ; physical addr (LBA)	
+.VolumeSize:	  resd 1
+.StartupFileAddr: resd 1 ; offset/logical addr
+.MATLocation:	  resd 1 ; offset/logical addr
+.RootDirLocation: resd 1 ; offset/logical addr
+.RegistryFileAddr:resd 1
+.SwapFileAddress: resd 1
+.UndeleteDirAddr: resd 1
+.DriveNumber:	  resb 1 ; boot drive number
+.LBAyes:	  resb 1 ; 1 = LBA (0 = CHS)
+.CHS_MagicWord:	  resw 1 ; 01A1h
+.OperatingSystem: resb 16 ; "TR-SINGLIX v1.0b"
+.OpSysTerminator: resb 1 ; 0
+.BootCode:	  resb 445
+.BootSignature:	  resw 1
+.size:		; 512 bytes
+endstruc
+
+TRFS.CHS	equ TRFS.CHS_MagicWord
+TRFS.MagicWord	equ TRFS.CHS_MagicWord
+
+; 02/06/2025 - temporary !
+%if 1
+; 02/06/2025 - Retro DOS v5.0 (PCDOS 7.1)
+; MSDOS (386 DOS v1.0)
+; Current Directory Structure
+
+DIRSTRLEN equ 67 ; 64+3
+
+struc curdir	; curdir_list
+.text:		resb DIRSTRLEN
+			; text of assignment and curdir
+.flags:		resw 1	; various flags
+.devptr:	resd 1	; local pointer to DPB or net device
+.ID:		resw 2	; cluster of current dir (net ID)
+.user_word:	resw 1
+.end:		resw 1	; index to ".." backup limit - see above
+.type:		resb 1	; IFS drive (2=ifs, 4=netuse)
+.ifs_hdr:	resd 1	; Ptr to File System Header
+.fsda:		resb 2	; File System Dependent Data Area
+.size:
+endstruc
+
+%endif
+
+; 02/06/2025 - TRDOS 386 v2.0.10
+; Retro DOS v5.0 (PCDOS 7.1)
+; (386 DOS v1.0)
+; Directory Entry Structure 
+
+struc dir_entry
+.dir_name:	resb 11	; file name (short file name)
+.dir_attr:	resb 1	; file attributes (*)
+.dir_nt_res:	resb 1	; reserved for use by Windows NT. 0
+.dir_pad:	;resb 7	; (creation time, last access date
+			;  for use by Windows) 
+.dir_crttime_tenth:
+		resb 1
+.dir_crttime:	resw 1
+.dir_crtdate:	resw 1
+.dir_lstaccdate:
+		resw 1
+.dir_fclus_hi:	resw 1	; FAT32	fs 
+			; high word of first cluster number
+.dir_time:	resw 1	; time of last write
+.dir_date:	resw 1	; date of last write
+.dir_fclus:				
+.dir_first:	resw 1	; first cluster (alloc. unit) of file
+.dir_file_size:
+.dir_size_l:	resw 1	; low 16 bits of file size
+.dir_size_h:	resw 1	; high 16 bits of file size
+.size:
+endstruc
+

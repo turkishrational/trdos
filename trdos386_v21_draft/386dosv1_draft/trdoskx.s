@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 11/05/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 02/06/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -32,7 +32,9 @@ Current_Drv: resb 1
 Current_Dir_Drv:   resb 1 ; '?'
                    resb 1 ; ':'
 Current_Dir_Root:  resb 1 ; '/'
-Current_Directory: resb 90
+;Current_Directory: resb 90
+; 14/05/2025 - TRDOS 386 v2.0.10
+Current_Directory: resb 103 ; 8 sub dir levels (7*13 + 12)
 End_Of_Current_Dir_Str: resb 1
 Current_Dir_StrLen: resb 1
 
@@ -153,9 +155,11 @@ CCD_DriveDT:	resd 1 ; DIR.ASM ; (word)
 CCD_Level:	resb 1 ; DIR.ASM
 Last_Dir_Level:	resb 1 ; DIR.ASM
 ;
-CDLF_AttributesMask: resw 1 ; DIR.ASM
 CDLF_FNAddress:	resd 1 ; DIR.ASM (word)
+CDLF_AttributesMask: resw 1 ; DIR.ASM
 CDLF_DEType:	resw 1 ; DIR.ASM
+; 29/05/2025 - TRDOS 386 v2.0.10
+DirEntry_Counter: resd 1 ; directory entry index number
 ;
 CD_COMMAND:	resb 1 ; DIR.ASM
 
@@ -175,13 +179,18 @@ sector_count:	resd 1 ; DISK_IO.ASM ; (Disk_RW_SectorCount)
 
 ; 06/02/2016 (long name)
 FDE_AttrMask:	   resw 1 ; DIR.ASM
-AmbiguousFileName: resw 1 ; DIR.ASM
+;AmbiguousFileName: resw 1 ; DIR.ASM
+; 18/05/2025 - TRDOS 386 v2.0.10
+AmbiguousFileName: resb 1
 PreviousAttr:	   resb 1 ; DIR.ASM
-;
-LongNameFound:   resb 1	  ; DIR.ASM
+; 01/06/2025
+LFN_level:	 resb 1   ; 25/05/2025
+LongNameFound:	 resb 1	  ; DIR.ASM
 LFN_EntryLength: resb 1   ; DIR.ASM
-LFN_CheckSum:    resb 1   ; DIR.ASM
-LongFileName:    resb 132 ; DIR.ASM
+LFN_CheckSum:	 resb 1   ; DIR.ASM
+;LongFileName:	 resb 132 ; DIR.ASM
+; 25/05/2025 - TRDOS 386 v2.0.10
+LongFileName:	 resb 260 ; 130 UNICODE (2-byte) chars
 
 ;PATH_Array_Ptr: resw 1 ; DIR.ASM
 PATH_CDLevel:	 resb 1 ; DIR.ASM
@@ -190,8 +199,9 @@ PATH_Level:	 resb 1 ; DIR.ASM
 ; 07/02/2016
 Dir_File_Name:	resb 13 ; DIR.ASM ; 09/10/2011
 
+; 18/05/2025
 ; 10/02/2016
-Dir_Entry_Name:	resb 13 ; DIR.ASM
+;Dir_Entry_Name: resb 13 ; DIR.ASM
 
 alignb 2
 
@@ -201,31 +211,32 @@ AttributesMask: resw 1 ; CMD_INTR.ASM ; 09/11/2011
 ; 08/02/2016
 ;FFF Structure (128 bytes) ; DIR.ASM ; 09/10/2011
 FINDFILE_BUFFER:	; 11/05/2025
-;;;;
-; 12/05/2025 - Temporary
-; (TRDOS 386 v2.0.10)
-find_buf.drive:	resb 1		; drive of search
-find_buf.name:	resb 11		; formatted name
-find_buf.sattr: resb 1		; attribute of search
-find_buf.LastEnt:  resd 1	; LastEnt
-find_buf.DirStart: resd 1	; DirStart
-find_buf.NETID:	resd 1		; Reserved for NET
-find_buf.DirEntry: resb 32	; Directory Entry
 
 FindFile_Drv:		  resb 1
-FindFile_Directory:	  resb 65
+;FindFile_Directory:	  resb 65
+; 15/05/2025
+FindFile_Directory:	  resb 104 ; 7*13 + 12 + zero
 FindFile_Name:		  resb 13
-FindFile_LongNameEntryLength:
-FindFile_LongNameYes: 	  resb 1 ; Sign for longname procedures
-;Above 80 bytes form
-;TR-DOS Source/Destination File FullName Format/Structure
+; 17/05/2025
 FindFile_AttributesMask:  resw 1
 FindFile_DirEntry:	  resb 32
 FindFile_DirFirstCluster: resd 1
 FindFile_DirCluster:	  resd 1
-FindFile_DirEntryNumber:  resw 1
+FindFile_DirSector:	  resd 1
+FindFile_DirEntryNumber:  resb 1
+FindFile_DirSectorCount:  resb 1
 FindFile_MatchCounter:	  resw 1
-FindFile_Reserved:	  resw 1 ; 06/03/2016
+;FindFile_Reserved1:	  resw 1 ; 06/03/2016
+FindFile_LastEntryNumber: resw 1 ; 29/05/2025
+FindFile_LongNameEntryLength:
+FindFile_LongNameYes: 	  resb 1 ; Sign for longname procedures
+;FindFile_Reserved2:	  resb 1 ; 17/05/2025
+;FindFile_DirBuffer:	  resd 1 ; 19/05/2025
+FindFile_DirEntryName:	  resb 13 ; 18/05/2025
+;FindFile_Reserved3:	  resb 1 ; 18/05/2025
+; 184 bytes ; 19/05/2025
+; 25/05/2025
+FindFile_LongName:	  resb 129 ; ASCIIZ (max. 128+NUL)
 
 First_Path_Pos: resd 1	; DIR.ASM ; 09/10/2011
 Last_Slash_Pos: resd 1	; DIR.ASM
@@ -545,6 +556,10 @@ alignb 4
 
 ; 16/10/2016
 FFF_UBuffer:	resd 1  ; User's buffer address for FFF & FNF system calls
+; 18/05/2025 - TRDOS 386 v2.0.10
+FFF_mpid:	resw 1
+; 20/05/2025
+FFF_FATtype:	resb 1
 ; 15/10/2016
 FFF_Valid:	resb 1  ; Find First File Structure validation byte
 			; 0  = invalid (Find Next File can't use FFF struct)
@@ -844,10 +859,70 @@ CLUSNUM:	resd 1	; (MSDOS -> CLUSNUM)
 ClusSec:	resd 1	; (MSDOS -> CLUSSEC)
 ClusSave:	resd 1	; (MSDOS -> CLUSSAVE)
 DIRSTART:	resd 1	; (MSDOS -> DIRSTART)
-DIRSEC:		resd 1	; (MSDOS -> DIRSEC) 	
+DIRSEC:		resd 1	; (MSDOS -> DIRSEC)
 pre_read:	resb 1	; (MSDOS -> PREREAD)
 ClusSplit:	resb 1	; (MSDOS -> CLUSSPLIT)
 CLUSFAC:	resb 1	; (MSDOS -> CLUSFAC)
 SECCLUSPOS:	resb 1	; (MSDOS -> SECCLUSPOS)
 NXTCLUSNUM:	resd 1	; (MSDOS -> NXTCLUSNUM)
-SRCH_CLUSTER:	resd 1	; (MSDOS -> SRCH_CLUSTER)	
+SRCH_CLUSTER:	resd 1	; (MSDOS -> SRCH_CLUSTER)
+LASTENT:	resd 1	; (MSDOS -> LASTENT)
+; 02/06/2025
+WFP_START:	resd 1	; (MSDOS -> WFP_START)
+THISCDS:	resd 1	; (MSDOS -> THISCDS)
+CURR_DIR_END:	resd 1	; (MSDOS -> CURR_DIR_END)
+ATTRIB:		resb 1	; (MSDOS -> ATTRIB)
+SATTRIB:	resb 1	; (MSDOS -> SATTRIB)
+NAME1: 		resb 12	; (MSDOS -> NAME1)
+NoSetDir:	resb 1	; (MSDOS -> NoSetDir)
+CREATING:	resb 1	; (MSDOS -> CREATING)
+DELALL:		resb 1	; (MSDOS -> DELALL)
+VOLID:		resb 1	; (MSDOS -> VOLID)
+		resw 1
+ENTLAST:	resd 1	; (MSDOS -> ENTLAST)
+ENTFREE:	resd 1	; (MSDOS -> ENTFREE)
+ENTLAST_PREV:	resd 1	; (PCDOS 7.1 -> ? -LFN search-)
+LNE_COUNT:	resb 1	; (PCDOS 7.1 -> ? -LFN entry count-)
+
+; 02/06/2025 - TRDOS 386 v2.0.10
+; get_direntry parameters
+GDE_BINDEX:	resd 1
+GDE_INDEX:	resd 1
+;GDE_SPC:	resd 1
+GDE_SINDEX:	resd 1
+GDE_CINDEX:	resd 1
+GDE_SKIP:	resd 1
+GDE_DRVT:	resd 1
+GDE_FCLUST:	resd 1
+GDE_CCLUST:	resd 1
+
+; 02/06/2025 - TRDOS 386 v2.0.10
+; Windows/DOS long to short name conv. parms
+order_number:	resd 1
+
+; 02/06/2025 - TRDOS 386 v2.0.10
+; Singlix FS file name search parameters
+FS_DDT_Buffer:	resd 1
+FS_Dir_Index:	resd 1
+FS_CurrenDirectory:
+		resd 1
+
+; 25/05/2025 - TRDOS 386 v2.0.10
+; Singlix FS file name conversion parameters
+
+FDT_Number:	; 02/06/2025
+fdt_number:	resd 1
+f_name_limit:	resd 1
+;f_base_start:	resd 1
+f_target:	resd 1
+f_base_count:	resd 1
+f_ext_start:	resd 1
+f_ext_count:	resd 1
+;f_name_count:	resd 1
+formal_size:	resd 1
+lossy_conversion: ; 28/05/2025	
+insert_fdtnum:	resb 1
+target_name:	resb 13
+;temp_name:	resb 65
+temp_name:	resb 129
+conv_ucase:	resb 1
