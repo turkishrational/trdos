@@ -6777,14 +6777,12 @@ get_direntry:
 	retn
 
 gde_1: 
-	shr	ecx, 4 ; 512/32 = 16 entries/sector
+	;shr	ecx, 4 ; 512/32 = 16 entries/sector
 	; ecx = root dir sectors
 	;mov	[GDE_SPC], cl
-	push	eax
 	shr	eax, 4
 	mov	[GDE_SINDEX], eax
-	pop	eax
-	sub	ecx, ecx ; 0
+	sub	eax, eax ; 0
 	jmp	short gde_3
 
 	; sub directory
@@ -6795,12 +6793,12 @@ gde_2:
 	shr	eax, 4 ; 512/32
 	xor	edx, edx
 	div	ecx
-	mov	ecx, eax ; cluster index
+	; eax = cluster index
 	mov	[GDE_SINDEX], dl ; sector index
 	pop	edx
 gde_3:
-	mov	eax, ecx
-	xchg	ecx, [GDE_CINDEX]
+	mov	ecx, [GDE_CINDEX]
+	mov	[GDE_CINDEX], eax
 
 	; ecx = old index
 	; eax = new index
@@ -6817,42 +6815,44 @@ gde_3:
 
 	sub	eax, ecx ; current index
 	; eax = skip count if [GDE_CCLUST] is valid
-	jz	short gde_4  ; same
+	jz	short gde_4 ; same
+	jb	short gde_7 ; less (start from fclust)
+
+	mov	[GDE_SKIP], eax ; > 0
 
 	cmp	dword [GDE_CCLUST], -1 ; invalid ?
-	jnb	short gde_13 ; yes, do chain from fclust
-	mov	[GDE_SKIP], eax
+	jnb	short gde_8  ; yes, do chain from fclust
 	mov	ebx, [GDE_CCLUST]
-	jmp	short gde_7  ; chain from current clust
+	jmp	short gde_8  ; chain from current clust
 gde_4:
 	mov	eax, [GDE_CCLUST]
 	cmp	eax, -1 ; invalid ?
-	jb	short gde_14 ; no, valid
+	jb	short gde_15 ; no, valid
 
-	jecxz	gde_12 ; First Cluster
+	jecxz	gde_13 ; First Cluster
 
 gde_5:
 	mov	[GDE_DRVT], edx
 gde_6:
 	mov	[GDE_FCLUST], ebx
-
+gde_7:
 	xor	ecx, ecx
 	cmp	[GDE_CINDEX], ecx ; 0
-	je	short gde_12
+	je	short gde_13
 
 	; ebx = [GDE_FCLUST] >= 2
 
 	dec	ecx
 	mov	[GDE_CCLUST], ecx ; -1
-gde_7:
+gde_8:
 	mov	esi, edx ; LDRVT
 	mov	eax, ebx ; current cluster
-gde_8:
+gde_9:
 	call	get_next_cluster
-	jnc	short gde_11 ; edx = esi
+	jnc	short gde_12 ; edx = esi
 
 	or	eax, eax
-	jnz	short gde_9
+	jnz	short gde_10
 
 	; (end of cluster chain)
 	; Directory entry not found
@@ -6860,27 +6860,27 @@ gde_8:
 	stc
 	retn
 
-gde_9:
+gde_10:
 	; Drive not ready or read error
 	mov	eax, ERR_DRV_READ ; 17
 	stc
-gde_10:
+gde_11:
 	retn
 
-gde_11:
+gde_12:
 	; eax = next cluster
 	; ecx = current cluster
 	dec	dword [GDE_SKIP]
-	jnz	short gde_8
+	jnz	short gde_9
 	mov	[GDE_CCLUST], eax
-	jmp	short gde_14
+	jmp	short gde_15
 
-gde_12:
-	mov	[GDE_CCLUST], ebx
 gde_13:
+	mov	[GDE_CCLUST], ebx
+gde_14:
 	;mov	eax, [GDE_CCLUST]
 	mov	eax, ebx
-gde_14:
+gde_15:
 	; edx = LDRVT
 	; eax = cluster number
 	call	FIGREC
@@ -6891,7 +6891,7 @@ gde_14:
 	;       (needed for GETBUFFER procedure)
 
 	call	GETBUFFER
-	jc	short gde_10
+	jc	short gde_11
 
 	;mov	esi, [CurrentBuffer]
 	or	byte [esi+BUFFINFO.buf_flags], buf_isDIR

@@ -894,834 +894,836 @@ wakeup:
 	retn
 
 set_working_path_x:
-		; 17/10/2016 (TRDOS 386 - FFF & FNF)
-		;mov	ax, 1 
-			; File name is needed/forced (AL=1)
-			; Change directory as temporary (AH=0)
-		; 29/07/2022
-		xor	eax, eax
-		inc	al
-		; eax = 1
+	; 17/10/2016 (TRDOS 386 - FFF & FNF)
+	;mov	ax, 1 
+		; File name is needed/forced (AL=1)
+		; Change directory as temporary (AH=0)
+	; 29/07/2022
+	xor	eax, eax
+	inc	al
+	; eax = 1
 set_working_path_xx: ; 30/12/2017 (syschdir)
-		; This is needed for preventing wrong Find Next File
-		; system call after sysopen, syscreate, sysmkdir etc.
-		; Find Next File must immediate follow Find First File)
+	; This is needed for preventing wrong Find Next File
+	; system call after sysopen, syscreate, sysmkdir etc.
+	; Find Next File must immediate follow Find First File)
 
-		mov	[FFF_Valid], ah ; 0 ; reset ; 17/10/2016
+	mov	[FFF_Valid], ah ; 0 ; reset ; 17/10/2016
 
 set_working_path:
-		; 08/08/2022
-		; 29/07/2022 - TRDOS 386 Kernel v2.0.5
-		; 16/10/2016
-		; 12/10/2016
-		; 10/10/2016
-		; 05/10/2016 - TRDOS 386 (TRDOS v2.0)
-		;
-		; TRDOS v1.0 (DIR.ASM, "proc_set_working_path")
-                ; 27/01/2011 - 08/02/2011 
-		; Set/Changes current drive, directory and file
-		; depending on command tail
-		; (procedure is derivated from CMD_INTR.ASM 
-		; file or dir locating code of internal commands)
-		; (This procedure is prepared for INT 21H file/dir 
-		; functions and also to get compact code for 
-		; internal mainprog -command interpreter- commands)
-		; 
-		; INPUT: DS:SI -> Command tail (ASCIIZ string)
-		; AL = 0 -> any, AL > 0 -> file name is forced
-		; AH = CD -> Change directory permanently 
-		; AH <> CD -> Change directory as temporary    
-		; 
-		; OUTPUT: ES=DS, FindFile structure has been set
-		;        RUN_CDRV points previous current drive  
-		;        DS:SI = FindFile structure address
-		;        (DS=CS)       
-		;        AX, BX, CX, DX, DI will be changed
-		;   cf = 1 -> Error code in AX (AL)
-		;        stc & AX = 0 -> Bad command or path name
-		; -----------------------------------------------
-		;
-		; TRDOS 386 (05/10/2016)
-		; INPUT:
-		;	ESI = File/Directory Path (ASCIIZ string)
-		;             address in user's memory space
-		;       AL = 0 -> any
-		;       AL > 0 -> file name is forced
-		;       AH = CD -> change directory as permanent
-		;       AH <> CD -> change directory as temporary
-		; 
-		; OUTPUT:
-		;	FindFile structure has been set
-		;       RUN_CDRV points previous current drive
-		;       ESI = FindFile_Name address ; 12/10/2016
-		;
-		;       cf = 1 -> Error code in EAX (AL)
-		;       stc & EAX = 0 -> Bad command or path name
-		;  
-		; Modified registers: EAX, EBX, ECX, EDX, ESI, EDI
+	; 08/08/2022
+	; 29/07/2022 - TRDOS 386 Kernel v2.0.5
+	; 16/10/2016
+	; 12/10/2016
+	; 10/10/2016
+	; 05/10/2016 - TRDOS 386 (TRDOS v2.0)
+	;
+	; TRDOS v1.0 (DIR.ASM, "proc_set_working_path")
+	; 27/01/2011 - 08/02/2011 
+	; Set/Changes current drive, directory and file
+	; depending on command tail
+	; (procedure is derivated from CMD_INTR.ASM
+	; file or dir locating code of internal commands)
+	; (This procedure is prepared for INT 21H file/dir
+	; functions and also to get compact code for
+	; internal mainprog -command interpreter- commands)
+	;
+	; INPUT: DS:SI -> Command tail (ASCIIZ string)
+	; AL = 0 -> any, AL > 0 -> file name is forced
+	; AH = CD -> Change directory permanently
+	; AH <> CD -> Change directory as temporary
+	;
+	; OUTPUT: ES=DS, FindFile structure has been set
+	;        RUN_CDRV points previous current drive
+	;        DS:SI = FindFile structure address
+	;        (DS=CS)
+	;        AX, BX, CX, DX, DI will be changed
+	;   cf = 1 -> Error code in AX (AL)
+	;        stc & AX = 0 -> Bad command or path name
+	; -----------------------------------------------
+	;
+	; TRDOS 386 (05/10/2016)
+	; INPUT:
+	;	ESI = File/Directory Path (ASCIIZ string)
+	;             address in user's memory space
+	;       AL = 0 -> any
+	;       AL > 0 -> file name is forced
+	;       AH = CD -> change directory as permanent
+	;       AH <> CD -> change directory as temporary
+	;
+	; OUTPUT:
+	;	FindFile structure has been set
+	;       RUN_CDRV points previous current drive
+	;       ESI = FindFile_Name address ; 12/10/2016
+	;
+	;       cf = 1 -> Error code in EAX (AL)
+	;       stc & EAX = 0 -> Bad command or path name
+	;
+	; Modified registers: EAX, EBX, ECX, EDX, ESI, EDI
 
-		mov	[SWP_Mode], ax
-		mov	al, [Current_Drv]
-		xor	ah, ah
-		mov	[SWP_DRV], ax
+	mov	[SWP_Mode], ax
+	mov	al, [Current_Drv]
+	xor	ah, ah
+	mov	[SWP_DRV], ax
 
-		; TRDOS 386 ring 3 (user's page directory)
-		; to ring 0 (kernel's page directory)
-		; transfer modifications (05/10/2016).
+	; TRDOS 386 ring 3 (user's page directory)
+	; to ring 0 (kernel's page directory)
+	; transfer modifications (05/10/2016).
 
-		push	ebp
-		mov	ebp, esp
-		
-		;mov	ecx, 128 ; maximum path length = 128 bytes
-		; 29/07/2022
-		xor	ecx, ecx
-		mov	cl, 128
-		sub	esp, ecx ; reserve 128 bytes (buffer) on stack
-		mov	edi, esp ; destination address (kernel space)
-		; esi = source address (virtual, in user's memory space)
-		call	transfer_from_user_buffer
-		jc	short loc_swp_xor_retn 
-		
-		mov	esi, esp ; temporary buffer (the path) on stack
+	push	ebp
+	mov	ebp, esp
+
+	;mov	ecx, 128 ; maximum path length = 128 bytes
+	; 29/07/2022
+	xor	ecx, ecx
+	mov	cl, 128
+	sub	esp, ecx ; reserve 128 bytes (buffer) on stack
+	mov	edi, esp ; destination address (kernel space)
+	; esi = source address (virtual, in user's memory space)
+	call	transfer_from_user_buffer
+	jc	short loc_swp_xor_retn 
+
+	mov	esi, esp ; temporary buffer (the path) on stack
 loc_swp_fchar:
-		mov	al, [esi]
-		cmp	al, 20h
-		ja	short loc_swp_parse_path_name
-		;je	short loc_swp_fchar_next
-		; 29/07/2022
-		jb	short loc_swp_xor_retn
+	mov	al, [esi]
+	cmp	al, 20h
+	ja	short loc_swp_parse_path_name
+	;je	short loc_swp_fchar_next
+	; 29/07/2022
+	jb	short loc_swp_xor_retn
 
 loc_swp_fchar_next:
-		inc	esi
-		jmp	short loc_swp_fchar
+	inc	esi
+	jmp	short loc_swp_fchar
 
 loc_swp_xor_retn:
-		xor	eax, eax
-		stc
+	xor	eax, eax
+	stc
 loc_swp_retn:
-		mov	esp, ebp
-		pop	ebp
+	mov	esp, ebp
+	pop	ebp
 
-		;mov	esi, FindFile_Drv
-		mov	esi, FindFile_Name ; 12/10/2016
-		retn 
+	;mov	esi, FindFile_Drv
+	mov	esi, FindFile_Name ; 12/10/2016
+	retn
 
 ;loc_swp_fchar_next:
-;		inc	esi
-;		jmp	short loc_swp_fchar  
+;	inc	esi
+;	jmp	short loc_swp_fchar
 
 loc_swp_parse_path_name:
-		mov	edi, FindFile_Drv
-		call	parse_path_name
-		jc	short loc_swp_retn
+	mov	edi, FindFile_Drv
+	call	parse_path_name
+	jc	short loc_swp_retn
 
 loc_swp_checkfile_name:
-		cmp	byte [SWP_Mode], 0
-		jna	short loc_swp_drv
+	cmp	byte [SWP_Mode], 0
+	jna	short loc_swp_drv
 
-		; 10/10/2016 (valid file name checking)
-		mov	esi, FindFile_Name
-		cmp	byte [esi], 20h
-		jna	short loc_swp_xor_retn
+	; 10/10/2016 (valid file name checking)
+	mov	esi, FindFile_Name
+	cmp	byte [esi], 20h
+	jna	short loc_swp_xor_retn
 
-		; 16/10/2016
-		mov	byte [SWP_inv_fname], 0 ; reset 
-		; esi = file name address (ASCIIZ)
-		call	check_filename
-		jnc	short loc_swp_drv
+	; 16/10/2016
+	mov	byte [SWP_inv_fname], 0 ; reset
+	; esi = file name address (ASCIIZ)
+	call	check_filename
+	jnc	short loc_swp_drv
 
-		inc	byte [SWP_inv_fname] ; set
+	inc	byte [SWP_inv_fname] ; set
 loc_swp_drv:
-		mov	dh, [Current_Drv]
-               ;mov	[RUN_CDRV], dh
+	mov	dh, [Current_Drv]
+	;mov	[RUN_CDRV], dh
 
-		mov	dl, [FindFile_Drv]
-               ;cmp	dl, dh
-		cmp	dl, [Current_Drv]
-		je	short loc_swp_change_directory
+	mov	dl, [FindFile_Drv]
+	;cmp	dl, dh
+	cmp	dl, [Current_Drv]
+	je	short loc_swp_change_directory
 
-		inc	byte [SWP_DRV_chg]
-		call	change_current_drive
-		jc	short loc_swp_retn ; eax = error code
-		; eax = 0
+	inc	byte [SWP_DRV_chg]
+	call	change_current_drive
+	jc	short loc_swp_retn ; eax = error code
+	; eax = 0
 
 loc_swp_change_directory:
-		cmp	byte [FindFile_Directory], 21h
-		cmc
-		jnc	short loc_swp_retn
+	cmp	byte [FindFile_Directory], 21h
+	cmc
+	jnc	short loc_swp_retn
 
-		inc	byte [SWP_DRV_chg]
-		inc	byte [Restore_CDIR]
-		mov	esi, FindFile_Directory
-		mov	ah, [SWP_Mode+1] 
-		call	change_current_directory
-		;jc	short loc_swp_retn ; eax = error code
-		; 08/08/2022
-		jnc	short loc_swp_change_prompt_dir_string
-		jmp	loc_swp_retn	
+	inc	byte [SWP_DRV_chg]
+	inc	byte [Restore_CDIR]
+	mov	esi, FindFile_Directory
+	mov	ah, [SWP_Mode+1]
+	call	change_current_directory
+	;jc	short loc_swp_retn ; eax = error code
+	; 08/08/2022
+	jnc	short loc_swp_change_prompt_dir_string
+	jmp	loc_swp_retn
 
 loc_swp_change_prompt_dir_string:
-		; esi = PATH_Array
-		; eax = Current Directory First Cluster
-		; edi = Logical DOS Drive Description Table
-		call	change_prompt_dir_str 
-		sub	eax, eax ; 0
-		jmp	loc_swp_retn 
+	; esi = PATH_Array
+	; eax = Current Directory First Cluster
+	; edi = Logical DOS Drive Description Table
+	call	change_prompt_dir_str
+	sub	eax, eax ; 0
+	jmp	loc_swp_retn
 
 reset_working_path:
-		; 06/10/2016 - TRDOS 386 (TRDOS v2.0)
-		;
-		; TRDOS v1.0 (DIR.ASM, "proc_reset_working_path")
-		; 05/02/2011 - 08/02/2011
-		;
-		; Restores current drive and directory
-		; 
-		; INPUT: none
-		; OUTPUT: DL = SWP_DRV, EAX = 0 -> OK
-		;
-		;    AX = 0 -> ESI = Logical Dos Drv Desc. Table
-		;
-		;    EAX, EBX, ECX, EDX, ESI, EDI will be changed
-		;
+	; 06/10/2016 - TRDOS 386 (TRDOS v2.0)
+	;
+	; TRDOS v1.0 (DIR.ASM, "proc_reset_working_path")
+	; 05/02/2011 - 08/02/2011
+	;
+	; Restores current drive and directory
+	;
+	; INPUT: none
+	; OUTPUT: DL = SWP_DRV, EAX = 0 -> OK
+	;
+	;    AX = 0 -> ESI = Logical Dos Drv Desc. Table
+	;
+	;    EAX, EBX, ECX, EDX, ESI, EDI will be changed
+	;
 
-  
-		xor	eax, eax
-		dec	eax 
+	xor	eax, eax
+	dec	eax
 
-		mov	dx, [SWP_DRV]
-		or	dh, dh
-		jz	short loc_rwp_return
+	mov	dx, [SWP_DRV]
+	or	dh, dh
+	jz	short loc_rwp_return
 
-		cmp	dl, [Current_Drv]
-		je	short loc_rwp_restore_cdir
+	cmp	dl, [Current_Drv]
+	je	short loc_rwp_restore_cdir
 loc_rwp_restore_cdrv:
-		call	change_current_drive 
-		jmp	short loc_rwp_restore_ok
+	call	change_current_drive
+	jmp	short loc_rwp_restore_ok
 loc_rwp_restore_cdir:
-		xor	ebx, ebx
-		mov	bh, dl
-		mov	esi, Logical_DOSDisks
-		add	esi, ebx
+	xor	ebx, ebx
+	mov	bh, dl
+	mov	esi, Logical_DOSDisks
+	add	esi, ebx
 
-		call	restore_current_directory
+	call	restore_current_directory
 
 loc_rwp_restore_ok:
-		mov	dx, [SWP_DRV]
-		xor	eax, eax  
-		mov	[SWP_DRV_chg], ax
+	mov	dx, [SWP_DRV]
+	xor	eax, eax
+	mov	[SWP_DRV_chg], ax
 loc_rwp_return:
-		retn
+	retn
 
 get_file_name:
-		; 25/08/2024 (TRDOS 386 Kernel v2.0.9)
-		; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
-		; 15/10/2016 - TRDOS 386 (TRDOS v2.0)
-		; Convert file name 
-		;	from directory entry format
-                ; 	to (8.3) dot file name format
-		;
-		; TRDOS v1.0 (DIR.ASM, "get_file_name")
-                ; 2005 - 09/10/2011
-		; INPUT: 
-		;	DS:SI -> Directory Entry Format File Name
-		;       ES:DI -> DOS Dot File Name Address
-		; OUTPUT:
-		;	DS:SI -> DOS Dot File Name Address
-                ;	ES:DI -> Directory Entry Format File Name
-		;	
-		; TRDOS 386 (15/10/2016)
-		; INPUT:
-		;	ESI = File name addr in dir entry format
-		;	EDI = Dot file name address (destination)
-		; OUTPUT: 
-		;	File name is converted and moved
-		;	to destination (as 8.3 dot filename)
-		;  
-		; Modified registers: EAX, ECX
+	; 25/08/2024 (TRDOS 386 Kernel v2.0.9)
+	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
+	; 15/10/2016 - TRDOS 386 (TRDOS v2.0)
+	; Convert file name 
+	;	from directory entry format
+	; 	to (8.3) dot file name format
+	;
+	; TRDOS v1.0 (DIR.ASM, "get_file_name")
+	; 2005 - 09/10/2011
+	; INPUT:
+	;	DS:SI -> Directory Entry Format File Name
+	;       ES:DI -> DOS Dot File Name Address
+	; OUTPUT:
+	;	DS:SI -> DOS Dot File Name Address
+	;	ES:DI -> Directory Entry Format File Name
+	;
+	; TRDOS 386 (15/10/2016)
+	; INPUT:
+	;	ESI = File name addr in dir entry format
+	;	EDI = Dot file name address (destination)
+	; OUTPUT: 
+	;	File name is converted and moved
+	;	to destination (as 8.3 dot filename)
+	;
+	; Modified registers: EAX, ECX
 
-                ; 2005 (TRDOS 8086) - 2016 (TRDOS 386)
+	; 2005 (TRDOS 8086) - 2016 (TRDOS 386)
 
-		push	edi
-		push	esi
-		lodsb
-		; 25/08/2024
-		xor	ecx, ecx ; 0
-		cmp	al, 20h
-		jna	short pass_gfn_ext
-		; 25/08/2024
-		;push	esi
-		stosb
-		; 25/08/2024
-		; 29/07/2022
-		;xor	ecx, ecx
-		; ecx <= 128 ; 25/08/2024
-		mov	cl, 7
-		; 25/08/2024
-		add	esi, ecx ; add esi, 7
-		push	esi ; (*)
+	push	edi
+	push	esi
+	lodsb
+	; 25/08/2024
+	xor	ecx, ecx ; 0
+	cmp	al, 20h
+	jna	short pass_gfn_ext
+	; 25/08/2024
+	;push	esi
+	stosb
+	; 25/08/2024
+	; 29/07/2022
+	;xor	ecx, ecx
+	; ecx <= 128 ; 25/08/2024
+	mov	cl, 7
+	; 25/08/2024
+	add	esi, ecx ; add esi, 7
+	push	esi ; (*)
 loc_gfn_next_char:
-		lodsb
-		cmp	al, 20h
-		jna	short pass_gfn_fn
-		stosb
-		loop	loc_gfn_next_char
+	lodsb
+	cmp	al, 20h
+	jna	short pass_gfn_fn
+	stosb
+	loop	loc_gfn_next_char
 pass_gfn_fn:
-		;pop	esi
-		;add	esi, 7
-		; 25/08/2024
-		pop	esi ; (*)
+	;pop	esi
+	;add	esi, 7
+	; 25/08/2024
+	pop	esi ; (*)
 
-		lodsb
-		cmp	al, 20h
-		jna	short pass_gfn_ext
-		mov	ah, '.'
-		xchg	ah, al
-		stosw
-		lodsb
-		cmp	al, 20h
-		jna	short pass_gfn_ext
-		stosb
-		lodsb
-		cmp	al, 20h
-		jna	short pass_gfn_ext
-		stosb
+	lodsb
+	cmp	al, 20h
+	jna	short pass_gfn_ext
+	mov	ah, '.'
+	xchg	ah, al
+	stosw
+	lodsb
+	cmp	al, 20h
+	jna	short pass_gfn_ext
+	stosb
+	lodsb
+	cmp	al, 20h
+	jna	short pass_gfn_ext
+	stosb
 pass_gfn_ext:
-		xor	al, al
-		stosb
-		pop	esi
-		pop	edi
-		; 25/08/2024
-		; ecx <= 7
-		retn
+	xor	al, al
+	stosb
+	pop	esi
+	pop	edi
+	; 25/08/2024
+	; ecx <= 7
+	retn
 
 set_hardware_int_vector:
-		; 18/03/2017
-		; 03/03/2017
-		; 28/02/2017 - TRDOS 386 (TRDOS v2.0)
-		;
-		; SET/RESET HARDWARE INTERRUPT GATE
-		;
-		; Changes interrupt gate descriptor table
-		; (without changing default interrupt list)
-		;
-		; INPUT:
-		;	AL = IRQ number (0 to 15)
-		;	AH > 0 -> set
-		;	AH = 0 -> reset
-		;	
-		; Modified registers: eax, ebx, edx, edi
-		;
-		
-		shl	al, 2 ; IRQ number * 4
-		movzx	ebx, al
+	; 18/03/2017
+	; 03/03/2017
+	; 28/02/2017 - TRDOS 386 (TRDOS v2.0)
+	;
+	; SET/RESET HARDWARE INTERRUPT GATE
+	;
+	; Changes interrupt gate descriptor table
+	; (without changing default interrupt list)
+	;
+	; INPUT:
+	;	AL = IRQ number (0 to 15)
+	;	AH > 0 -> set
+	;	AH = 0 -> reset
+	;	
+	; Modified registers: eax, ebx, edx, edi
+	;
 
-		or	ah, ah
-		jnz	short shintv_1 ; set (for user call service)
-		
-		; 18/03/2017
-		add	ebx, IRQ_list ; reset to default interrupt list
-		jmp	short shintv_2
+	shl	al, 2 ; IRQ number * 4
+	movzx	ebx, al
+
+	or	ah, ah
+	jnz	short shintv_1 ; set (for user call service)
+
+	; 18/03/2017
+	add	ebx, IRQ_list ; reset to default interrupt list
+	jmp	short shintv_2
 shintv_1:
-		add	ebx, IRQ_u_list
-shintv_2:	
-		mov	edx, [ebx] ; IRQ handler address
-		
-		; 03/03/2017
-		shl	al, 1 ; IRQ number * 8 
-		; 18/03/2017
-		movzx	edi, al 
-		add	edi, idt + (8*32) ; IRQ 0 offset = idt + 256
-		
-		mov	eax, edx ; IRQ handler address
-		mov	ebx, 80000h
+	add	ebx, IRQ_u_list
+shintv_2:
+	mov	edx, [ebx] ; IRQ handler address
 
-		;mov	edx, eax
-		mov	dx, 8E00h
-		mov	bx, ax
-		mov	eax, ebx ; /* selector = 0x0008 = cs */
-       			         ; /* interrupt gate - dpl=0, present */
-		stosd	; selector & offset bits 0-15 	
-		mov	[edi], edx ; attributes & offset bits 16-23
+	; 03/03/2017
+	shl	al, 1 ; IRQ number * 8
+	; 18/03/2017
+	movzx	edi, al 
+	add	edi, idt + (8*32) ; IRQ 0 offset = idt + 256
 
-		retn
+	mov	eax, edx ; IRQ handler address
+	mov	ebx, 80000h
+
+	;mov	edx, eax
+	mov	dx, 8E00h
+	mov	bx, ax
+	mov	eax, ebx ; /* selector = 0x0008 = cs */
+       		         ; /* interrupt gate - dpl=0, present */
+	stosd	; selector & offset bits 0-15 	
+	mov	[edi], edx ; attributes & offset bits 16-23
+
+	retn
 IRQ_u_list:
-		; 28/02/2017
-		dd	timer_int
-		dd	kb_int
-		dd	irq2
-		dd	IRQ_service3
-		dd	IRQ_service4
-		dd	IRQ_service5
-		dd	fdc_int	
-		dd	IRQ_service7
-		dd	rtc_int
-		dd	IRQ_service9
-		dd	IRQ_service10
-		dd	IRQ_service11
-		dd	IRQ_service12
-		dd	IRQ_service13
-		dd	hdc1_int
-		dd	hdc2_int
+	; 28/02/2017
+	dd	timer_int
+	dd	kb_int
+	dd	irq2
+	dd	IRQ_service3
+	dd	IRQ_service4
+	dd	IRQ_service5
+	dd	fdc_int	
+	dd	IRQ_service7
+	dd	rtc_int
+	dd	IRQ_service9
+	dd	IRQ_service10
+	dd	IRQ_service11
+	dd	IRQ_service12
+	dd	IRQ_service13
+	dd	hdc1_int
+	dd	hdc2_int
 
-		; 03/03/2017
-		; 27/02/2017
+	; 03/03/2017
+	; 27/02/2017
 IRQ_service3:
-		mov	byte [ss:IRQnum], 3
-		jmp	short IRQ_service
+	mov	byte [ss:IRQnum], 3
+	jmp	short IRQ_service
 IRQ_service4:
-		mov	byte [ss:IRQnum], 4
-		jmp	short IRQ_service
+	mov	byte [ss:IRQnum], 4
+	jmp	short IRQ_service
 IRQ_service5:
-		mov	byte [ss:IRQnum], 5
-		jmp	short IRQ_service
+	mov	byte [ss:IRQnum], 5
+	jmp	short IRQ_service
 IRQ_service7:
-		mov	byte [ss:IRQnum], 7
-		jmp	short IRQ_service
+	mov	byte [ss:IRQnum], 7
+	jmp	short IRQ_service
 IRQ_service9:
-		mov	byte [ss:IRQnum], 9
-		jmp	short IRQ_service
+	mov	byte [ss:IRQnum], 9
+	jmp	short IRQ_service
 IRQ_service10:
-		mov	byte [ss:IRQnum], 10
-		jmp	short IRQ_service
+	mov	byte [ss:IRQnum], 10
+	jmp	short IRQ_service
 IRQ_service11:
-		mov	byte [ss:IRQnum], 11
-		jmp	short IRQ_service
+	mov	byte [ss:IRQnum], 11
+	jmp	short IRQ_service
 IRQ_service12:
-		mov	byte [ss:IRQnum], 12
-		jmp	short IRQ_service
+	mov	byte [ss:IRQnum], 12
+	jmp	short IRQ_service
 IRQ_service13:
-		mov	byte [ss:IRQnum], 13
-		;jmp	short IRQ_service
+	mov	byte [ss:IRQnum], 13
+	;jmp	short IRQ_service
 IRQ_service:
-		; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
-		; 13/06/2017
-		; 11/06/2017
-		; 10/06/2017
-		; 01/03/2017, 04/03/2017
-		; 27/02/2017, 28/02/2017
-		push	ds
-		push	es
-		push	fs
-		push	gs
+	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
+	; 13/06/2017
+	; 11/06/2017
+	; 10/06/2017
+	; 01/03/2017, 04/03/2017
+	; 27/02/2017, 28/02/2017
+	push	ds
+	push	es
+	push	fs
+	push	gs
 
-		pushad	; eax,ecx,edx,ebx,esp,ebp,esi,edi
-		mov     cx, KDATA
-        	mov     ds, cx
-        	mov     es, cx
-        	mov     fs, cx
-        	mov     gs, cx
+	pushad	; eax,ecx,edx,ebx,esp,ebp,esi,edi
+	mov     cx, KDATA
+        mov     ds, cx
+        mov     es, cx
+        mov     fs, cx
+        mov     gs, cx
 
-		mov	eax, cr3
-		mov	[IRQ_cr3], eax
+	mov	eax, cr3
+	mov	[IRQ_cr3], eax
 
-		mov	eax, [k_page_dir]
-		mov	cr3, eax 
+	mov	eax, [k_page_dir]
+	mov	cr3, eax 
 
-		mov	al, [IRQnum]
+	mov	al, [IRQnum]
 
-		;mov	cl, [sysflg]
-		;mov	[u.r_mode], cl  ; system (0) or user mode (FFh) 
+	;mov	cl, [sysflg]
+	;mov	[u.r_mode], cl  ; system (0) or user mode (FFh)
 IRQsrv_0:
-		movzx	ebx, al
-		mov	bl, [ebx+IRQenum] ; IRQ (available) index number + 1
-		; 01/03/2017
-		dec	bl  ; IRQ index number, 0 to 8
-		;js	IRQsrv_5 ; not available to use here!?
-		; 29/07/2022
-		js	short IRQsrv_j5  ; (jump to IRQsrv_5)
-		;		 
-		cmp	byte [ebx+IRQ.method], 80h ; using by a dev or kernel? 
-		jb	short IRQsrv_1 ; no
+	movzx	ebx, al
+	mov	bl, [ebx+IRQenum] ; IRQ (available) index number + 1
+	; 01/03/2017
+	dec	bl  ; IRQ index number, 0 to 8
+	;js	IRQsrv_5 ; not available to use here!?
+	; 29/07/2022
+	js	short IRQsrv_j5  ; (jump to IRQsrv_5)
+	;
+	cmp	byte [ebx+IRQ.method], 80h ; using by a dev or kernel?
+	jb	short IRQsrv_1 ; no
 
-		; If the IRQ service is already owned by TRDOS 386 kernel
-		;	 or a Device driver
-		; we need to call 'dev_IRQ_service'
+	; If the IRQ service is already owned by TRDOS 386 kernel
+	;	 or a Device driver
+	; we need to call 'dev_IRQ_service'
 
-		; IRQ number in AL
-		call	dev_IRQ_service	 ; IRQ service for device drivers
-		; IRQ number in AL
-IRQsrv_1:		
-		; check user callback service status
-		; AL = IRQ number
-		; EBX = IRQ (Available) Index number
+	; IRQ number in AL
+	call	dev_IRQ_service	 ; IRQ service for device drivers
+	; IRQ number in AL
+IRQsrv_1:
+	; check user callback service status
+	; AL = IRQ number
+	; EBX = IRQ (Available) Index number
 
-		mov	[u.irqwait], al ; set waiting IRQ flag
+	mov	[u.irqwait], al ; set waiting IRQ flag
 
-		mov	al, [ebx+IRQ.owner]
-		and	al, al
-		;jz	IRQsrv_5 ; it is not owned by a user/proc
-		; 29/07/2022
-		jz	short IRQsrv_j5  ; (jump to IRQsrv_5)
+	mov	al, [ebx+IRQ.owner]
+	and	al, al
+	;jz	IRQsrv_5 ; it is not owned by a user/proc
+	; 29/07/2022
+	jz	short IRQsrv_j5  ; (jump to IRQsrv_5)
 
-		; 03/03/2017
-		mov	edx, ebx
-		shl	dl, 2
-		mov	edx, [edx+IRQ.addr] ; S.R.B. or Callback service addr
+	; 03/03/2017
+	mov	edx, ebx
+	shl	dl, 2
+	mov	edx, [edx+IRQ.addr] ; S.R.B. or Callback service addr
 		
-		mov	ah, [ebx+IRQ.method]
-		test	ah, 1
-		jnz	short IRQsrv_4 ; Callback service method
+	mov	ah, [ebx+IRQ.method]
+	test	ah, 1
+	jnz	short IRQsrv_4 ; Callback service method
 
-		; Signal Response Byte method
-		;mov	edx, [edx+IRQ.addr] ; Signal Response Byte address
-		;			    ; (Physical address, non-swappable)
-		and	ah, 2 ; bit 1, (S.R.B.) counter (auto increment) method
-		mov	ah, [ebx+IRQ.srb] ; Signal Response Byte value
-		jz	short IRQsrv_2 ; fixed S.R.B. value
-		; counter method (auto increment)
-		inc	ah
-		mov	[ebx+IRQ.srb], ah ; next (count) number
+	; Signal Response Byte method
+	;mov	edx, [edx+IRQ.addr] ; Signal Response Byte address
+	;			    ; (Physical address, non-swappable)
+	and	ah, 2 ; bit 1, (S.R.B.) counter (auto increment) method
+	mov	ah, [ebx+IRQ.srb] ; Signal Response Byte value
+	jz	short IRQsrv_2 ; fixed S.R.B. value
+	; counter method (auto increment)
+	inc	ah
+	mov	[ebx+IRQ.srb], ah ; next (count) number
 IRQsrv_2:
-		mov	[edx], ah ; put S.R.B. val to the user's S.R.B. addr
-		mov	byte [u.irqwait], 0 ; clear waiting IRQ flag
+	mov	[edx], ah ; put S.R.B. val to the user's S.R.B. addr
+	mov	byte [u.irqwait], 0 ; clear waiting IRQ flag
 
-		cmp	al, [u.uno]
-		;je	IRQsrv_5 ; the owner is current user/process
-		; 29/07/2022
-		je	short IRQsrv_j5  ; (jump to IRQsrv_5)
+	cmp	al, [u.uno]
+	;je	IRQsrv_5 ; the owner is current user/process
+	; 29/07/2022
+	je	short IRQsrv_j5  ; (jump to IRQsrv_5)
 IRQsrv_3:
-		; the owner is not current user/process
-		; AL = process number
-		mov	dl, 2 ; priority, 2 = event (high)
-		call	set_run_sequence
+	; the owner is not current user/process
+	; AL = process number
+	mov	dl, 2 ; priority, 2 = event (high)
+	call	set_run_sequence
 
-		; [u.irqwait] = waiting IRQ number for callback service
+	; [u.irqwait] = waiting IRQ number for callback service
 IRQsrv_j5:		; 29/07/2022
-		jmp	IRQsrv_5
+	jmp	IRQsrv_5
 IRQsrv_4:
-		cmp	al, [u.uno]  ; is the owner is current user/process?
-		jne	short IRQsrv_3 ; no !
+	cmp	al, [u.uno]  ; is the owner is current user/process?
+	jne	short IRQsrv_3 ; no !
 
-		; Check if an IRQ callback service already in progress
-		cmp	byte [u.r_lock], 0
-		;ja	IRQsrv_5 ; nothing to do !  
-				     ; (we need to complete prev callback)
-		; 29/07/2022
-		ja	short IRQsrv_j5  ; (jump to IRQsrv_5)
+	; Check if an IRQ callback service already in progress
+	cmp	byte [u.r_lock], 0
+	;ja	IRQsrv_5 ; nothing to do !
+			     ; (we need to complete prev callback)
+	; 29/07/2022
+	ja	short IRQsrv_j5  ; (jump to IRQsrv_5)
 
-		cmp	byte [u.t_lock], 0
-		ja	short IRQsrv_5 ; nothing to do !  
-				     ; (we need to complete timer callback)
+	cmp	byte [u.t_lock], 0
+	ja	short IRQsrv_5 ; nothing to do !
+			     ; (we need to complete timer callback)
 
-		; 04/03/2017
-		mov	byte [u.irqwait], 0 ; reset/clear waiting IRQ flag
+	; 04/03/2017
+	mov	byte [u.irqwait], 0 ; reset/clear waiting IRQ flag
 
-		inc	byte [u.r_lock] ; 'IRQ callback service in progress' flag
+	inc	byte [u.r_lock] ; 'IRQ callback service in progress' flag
 
-		mov	cl, [sysflg]   ; (system call) mode flag (kernel/user)
-		mov	[u.r_mode], cl ; system mode (0) or user mode (FFh)
+	mov	cl, [sysflg]   ; (system call) mode flag (kernel/user)
+	mov	[u.r_mode], cl ; system mode (0) or user mode (FFh)
 
-		; 
-		mov	ebp, [tss.esp0] ; kernel stack address (for ring 0)
-		sub	ebp, 20		; eip, cs, eflags, esp, ss
-	 	mov	[u.sp], ebp
-		mov	[u.usp], esp
+	;
+	mov	ebp, [tss.esp0] ; kernel stack address (for ring 0)
+	sub	ebp, 20		; eip, cs, eflags, esp, ss
+	mov	[u.sp], ebp
+	mov	[u.usp], esp
 
-		;or	word [ebp+8], 200h ; 22/01/2017, force enabling interrupts
+	;or	word [ebp+8], 200h ; 22/01/2017, force enabling interrupts
 
-		mov	eax, [esp+28] ; pushed eax
-		mov	[u.r0], eax
+	mov	eax, [esp+28] ; pushed eax
+	mov	[u.r0], eax
 
-		call	wswap ; save user's registers & status
+	call	wswap ; save user's registers & status
 
-		; software int is in ring 0 but IRQ handler must return to ring 3
-		; so, ring 3 return address and stack registers
-		; (eip, cs, eflags, esp, ss) 
-		; must be copied to IRQ handler return
-		; eip will be replaced by callback service routine address
+	; software int is in ring 0 but IRQ handler must return to ring 3
+	; so, ring 3 return address and stack registers
+	; (eip, cs, eflags, esp, ss) 
+	; must be copied to IRQ handler return
+	; eip will be replaced by callback service routine address
 
-		mov	byte [sysflg], 0FFh ; user mode
+	mov	byte [sysflg], 0FFh ; user mode
 
-		; system mode (system call)
-		;mov	ebp, [u.sp] ; EIP (u), CS (UCODE), EFLAGS (u),
-				    ; ESP (u), SS (UDATA)
+	; system mode (system call)
+	;mov	ebp, [u.sp] ; EIP (u), CS (UCODE), EFLAGS (u),
+			    ; ESP (u), SS (UDATA)
 
-		mov	eax, [ebp+16]	; SS (UDATA)
-		mov	esi, esp
-		push	eax
-		push	eax
-		mov	edi, esp
-		mov	[u.usp], edi
-		mov	ecx, ((ESPACE/4) - 4) ; except DS, ES, FS, GS
-		rep	movsd
-		mov	cl, 4	
-		rep	stosd
-		mov	[u.sp], edi
-		mov	esi, ebp
-		mov	cl, 5 ; EIP (u), CS (UCODE), EFLAGS (u), ESP (u), SS (UDATA)
-		rep	movsd
-		;
+	mov	eax, [ebp+16]	; SS (UDATA)
+	mov	esi, esp
+	push	eax
+	push	eax
+	mov	edi, esp
+	mov	[u.usp], edi
+	mov	ecx, ((ESPACE/4) - 4) ; except DS, ES, FS, GS
+	rep	movsd
+	mov	cl, 4	
+	rep	stosd
+	mov	[u.sp], edi
+	mov	esi, ebp
+	mov	cl, 5 ; EIP (u), CS (UCODE), EFLAGS (u), ESP (u), SS (UDATA)
+	rep	movsd
+	;
 
-		mov	ecx, [u.pgdir]
-		mov	[IRQ_cr3], ecx
+	mov	ecx, [u.pgdir]
+	mov	[IRQ_cr3], ecx
 
 set_IRQ_callback_addr:
-		;
-		; This routine sets return address
-		; to start of user's interrupt
-		; service (callback) address
-		;
-		; INPUT:
-		;	EDX = callback routine/service address
-		;	      (virtual, not physical address!)
-		;	[u.sp] = kernel stack, points to
-		;		 user's EIP,CS,EFLAGS,ESP,SS
-		;		 registers.
-		; OUTPUT:
-		;	EIP (user) = callback (service) address
-		;	CS (user) = UCODE
-		;	EFLAGS (user) = flags before callback
-		;       ESP (user) = ESP-4 (user, before callback)
-		;	[ESP](user) = EIP (user) before callback
-		;
-		; Note: If CPU was in user mode while entering 
-		;	the timer interrupt service routine,
-		;	'IRET' will get return to callback routine
-		;	immediately. If CPU was in system/kernel mode
-		;	'iret' will get return to system call and
-		;	then, callback routine will be return address
-		;	from system call. (User's callback/service code
-		;	will be able to return to normal return address
-		;	via a 'sysrele' system call at the end.) 
-		;
-		; Note: User's IRQ callback service code must be ended
-		;	with a 'sysrele' system call !
-		;
-		;	For example:
-		;
-		;	audio_IRQ_callback:
-		;	    ...	 
-		;	    <load DMA buffer with audio data>
-		;	    ...
-		;	    mov eax, 39 ; 'sysrele'
-		;	    int 40h ; TRDOS 386 system call (interrupt)
-		;
+	;
+	; This routine sets return address
+	; to start of user's interrupt
+	; service (callback) address
+	;
+	; INPUT:
+	;	EDX = callback routine/service address
+	;	      (virtual, not physical address!)
+	;	[u.sp] = kernel stack, points to
+	;		 user's EIP,CS,EFLAGS,ESP,SS
+	;		 registers.
+	; OUTPUT:
+	;	EIP (user) = callback (service) address
+	;	CS (user) = UCODE
+	;	EFLAGS (user) = flags before callback
+	;       ESP (user) = ESP-4 (user, before callback)
+	;	[ESP](user) = EIP (user) before callback
+	;
+	; Note: If CPU was in user mode while entering
+	;	the timer interrupt service routine,
+	;	'IRET' will get return to callback routine
+	;	immediately. If CPU was in system/kernel mode
+	;	'iret' will get return to system call and
+	;	then, callback routine will be return address
+	;	from system call. (User's callback/service code
+	;	will be able to return to normal return address
+	;	via a 'sysrele' system call at the end.) 
+	;
+	; Note: User's IRQ callback service code must be ended
+	;	with a 'sysrele' system call !
+	;
+	;	For example:
+	;
+	;	audio_IRQ_callback:
+	;	    ...	 
+	;	    <load DMA buffer with audio data>
+	;	    ...
+	;	    mov eax, 39 ; 'sysrele'
+	;	    int 40h ; TRDOS 386 system call (interrupt)
+	;
+
+	;mov	edx, [edx+IRQ.addr] ; Callback service address
+	;			    ; (Virtual address)
 		
-		;mov	edx, [edx+IRQ.addr] ; Callback service address
-		;			    ; (Virtual address)
-		
-		mov	ebp, [u.sp]; kernel's stack, points to EIP (user)
-		mov	[ebp], edx
+	mov	ebp, [u.sp]; kernel's stack, points to EIP (user)
+	mov	[ebp], edx
 IRQsrv_5:
-		; EOI & return
-		; 01/08/2020
-		; 11/06/2017
-		; 10/06/2017 
-		;mov	al, [IRQnum]
-		mov	al, 20h ; 01/08/2020
-		cli
-		;cmp	al, 7
-		cmp	byte [IRQnum], 7 ; 01/08/2020
-		jna	short IRQsrv_6
-		;
-		;;mov	al, EOI	; end of interrupt
-		;mov	al, 20h ; 01/08/2020
-		;cli		; disable interrupts till stack cleared
-		;out	INTB00, al ; For controll2 #2
-		out	0A0h, al
+	; EOI & return
+	; 01/08/2020
+	; 11/06/2017
+	; 10/06/2017 
+	;mov	al, [IRQnum]
+	mov	al, 20h ; 01/08/2020
+	cli
+	;cmp	al, 7
+	cmp	byte [IRQnum], 7 ; 01/08/2020
+	jna	short IRQsrv_6
+	;
+	;;mov	al, EOI	; end of interrupt
+	;mov	al, 20h ; 01/08/2020
+	;cli		; disable interrupts till stack cleared
+	;out	INTB00, al ; For controll2 #2
+	out	0A0h, al
 IRQsrv_6:
-		;mov	byte [IRQnum], 0 ; reset
-		;;mov	al, EOI	; end of interrupt
-		;mov	al, 20h ; 01/08/2020
-		;cli		; disable interrupts till stack cleared
-		;out	INTA00, al ; end of interrupt to 8259 - 1
-		out	20h, al	
+	;mov	byte [IRQnum], 0 ; reset
+	;;mov	al, EOI	; end of interrupt
+	;mov	al, 20h ; 01/08/2020
+	;cli		; disable interrupts till stack cleared
+	;out	INTA00, al ; end of interrupt to 8259 - 1
+	out	20h, al	
 IRQsrv_7:	
-		;; 13/06/2017
-		;or	word [ebp+8], 200h ; force enabling interrupts
-		;
-		mov 	ecx, [IRQ_cr3]	; previous content of cr3 register
- 		mov	cr3, ecx	; restore cr3 register content
-		;
-		popad ; edi,esi,ebp,(icrement esp by 4),ebx,edx,ecx,eax
-		;
-		pop	gs
-		pop	fs
-		pop	es
-		pop	ds
-		;
-		iretd	; return from interrupt
+	;; 13/06/2017
+	;or	word [ebp+8], 200h ; force enabling interrupts
+	;
+	mov 	ecx, [IRQ_cr3]	; previous content of cr3 register
+ 	mov	cr3, ecx	; restore cr3 register content
+	;
+	popad ; edi,esi,ebp,(icrement esp by 4),ebx,edx,ecx,eax
+	;
+	pop	gs
+	pop	fs
+	pop	es
+	pop	ds
+	;
+	iretd	; return from interrupt
 
 ; 17/04/2021
 ; ('get_device_number' procedure is disabled as temporary)
 
 ;get_device_number:
-;		; 08/10/2016
-;		; 07/10/2016 - TRDOS 386 (TRDOS v2.0)
-;		;
-;		; This procedure compares name of requested
-;		; device with kernel device names and
-;		; installable device names. If names match, 
-;		; the relevant device index (entry) number 
-;		; will be returned the caller (sysopen) 
-;		; for the requested device.
-;		;
-;		; NOTE: Installable device drivers must
-;		; be loaded before using 'sysopen'
-;		; (opendev) system call.
-;		;
-;		; INPUT:
-;		;    ESI = device name address (ASCIIZ)
-;		;         (in kernel's memory space)  
-;  		;    max name length = 8 without '/dev/')
-;		;    Device name will be capitalized 
-;		;    and if there is, '/dev/' will be
-;		;    removed from name before comparising)
-;		;
-;		; OUTPUT:
-;		;    cf = 0 -> 
-;		;      EAX (AL) = device entry/index number
-;		;    cf = 1 -> device not found (installed)
-;		;	       or invalid device name
-;		;	       (AL=0)
-;		;    device_name = device name address (asciiz)
-;			;
-;		; Modified registers: EAX, EBX, ESI, EDI
+;	; 08/10/2016
+;	; 07/10/2016 - TRDOS 386 (TRDOS v2.0)
+;	;
+;	; This procedure compares name of requested
+;	; device with kernel device names and
+;	; installable device names. If names match, 
+;	; the relevant device index (entry) number 
+;	; will be returned the caller (sysopen) 
+;	; for the requested device.
+;	;
+;	; NOTE: Installable device drivers must
+;	; be loaded before using 'sysopen'
+;	; (opendev) system call.
+;	;
+;	; INPUT:
+;	;    ESI = device name address (ASCIIZ)
+;	;         (in kernel's memory space)  
+;  	;    max name length = 8 without '/dev/')
+;	;    Device name will be capitalized 
+;	;    and if there is, '/dev/' will be
+;	;    removed from name before comparising)
+;	;
+;	; OUTPUT:
+;	;    cf = 0 -> 
+;	;      EAX (AL) = device entry/index number
+;	;    cf = 1 -> device not found (installed)
+;	;	       or invalid device name
+;	;	       (AL=0)
+;	;    device_name = device name address (asciiz)
+;	;
+;	; Modified registers: EAX, EBX, ESI, EDI
 ;
-;		mov	edi, device_name
-;		call 	lodsb_capitalize
-;		mov	ah, al
-;		cmp	al, '/'
-;		jne	short gdn_1
-;		mov	edi, device_name
-;		call 	lodsb_capitalize
+;	mov	edi, device_name
+;	call 	lodsb_capitalize
+;	mov	ah, al
+;	cmp	al, '/'
+;	jne	short gdn_1
+;	mov	edi, device_name
+;	call 	lodsb_capitalize
 ;gdn_0:
-;		and	al, al ; 0 ?
-;		jz	short gdn_err ; null name after '/'
+;	and	al, al ; 0 ?
+;	jz	short gdn_err ; null name after '/'
 ;gdn_1:
-;		cmp	al, 'D'
-;		jne	short gdn_2
-;		call 	lodsb_capitalize
-;		cmp	al, 'E'
-;		jne	short gdn_2
-;		call 	lodsb_capitalize
-;		cmp	al, 'V'
-;		jne	short gdn_2
-;		lodsb
-;		cmp	al, '/'
-;		je	short gdn_4
+;	cmp	al, 'D'
+;	jne	short gdn_2
+;	call 	lodsb_capitalize
+;	cmp	al, 'E'
+;	jne	short gdn_2
+;	call 	lodsb_capitalize
+;	cmp	al, 'V'
+;	jne	short gdn_2
+;	lodsb
+;	cmp	al, '/'
+;	je	short gdn_4
 ;gdn_2:
-;		cmp	ah, '/'
-;		jne	short gdn_5
+;	cmp	ah, '/'
+;	jne	short gdn_5
 ;gdn_err:		
-;		; invalid device name or device not found
-;		xor	eax, eax ; 0
-;		stc
-;		retn
+;	; invalid device name or device not found
+;	xor	eax, eax ; 0
+;	stc
+;	retn
 ;gdn_3:
-;		cmp	al, '/'
-;		jne	short gdn_5
+;	cmp	al, '/'
+;	jne	short gdn_5
 ;gdn_4:
-;		mov	edi, device_name
-;		jmp	short gdn_6
+;	mov	edi, device_name
+;	jmp	short gdn_6
 ;gdn_5:
-;		cmp	al, 0
-;		je	short gdn_7
+;	cmp	al, 0
+;	je	short gdn_7
 ;gdn_6:
-;		call	lodsb_capitalize
-;		cmp	edi, device_name + 8
-;		jb	short gdn_3
-;		cmp	al, 0
-;		jne	short gdn_err
-;		cmp	edi, device_name + 1
-;		jna	short gdn_err ; null name after '/'
+;	call	lodsb_capitalize
+;	cmp	edi, device_name + 8
+;	jb	short gdn_3
+;	cmp	al, 0
+;	jne	short gdn_err
+;	cmp	edi, device_name + 1
+;	jna	short gdn_err ; null name after '/'
 ;gdn_7:
-;		stosb
-;		; zero padding ("NAME",0,0,0,0)
-;		cmp	edi, device_name + 8
-;		jb	short gdn_7
+;	stosb
+;	; zero padding ("NAME",0,0,0,0)
+;	cmp	edi, device_name + 8
+;	jb	short gdn_7
 ;gdn_8:
-;		; search for kernel device names
-;		mov	esi, device_name 
-;		mov	edi, KDEV_NAME
-;		xor	eax, eax
+;	; search for kernel device names
+;	mov	esi, device_name 
+;	mov	edi, KDEV_NAME
+;	xor	eax, eax
 ;gdn_9:
-;		cmpsd	
-;		jne	short gdn_10
-;		cmpsd
-;		jne	short gdn_11
-;		jmp	short gdn_17 ; match
+;	cmpsd	
+;	jne	short gdn_10
+;	cmpsd
+;	jne	short gdn_11
+;	jmp	short gdn_17 ; match
 ;gdn_10:
-;		cmpsd  ; add esi, 4 & add edi, 4
+;	cmpsd  ; add esi, 4 & add edi, 4
 ;gdn_11:
-;		mov	esi, device_name
-;		inc	al
-;		cmp	al, NumOfKernelDevNames
-;		jb	short gdn_9
+;	mov	esi, device_name
+;	inc	al
+;	cmp	al, NumOfKernelDevNames
+;	jb	short gdn_9
 ;gdn_12:
-;		; search for installable device names
-;		; esi = offset device_name 
-;		mov	edi, IDEV_NAME
-;		sub	al, al ; 0
+;	; search for installable device names
+;	; esi = offset device_name 
+;	mov	edi, IDEV_NAME
+;	sub	al, al ; 0
 ;gdn_13:
-;		cmpsd	
-;		jne	short gdn_14
-;		cmpsd
-;		jne	short gdn_15
-;		jmp	short gdn_19 ; match
+;	cmpsd	
+;	jne	short gdn_14
+;	cmpsd
+;	jne	short gdn_15
+;	jmp	short gdn_19 ; match
 ;gdn_14:
-;		cmpsd  ; add esi, 4 & add edi, 4
+;	cmpsd  ; add esi, 4 & add edi, 4
 ;gdn_15:
-;		mov	esi, device_name
-;		inc	al
-;		cmp	al, NumOfInstallableDevices
-;		jb	short gdn_13
+;	mov	esi, device_name
+;	inc	al
+;	cmp	al, NumOfInstallableDevices
+;	jb	short gdn_13
 ;
-;gdn_16: 	; error: invalid device name (not found) !
-;		xor	al, al
-;		stc
-;		retn
+;gdn_16: 
+;	; error: invalid device name (not found) !
+;	xor	al, al
+;	stc
+;	retn
 ;
-;gdn_17:	; name match (with one of kernel device names)
-;		;
-;		; convert KDEV_NAME index to 
-;		; KDEV_NUMBER index
+;gdn_17:
+;	; name match (with one of kernel device names)
+;	;
+;	; convert KDEV_NAME index to 
+;	; KDEV_NUMBER index
 ;		; (different names are used for same devices)
-;		; (example: "COM1" & "TTY8" = device number 18)
-;		mov	ebx, eax ; < 256
-;		mov	al, [KDEV_NUMBER+ebx]
+;	; (example: "COM1" & "TTY8" = device number 18)
+;	mov	ebx, eax ; < 256
+;	mov	al, [KDEV_NUMBER+ebx]
 ;
-;		; check if empty dev entry in the list
-;		cmp	byte [DEV_OPENMODE+eax], 0
-;		ja	short gdn_18 ; it must be already set
+;	; check if empty dev entry in the list
+;	cmp	byte [DEV_OPENMODE+eax], 0
+;	ja	short gdn_18 ; it must be already set
 ;
-;		; (re)set device name and access flags
-;		; (remain open work will be easy after that)
-;		; (NOTE: here, data will be copied to bss section)
-;		mov	bl, al
-;		sub	edi, 8 ; kernel device name address (data)
-;		shl	bx, 2 
-;		mov	[DEV_NAME_PTR+ebx], edi ; (all) device names
-;		mov	bl, [KDEV_ACCESS+eax] ; kernel dev list (data)
-;		mov	[DEV_ACCESS+eax], bl ; (all) device list (bss)
+;	; (re)set device name and access flags
+;	; (remain open work will be easy after that)
+;	; (NOTE: here, data will be copied to bss section)
+;	mov	bl, al
+;	sub	edi, 8 ; kernel device name address (data)
+;	shl	bx, 2 
+;	mov	[DEV_NAME_PTR+ebx], edi ; (all) device names
+;	mov	bl, [KDEV_ACCESS+eax] ; kernel dev list (data)
+;	mov	[DEV_ACCESS+eax], bl ; (all) device list (bss)
 ;gdn_18:
-;		inc	al ; 1 to NumOfKernelDevNames (<=7Fh)
-;		; eax = device index/entry number
-;		retn		
+;	inc	al ; 1 to NumOfKernelDevNames (<=7Fh)
+;	; eax = device index/entry number
+;	retn		
 ;
-;gdn_19:	; name match (with one of installable device names)
-;		;
-;		; al = 0 to NumOfInstallableDevices - 1 (<=7Fh)
+;gdn_19:
+;	; name match (with one of installable device names)
+;	;
+;	; al = 0 to NumOfInstallableDevices - 1 (<=7Fh)
 ;
-;		mov	ebx, eax
-;		add	bl, NumOfKernelDevices 	; < NUMOFDEVICES
+;	mov	ebx, eax
+;	add	bl, NumOfKernelDevices 	; < NUMOFDEVICES
 ;
-;		; check if empty dev entry in the list
-;		cmp	byte [DEV_OPENMODE+ebx], 0
-;		ja	short gdn_20 ; it must be already set
+;	; check if empty dev entry in the list
+;	cmp	byte [DEV_OPENMODE+ebx], 0
+;	ja	short gdn_20 ; it must be already set
 ;
-;		; (re)set device name and access flags
-;		; (remain open work will be easy after that)
-;		sub	edi, 8 ; installable device name address
-;		shl	bx, 2 ;*4
-;		mov	[DEV_NAME_PTR+ebx], edi ; (all) device names
-;		shr	bx, 2
-;		mov	al, [IDEV_FLAGS+eax] ; installable dev list
-;		mov	[DEV_ACCESS+ebx], al ; (all) device list
+;	; (re)set device name and access flags
+;	; (remain open work will be easy after that)
+;	sub	edi, 8 ; installable device name address
+;	shl	bx, 2 ;*4
+;	mov	[DEV_NAME_PTR+ebx], edi ; (all) device names
+;	shr	bx, 2
+;	mov	al, [IDEV_FLAGS+eax] ; installable dev list
+;	mov	[DEV_ACCESS+ebx], al ; (all) device list
 ;gdn_20:	
-;		mov	al, bl
-;		; eax = device index/entry number ; < NUMOFDEVICES
-;		retn
+;	mov	al, bl
+;	; eax = device index/entry number ; < NUMOFDEVICES
+;	retn
 
 ;lodsb_capitalize:
 ;	; 07/10/2016 - TRDOS 386 (TRDOS v2.0)
