@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/06/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 04/06/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -6795,6 +6795,7 @@ sln_fail_flags:
 
 	; 03/06/2025 - TRDOS 386 v2.0.10
 check_lfn_sub_component:
+	; 04/06/2025
 	; Compare asciiz string (long name) with
 	; Unicode Long File Name sub-component
 	; (letter by letter after a conversion to ascii)
@@ -6915,12 +6916,14 @@ clfnsc_3_next:
 	loop	clfnsc_3
 
 clfnsc_ok:
+	; 04/06/2025
+	; ecx = 0
+clfnsc_fail_@:	; ecx > 0
 	or	ecx, ecx ; zf = 1
 
 	; zf = 1 -> match
 	; zf = 0 -> not match
 
-clfnsc_fail_@:
 	pop	edi	; *
 
 	; zf = 0
