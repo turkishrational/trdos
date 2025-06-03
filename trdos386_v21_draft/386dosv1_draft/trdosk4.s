@@ -6588,6 +6588,46 @@ a_to_u_exit_2:
 	sub	eax, ecx
 	retn
 
+	; 04/06/2025 - TRDOS 386 v2.0.10
+calc_LFN_level:
+	; Calculate LFN level for a long name
+	; (before/without converting it to UNICODE)
+	;
+	; Input:
+	;  esi = ASCIIZ file name buffer
+	;	(max. 128 + NUL bytes)
+	;
+	; Output:
+	;  byte	[LFN_level] = Required LFN Entry Count
+	;  eax = long name length (except NUL tail)
+	;	 -asciiz string length, except zero-
+	;
+	; Modified registers: eax, ebx, ecx, esi
+	;
+
+	xor	eax, eax
+	mov	[LFN_level], al ; 0
+
+	mov	ecx, 128
+clfnl_1:
+	mov	ebx, 13
+	inc	byte [LFN_level]
+clfnl_2:
+	lodsb
+	or	al, al
+	jz	short clfnl_3
+	dec	ecx
+	jz	short clfnl_3
+	dec	ebx
+	jnz	short clfnl_2
+	jmp	short clfnl_1
+
+clfnl_3:
+	mov	al, 128
+	sub	eax, ecx
+	retn
+
+	; 04/06/2025
 	; 03/06/2025
 	; 01/06/2025 - TRDOS 386 v2.0.10
 search_longname:
@@ -6629,16 +6669,19 @@ slfn_invalid:
 	retn
 
 sln_1:
-	mov	edi, LongFileName
+	;mov	edi, LongFileName
 
 	; edi = Unicode long name buffer
 	;	(max. 260 bytes)
 
 	; convert to unicode file name
-	call	ascii_to_unicode
+	;call	ascii_to_unicode
+
+	; calculate count of long dir entries
+	call	calc_LFN_level
 
 	; asciiz long name length except zero tail
-	mov	ecx, eax
+	;mov	ecx, eax
 
 	; [LFN_level] = long name sub components
 
@@ -6866,11 +6909,12 @@ clfnsc_0:
 	mov	ebp, esi ; asciiz file name
 	add	ebp, eax
 
-	mov	esi, edi ; unicode file name
 	shl	eax, 1	; Order-1 * 26 
+	mov	edi, eax 
 
-	mov	edi, LongFileName
-	add	edi, eax ; unicode LFN sub component
+	mov	esi, edi ; unicode LFN sub component
+
+	add	edi, LongFileName
 
 	inc	esi	; LDIR.Name1
 
