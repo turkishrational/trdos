@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 02/06/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 03/06/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -895,6 +895,13 @@ GDE_SKIP:	resd 1
 GDE_DRVT:	resd 1
 GDE_FCLUST:	resd 1
 GDE_CCLUST:	resd 1
+
+; 03/06/2025
+; long name search parameters
+LFN_Pos:	resd 1
+LDIR_Ord:	resb 1
+		resb 1
+		resw 1
 
 ; 02/06/2025 - TRDOS 386 v2.0.10
 ; Windows/DOS long to short name conv. parms

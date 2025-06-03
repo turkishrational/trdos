@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - DEFINITIONS : trdosk0.s
 ; ----------------------------------------------------------------------------
-; Last Update: 02/06/2025 (Previous: 29/02/2016, v2.0.0)
+; Last Update: 03/06/2025 (Previous: 29/02/2016, v2.0.0)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -671,6 +671,25 @@ struc dir_entry
 .dir_file_size:
 .dir_size_l:	resw 1	; low 16 bits of file size
 .dir_size_h:	resw 1	; high 16 bits of file size
+.size:
+endstruc
+
+; 03/06/2025 - TRDOS 386 v2.0.10
+; ----------------------------------
+; FAT Long Directory Entry Structure
+; ----------------------------------
+; ref: Microsoft FAT32 File System Specification (2000)
+
+struc LDIR
+.Ord:		resb 1	; Order of the entry
+			; LAST_LONG_ENTRY is masked with 40h
+.Name1:		resb 10 ; Chars 1-5 of the long name sub-component
+.Attr:		resb 1	; Attributes must be ATTR_LONG_NAME (0Fh)
+.Type:		resb 1	; Zero indicates long name sub-component
+.Chksum:	resb 1	; Checksum of name in short dir entry	
+.Name2:		resb 12	; Chars 6-11 of the LFN sub-component
+.FstClusLO:	resw 1	; Must be ZERO
+.Name3:		resb 4	; Chars 12-13 of the LFN sub-component
 .size:
 endstruc
 

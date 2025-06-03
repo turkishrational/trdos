@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 31/05/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 03/06/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1686,6 +1686,7 @@ loc_pslnsc_retn:
     	retn
 
 parse_path_name:
+	; 03/06/2025
 	; 19/05/2025 (TRDOS 386 v2.0.10)
 	; 03/09/2024 (TRDOS 386 v2.0.9)
 	; 09/08/2022
@@ -1795,7 +1796,9 @@ loc_scan_next_slash_pos:
 
 	mov	ecx, [Last_Slash_Pos]
 	; 03/09/2024
-	jcxz	pass_ppn_cdir
+	; jcxz	pass_ppn_cdir
+	; 03/06/2025
+	jecxz	pass_ppn_cdir
 	mov	esi, [First_Path_Pos]
 	sub	ecx, esi
 	inc	ecx
@@ -6541,10 +6544,12 @@ ascii_to_unicode:
 	;
 	; Output:
 	;  byte	[LFN_level] = Required LFN Entry Count
+	;  eax = long name length (except NUL tail)
+	;	 -asciiz string length, except zero-
 	;
 	; Modified registers: eax, ebx, ecx, esi, edi
 	;
-	
+
 	; 01/06/2025
 	; (temporary code before version 2.1)
 
@@ -6581,144 +6586,346 @@ a_to_u_exit_2:
 	stosd
 	mov	al, 128
 	sub	eax, ecx
-	retn	
+	retn
 
+	; 03/06/2025
 	; 01/06/2025 - TRDOS 386 v2.0.10
 search_longname:
 	; Search DOS/Windows LFN in current directory
 	;
 	; Input:
-	;  esi = ASCIIZ long name (not UNICODE!)
-	;	(max. 128 bytes, + NUL)
-	;  ecx = 
-	;  edi = Unicode long name buffer
-	;	(max. 260 bytes)
+	;   esi = ASCIIZ long name (not UNICODE!)
+	;   	  (max. 128 bytes, + NUL)
 	;
+	;   [Current_Drv] = Logical Dos Drive Number
+	;   [Current_Dir_FCluster] = 1st clust of the dir
+	;		which the LFN will be searched
+	;	          = 0 -> root directory	
 	; Output:
-	;  ecx = remain bytes in buffer
-	;	  (after the last zero)
-	;   al = the last char converted
-	;  edi = next byte position
-	;	  in ASCIIZ string/name buffer
+	;   eax = LFN position (found)
+	;   ebx = the 1st cluster of the directory
+	;   ecx = number of LFN sub components
+	;   edx = Logical Dos Drive parameters Table
+	;   esi = ASCIIZ long name (same with input)
+	;   edi = short dir entry (in the dir buff)
+	;   ebp = Long File Name (UNICODE) address
 	;
-	; Modified registers: eax, ecx, esi, edi
+	;   If CF = 1 -> error code in EAX
+	;
+	; Modified registers:
+	;	eax, ebx, ecx, edx, edi, ebp
 	;
 
 	mov	[f_target], esi ; save string address
 
 	call	check_invalid_lfn_chars
-	jc	short slfn_invalid
+	;jc	short slfn_invalid
+	jnc	short sln_1
+
+slfn_invalid:
+	; invalid file name
+	mov	eax, ERR_INV_FILE_NAME ;  26
+	stc
+	retn
+
+sln_1:
+	mov	edi, LongFileName
+
+	; edi = Unicode long name buffer
+	;	(max. 260 bytes)
 
 	; convert to unicode file name
 	call	ascii_to_unicode
 
+	; asciiz long name length except zero tail
+	mov	ecx, eax
+
+	; [LFN_level] = long name sub components
+
+	mov	al, [LFN_level]
+
+	or	al, 40h
+	mov	[LDIR_Ord], al
+
+	xor	edx, edx
+	mov	dh, [Current_Drv]
+
+	mov	ebx, [Current_Dir_FCluster]
+
+	xor	eax, eax ; 0
+
+	or	ebx, ebx ; root ?
+	jz	short sln_3
+
+	cmp	byte [edx+LD_FATType], 3
+	jb	short sln_2
+
+	; Check if it is FAT32 root dir cluster
+	cmp	ebx, [edx+LD_BPB+BPB_RootClus]
+	je	short sln_3
+sln_2:
+	mov	al, 2	; skip '.' and '..'
+sln_3:
+	mov	[DirEntry_Counter], eax
+
+	call	get_direntry_@
+	jc	short sln_fail
+
+sln_4:
+	; edi = directory entry
+	; esi = directory buffer header
+	; eax = directory entry offset (0-480)
+
+	lea	ebx, [esi+BUFINSIZ+512]
+sln_5:
+	mov	al, [edi]
+	or	al, al
+	jz	short sln_not_found ; end of directory
+
+	;cmp	byte [edi+0Bh], 0Fh
+	cmp	byte [edi+dir_entry.dir_attr], ATTR_LONGNAME
+	jne	short sln_9
+
+	cmp	al, [LDIR_Ord]
+	jne	short sln_10
+
+	mov	esi, [f_target]
+
+	call	check_lfn_sub_component
+	jnz	short sln_9
+
+	;mov	cl, [edi+0Dh] ; long name checksum
+	mov	cl, [edi+LDIR.Chksum]
+	mov	[LFN_CheckSum], cl
+
+	test	byte [LDIR_Ord], 40h
+	jz	short sln_6
+
+	and	byte [LDIR_Ord], 0Fh ; ~40h
+	mov	eax, [DirEntry_Counter]
+	mov	[LFN_Pos], eax
+
+sln_6:
+	dec	byte [LDIR_Ord]
+	jz	short sln_11
+
+sln_7:
+	inc	dword [DirEntry_Counter]
+	add	edi, 32
+sln_8:
+	cmp	edi, ebx ; buffer end
+	jb	short sln_5
+
+	mov	eax, [DirEntry_Counter]
+	mov	ebx, [Current_Dir_FCluster]
+	call	get_direntry
+	jc	short sln_fail
+	jmp	short sln_4
+
+sln_not_found:
+	; Long File Name not found
+	mov	eax, ERR_FILE_NOT_FOUND ; 12
+sln_fail:
+	; error code in EAX
+	stc
+	retn
+
+sln_9:
+	test	byte [LDIR_Ord], 40h
+	jnz	short sln_7
+	mov	al, [LFN_level]
+	or	al, 40h
+	mov	[LDIR_Ord], al
+	jmp	short sln_7
+
+sln_10:
+	and	eax, 0Fh
+	add	[DirEntry_Counter], eax
+	shl	eax, 5 ; * 32
+	add	edi, eax
+	jmp	short sln_8
+
+sln_11:
+	inc	dword [DirEntry_Counter]
+	add	edi, 32
+	cmp	edi, ebx ; buffer end
+	jnb	short sln_13
+
+sln_12:
+	;test	byte [edi+0Bh], 0C8h
+	test	byte [edi+dir_entry.dir_attr], 0C8h
+		; not volume, also bit 6&7 must be 0
+	jnz	short sln_fail_flags
+	mov	esi, edi
+	call	calculate_checksum
+	; ecx = 0
+	cmp	al, [LFN_CheckSum]
+	jne	short sln_fail_chksum
+
+sln_found:
+	;clc
+	mov	eax, [LFN_Pos]
+	mov	ebx, [Current_Dir_FCluster]
+	mov	esi, [f_target] ; asciiz long name
+	mov	ebp, LongFileName ; UNICODE name
 	mov	cl, [LFN_level]
-	or	cl, 40h
-	; first character = 4?h
-	mov	ch, 0FFh ; check only attributes
-	mov	ah, 0 ; no filter
-	mov	al, 0Fh ; long name
+	; ecx = number of LFN sub components
+	; edi = short directory entry
+	; edx = LDRVT
+	retn
 
-	;mov	esi, temp_name ; not necessary...
-	
-	call	locate_current_dir_file
-	jc	short slfn_not_found
+sln_13:
+	mov	eax, [DirEntry_Counter]
+	mov	ebx, [Current_Dir_FCluster]
+	call	get_direntry
+	jc	short sln_fail
+	jmp	short sln_12
 
-	; edi = directory entry address
-	; ebx = directory buffer entry index
+sln_fail_chksum:
+	; checksum error
+	mov	eax, ERR_CHECKSUM ; 31
+	stc
+	retn
 
-	; [CLUSFAC] = remain sector count
-	;			in the cluster
-	; [DIRSEC] = physical disk address
+sln_fail_flags:
+	; invalid (short dir entry) flags
+	mov	eax, ERR_INV_FLAGS
+	stc
+	retn
+
+	; 03/06/2025 - TRDOS 386 v2.0.10
+check_lfn_sub_component:
+	; Compare asciiz string (long name) with
+	; Unicode Long File Name sub-component
+	; (letter by letter after a conversion to ascii)
 	;
-	; [DirEntry_Counter] = dir entry index
-	;	from the start of the dir (found)
-	; [DirBuff_Cluster] = cluster number
-	; [CurrentBuffer] = dir buffer header
-	; [DirBuff_CurrentEntry] = bl
+	; Input:
+	;   esi = asciiz long name address
+	;	(max. 128 bytes + NUL)
+	;
+	;   edi = long directory entry address
+	;    al = long directory entry order/ordinal
+	;
+	;   LongFileName = Unicode long file name
+	;	buffer (260 bytes)
+	;
+	; Output:
+	;   If zf = 1 -> match
+	;   	LongFileName = unicode long name
+	;	ecx = 0
+	;	al = matching (lowercase) character
+	;   If zf = 0 -> not match
+	;	al = mismatched lowercase character
+	;
+	;   If cf = 1 -> condition mismatch
+	;	al = LDIR order (0-15)
+	;
+	; Note: If the characters do not match,
+	;     they are compared again in lower case.
+	;  (dir entry char is converted to lower case)
+	;
+	; Modified registers:
+	;	eax, ecx, esi, ebp
+	;
 
-	push	edi
-	mov	esi, edi ; LDIR_order
-	mov	edi, temp_name
-	inc	esi
-	mov	ecx, 5 ; chars 1 to 5
-c1:
+	xor	ecx, ecx
+	and	eax, 0Fh
+	cmp	al, 0Ah	; limit for TRDOS 386 v2.0.10
+	ja	short clfnsc_fail
+
+	cmp	al, 1
+	jb	short clfnsc_fail
+
+	cmp	al, 10 ; 0Ah
+	jb	short clfnsc_0
+
+	; check 128 bytes limit (117+11)
+	; the 12th char must be ZERO or 0FFFFh
+	mov	cx, [edi+LDIR.Name3]
+	jecxz	clfnsc_0 ; 0
+	inc	cx ; -1 -> 0
+	;jnz	short clfnsc_fail
+	jz	short clfnsc_0
+
+clfnsc_fail:
+	; cf = 1
+	stc
+	retn 
+
+clfnsc_0:
+	dec	al	; 1 -> 0 or 41h -> 0
+
+	mov	cl, 13	; Order-1 * 13
+	mul	cl
+	; eax = offset
+	;	(0-13-26-39-52-65-78-91-104-117)
+
+	push	edi	; *
+
+	mov	ebp, esi ; asciiz file name
+	add	ebp, eax
+
+	mov	esi, edi ; unicode file name
+	shl	eax, 1	; Order-1 * 26 
+
+	mov	edi, LongFileName
+	add	edi, eax ; unicode LFN sub component
+
+	inc	esi	; LDIR.Name1
+
+	mov	cl, 5	; Characters 1-5
+clfnsc_1:
 	lodsw
+	stosw
 	call	ascii_from_unicode
-	stosb
-	loop	c1
+	cmp	al, [ebp]
+	je	short clfnsc_1_next
+	call	check_lcase
+	jne	short clfnsc_fail_@
+clfnsc_1_next:
+	inc	ebp
+	loop	clfnsc_1
 
 	add	esi, 3
-	mov	cl, 6 ; chars 6 to 11
-c2:
+	mov	cl, 6	; Characters 6-11
+clfnsc_2:
 	lodsw
+	stosw
 	call	ascii_from_unicode
-	stosb
-	loop	c2
-
-	inc	esi
-	inc	esi
-	
+	cmp	al, [ebp]
+	je	short clfnsc_2_next
+	call	check_lcase
+	jne	short clfnsc_fail_@
+clfnsc_2_next:
+	inc	ebp
+	loop	clfnsc_2
 	lodsw
-	call	ascii_from_unicode
-	stosb
 
+	mov	cl, 2	; Characters 12-13
+clfnsc_3:
 	lodsw
+	stosw
 	call	ascii_from_unicode
-	stosb
+	cmp	al, [ebp]
+	je	short clfnsc_3_next
+	call	check_lcase
+	jne	short clfnsc_fail_@
+clfnsc_3_next:
+	inc	ebp
+	loop	clfnsc_3
 
-	;xor	al, al
-	;stosb
+clfnsc_ok:
+	or	ecx, ecx ; zf = 1
 
-	mov	esi, [f_target] ; restore esi
-	mov	ecx, 13
-c3:
-	lodsb
-	cmp	al, [edi]
-	jnz	short check_lcase
+	; zf = 1 -> match
+	; zf = 0 -> not match
 
-	or	al, al
-	jz	short ok
+clfnsc_fail_@:
+	pop	edi	; *
 
-next:
-	inc	edi
-	loop	c3
-ok:
-slfn_not_found:
-check_next_direntry:
-	retn
+	; zf = 0
+	; ecx = 0
 
-check_lcase:
-	; 01/06/2025 - Erdogan Tan
-	; if lower case character matches,
-	; it will be accepted.
-	; (The user may write a directory/file name
-	;  with lowercase letters.
-	;  Uppercase to lowercase conversion
-	;  is for directory entry only,
-	;  not for the user.)
-	call	simple_lcase
-	cmp	al, [edi]
-	je	short next
-fail:
-	jmp	short check_next_direntry
-
-
-	pop	edi
-
-	; edi = directory entry
-	call	save_longname_sub_component
-	; only ecx modified here
-
-
-
-slfn_invalid:
-	; invalid file name
-	mov	eax, ERR_INV_FILE_NAME ;  26 
-	retn
-
-slfn_notfound:
-	; eax = error code
 	retn
 
 ; -----------------------------------------------
@@ -6728,6 +6935,7 @@ get_direntry_@:
 	; initialization
 	mov	dword [GDE_CCLUST], -1
 
+	; 03/06/2025
 	; 02/06/2025
 	; 01/06/2025 - TRDOS 386 v2.0.10
 get_direntry:
@@ -6742,10 +6950,10 @@ get_direntry:
 	; Output:
 	;  edi = directory entry address
 	;  esi = directory buffer header
-	;  (eax = directory entry offset) 
+	;  (eax = directory entry offset)
 	;  edx = LDRVT
 	;
-	;  if cf = 1 -> error code in eax 
+	;  if cf = 1 -> error code in eax
 	;
 	; Modified registers:
 	;	 eax, ebx, ecx, esi, edi, ebp
@@ -6765,8 +6973,12 @@ get_direntry:
 	; root directory
 
 	cmp	byte [edx+LD_FATType], 3
-	jnb	short gde_2
+	jb	short gde_0
 
+	mov	ebx, [edx+LD_BPB+FAT32_RootFClust]
+	jmp	short gde_2
+
+gde_0:
 	mov	cx, [edx+LD_BPB+RootDirEnts]
 	cmp	eax, ecx
 	jb	short gde_1
@@ -6818,16 +7030,17 @@ gde_3:
 	jz	short gde_4 ; same
 	jb	short gde_7 ; less (start from fclust)
 
-	mov	[GDE_SKIP], eax ; > 0
-
 	cmp	dword [GDE_CCLUST], -1 ; invalid ?
 	jnb	short gde_8  ; yes, do chain from fclust
+
+	mov	[GDE_SKIP], eax ; > 0
 	mov	ebx, [GDE_CCLUST]
+
 	jmp	short gde_8  ; chain from current clust
 gde_4:
 	mov	eax, [GDE_CCLUST]
 	cmp	eax, -1 ; invalid ?
-	jb	short gde_15 ; no, valid
+	jb	short gde_14 ; no, valid
 
 	jecxz	gde_13 ; First Cluster
 
@@ -6877,15 +7090,20 @@ gde_12:
 
 gde_13:
 	mov	[GDE_CCLUST], ebx
-gde_14:
 	;mov	eax, [GDE_CCLUST]
 	mov	eax, ebx
+gde_14:
+	or	eax, eax
+	jnz	short gde_15
+	mov	eax, [edx+LD_ROOTBegin]
+	jmp	short gde_16
 gde_15:
 	; edx = LDRVT
 	; eax = cluster number
 	call	FIGREC
+gde_16:
 	add	eax, [GDE_SINDEX]
-	
+
 	; eax = physical sector number
 	;  cl = physical drive/disk number
 	;       (needed for GETBUFFER procedure)
@@ -6902,6 +7120,31 @@ gde_15:
 	shl	eax, 5 ; * 32
 	add	edi, eax
 
+	retn
+
+; -----------------------------------------------
+
+check_lcase:
+	; 03/06/2025
+	; 01/06/2025 - Erdogan Tan
+	; if lower case character matches,
+	; it will be accepted.
+	; (The user may write a directory/file name
+	;  with lowercase letters.
+	;  Uppercase to lowercase conversion
+	;  is for directory entry only,
+	;  not for the user.)
+
+	; al = character 
+	;      (in directory entry)
+	;  -already converted to ascii from unicode-
+	;
+	; [ebp] = user's character (asciiz string)
+ 
+	call	simple_lcase
+	; zf = 1 -> match
+	; zf = 0 -> not match
+	cmp	al, [ebp]
 	retn
 
 ; -----------------------------------------------
