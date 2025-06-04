@@ -6737,6 +6737,8 @@ sln_5:
 	call	check_lfn_sub_component
 	jnz	short sln_9
 
+	; long name subcomponent matches
+
 	;mov	cl, [edi+0Dh] ; long name checksum
 	mov	cl, [edi+LDIR.Chksum]
 	mov	[LFN_CheckSum], cl
@@ -6856,13 +6858,12 @@ check_lfn_sub_component:
 	; Output:
 	;   If zf = 1 -> match
 	;   	LongFileName = unicode long name
-	;	ecx = 0
-	;	al = matching (lowercase) character
+	;	If al = 0 -> NUL tail of the long name
 	;   If zf = 0 -> not match
 	;	al = mismatched lowercase character
 	;
-	;   If cf = 1 -> condition mismatch
-	;	al = LDIR order (0-15)
+	;   ;If cf = 1 -> condition mismatch
+	;   ;	al = LDIR order (0-15)
 	;
 	; Note: If the characters do not match,
 	;     they are compared again in lower case.
@@ -6873,28 +6874,18 @@ check_lfn_sub_component:
 	;
 
 	xor	ecx, ecx
+
 	and	eax, 0Fh
+	;jz	short clfnsc_fail_@
+
 	cmp	al, 0Ah	; limit for TRDOS 386 v2.0.10
-	ja	short clfnsc_fail
+	;;ja	short clfnsc_fail_@
+	;jna	short clfnsc_0
 
-	cmp	al, 1
-	jb	short clfnsc_fail
-
-	cmp	al, 10 ; 0Ah
-	jb	short clfnsc_0
-
-	; check 128 bytes limit (117+11)
-	; the 12th char must be ZERO or 0FFFFh
-	mov	cx, [edi+LDIR.Name3]
-	jecxz	clfnsc_0 ; 0
-	inc	cx ; -1 -> 0
-	;jnz	short clfnsc_fail
-	jz	short clfnsc_0
-
-clfnsc_fail:
-	; cf = 1
-	stc
-	retn 
+;clfnsc_fail_@:
+;	; cf = 1
+;	stc
+;	retn 
 
 clfnsc_0:
 	dec	al	; 1 -> 0 or 41h -> 0
@@ -6924,9 +6915,14 @@ clfnsc_1:
 	stosw
 	call	ascii_from_unicode
 	cmp	al, [ebp]
-	je	short clfnsc_1_next
+	jne	short clfnsc_1_lc
+	or	al, al
+	jnz	short clfnsc_1_next
+	pop	edi	; *
+	retn
+clfnsc_1_lc:
 	call	check_lcase
-	jne	short clfnsc_fail_@
+	jne	short clfnsc_fail
 clfnsc_1_next:
 	inc	ebp
 	loop	clfnsc_1
@@ -6938,9 +6934,14 @@ clfnsc_2:
 	stosw
 	call	ascii_from_unicode
 	cmp	al, [ebp]
-	je	short clfnsc_2_next
+	jne	short clfnsc_2_lc
+	or	al, al
+	jnz	short clfnsc_2_next
+	pop	edi	; *
+	retn
+clfnsc_2_lc:
 	call	check_lcase
-	jne	short clfnsc_fail_@
+	jne	short clfnsc_fail
 clfnsc_2_next:
 	inc	ebp
 	loop	clfnsc_2
@@ -6952,22 +6953,24 @@ clfnsc_3:
 	stosw
 	call	ascii_from_unicode
 	cmp	al, [ebp]
-	je	short clfnsc_3_next
+	jne	short clfnsc_3_lc
+	or	al, al
+	jnz	short clfnsc_3_next
+	pop	edi	; *
+	retn
+clfnsc_3_lc:
 	call	check_lcase
-	jne	short clfnsc_fail_@
+	jne	short clfnsc_fail
 clfnsc_3_next:
 	inc	ebp
 	loop	clfnsc_3
 
 clfnsc_ok:
-	; 04/06/2025
-	; ecx = 0
-clfnsc_fail_@:	; ecx > 0
-	or	ecx, ecx ; zf = 1
+	or	ecx, ecx
+	; zf = 1
+	; al = the last char (> 0)
 
-	; zf = 1 -> match
-	; zf = 0 -> not match
-
+clfnsc_fail:
 	pop	edi	; *
 
 	; zf = 0
