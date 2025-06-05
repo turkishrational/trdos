@@ -2715,7 +2715,7 @@ getb_1:
 getb_2:
 	cmp	eax, [esi+BUFFINFO.buf_sector]	; (phy) sector num
 	jne	short getb_7
-	
+
 	cmp	cl, [esi+BUFFINFO.buf_ID]	; (phy) drive num
 	jne	short getb_7
 
@@ -2842,7 +2842,7 @@ getb_13:
 	mov	[esi+BUFFINFO.buf_ID], cx ; set ID and flags
 	mov	ch, [pre_read]	; bit 0 -> fat buffer flag
 				; bit 7 -> no pre-read flag
-	jmp	getb_3				
+	jmp	getb_3
 
 ; --------------------------------------------------------------------
 

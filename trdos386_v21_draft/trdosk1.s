@@ -791,7 +791,13 @@ set_buffers:
 	; output: buffers Queue established
 	mov	edi, BUFFERS
 	mov	[BufferQueue], edi		; head of Buff Q
-	xor	ecx, ecx ; 0
+
+	; 05/06/2025
+	mov	[FIRST_BUFF_ADDR], edi
+	mov	ecx, -1
+	mov	[LastBuffer], ecx ; -1
+	;xor	ecx, ecx ; 0
+	inc	ecx ; 0
 	mov	[DirtyBufferCount], ecx ; 0	; set dirty_count to 0.
 	mov	[buf_prev_off], ecx ; 0
 
@@ -801,8 +807,6 @@ set_buffers:
 nxt_buff:
 	call	set_buffer_info 		; set buf_link,buf_id...
 	loop	nxt_buff
-	; 05/06/2025
-	mov	dword [LastBuffer], -1
 	retn
 
 	; 17/04/2025 - TRDOS 386 v2.0.10
