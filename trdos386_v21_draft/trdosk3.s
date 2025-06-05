@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 20/05/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 05/06/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -3326,6 +3326,8 @@ loc_fnf_stc_retn_@:
 	retn
 
 get_and_print_longname:
+	; 05/06/2025
+	; 04/06/2025
 	; 20/05/2025 (TRDOS 386 v2.0.10)
 	;	-Major Modification-
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -3335,12 +3337,66 @@ get_and_print_longname:
 	; 17/10/2009 (CMD_INTR.ASM, 'cmp_cmd_longname')
 get_longname_fchar:
 	cmp	byte [esi], 20h
-	ja	short loc_find_longname
+	;ja	short loc_find_longname
+	; 04/06/2025
+	ja	short get_longname_option
 	;jb	short loc_longname_retn
 	;inc	esi
 	;je	short get_longname_fchar
 ;loc_longname_retn:
 	retn
+
+get_longname_option:
+	; 04/06/2025
+	cmp	byte [esi], '"'
+	jne	short loc_find_longname
+
+	lodsb	; skip the 1st dbl quote
+	mov	ecx, 128
+	mov	edi, temp_name
+get_longname_option_1:
+	lodsb
+	cmp	al, '"'
+	je	short get_longname_option_2
+			; the 2nd dbl quote, stop
+	cmp	al, 20h
+	jb	short inv_longname_err
+	stosb
+	loop	get_longname_option_1
+
+inv_longname_err:
+	mov	esi, Msg_Invalid_LongName
+	jmp	print_msg
+
+get_longname_option_2:
+	xor	al, al
+	stosb
+	mov	esi, temp_name 
+	call	search_longname
+	jnc	short get_longname_option_3
+
+	cmp	al, ERR_FILE_NOT_FOUND ; 12
+	je	short loc_longname_not_found
+
+	; 05/06/2025
+	cmp	al, ERR_INV_FILE_NAME ; 26
+	je	short inv_longname_err
+
+	jmp	short loc_fln_error
+
+get_longname_option_3:
+	; convert short name to 8.3 format
+	
+	; edi = short dir entry address
+	mov	esi, Dir_File_Name
+	; esi = dos dot (8.3) file name buffer
+	xchg	esi, edi
+	call	convert_to_8_3_fname
+	; 05/06/2025
+	mov	esi, edi
+	; esi = dos (8.3) dot file name (asciiz)
+	jmp	loc_print_shortname
+
 loc_find_longname:
 	call	find_longname
 	jnc	short loc_print_longname
@@ -3348,8 +3404,10 @@ loc_find_longname:
 	or	al, al
 	jz	short loc_longname_not_found
 
+	; 04/06/2025
+loc_fln_error:
 	; 16/10/2016 (15h -> 15, 17)
-	cmp	al, 15
+	cmp	al, ERR_DRV_NOT_RDY ; 15
 	;je	cd_drive_not_ready ; drive not ready
 	; 28/07/2022
 	jne	short loc_fln_err2
@@ -3357,10 +3415,11 @@ loc_fln_err1:
 	jmp	cd_drive_not_ready
 loc_fln_err2:
 				   ; or
-	cmp	al, 17		   ; read error
+	cmp	al, ERR_DRV_READ ; 17 ; read error
 	;je	cd_drive_not_ready
+	; 04/06/2025
 	; 28/07/2022
-	;je	short loc_fln_err1
+	je	short loc_fln_err1
 
 loc_ln_file_dir_not_found:
 	mov	esi, Msg_File_Directory_Not_Found
@@ -3384,15 +3443,15 @@ loc_print_longname:
 	;mov	esi, LongFileName ; (max. 130 bytes)
 	mov	edi, TextBuffer ; (max. space: 256 bytes)
 	push	edi 
+	; 04/06/2025
 	; 20/05/2025
 	; TRDOS 386 v2.0.10 limit for FAT/FAT32 long name
 	mov	ecx, 130 ; asciiz or full 130 bytes
 	cmp	al, 0
 	ja	short loc_print_longname_1
-		; asciiz name length limit for Singlix FS 
+		; asciiz name length limit for Singlix FS
 	mov	cl, 64  ; asciiz or full 64 bytes
-loc_print_longname_1:
-;loc_print_FS_longname: ; Singlix FS (64 byte ASCIIZ file name)
+loc_print_FS_longname: ; Singlix FS (64 byte ASCIIZ file name)
 	;lodsb
 	;stosb
 	;or	al, al
@@ -3402,19 +3461,25 @@ loc_print_longname_1:
 	;;;;
 	; 20/02/2025
 	rep	movsb
-		 ; may be better to put a zero at the end
+		; may be better to put a zero at the end
 	sub	al, al ; 0
 	stosb
+	; 04/06/2025
+	jmp	short loc_print_longname_2
 	;;;;
-	
-;loc_print_longname_1: ; MS Windows long name (UNICODE chars)
-	;lodsw
-	;stosb
-	;or	al, al
-	;jnz	short loc_print_longname_1
-	;
+
+loc_print_longname_1: ; MS Windows long name (UNICODE chars)
+	lodsw
+	; 04/06/2025
+	call	ascii_from_unicode
+	stosb
+	or	al, al
+	jz	short loc_print_longname_2
+	loop	loc_print_longname_1
+
 loc_print_longname_2:
 	pop	esi
+loc_print_shortname: ; 04/06/2025
 	call	print_msg
   	mov	esi, nextline
 loc_lfn_err3:

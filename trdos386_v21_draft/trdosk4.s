@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 04/06/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 05/06/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -695,7 +695,7 @@ locate_current_dir_file:
 	; 	If cf= 1 ->
 	;   	[DirEntry_Counter] = the last direntry index number
 	;		from the start of the directory (not found)
-	
+
 	;mov	word [DirBuff_EntryCounter], 0 ; Zero Based
 
 	; 17/05/2025
@@ -704,7 +704,7 @@ locate_current_dir_file:
 
 	; 29/05/2025
 	; Reset directory entry (index) counter
-	mov	[DirEntry_Counter], edx ; 0 
+	mov	[DirEntry_Counter], edx ; 0
 	; 29/05/2025
 	mov	[PreviousAttr], dl ; 0
 
@@ -750,7 +750,7 @@ locate_current_sub_dir_file:
 	mov	cl, [edx+LD_BPB+SecPerClust]
 	;mov	[DirBuff_sectors], cl
 	mov	[CLUSFAC], cl
-	
+
 	; 17/05/2025
 	;sub	ebx, ebx
 
@@ -768,7 +768,7 @@ locate_current_sub_dir_file_@:
 
 	call	GETBUFFER
 	jc	short loc_cdir_locate_file_retn
-	
+
 	;mov	esi, [CurrentBuffer]
 	or	byte [esi+BUFFINFO.buf_flags], buf_isDIR
 
@@ -782,7 +782,7 @@ loc_cdir_locatefile_search:
 
 	;mov	byte [DirBuff_LastEntry], 16 ; 512/32
 
-	xor	ebx, ebx ; 0  ; current entry index in the dir buff 
+	xor	ebx, ebx ; 0  ; current entry index in the dir buff
 	; edi = directory buffer (data) start address
 
 	push	edx ; LDRVT address
@@ -800,7 +800,7 @@ loc_locatefile_check_next_entryblock:
 
 	dec	byte [CLUSFAC] ; (MSDOS -> [CLUSFAC])
 	jz	short loc_locatefile_check_root_dir
-	
+
 	mov	eax, [DIRSEC]
 	inc	eax
 
@@ -1016,7 +1016,7 @@ loc_find_dir_next_entry:
 	mov	byte [PreviousAttr], dl ; LongName check
 loc_find_dir_next_entry_1:
 	pop	esi
-	; 
+	;
 	; 29/05/2025
 	; Directory entry index from the start of
 	; the directory (from the 1st cluster)
@@ -1222,7 +1222,7 @@ loc_check_ffde_0_next:
 	inc	ebx
 	add	edi, 32
 	;inc	word [DirBuff_EntryCounter]
-	 
+
         ;cmp	bx, [DirBuff_LastEntry]
 	;;ja	short loc_ffde_stc_retn_255
 	;; 07/08/2022
@@ -6627,6 +6627,7 @@ clfnl_3:
 	sub	eax, ecx
 	retn
 
+	; 05/06/2025
 	; 04/06/2025
 	; 03/06/2025
 	; 01/06/2025 - TRDOS 386 v2.0.10
@@ -6664,7 +6665,7 @@ search_longname:
 
 slfn_invalid:
 	; invalid file name
-	mov	eax, ERR_INV_FILE_NAME ;  26
+	mov	eax, ERR_INV_FILE_NAME ; 26
 	stc
 	retn
 
@@ -6692,6 +6693,8 @@ sln_1:
 
 	xor	edx, edx
 	mov	dh, [Current_Drv]
+	; 05/06/2025
+	add	edx, Logical_DOSDisks
 
 	mov	ebx, [Current_Dir_FCluster]
 
@@ -6840,6 +6843,7 @@ sln_fail_flags:
 
 	; 03/06/2025 - TRDOS 386 v2.0.10
 check_lfn_sub_component:
+	; 05/06/2025
 	; 04/06/2025
 	; Compare asciiz string (long name) with
 	; Unicode Long File Name sub-component
@@ -6878,7 +6882,7 @@ check_lfn_sub_component:
 	and	eax, 0Fh
 	;jz	short clfnsc_fail_@
 
-	cmp	al, 0Ah	; limit for TRDOS 386 v2.0.10
+	;cmp	al, 0Ah	; limit for TRDOS 386 v2.0.10
 	;;ja	short clfnsc_fail_@
 	;jna	short clfnsc_0
 
@@ -6900,10 +6904,11 @@ clfnsc_0:
 	mov	ebp, esi ; asciiz file name
 	add	ebp, eax
 
+	; 05/06/2025
+	mov	esi, edi ; unicode LFN sub component
+
 	shl	eax, 1	; Order-1 * 26 
 	mov	edi, eax 
-
-	mov	esi, edi ; unicode LFN sub component
 
 	add	edi, LongFileName
 
@@ -7209,6 +7214,53 @@ simple_lcase:
 simple_lcase_skip:
 	retn
 
+; -----------------------------------------------
+
+	; 04/06/2025 - TRDOS 386 v2.0.10
+convert_to_8_3_fname:
+	; esi = directory entry format file name
+	;	(11 bytes)
+	; edi = dos dot file name buffer
+	;
+	; Modified registers: eax
+
+	push	edi ; *
+	push	esi ; **
+	push	esi ; ***
+	; write basis name
+	mov	ah, 8
+ctodotfn_1:
+	lodsb
+	cmp	al, 20h
+	jna	short ctodotfn_2
+	stosb
+	dec	ah
+	jnz	short ctodotfn_1
+ctodotfn_2:
+	; write name extension (1-3 bytes)
+	pop	esi ; ***
+	add	esi, 8
+	lodsb
+	cmp	al, 20h
+	jna	short ctodotfn_3
+			; name without ext.
+	mov	byte [edi], '.' ; 8.3
+	inc	edi
+	stosb	; .e
+	lodsb
+	cmp	al, 20h
+	jna	short ctodotfn_3
+	stosb	; .ex
+	lodsb
+	cmp	al, 20h
+	jna	short ctodotfn_3
+	stosb	; .ext
+ctodotfn_3:
+	xor	al, al
+	stosb	; 13th byte is zero (NUL tail)
+	pop	esi ; **
+	pop	edi ; *
+	retn
 
 ; 20/05/2025 - TRDOS 386 v2.0.10
 ;------------------------------------------------------
@@ -8082,8 +8134,8 @@ get_fs_sector:
 		; TRIPLE indirect tables are not usable
 		; for current TRDOS 386 version. (*)
 	jnb	short s_fdt_num_dnf_@ ; (*)
-	
-	push	esi ; **	
+
+	push	esi ; **
 
 	cmp	al, 1
 	ja	short get_fs_sector_dblindirect

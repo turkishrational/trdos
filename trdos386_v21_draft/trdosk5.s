@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 02/06/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 05/06/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -3982,6 +3982,7 @@ OkStore:
 ; 11/05/2025 - TRDOS 386 v2.0.10
 
 GETPATH:
+	; 05/06/2025
 	; 11/05/2025
 	; (MSDOS -> GETPATH) - Ref: Retro DOS v5 - ibmdos7.s
 	;
@@ -4051,6 +4052,8 @@ GetPathNoSet:
 	mov	[CurrentBuffer], eax	; -1 ; initial setting
 	xor	edx, edx
 	mov	dh, [Current_Drv]
+	; 05/06/2025
+	add	edx, Logical_DOSDisks
 	; edx = LDRVT address		; (MSDOS -> [THISDPB])
 CrackIt:
 	mov	byte [ATTRIB],attr_directory+attr_system+attr_hidden
@@ -4064,19 +4067,20 @@ CrackIt:
 	;	This number is -1 if the media has been uncertainly changed.
 	; ESI = Path offset to end of current directory text.
 	;	This may be -1 if no current directory part has been used.
-	
+
 	cmp	esi, eax		; if Current directory is not part
 	je	short NO_CURR_D		; then we must crack from root
-	
+
 	cmp	ebx, eax	; is the current directory cluster valid ?
 	jne	short short Got_Search_Cluster ; yes
-	
+
 	; no, crack from the root
 NO_CURR_D:
 	mov	esi, [WFP_START]
 	add	esi, 3			; skip 'd:/'
 	;xor	edx, edx
 	;mov	dh, [Current_Drv]
+	;add	edx, Logical_DOSDisks
 	; edx = LDRVT address		; (MSDOS -> [THISDPB])
 	jmp	short ROOTPATH
 
@@ -4084,6 +4088,7 @@ NO_CURR_D:
 Got_Search_Cluster:
 	;xor	edx, edx
 	;mov	dh, [Current_Drv]
+	;add	edx, Logical_DOSDisks
 	; edx = LDRVT address		; (MSDOS -> [THISDPB])
 	call	SETDIRSRCH
 	jnc	short FINDPATH
