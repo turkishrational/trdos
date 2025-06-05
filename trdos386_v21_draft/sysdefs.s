@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - SYSTEM DEFINITIONS : sysdefs.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/06/2025  (Previous: 23/07/2022, v2.0.5)
+; Last Update: 05/06/2025  (Previous: 23/07/2022, v2.0.5)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -32,7 +32,9 @@ nproc 	equ	16  ; number of processes
 ;nfiles equ	50
 ntty	equ     8   ; 8+1 -> 8 (10/05/2013)
 ; 17/04/2025 - TRDOS 386 v2.0.10
-nbuf	equ	114
+;nbuf	equ	114
+; 05/06/2025 - temporary !
+nbuf	equ	60
 ;nbuf	equ	4   ; 6 ;; 21/08/2015 - 'namei' buffer problem when nbuf > 4
 		; NOTE: If fd0 super block buffer addres is beyond of the 1st
 		; 32K, DMA r/w routine or someting else causes a jump to 

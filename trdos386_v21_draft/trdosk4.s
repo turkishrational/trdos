@@ -6985,10 +6985,14 @@ clfnsc_fail:
 
 ; -----------------------------------------------
 
+
+; -----------------------------------------------
+
 	; 02/06/2025
 get_direntry_@:
 	; initialization
 	mov	dword [GDE_CCLUST], -1
+	;mov	dword [GDE_CINDEX], 0
 
 	; 03/06/2025
 	; 02/06/2025
@@ -7043,7 +7047,7 @@ gde_0:
 	stc
 	retn
 
-gde_1: 
+gde_1:
 	;shr	ecx, 4 ; 512/32 = 16 entries/sector
 	; ecx = root dir sectors
 	;mov	[GDE_SPC], cl
@@ -7163,6 +7167,8 @@ gde_16:
 	;  cl = physical drive/disk number
 	;       (needed for GETBUFFER procedure)
 
+	; 04/06/2025
+%if 1
 	call	GETBUFFER
 	jc	short gde_11
 
@@ -7170,7 +7176,23 @@ gde_16:
 	or	byte [esi+BUFFINFO.buf_flags], buf_isDIR
 
 	lea	edi, [esi+BUFINSIZ]
-
+%else
+	; temporary ! 04/06/2025 ! test
+	; GetBuffer simulation
+	mov	ebx, DOSBootSectorBuff
+	mov	esi, edx
+	push	ebx
+	push	edx
+	call	DREAD
+	pop	edx
+	pop	edi
+	jnc	short gde_17
+	mov	al, ERR_DRV_READ ; 17
+	jmp	short gde_11
+gde_17:
+	mov	esi, edi
+	sub	esi, BUFINSIZ
+%endif
 	mov	eax, [GDE_BINDEX]
 	shl	eax, 5 ; * 32
 	add	edi, eax

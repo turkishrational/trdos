@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - DEFINITIONS : trdosk0.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/06/2025 (Previous: 29/02/2016, v2.0.0)
+; Last Update: 05/06/2025 (Previous: 29/02/2016, v2.0.0)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -344,7 +344,9 @@ buf_type_0	EQU	11110001B	; AND sets type to "none"
 
 ; 04/05/2025
 ; 17/04/2025
-BUFFERS		EQU	Directory_Buffer ; start address of disk buffers
+;BUFFERS	EQU	Directory_Buffer ; start address of disk buffers
+; 05/06/2025 - temporary !
+BUFFERS		EQU	Directory_Buffer + 32768
 
 ; 03/05/2025
 ; directory entry size
