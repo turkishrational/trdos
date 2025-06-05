@@ -799,7 +799,9 @@ set_buffers:
 	;xor	ecx, ecx ; 0
 	inc	ecx ; 0
 	mov	[DirtyBufferCount], ecx ; 0	; set dirty_count to 0.
-	mov	[buf_prev_off], ecx ; 0
+	;mov	[buf_prev_off], ecx ; 0
+	; 05/06/2025
+	mov	ebx, edi
 
 	;mov	ecx, nbuf			; number of buffers
 	mov	cl, nbuf
@@ -815,17 +817,20 @@ nxt_buff:
 
 	retn
 
+	; 05/06/2025
 	; 17/04/2025 - TRDOS 386 v2.0.10
 	; ref: Retro DOS v5.0 (PCDOS 7.1)
 set_buffer_info:
 	; function: set buf_link,buf_id,buf_sector
-	mov	ebx, [buf_prev_off]
+	;mov	ebx, [buf_prev_off]
+	; 05/06/2025
 	mov	[edi+BUFFINFO.buf_prev], ebx
 	mov	eax, edi
 	add	eax, edx
 	;mov	[edi+BUFFINFO.buf_next], eax
 	mov	[edi], eax
-	mov	[buf_prev_off], edi
+	;mov	[buf_prev_off], edi
+	mov	ebx, edi
 	mov	edi, eax
 	mov	dword [edi+BUFFINFO.buf_ID], 00FFh  ; new buffer free
 	mov	dword [edi+BUFFINFO.buf_sector], 0

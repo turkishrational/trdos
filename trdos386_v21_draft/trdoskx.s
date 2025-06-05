@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/06/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 05/06/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -847,7 +847,8 @@ sb16_dma_buffer: resb 65536 ; DMA buffer for sb16 audio playing.
 BufferQueue:	resd 1	; (MSDOS -> BufferQueue)
 DirtyBufferCount:
 		resd 1	; (MSDOS -> DirtyBufferCount)
-buf_prev_off:	resd 1
+; 05/06/2025
+;buf_prev_off:	resd 1
 
 ; 03/05/2025
 LastBuffer:	resd 1 	; (MSDOS -> LastBuffer)
