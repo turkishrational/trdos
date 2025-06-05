@@ -807,6 +807,12 @@ set_buffers:
 nxt_buff:
 	call	set_buffer_info 		; set buf_link,buf_id...
 	loop	nxt_buff
+	; 05/06/2025
+	mov	eax, [FIRST_BUFF_ADDR]
+	mov	[eax+BUFFINFO.buf_prev], edi	; first->prev = last
+	;mov	[edi+BUFFINFO.buf_next], eax	; last->next = first
+	mov	[edi], eax
+
 	retn
 
 	; 17/04/2025 - TRDOS 386 v2.0.10
