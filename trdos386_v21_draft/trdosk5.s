@@ -2651,6 +2651,7 @@ ude_4:
 ; 21/04/2025 - TRDOS 386 v2.0.10
 
 GETFATBUFFER:
+	; 05/06/2025
 	; 28/04/2025
 	; 21/04/2025
 	; (MSDOS -> GETBUFFRB) - Ref: Retro DOS v5 - ibmdos7.s
@@ -2659,15 +2660,17 @@ GETFATBUFFER:
 	jmp	short getb_x
 
 GETBUFFER_NPR:
+	; 05/06/2025
 	; 28/04/2025
 	; 21/04/2025
 	; (MSDOS -> GETBUFFR) - Ref: Retro DOS v5 - ibmdos7.s
-	
+
 	mov	ch, 80h		; bit 7 is 1 = no pre-read
 				; not fat buffer (bit 0)
 	jmp	short getb_x
 
 GETBUFFER:
+	; 05/06/2025
 	; 28/04/2025
 	; 24/04/2025
 	; 21/04/2025
@@ -2754,6 +2757,7 @@ getb_6:
 	jmp	short getb_0
 
 getb_7:
+	; eax = physical sector number
 	cmp	byte [esi+BUFFINFO.buf_ID], 0FFh ; -1 ; Free buffer ?
 	jne	short getb_8		; no
 
@@ -2763,6 +2767,11 @@ getb_8:
 	mov	esi, [esi]
 	cmp	esi, [FIRST_BUFF_ADDR]	; back at the front again?
 	jne	short getb_2		; no, continue looking
+
+	; 05/06/2025
+	; 28/04/2025
+	push	ebx ; *
+	push	edx ; **
 
 	cmp	ebp, -1		; 0FFFFFFFFh ; invalid (not free buf)
 	je	short getb_9
@@ -2777,60 +2786,71 @@ getb_9:
 	;
 	; Flush the first buffer & read in the new sector into it.
 
-	; 28/04/2025
-	push	ebx ; *
-	push	edx ; **
-	push	esi ; ***
-
-	mov	ebp, eax ; save disk sector number
+	mov	ebp, eax  ; save sector number
 
 	call	BUFWRITE		; write out the dirty buffer
-	jc	short getb_11
+	;jc	short getb_11
+	; 05/06/2025
+	jc	short getb_12
+	mov	eax, ebp  ; restore sector number
 getb_10:
+	; 05/06/2025
+	push	esi ; ***
+
+	; eax = physical sector number
 	mov	ch, [pre_read]	; bit 7 = no pre-read flag
 				; bit 0 = fat buffer flag
 	test	ch, 80h			; read in new sector ?
-	jnz	short getb_13		; no, done
+	;jnz	short getb_14		; no, done
+	; 05/06/2025
+	jnz	short getb_15
 
 	; 28/04/2025
 	lea	ebx, [esi+BUFINSIZ]	; buffer data address
 	mov	esi, edx
 
+	; 05/06/2025
+	push	eax ; **** ; save disk sector number
+
 	and	ch, ch			; fat sector ?
-	jz	short getb_12		; no
+	jz	short getb_13		; no
 
 	; input: eax = phy sector, ebx = buffer, esi = ldrv table
 	call	FATSECRD
 	; modified registers: (eax), ecx, edx
 	jc	short getb_11
 	mov	ch, buf_isFAT		; set buf_flags
-	jmp	short getb_13
+	jmp	short getb_14
 
 getb_11:
+	; 05/06/2025
+	pop	ebp ; **** ; disk sector number
 	; 28/04/2025
 	pop	esi ; ***
+getb_12:
 	pop	edx ; **
 	pop	ebx ; *
 	; eax = error code (if CF = 1)
 	retn
 
-getb_12:
+getb_13:
 	; 28/04/2025 - TRDOS 386 v2.0.10
 	; read 1 disk sector ('trdosk7.s')
 	;   --- mov ecx, 1
 	;   --- call disk_read
-	; input: eax = phy sector, ebx = buffer, esi = ldrv table 
+	; input: eax = phy sector, ebx = buffer, esi = ldrv table,
 	call	DREAD
 	; modified registers: eax, ebx, ecx, edx
 	jc	short getb_11
 	mov	ch, 0			; set buf_flags to no type
-getb_13:
+getb_14:
+	; 05/06/2025
+	pop	eax ; **** ; restore disk sector number
+getb_15:
 	; 28/04/2025
 	pop	esi ; ***
 	pop	edx ; **
 	pop	ebx ; *
-
-	mov	eax, ebp ; restore disk sector number
 
 	; eax = disk sector
 	; ch = buf_flags
