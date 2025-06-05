@@ -305,6 +305,11 @@ Msg_Insufficient_Memory:
                 db "Insufficient memory!"
                 db 0Dh, 0Ah, 0
 
+	; 04/06/2025 - TRDOS 386 v2.0.10
+Msg_Invalid_LongName:
+                db "Invalid long name!"
+                db 0Dh, 0Ah, 0
+
 Msg_Error_Code:
                 db 'Command failed! Error code : '
 error_code_hex: db '00h'

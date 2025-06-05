@@ -2786,13 +2786,13 @@ getb_9:
 	;
 	; Flush the first buffer & read in the new sector into it.
 
-	mov	ebp, eax  ; save sector number
+	mov	ebp, eax	; save sector number
 
 	call	BUFWRITE		; write out the dirty buffer
 	;jc	short getb_11
 	; 05/06/2025
 	jc	short getb_12
-	mov	eax, ebp  ; restore sector number
+	mov	eax, ebp	; restore sector number
 getb_10:
 	; 05/06/2025
 	push	esi ; ***
