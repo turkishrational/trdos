@@ -199,10 +199,9 @@ PATH_Level:	 resb 1 ; DIR.ASM
 ; 07/02/2016
 Dir_File_Name:	resb 13 ; DIR.ASM ; 09/10/2011
 
-; 04/06/2025 - Temporary ! 
 ; 18/05/2025
 ; 10/02/2016
-Dir_Entry_Name: resb 13 ; DIR.ASM
+;Dir_Entry_Name: resb 13 ; DIR.ASM
 
 alignb 2
 

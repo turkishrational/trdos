@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 05/06/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 08/06/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -638,6 +638,7 @@ pass_ppdn_set_al_to_ah:
 	jmp	short pass_ppdn_convert_sub_dir_name
 
 locate_current_dir_file:
+	; 06/06/2025
 	; 29/05/2025
 	; 18/05/2025
 	; 17/05/2025
@@ -709,6 +710,9 @@ locate_current_dir_file:
 	mov	[PreviousAttr], dl ; 0
 
 	mov	dh, [Current_Drv]
+
+	; 06/06/2025
+	add	edx, Logical_DOSDisks
 
 	; 17/05/2025
 	mov	ebx, [Current_Dir_FCluster]
@@ -1296,6 +1300,9 @@ loc_check_ffde_attrib:
         jmp	short loc_check_ffde_retn_2
 
 convert_file_name:
+	; 08/06/2025
+	; 07/06/2025
+	; 06/06/2025
 	; 18/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 06/03/2016
@@ -1413,6 +1420,9 @@ stop_convert_file_x:
 	pop	esi
 	retn
 %else
+	; 08/06/2025
+	; 07/06/2025
+	; 06/06/2025
 	; 18/05/2025 - TRDOS 386 v2.0.10
 	;
 	; *.ext -> 8 bytes ? then '.ext'
@@ -1421,7 +1431,9 @@ stop_convert_file_x:
 	;
 	; (modified for METACOMPARE procedure)
 
-	mov	byte [AmbiguousFileName], 0 ; reset
+	xor	eax, eax
+
+	mov	[AmbiguousFileName], al ; 0 ; reset
 
 	;mov	ecx, 8
 	mov	cl, 8
@@ -1429,11 +1441,12 @@ check_nch:
 	lodsb
 
 	cmp	al, 20h
-	jna	short convert_ok
+	jna	convert_ok
 
 	cmp	al, '.'
 	je	short convert_ext
-check_s:
+
+check_star:
 	cmp	al, '*'
 	jne	short not_star
 
@@ -1447,23 +1460,61 @@ check_s:
 	rep	stosb
 	pop	ecx
 
-check_dot:
+	; 08/06/2025
+	; 07/06/2025
+	; 06/06/2025
+	;;;
 	lodsb
 	cmp	al, '.'
 	je	short convert_ext
-	loop	check_dot
+	; ah = 0
+check_dot:
+	cmp	al, 20h
+	ja	short check_dot_3
+	; 08/06/2025
+check_dot_1:
+	or	ah, ah
+	jnz	short check_dot_2
+	jecxz	check_ext
 	jmp	short convert_ok
+check_dot_2:
+	dec	edi
+	pop	eax
+	mov	[edi], al
+	jmp	short check_dot_1
+check_dot_3:
+	call	simple_ucase
+	push	eax
+	inc	ah
+	dec	ecx
+	jz	short check_dot_2
+	lodsb
+	cmp	al, '.'
+	jne	short check_dot
+	; 08/06/2025
+	; ah > 0
+check_dot_4:
+	dec	edi
+	pop	eax
+	mov	[edi], al
+	and	ah, ah
+	jnz	short check_dot_4
+	jmp	short convert_ext
+	;;;
 
 not_star:
 	cmp	al, '?'
 	jne	short check_char_ucase
-	stosb
 	or	byte [AmbiguousFileName], 1
-	loop	check_nch
-	jmp	short check_ext
+	;stosb
+	;loop	check_nch
+	;jmp	short check_ext
+	; 07/06/2025
+	jmp	short not_star_next
 
 check_char_ucase:
 	call	simple_ucase
+not_star_next:
 	stosb
 	loop	check_nch
 
@@ -1476,6 +1527,9 @@ check_ext:
 
 convert_ext:
 	mov	cl, 3
+	; 07/06/2025
+	mov	edi, [esp]
+	add	edi, 8
 convert_ext_@:
 	lodsb
 	cmp	al, 20h
@@ -1484,7 +1538,7 @@ convert_ext_@:
 	cmp	al, '.'
 	je	short convert_ok
 
-check_s_@:
+check_star_@:
 	cmp	al, '*'
 	jne	short not_star_@
 
@@ -1492,8 +1546,11 @@ check_s_@:
 
 	mov	al, '?'
 	rep	stosb
-
-	jmp	short convert_ok
+	
+convert_ok:
+	pop	edi
+	pop	esi
+	retn
 
 not_star_@:
 	cmp	al, '?'
@@ -1503,11 +1560,7 @@ not_star_@:
 
 	stosb
 	loop	convert_ext_@
-
-convert_ok:
-	pop	edi
-	pop	esi
-	retn
+	jmp	short convert_ok
 
 check_char_ucase_@:
 	call	simple_ucase

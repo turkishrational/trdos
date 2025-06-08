@@ -2963,7 +2963,7 @@ WildCrd:
 	repe	cmpsb
 	jz	short MetaRet 	; most of the time we will fail.
 
-	cmp	byte [esi-1],"?"
+	cmp	byte [esi-1], "?"
 	je	short WildCrd
 MetaRet:
  	retn			; Zero set, Match

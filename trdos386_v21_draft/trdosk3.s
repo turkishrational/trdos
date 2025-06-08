@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 05/06/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 07/06/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -2462,8 +2462,20 @@ print_directory_list:
 	; 27/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 10/02/2016
 	; 08/02/2016 (TRDOS 386 = TRDOS v2.0)
-	; 06/12/2009 ('cmp_cmd_dir')	
+	; 06/12/2009 ('cmp_cmd_dir')
 	;
+
+; 07/06/2025 - temporary (for test)
+%if 0
+ 	push	esi
+ 	mov	edi, Dir_File_Name
+ 	call	convert_file_name
+ 	mov	esi, Dir_File_Name
+ 	call	print_msg
+ 	pop	esi
+ 	xor	ah, ah
+ 	int	32h
+%endif
 	mov	word [AttributesMask], 0800h ; ..except volume names..
 	mov	al, [Current_Drv]
 	mov	[RUN_CDRV], al
@@ -2603,7 +2615,7 @@ loc_print_dir_change_directory:
 
 	inc	byte [Restore_CDIR]
 	mov	esi, FindFile_Directory
-	xor	ah, ah ; CD_COMMAND sign -> 0 
+	xor	ah, ah ; CD_COMMAND sign -> 0
 	call	change_current_directory
         ;jc	loc_run_cmd_failed
 	; 27/07/2022
