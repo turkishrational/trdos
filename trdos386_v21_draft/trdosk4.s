@@ -1324,7 +1324,7 @@ convert_file_name:
 	;	   bit 0,1 -> '?' (bit 1 -> extension)
 	;	   bit 2,3 -> '*' (bit 3 -> extension)			
 	;
-	; (ECX, AL will be changed)
+	; (ECX, EAX will be changed)
 
 	push	esi
 	push	edi
@@ -1437,6 +1437,7 @@ stop_convert_file_x:
 
 	;mov	ecx, 8
 	mov	cl, 8
+
 check_nch:
 	lodsb
 
@@ -1456,51 +1457,55 @@ check_star:
 	stosb
 	dec	ecx
 	jz	short check_ext
-	push	ecx
-	rep	stosb
-	pop	ecx
 
 	; 08/06/2025
 	; 07/06/2025
 	; 06/06/2025
-	;;;
-	lodsb
-	cmp	al, '.'
-	je	short convert_ext
-	; ah = 0
-check_dot:
-	cmp	al, 20h
-	ja	short check_dot_3
-	; 08/06/2025
-check_dot_1:
-	or	ah, ah
-	jnz	short check_dot_2
-	jecxz	check_ext
-	jmp	short convert_ok
-check_dot_2:
-	dec	edi
-	pop	eax
-	mov	[edi], al
-	jmp	short check_dot_1
-check_dot_3:
-	call	simple_ucase
-	push	eax
-	inc	ah
-	dec	ecx
-	jz	short check_dot_2
-	lodsb
-	cmp	al, '.'
-	jne	short check_dot
-	; 08/06/2025
-	; ah > 0
-check_dot_4:
-	dec	edi
-	pop	eax
-	mov	[edi], al
-	and	ah, ah
-	jnz	short check_dot_4
+	cmp	byte [esi], '.'
+	jne	short check_cr
+
+	inc	esi ; skip the dot
+	; al = '?'
+	rep	stosb
 	jmp	short convert_ext
-	;;;
+	
+	; 08/06/2025
+check_cr:
+	cmp	byte [esi], 20h
+	ja	short check_star_dot
+	; al = '?'
+	rep	stosb
+	jmp	short convert_ok
+
+check_star_dot:
+	push	esi
+	push	ecx
+check_star_dot_next:
+	lodsb
+	cmp	al, 20h
+	jna	short star_dot_not_found
+	cmp	al, '.'
+	je	short star_dot_found
+	loop	check_star_dot_next
+	xor	eax, eax
+	jmp	short star_dot_no_pqm
+star_dot_not_found:
+star_dot_found:
+	push	ecx
+	mov	al, '?'
+	rep	stosb
+	pop	eax
+star_dot_no_pqm:
+	pop	ecx
+	pop	esi
+	sub	ecx, eax
+	jz	short check_ext
+star_dot_nch:
+	lodsb
+	call	simple_ucase
+	stosb
+	loop	star_dot_nch
+	jmp	short check_ext
 
 not_star:
 	cmp	al, '?'
