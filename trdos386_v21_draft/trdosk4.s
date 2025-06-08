@@ -1502,7 +1502,16 @@ star_dot_no_pqm:
 	jz	short check_ext
 star_dot_nch:
 	lodsb
+
+	; 08/06/2025
+	cmp	al, '?'
+	jne	short star_dot_nch_ucase
+	or	byte [AmbiguousFileName], 1
+	jmp	short star_dot_nch_@
+
+star_dot_nch_ucase:
 	call	simple_ucase
+star_dot_nch_@:
 	stosb
 	loop	star_dot_nch
 	jmp	short check_ext
@@ -1557,21 +1566,25 @@ convert_ok:
 	pop	esi
 	retn
 
+check_char_ucase_@:
+	call	simple_ucase
+convert_ext_next:	; 08/06/2025
+	stosb
+	loop	convert_ext_@
+	jmp	short convert_ok
+
 not_star_@:
 	cmp	al, '?'
 	jne	short check_char_ucase_@
 
 	or	byte [AmbiguousFileName], 2
 
-	stosb
-	loop	convert_ext_@
-	jmp	short convert_ok
-
-check_char_ucase_@:
-	call	simple_ucase
-	stosb
-	loop	convert_ext_@
-	jmp	short convert_ok
+	; 08/06/2025
+	jmp	short convert_ext_next
+	
+	;stosb
+	;loop	convert_ext_@
+	;jmp	short convert_ok
 
 	; 18/05/2025 - TRDOS 386 v2.0.10
 simple_ucase:
