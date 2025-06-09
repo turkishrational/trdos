@@ -1655,7 +1655,7 @@ save_longname_sub_component:
 	;	// If a longname is longer than 65 bytes,
 	;	// it is invalid for trdos. (>45h)
 	;
-	; 20/05/2025 - TRDOS 386 v2.01.0
+	; 20/05/2025 - TRDOS 386 v2.0.10
 	;	According to
 	;	Microsoft FAT32 File System Specification
 	;   ... Long names are limited to 255 chars,
