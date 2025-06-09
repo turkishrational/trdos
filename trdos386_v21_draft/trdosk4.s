@@ -306,7 +306,7 @@ pass_ccd_parse_dir_name:
 
 	mov	[CCD_DriveDT], esi
 
-	; 14/05/2025 - TRDOS 386 v2.0.9
+	; 14/05/2025 - TRDOS 386 v2.0.10
 	cmp	al, 8
 	;cmp	al, 7
 	jb	short loc_ccd_load_child_dir
