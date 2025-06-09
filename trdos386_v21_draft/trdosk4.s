@@ -584,7 +584,7 @@ loc_ppdn_get_dir_name:
 repeat_ppdn_get_dir_name:
 	;;;;
 	; 09/06/2025
-	; ! ambigious file name characters
+	; ! ambiguous file name characters
 	; ('*' and '?') should not be used as they cause
 	; confusion in the pathname text !
 	cmp	al, '*'
