@@ -432,25 +432,11 @@ loc_ccd_load_FS_sub_directory_next:
 	jmp	short pass_ccd_set_dir_cluster_ptr
 
 loc_ccd_set_dir_cluster_ptr:
-	; 09/06/2025
-	mov	ch, al
-
 	; EDI = Directory Entry
 	mov	ax, [edi+20] ; First Cluster High Word
 	shl	eax, 16
 	mov	ax, [edi+26] ; First Cluster Low Word
 
-	; 09/06/2025
-	; if ambiguous file name char is used, name 
-	; must be replaced with exact/found dir name
-	or	ch, ch
-	jz	short loc_ccd_set_dir_cluster_ptr_@
-
-	xchg	esi, edi
-	mov	ecx, 11
-	rep	movsb
-
-loc_ccd_set_dir_cluster_ptr_@:
 	mov	esi, [CCD_DriveDT]
 	; 14/05/2025
 	cmp	byte [esi+LD_FATType], 1
