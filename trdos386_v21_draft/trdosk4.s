@@ -1665,7 +1665,7 @@ save_longname_sub_component:
 	;	260 chars including the trailing NUL. ...
 	;	(520 bytes)
 	;   So, in this version of TRDOS 386
-	;	UNICODE chars (two bytes) wil be converted
+	;	UNICODE chars (two bytes) will be converted
 	;	to ASCII chars only using low bytes of
 	;	of two byte UNICODE chars,
 	;	as a very simple method.
