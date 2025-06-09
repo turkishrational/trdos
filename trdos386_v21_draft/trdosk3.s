@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 07/06/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 09/06/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -225,9 +225,8 @@ loc_restore_FS_current_directory:
 	jmp	short loc_ccdrv_reset_cdir_FAT_fcluster
 
 loc_ccdrv_reset_cdir_FAT_12_16_32_fcluster:
-	;cmp	al, 3
-	; 14/05/2025
-	cmp	dl, 3
+	; 09/06/2025
+	cmp	al, 3
 	jb	short loc_ccdrv_reset_cdir_FAT_12_16_fcluster
 loc_ccdrv_reset_cdir_FAT32_fcluster:
 	mov	eax, [esi+LD_BPB+FAT32_RootFClust]

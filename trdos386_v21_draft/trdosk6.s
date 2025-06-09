@@ -17535,7 +17535,7 @@ sysdir: ; Get Current (Working) Drive & Directory (for user)
 	;	;<= 92 bytes for current TRDOS 386 version.
 	;	;(7*12 name chars + 7 slash + 0)
 	;	; 16/05/2025
-	;	;<= 104 bytes for since TRDOS 386 v2.10.10.
+	;	;<= 104 bytes for since TRDOS 386 v2.0.10.
 	;	;(8*12 name chars + 7 slash + 0)
 
 	mov	ebp, esp

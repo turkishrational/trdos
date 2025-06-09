@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 05/06/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 08/06/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -471,8 +471,9 @@ load_FAT32_root_dir0:
 	;jmp	short load_FAT_sub_dir0
 
 load_FAT32_sub_directory:
-		
+
 load_FAT_sub_directory:
+	; 08/06/2025
 	; 13/05/2025
 	; 08/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -569,11 +570,12 @@ load_fat_subdir_@:
 
 	; 13/05/2025
 	mov	edx, esi
-	xor	ebx, ebx ; 0
+	; 08/06/2025
+	;xor	ebx, ebx ; 0
 
 	; edx = Logical DOS Drive Description Table address
 	; eax = Cluster Number (28bit for FAT32 fs)
-	; ebx = Sector position in cluster
+	;; ebx = Sector position in cluster
 
 	call	FIGREC
 

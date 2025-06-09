@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 08/06/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 09/06/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -124,7 +124,7 @@ get_current_directory:
 	;         for TRDOS (7*12 name chars + 7 slash + 0)
 	; 	; 16/05/2025 - buffer length <= 104 bytes
 	;	  (8*12 name chars + 7 slashes + 0)
-
+	;
 	; OUTPUT ->  ESI = Current Directory Buffer
 	;            EAX, EBX, ECX, EDX, EDI will be changed
 	;            ECX/CL = Current Directory String Length
@@ -168,7 +168,7 @@ loc_get_current_drive_2:
 	; 11/08/2022 - BugFix (*)
 	pop	esi ; (*) Current Directory Buffer address
 
-	mov	[esi], ah
+	mov	[esi], ah ; 0
 	; 28/07/2022
 	;xor	ecx, ecx
 	jmp	short loc_get_current_drive_4
@@ -213,6 +213,7 @@ loc_get_current_drive_4:
 	retn
 
 change_current_directory:
+	; 09/06/2025
 	; 14/05/2025 (TRDOS 386 Kernel v2.0.10)
 	;	(8 sub directory levels, + root directory)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -226,7 +227,7 @@ change_current_directory:
 	; 04/10/2009
 	; 2005
 	; INPUT ->
-	;	ESI = Directory string
+	;	ES/I/ = Directory string
 	;	ah = CD command (CDh = save current dir string)
 	; OUTPUT ->
 	; 	EDI = DOS Drive Description Table
@@ -280,10 +281,12 @@ loc_ccd_parse_path_name:
 	jnc	short pass_ccd_parse_dir_name
 
 		; ESI = Path name
-		; AL = CCD_Level
+		; AL = CCD_Level ; Current Dir Level
+		; 09/06/2025
+		; AH = Last Directory level (= AL)
 	call	parse_dir_name
 		; AL = CCD_Level
-		; AH = Last Sub Directory Level
+		; AH = Last (Sub) Directory Level
 		; (EDI = PATH_Array)
 
 pass_ccd_parse_dir_name:
@@ -327,15 +330,18 @@ loc_ccd_load_child_dir:
 	; 28/07/2022
 	mov	ecx, eax
 
+	; 09/06/2025
 	; 14/05/2025 - TRDOS 386 v2.0.10 (8 sub dir levels)
-	dec	eax  ; 1 -> 0, 8 -> 7
+	;dec	eax  ; 1 -> 0, 8 -> 7
 
 	shl	al, 4
 	movzx	esi, al
      	add	esi, edi  ; offset PATH_Array
+	;mov	eax, [esi+12]
+	; 09/06/2025
+	mov	eax, [esi-4]
 
-	mov	eax, [esi+12]
-	cmp	cl, ch ; ch = 0
+	cmp	cl, ch
 	;je	loc_ccd_load_sub_directory
 	; 28/07/2022
 	jne	short loc_ccd_1
@@ -343,9 +349,22 @@ loc_ccd_load_child_dir:
 
 loc_ccd_1:	; 28/07/2022
 	mov	[Current_Dir_FCluster], eax
+	; 09/06/2025
+	;add	esi, 16
+	jmp	short loc_ccd_load_child_dir_next_@
 
 loc_ccd_load_child_dir_next:
-	add	esi, 16 ; DOS DirEntry Format FileName Address
+	; 09/06/2025
+	;add	esi, 16
+	; esi = Path_Array
+
+	movzx	eax, cl ; CCD_Level ; current level
+	shl	eax, 4
+	add	esi, eax
+	; esi = dir entry name of the next level 
+
+loc_ccd_load_child_dir_next_@:
+	; esi = DOS DirEntry Format FileName Address
 
  	; Directory attribute : 10h
 	mov	al, 00010000b ; 10h (Attrib AND mask)
@@ -442,8 +461,10 @@ pass_ccd_set_dir_cluster_ptr:
 	inc	byte [CCD_Level]
 	;movzx	ebx, byte [CCD_Level]
 	shl	bl, 4 ; * 16 (<= 128)
-	add	esi, ebx ; 19/02/2016
-	mov	[esi+12], eax
+	; 09/06/2025
+	add	ebx, esi ; 19/02/2016
+	mov	[ebx+12], eax
+	; esi = offset PATH_Array
 	jmp	short loc_ccd_set_cdfc
 
 loc_ccd_load_FAT32_root_dir:
@@ -476,7 +497,7 @@ loc_ccd_set_cdfc:
 	cmp	cl, ch
 	;jb	loc_ccd_load_child_dir_next
 	; 28/07/2022
-	jnb	short loc_ccd_2	
+	jnb	short loc_ccd_2
 	jmp	loc_ccd_load_child_dir_next
 loc_ccd_2:
 	cmp	byte [CD_COMMAND], 0CDh ;'CD' command or another
@@ -523,6 +544,7 @@ loc_ccd_save_current_dir:
 	retn
 
 parse_dir_name:
+	; 09/06/2025
 	; 14/05/2025 - TRDOS 386 v2.0.10
 	; 11/02/2016
 	; 10/02/2016
@@ -532,6 +554,8 @@ parse_dir_name:
 	; INPUT ->
 	;	ESI = ASCIIZ Directory String Address
 	;	AL = Current Directory Level
+	;	09/06/2025
+	;	AH = Last Directory Level (= AL)
 	;	EDI = Destination Adress
 	;	     (8 sub dir levels, each one 12+4 bytes)
 	; OUTPUT ->
@@ -543,7 +567,9 @@ parse_dir_name:
 	; (esi, ebx, ecx will be changed)
 
 	;mov	[PATH_Array_Ptr], edi
-	mov	ah, al
+	; 09/06/2025
+	; ah = Last Dir Level
+	;mov	ah, al
 	mov	[PATH_CDLevel], ax
 repeat_ppdn_check_slash:
 	lodsb
