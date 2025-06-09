@@ -283,7 +283,7 @@ loc_ccd_parse_path_name:
 		; ESI = Path name
 		; AL = CCD_Level ; Current Dir Level
 		; 09/06/2025
-		; AH = Last Directory level (= AL)
+		; AH = Last Directory Level (= AL)
 	call	parse_dir_name
 		; AL = CCD_Level
 		; AH = Last (Sub) Directory Level
