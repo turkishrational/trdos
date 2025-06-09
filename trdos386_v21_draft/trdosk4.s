@@ -361,7 +361,7 @@ loc_ccd_load_child_dir_next:
 	movzx	eax, cl ; CCD_Level ; current level
 	shl	eax, 4
 	add	esi, eax
-	; esi = dir entry name of the next level 
+	; esi = dir entry name of the next level
 
 loc_ccd_load_child_dir_next_@:
 	; esi = DOS DirEntry Format FileName Address
@@ -432,11 +432,25 @@ loc_ccd_load_FS_sub_directory_next:
 	jmp	short pass_ccd_set_dir_cluster_ptr
 
 loc_ccd_set_dir_cluster_ptr:
+	; 09/06/2025
+	mov	ch, al
+
 	; EDI = Directory Entry
 	mov	ax, [edi+20] ; First Cluster High Word
 	shl	eax, 16
 	mov	ax, [edi+26] ; First Cluster Low Word
 
+	; 09/06/2025
+	; if ambiguous file name char is used, name 
+	; must be replaced with exact/found dir name
+	or	ch, ch
+	jz	short loc_ccd_set_dir_cluster_ptr_@
+
+	xchg	esi, edi
+	mov	ecx, 11
+	rep	movsb
+
+loc_ccd_set_dir_cluster_ptr_@:
 	mov	esi, [CCD_DriveDT]
 	; 14/05/2025
 	cmp	byte [esi+LD_FATType], 1
@@ -582,6 +596,17 @@ loc_ppdn_get_dir_name:
 	mov	ecx, 12
 	mov	edi, Dir_File_Name
 repeat_ppdn_get_dir_name:
+	;;;;
+	; 09/06/2025
+	; ! ambigious file name characters
+	; ('*' and '?') should not be used as they cause
+	; confusion in the pathname text !
+	cmp	al, '*'
+	je	short loc_ppdn_badname_err
+	cmp	al, '?'
+	je	short loc_ppdn_badname_err		
+	;;;;
+
 	stosb
 	lodsb
 	cmp	al, '/'
@@ -589,6 +614,7 @@ repeat_ppdn_get_dir_name:
 	cmp	al, 20h
 	jna	short loc_ppdn_end_of_path_scan
 	loop	repeat_ppdn_get_dir_name
+loc_ppdn_badname_err:	; 09/06/2025
 	pop	edi
 	stc
 loc_ppdn_retn:
