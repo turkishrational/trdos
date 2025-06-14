@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 05/06/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 14/06/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -150,10 +150,14 @@ RUN_CDRV: resb 1 ; CMD_INTR.ASM  ; 09/11/2011
 
 ; 24/01/2016
 PATH_Array:     resb 128 ; DIR.ASM ; 09/10/2011
+
+; 14/06/2025
 ; 06/02/2016
-CCD_DriveDT:	resd 1 ; DIR.ASM ; (word)
-CCD_Level:	resb 1 ; DIR.ASM
-Last_Dir_Level:	resb 1 ; DIR.ASM
+;CCD_DriveDT:	resd 1 ; DIR.ASM ; (word)
+
+; 14/06/2025
+;CCD_Level:	resb 1 ; DIR.ASM
+;Last_Dir_Level: resb 1 ; DIR.ASM
 ;
 CDLF_FNAddress:	resd 1 ; DIR.ASM (word)
 CDLF_AttributesMask: resw 1 ; DIR.ASM
@@ -192,9 +196,13 @@ LFN_CheckSum:	 resb 1   ; DIR.ASM
 ; 25/05/2025 - TRDOS 386 v2.0.10
 LongFileName:	 resb 260 ; 130 UNICODE (2-byte) chars
 
+; 13/06/2025 - TRDOS 386 v2.0.10
+DIR_FCluster:	resd 1
+ 
 ;PATH_Array_Ptr: resw 1 ; DIR.ASM
 PATH_CDLevel:	 resb 1 ; DIR.ASM
-PATH_Level:	 resb 1 ; DIR.ASM
+; 14/06/2025
+;PATH_Level:	 resb 1 ; DIR.ASM
 
 ; 07/02/2016
 Dir_File_Name:	resb 13 ; DIR.ASM ; 09/10/2011
@@ -302,10 +310,13 @@ gffc_last_free_cluster:  resd 1
 Cluster_Index: ; resd 1
 ; 22/02/2016
 ClusterValue:	resd 1
+
 ; 04/03/2016
 Attributes:	resb 1
 ;;CFS_error:  resb 1 ;; 01/03/2016
-resb 1
+; 13/06/2025 (negative attributes)
+NegAttribs:	resb 1
+
 CFS_OPType: resb 1
 CFS_Drv:    resb 1
 CFS_CC:	    resd 1
@@ -358,7 +369,6 @@ SourceFile_MatchCounter:	resw 1
 SourceFile_SecPerClust:		resb 1
 SourceFile_Reserved:		resb 1
 ; Above is 128 bytes
-
 ;Destination File Structure (same with 'Find File' Structure)
 DestinationFile_Drv:		resb 1
 DestinationFile_Directory: 	resb 65

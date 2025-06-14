@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 10/06/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 14/06/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -1757,6 +1757,7 @@ loc_gvsn_return:
 ; 29/01/2005
 
 command_interpreter:
+	; 14/06/2025 (TRDOS 386 Kernel v2.0.10)
 	; 26/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 16/10/2016
 	; 12/10/2016
@@ -2076,8 +2077,11 @@ cd_error_messages:
 	je	short cd_drive_not_ready
 	cmp	al, 17 ; read error
 	je	short cd_drive_not_ready
-	cmp	al, 19 ; ; Bad directory/path name
+	cmp	al, 19 ; bad directory/path name
 	je	short cd_command_failed
+	; 14/06/2025 - TRDOS 386 v2.0.10
+	cmp	al, 11 ; permission denied
+	je	short cd_command_failed 	 
 
 cd_path_not_found:
 	push	eax ; 29/12/2017
@@ -3341,6 +3345,7 @@ loc_fnf_stc_retn_@:
 	retn
 
 get_and_print_longname:
+	; 14/06/2025
 	; 05/06/2025
 	; 04/06/2025
 	; 20/05/2025 (TRDOS 386 v2.0.10)
@@ -3386,7 +3391,9 @@ inv_longname_err:
 get_longname_option_2:
 	xor	al, al
 	stosb
-	mov	esi, temp_name 
+	mov	esi, temp_name
+	; 14/06/2025
+	mov	ebx, [Current_Dir_FCluster] 
 	call	search_longname
 	jnc	short get_longname_option_3
 
