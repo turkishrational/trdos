@@ -720,7 +720,7 @@ change_current_directory:
 	xor	ebx, ebx ; First Cluster = 0 -> root
 	; 14/06/2025
 	mov	[Current_Dir_Level], al ; 0
-	mov	[Current_Dir_FCluster], ebx  ; 0
+	mov	[Current_Dir_FCluster], ebx ; 0
 	jmp	short loc_ccd_parse_path_name
 loc_ccd_cdir_level:
 	mov	al, [Current_Dir_Level]
