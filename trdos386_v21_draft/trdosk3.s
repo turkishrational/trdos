@@ -2743,7 +2743,7 @@ print_dir_strlen_shorting_@:
 	je	short pass_print_dir_strlen_shorting
 	dec	ecx
 	;jnz	short print_dir_strlen_shorting_@
-	jmp	short print_dir_strlen_shorting_@	
+	jmp	short print_dir_strlen_shorting_@
 
 	; esi points to the 1st non-path ('/') char
 
@@ -2758,7 +2758,7 @@ pass_print_dir_strlen_shorting:
 
 	mov	esi, Dir_Str_Header
 	call	print_msg
-	
+
 	mov	esi, next2line
 	call	print_msg
 
@@ -2772,7 +2772,7 @@ loc_print_dir_first_file:
 	; 27/07/2022
 	jnc	short loc_dfname_use_this
 	jmp	loc_dir_ok
-	 
+
 loc_dfname_use_this:
 	; bl =	File Attributes (bh = Long Name Entry Length)
 	test	bl, 10h  ; Is it a directory?
@@ -3028,7 +3028,7 @@ rediv_tfs_hex:
 	mov     [edi], dl
 	and	eax, eax
 	jnz	short rediv_tfs_hex
-	
+
 	mov	[TFS_Dec_Begin], edi
 	mov	esi, Decimal_File_Count_Header
 	call	print_msg
@@ -3271,13 +3271,13 @@ loc_fnf_search:
 	mov	dh, [FindFile_Drv]
 	add	edx, Logical_DOSDisks
 	mov	cl, [edx+LD_PhyDrvNo]
-	
+
 	call	GETBUFFER
 	jc	short loc_fnf_retn
-	
+
 	;mov	esi, [CurrentBuffer]
 	or	byte [esi+BUFFINFO.buf_flags], buf_isDIR
-	
+
 	lea	edi, [esi+BUFINSIZ]
 
 	;movzx	ebx, byte [FindFile_DirEntryNumber]
@@ -3313,7 +3313,7 @@ loc_cont_search_next_file_@:
 	;or	cx, cx
 	or	ecx, ecx
 	jz	short loc_fnf_stc_retn ; end of dir
-	
+
 loc_cont_search_next_file:
 	; 17/05/2025
 	dec	byte [FindFile_DirSectorCount]
@@ -3952,7 +3952,7 @@ loc_file_rw_restore_retn:
 	; 15/02/2016 (TRDOS 386 = TRDOS v2.0)
 	; 28/02/2010 (CMD_INTR.ASM)
 loc_file_rw_cmd_failed:
-	pushf 
+	pushf
 	call	restore_cdir_after_cmd_fail
 	popf
 	jc	short loc_file_rw_check_write_fault
@@ -4016,7 +4016,7 @@ loc_mkdir_check_dirname_exists:
 loc_mkdir_drv:
 	mov	dh, [Current_Drv]
 	mov	[RUN_CDRV], dh
-	
+
 	mov	dl, [FindFile_Drv]
 	cmp	dl, dh
 	je	short loc_mkdir_change_directory
@@ -4824,7 +4824,7 @@ set_file_attributes:
 	; 06/03/2016
 	; 04/03/2016 (TRDOS 386 = TRDOS v2.0)
 	; 10/07/2010 (TRDOS v1, CMD_INTR.ASM, 'cmp_cmd_attrib')
-	; 23/05/2010 
+	; 23/05/2010
 	; 17/12/2000 (P2000.ASM)
 
 	; esi = file or directory name
@@ -4854,7 +4854,7 @@ loc_sfa_1:
 	cmp	al, '+'
 	;jne	loc_cmd_failed
 	je	short loc_attr_space
-loc_sfa_2: 
+loc_sfa_2:
 	jmp	loc_cmd_failed
 loc_attr_space:
 	mov	ah, [esi+1]
@@ -5167,7 +5167,7 @@ rename_scan_destination_file_1:
 	mov	byte [esi], 0
 
 rename_scan_destination_file_2:
-	inc	esi  
+	inc	esi
 	cmp	byte [esi], 20h
 	je	short rename_scan_destination_file_2
 	;;jb	short loc_rename_nofilename_retn
@@ -5261,7 +5261,7 @@ loc_rename_sf_ambgfn_check:
 
 loc_rename_sf_found:
 	; EDI = Directory buffer entry offset/address
-	; BL = File (or Directory) Attributes 
+	; BL = File (or Directory) Attributes
 	;	(Note: It was 'CL' in TRDOS v1)
 	; mov	bl, [EDI+0Bh]
 
@@ -5517,7 +5517,7 @@ move_scan_destination_1:
 	mov	byte [esi], 0
 
 move_scan_destination_2:
-	inc	esi  
+	inc	esi
 	cmp	byte [esi], 20h
 	je	short move_scan_destination_2
 	;;jb	short loc_move_nofilename_retn
@@ -6391,7 +6391,7 @@ set_env_chk_validation3x:
 set_env_chk_validation3c:
 	cmp	al, 20h
 	jnb	short set_env_chk_validation3x
-		
+
 	cmp	byte [edi], 0
 	ja	short set_env_chk_validation4
 
@@ -6656,7 +6656,7 @@ set_env_change_variable_calc5:
 	mov	esi, edi
 
 set_env_change_variable_calc6:
-	lodsb 
+	lodsb
 	and	al, al
 	jnz	short set_env_change_variable_calc6
 
@@ -6699,7 +6699,7 @@ set_env_change_variable_calc8:
 
 	mov	eax, ecx ; old variable's address (after '=')
 
-	mov	ecx, esi 
+	mov	ecx, esi
 	sub	ecx, edi ; count of bytes to move forward
 
 	; 13/04/2016
@@ -7183,7 +7183,7 @@ load_and_execute_file:
 	; OUTPUT ->
 	;	none (error message will be shown if an error will occur)
 	;
-	; (EAX, EBX, ECX, EDX, ESI, EDI, EBP will be changed) 
+	; (EAX, EBX, ECX, EDX, ESI, EDI, EBP will be changed)
 	;
 loc_run_check_filename:
 	cmp	byte [esi], 20h
@@ -7425,7 +7425,7 @@ loc_run_auto_path_move_ok:
 	mov	[edi], al
 
 loc_run_auto_path_move_file_name:
-	inc	edi   
+	inc	edi
 	mov	esi, FindFile_Name
 
 loc_run_auto_path_move_fn_loop:
@@ -7585,7 +7585,7 @@ check_prg_filename_ext:
 	;	ESI = Last char + 1 position
 	;     cf = 1 -> Invalid executable file name
 	;	or no file name extension if AH<=8
-	;	AL = Last file name char     
+	;	AL = Last file name char
 	;     cf = 0 -> AL='P' (PRG), AL=0 (no extension)
 	;
 	; (Modified registers: EAX, ESI)
@@ -7594,7 +7594,7 @@ check_prg_filename_ext:
 loc_run_check_filename_ext:
 	lodsb
 	cmp	al, 21h
-	jb	short loc_check_exe_fn_retn 
+	jb	short loc_check_exe_fn_retn
 	inc	ah
 	cmp	al, '.'
 	jne	short loc_run_check_filename_ext
