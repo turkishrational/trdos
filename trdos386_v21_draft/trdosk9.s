@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - INITIALIZED DATA : trdosk9.s
 ; ----------------------------------------------------------------------------
-; Last Update: 15/06/2025 (Previous: 29/12/2024 - Kernel v2.0.9)
+; Last Update: 16/06/2025 (Previous: 29/12/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -31,7 +31,7 @@ Magic_Bytes:
 		db 1
 mainprog_Version:
 		db 7
-		db "[TRDOS] Main Program v2.1.0 (15/06/2025)"
+		db "[TRDOS] Main Program v2.1.0 (16/06/2025)"
 		db 0Dh, 0Ah
 		db "(c) Erdogan Tan 2005-2025"
 		db 0Dh, 0Ah, 0
@@ -261,9 +261,13 @@ Vol_Free_Sectors_Header:
 Dir_Str_Header:
                 db "Directory: "
 Dir_Str_Root:   db "/"
-Dir_Str:        times 64 db 0
-                dd 0
-                db 0
+Dir_Str:        ;times 64 db 0
+                ;dd 0
+		; 16/06/2025 - TRDOS 386 v2.0.10
+		; (max. 79 bytes)
+                times 67 db 0
+		db 0
+		db 0 ; 16/06/2025
 
 Msg_Bad_Command:
                 db "Bad command or file name!"

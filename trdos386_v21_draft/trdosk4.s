@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 14/06/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 16/06/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -16,6 +16,7 @@
 ; FILE.ASM [ FILE FUNCTIONS ] Last Update: 09/10/2011
 
 change_prompt_dir_string:
+	; 16/06/2025 (TRDOS 386 Kernel v2.0.10)
 	; 05/10/2016
 	; 24/01/2016 (TRDOS 386 = TRDOS v2.0)
 	; 27/03/2011
@@ -26,7 +27,8 @@ change_prompt_dir_string:
 
 	mov	esi, PATH_Array
 change_prompt_dir_str: ; 05/10/2016 (call from 'set_working_path')
-	mov	edi, Current_Directory
+	; 16/06/2025
+	;mov	edi, Current_Directory
 	mov	ah, [Current_Dir_Level]
 	call	set_current_directory_string
 	mov	[Current_Dir_StrLen], cl
@@ -34,6 +36,7 @@ change_prompt_dir_str: ; 05/10/2016 (call from 'set_working_path')
 	retn
 
 set_current_directory_string:
+	; 16/06/2025
 	; 16/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 11/08/2022 (TRDOS 386 Kernel v2.0.5)
 	; 24/01/2016 (TRDOS 386 = TRDOS v2.0)
@@ -41,11 +44,14 @@ set_current_directory_string:
 	; 09/10/2009
 	; INPUT:
 	;    ESI = Path Array Address
-	;    EDI = Current Directory String Buffer
+	;;;; EDI = Current Directory String Buffer
 	;    AH = Current Directory Level
 	; OUTPUT => EAX, EBX, ESI will be changed
-	;    EDI will be same with input
+	;    EDI = Current Directory String Buffer
 	;    ECX = Current Directory String Length
+
+	; 16/06/2025
+	mov	edi, Current_Directory
 
 	push    edi
 	cmp     ah, 0
@@ -750,7 +756,7 @@ loc_ccd_parse_path_name:
 	mov	cl, 8
 	sub	cl, al
 	shl	cl, 2
-	
+
 	push	eax
 	xor	eax, eax ; 0
 	rep	stosd
@@ -840,6 +846,7 @@ loc_ccd_retn_c:
 	retn
 
 parse_dir_name:
+	; 16/06/2025
 	; 14/06/2025
 	; 13/06/2025 (Major Modification)
 	; 09/06/2025
@@ -906,12 +913,25 @@ ppdn_not_slash:
 	mov	ah, [PATH_CDLevel]
 	clc
 	retn
+
 loc_ppdn_get_dir_name:
+	; 16/06/2025
+	; check path (sub directory) level limit
+	; (('..' must be acceptable at level 8))
+	;cmp	byte [PATH_CDLevel], 8
+	;jnb	short loc_ppdn_badname_err
+	
 	;;;;
 	; 13/06/2025 (chdir "LongName" method)
 	cmp	al, '"' ; the 1st double quote
 			; long name start
 	jne	short loc_ppdn_get_dir_name_@
+
+	; 16/06/2025
+	; check path (sub directory) level limit
+	cmp	byte [PATH_CDLevel], 8
+	jnb	short loc_ppdn_badname_err
+
 parse_dir_long_name:
 	mov	ecx, 128
 	mov	edi, temp_name
@@ -994,6 +1014,11 @@ repeat_ppdn_name_dot_dot:
 	jb	short pass_ppdn_convert_sub_dir_name
 
 loc_ppdn_convert_sub_dir_name:
+	; 16/06/2025
+	; check path (sub directory) level limit
+	cmp	byte [PATH_CDLevel], 8
+	jnb	short loc_ppdn_badname_err
+	
 	; 14/06/2025
  	; Directory attribute : 10h
 	;mov	al, 00010000b ; 10h (Attrib AND mask)
@@ -1017,8 +1042,9 @@ loc_ppdn_convert_sub_dir_name:
 	; 13/06/2025 - TRDOS 386 v2.0.10
 loc_ppdn_set_directory:
 	movzx	eax, byte [PATH_CDLevel]
-	cmp	al, 8
-	jnb	short repeat_ppdn_check_last_slash
+	; 16/06/2025
+	;cmp	al, 8
+	;jnb	short loc_ppdn_badname_err
 
 	mov	esi, edi
 	mov	edi, [esp]
