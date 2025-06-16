@@ -3045,6 +3045,7 @@ rediv_tfs_hex:
 	jmp	print_msg
 
 find_first_file:
+	; 16/06/2025
 	; 10/06/2025
 	; 02/06/2025
 	; 29/05/2025
@@ -3092,12 +3093,15 @@ find_first_file:
 	;mov	ecx, 11
 	; 28/07/2022
 	xor	ecx, ecx
-	mov	cl, 11
+	;mov	cl, 11
+	; 16/06/2025
+	mov	cl, 12	; 48 bytes
 	rep	stosd	; 44 bytes
 	;stosw		; +2 bytes
 
+	; 16/06/2025
 	; 10/06/2025
-	mov	[FindFile_MatchCounter], ax ; 0
+	;mov	[FindFile_MatchCounter], ax ; 0
 
 	mov	edi, FindFile_Name ; FFF structure, offset 105 ; 15/05/2025
 	cmp	esi, edi

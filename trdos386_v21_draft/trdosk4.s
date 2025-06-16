@@ -1793,6 +1793,7 @@ loc_check_ffde_attrib:
         jmp	short loc_check_ffde_retn_2
 
 convert_file_name:
+	; 16/06/2025
 	; 08/06/2025
 	; 07/06/2025
 	; 06/06/2025
@@ -1815,7 +1816,7 @@ convert_file_name:
 	;      [AmbiguousFileName] bits will be set 
 	;	if DOT file name contains '?' or '*'
 	;	   bit 0,1 -> '?' (bit 1 -> extension)
-	;	   bit 2,3 -> '*' (bit 3 -> extension)			
+	;	   bit 2,3 -> '*' (bit 3 -> extension)
 	;
 	; (ECX, EAX will be changed)
 
@@ -1913,6 +1914,7 @@ stop_convert_file_x:
 	pop	esi
 	retn
 %else
+	; 16/06/2025
 	; 08/06/2025
 	; 07/06/2025
 	; 06/06/2025
@@ -1928,6 +1930,21 @@ stop_convert_file_x:
 
 	mov	[AmbiguousFileName], al ; 0 ; reset
 
+	;;;;
+	; 16/06/2025
+	; check '.' and '..' at first
+	mov	al, '.'
+	cmp	byte [esi], al ; '.'
+	jne	short cfn_@
+cfn_dot:
+	stosb
+	lodsb
+	cmp	[esi], al ; '..'
+	jne	short cfn_@
+	stosb
+	inc	esi
+	;;;;
+cfn_@:
 	;mov	ecx, 8
 	mov	cl, 8
 
