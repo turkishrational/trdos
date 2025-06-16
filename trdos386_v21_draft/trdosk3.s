@@ -2738,7 +2738,12 @@ print_dir_strlen_check:
 print_dir_strlen_shorting_@:
 	lodsb
 	cmp	al, '/'
-	jne	short print_dir_strlen_shorting_@
+	;jne	short print_dir_strlen_shorting_@
+	; 16/06/2025
+	je	short pass_print_dir_strlen_shorting
+	dec	ecx
+	;jnz	short print_dir_strlen_shorting_@
+	jmp	short print_dir_strlen_shorting_@	
 
 	; esi points to the 1st non-path ('/') char
 
