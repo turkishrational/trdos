@@ -2712,10 +2712,9 @@ print_directory:
 
 print_dir_strlen_check:
 	mov	esi, Current_Dir_Root
-	; 16/06/2025 - TRDOS 386 v2.0.10
-	;mov	edi, Dir_Str_Root
-	mov	edi, Dir_Str
+	mov	edi, Dir_Str_Root
 
+	; 16/06/2025 - TRDOS 386 v2.0.10
 	;xor	ecx, ecx
         mov     cl, [Current_Dir_StrLen]
 	inc	cl
@@ -2729,7 +2728,7 @@ print_dir_strlen_check:
 	; 16/06/2025
 	mov	cl, 63
 	sub	esi, ecx ; 63 ; '.../'
-	;inc	edi
+	inc	edi
 	;mov	eax, '... '
 	; 16/06/2025
 	mov	eax, '.../'
