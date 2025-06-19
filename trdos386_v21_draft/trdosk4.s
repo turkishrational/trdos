@@ -9356,11 +9356,11 @@ sfssn_4:
 
 sfssn_5:
 	; 19/06/2025
+	mov	esi, FS_FDT_BUFFER
 	mov	al, [esi+FDT.Attributes]
 	mov	ah, al
 	xchg	al, [Attributes]
 
-	mov	esi, FS_FDT_BUFFER
 	cmp	byte [esi+FDT.Signature], 'D'
 	jne	short sfssn_6
 
