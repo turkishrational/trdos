@@ -37,9 +37,9 @@ ntty	equ     8   ; 8+1 -> 8 (10/05/2013)
 nbuf	equ	60
 ;nbuf	equ	4   ; 6 ;; 21/08/2015 - 'namei' buffer problem when nbuf > 4
 		; NOTE: If fd0 super block buffer addres is beyond of the 1st
-		; 32K, DMA r/w routine or someting else causes a jump to 
+		; 32K, DMA r/w routine or someting else causes a jump to
 		; kernel panic routine (in 'alloc' routine, in u5.s)
-		; because of invalid buffer content (r/w error). 
+		; because of invalid buffer content (r/w error).
 		; When all buffers are set before the end of the 1st 32k,
 		; there is no problem!? (14/11/2015)
 
@@ -117,7 +117,7 @@ _env	equ 24 ; TRDOS 386, Get/Set Env Vars (31/12/2017)
 _stime	equ 25 ; TRDOS 386, Set Sys Date&Time (30/12/2017)
 _quit	equ 26
 _intr	equ 27
-_dir	equ 28 ; TRDOS 386, Get Curr Drive&Dir (30/12/2017) 
+_dir	equ 28 ; TRDOS 386, Get Curr Drive&Dir (30/12/2017)
 _emt 	equ 29
 _ldrvt 	equ 30 ; TRDOS 386, Get Logical DOS DDT (30/12/2017)
 _video  equ 31 ; TRDOS 386 Video Functions (16/05/2016)
@@ -170,7 +170,7 @@ ERR_DIR_ACCESS     equ 11 ; 'permission denied !' error
 ERR_FILE_NOT_FOUND equ 12 ; 'file not found !' error
 ERR_TOO_MANY_FILES equ 13 ; 'too many open files !' error
 ERR_DIR_EXISTS     equ 14 ; 'directory already exists !' error
-; 16/05/2015		
+; 16/05/2015
 ERR_DRV_NOT_RDY    equ 15 ; 'drive not ready !' error
 ; 18/05/2015
 ERR_DEV_NOT_RDY    equ 15 ; 'device not ready !' error
@@ -188,7 +188,7 @@ ERR_FILE_SIZE	   equ 20 ; 'file size error !'
 ; 22/06/2015
 ERR_NOT_SUPERUSER  equ 11 ; 'permission denied !' error
 ERR_NOT_OWNER      equ 11 ; 'permission denied !' error
-ERR_NOT_FILE       equ 11 ; 'permission denied !' error	
+ERR_NOT_FILE       equ 11 ; 'permission denied !' error
 ; 23/06/2015
 ERR_FILE_EXISTS    equ 14 ; 'file already exists !' error
 ERR_DRV_NOT_SAME   equ 21 ; 'not same drive !' error

@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 14/06/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 19/06/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -196,6 +196,8 @@ LFN_CheckSum:	 resb 1   ; DIR.ASM
 ; 25/05/2025 - TRDOS 386 v2.0.10
 LongFileName:	 resb 260 ; 130 UNICODE (2-byte) chars
 
+; 16/06/2025
+Current_DDT:
 ; 13/06/2025 - TRDOS 386 v2.0.10
 DIR_FCluster:	resd 1
  
@@ -920,22 +922,31 @@ order_number:	resd 1
 
 ; 02/06/2025 - TRDOS 386 v2.0.10
 ; Singlix FS file name search parameters
-FS_DDT_Buffer:	resd 1
+;FS_DDT_Buffer:	resd 1
 FS_Dir_Index:	resd 1
-FS_CurrenDirectory:
+FS_CurrentDirectory:
 		resd 1
+; 17/06/2025
+FS_Consequtive: resd 1
+FS_CurrentSector:
+		resd 1
+; 18/06/2025
+FS_Dir_Buffer:	resd 1
+; 19/06/2025
+FS_Current_DDT: resd 1
 
 ; 25/05/2025 - TRDOS 386 v2.0.10
 ; Singlix FS file name conversion parameters
 
 FDT_Number:	; 02/06/2025
 fdt_number:	resd 1
-f_name_limit:	resd 1
+; 17/06/2025
+;f_name_limit:	resd 1
 ;f_base_start:	resd 1
 f_target:	resd 1
-f_base_count:	resd 1
+f_base_count:	resd 1 ; 1 byte is used
 f_ext_start:	resd 1
-f_ext_count:	resd 1
+f_ext_count:	resd 1 ; 1 byte is used	
 ;f_name_count:	resd 1
 formal_size:	resd 1
 lossy_conversion: ; 28/05/2025	
