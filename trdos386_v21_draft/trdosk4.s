@@ -9219,8 +9219,9 @@ search_fs_shortname:
 	;	          = 0 -> root directory
 	; Output:
 	;   19/06/2025
-	;   eax = file/dir name position (found)
-	;   ebx = DDT number of the directory
+	;   eax = file size
+	;    bh = 5th byte of file size
+	;    bl = attributes (FDT.Attributes)
 	;
 	;   ecx = date & time in MSDOS Dir Entry format
 	;    lw = time (16 bits) -HHHHHMMMMMMSSSSS-
