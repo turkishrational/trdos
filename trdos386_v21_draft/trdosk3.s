@@ -276,7 +276,7 @@ loc_ccdrv_reset_cdir_FAT_fcluster:
 
 dos_prompt:
 	; 16/06/2025
-	; 14/05/2025 (TRDOS 386 Kernel v2.0.5)
+	; 14/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; (8 sub dir levels, max. 103 chars curdir string, +zero )
 	; ((max. 66 bytes curdir ASCIIZ string will be displayed))
 	;
@@ -454,15 +454,15 @@ loc_move_cmd_arguments:
 ;	and	al, 0DFh
 ;pass_capitalize:
 ;	stosb
-;	inc     cl
-;	cmp     esi, CommandBuffer + 79
-;	jb      short next_command_char
+;	inc	cl
+;	cmp	esi, CommandBuffer + 79
+;	jb	short next_command_char
 
 loc_move_cmd_arguments_ok:
-        mov     byte [edi], 0
+        mov	byte [edi], 0
 
 call_command_interpreter:
-	call    command_interpreter
+	call	command_interpreter
 
 return_from_cmd_interpreter:
         mov	ecx, 80
@@ -491,13 +491,13 @@ loc_check_active_page:
 	; AL = 0 = video page 0
 	call	set_active_page
 loc_prompt_again: ; 26/07/2022
-        jmp     loc_TRDOS_prompt ; infinitive loop
+        jmp	loc_TRDOS_prompt ; infinitive loop
 
 pass_set_txt_mode:
 	mov	esi, nextline
 	call	print_msg
 	; al = 0
-	jmp     short loc_check_active_page
+	jmp	short loc_check_active_page
 
 ;rw_char:
 	; 26/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -527,7 +527,7 @@ rw_char:
 	;xor	bh, bh ; 0 = video page 0
 
 readnextchar:
-	xor     ah, ah
+	xor	ah, ah
 	call	int16h
 	and	al, al
 	jz	short loc_arrow
@@ -537,7 +537,7 @@ readnextchar:
 	jne	short char_return
 loc_back:
 	cmp	dl, [CursorColumn]
-	jna     short readnextchar
+	jna	short readnextchar
 prev_column:
 	dec	dl
 set_cursor_pos:
@@ -566,7 +566,7 @@ set_cursor_pos:
 ;	cmp	ah, 4Bh
 ;	je	short loc_back
 ;	cmp	ah, 53h
-;	je      short loc_back
+;	je	short loc_back
 ;	cmp	ah, 4Dh
 ;	jne	short readnextchar
 ;	cmp	dl, 79
@@ -685,7 +685,7 @@ set_date_1:
 	mov	bl, 7
 	call	_write_tty
 loc_enter_day_2:
-	xor     ah, ah
+	xor	ah, ah
 	call	int16h
 	; AL = ASCII Code of the Character
 	cmp	al, 27
@@ -694,9 +694,9 @@ loc_enter_day_2:
 	je	short set_date_0
 	mov	[Day+1], al
 	cmp	al, '0'
-        jb      short loc_set_date_stc_1
+        jb	short loc_set_date_stc_1
 	cmp	al, '9'
-        ja      short loc_set_date_stc_1
+        ja	short loc_set_date_stc_1
 	cmp	byte [Day], '3'
 	jb	short pass_set_day_31
 	cmp	al, '1'
@@ -713,7 +713,7 @@ loc_set_date_stc_1:
 	jmp	short loc_enter_day_2
 loc_set_date_bs_1:
 	call	write_backspace
-	jmp     short loc_enter_day_1
+	jmp	short loc_enter_day_1
 
 pass_set_day_31:
 	; 13/05/2016
@@ -722,7 +722,7 @@ pass_set_day_31:
 	mov	bl, 7
 	call	_write_tty
 loc_enter_separator_1:
-	sub     ah, ah ; 0
+	sub	ah, ah ; 0
 	call	int16h
 	; AL = ASCII Code of the Character
 	cmp	al, 27
@@ -776,7 +776,7 @@ pass_set_date_separator_1:
 	mov	bl, 7	
 	call	_write_tty
 loc_enter_month_1:
-	xor     ah, ah ; 0
+	xor	ah, ah ; 0
 	call	int16h
 	; AL = ASCII Code of the Character
 	cmp	al, 27
@@ -787,7 +787,7 @@ loc_enter_month_1:
 	je	short jmp_loc_set_date_ok
 	mov	[Month], al
 	cmp	al, '0'
-        jb      short loc_set_date_stc_3
+        jb	short loc_set_date_stc_3
 	cmp	al, '1'
         ja	short loc_set_date_stc_3
 	; 13/05/2016
@@ -796,7 +796,7 @@ loc_enter_month_1:
 	mov	bl, 7
 	call	_write_tty
 loc_enter_month_2:
-	xor     ah, ah
+	xor	ah, ah
 	call	int16h
 	; AL = ASCII Code of the Character
 	cmp	al, 27
@@ -824,7 +824,7 @@ pass_set_month_12:
 	mov	bl, 7	
 	call	_write_tty
 loc_enter_separator_2:
-	sub     ah, ah
+	sub	ah, ah
 	call	int16h
 	; AL = ASCII Code of the Character
 	cmp	al, 27
@@ -842,7 +842,7 @@ pass_set_date_separator_2:
 	mov	bl, 7
 	call	_write_tty
 loc_enter_year_1:
-	xor    ah, ah
+	xor	ah, ah
 	call	int16h
 	; AL = ASCII Code of the Character
 	cmp	al, 27
@@ -869,7 +869,7 @@ loc_enter_year_2:
 	je	short loc_set_date_ok
 	mov	byte [Year+1], al
 	cmp	al, '0'
-        jb 	short loc_set_date_stc_7
+        jb	short loc_set_date_stc_7
 	cmp	al, '9'
         ja	short loc_set_date_stc_7
 	; 13/05/2016
@@ -916,7 +916,7 @@ loc_set_date_ok:
 ;	jmp	loc_enter_day_2
 ;loc_set_date_bs_1:
 ;	call	write_backspace
-;	jmp     loc_enter_day_1
+;	jmp	loc_enter_day_1
 ;loc_set_date_stc_2:
 ;	call	check_for_backspace
 ;	je	short loc_set_date_bs_2
@@ -957,7 +957,7 @@ loc_set_date_bs_5:
 	jmp	loc_enter_month_2
 loc_set_date_stc_6:
 	call	check_for_backspace
-        je      short loc_set_date_bs_6
+        je	short loc_set_date_bs_6
 	;xor	bh, bh ; video page 0
 	call	beeper ; BEEP !
 	jmp	loc_enter_year_1
@@ -1073,7 +1073,7 @@ set_time:
 	call	print_msg
 
 loc_enter_hour_1:
-	xor     ah, ah
+	xor	ah, ah
 	call	int16h
 	; AL = ASCII Code of the Character
 	cmp	al, 13 ; ENTER key
@@ -1119,7 +1119,7 @@ set_time_1:
 	mov	bl, 7
 	call	_write_tty
 loc_enter_hour_2:
-	xor     ah, ah
+	xor	ah, ah
 	call	int16h
 	; AL = ASCII Code of the Character
 	cmp	al, 27
@@ -1129,7 +1129,7 @@ loc_enter_hour_2:
 	jb	short loc_set_time_stc_1
 	cmp	al, '9'
 	ja	short loc_set_time_stc_1
-        cmp     byte [Hour], '2'
+        cmp	byte [Hour], '2'
 	jb	short pass_set_time_24
 	cmp	al, '4'
 	ja	short loc_set_time_stc_1
@@ -1140,7 +1140,7 @@ pass_set_time_24:
 	mov	bl, 7
 	call	_write_tty
 loc_enter_time_separator_1:
-	sub    ah, ah ; 0
+	sub	ah, ah ; 0
 	call	int16h
 	; AL = ASCII Code of the Character
 	cmp	al, 27
@@ -1168,7 +1168,7 @@ set_time_2:
 	mov	bl, 7
 	call	_write_tty
 loc_enter_minute_1:
-	xor     ah, ah
+	xor	ah, ah
 	call	int16h
 	; AL = ASCII Code of the Character
 	cmp	al, 27
@@ -1199,7 +1199,7 @@ set_time_3:
 	mov	bl, 7
 	call	_write_tty
 loc_enter_minute_2:
-	xor     ah, ah
+	xor	ah, ah
 	call	int16h
 	; AL = ASCII Code of the Character
 	cmp	al, 27
@@ -1235,7 +1235,7 @@ set_time_4:
 	call	_write_tty
 loc_enter_time_separator_2:
 	mov	word [Second], 3030h
-	sub     ah, ah
+	sub	ah, ah
 	call	int16h
 	; AL = ASCII Code of the Character
 	cmp	al, 13
@@ -1262,7 +1262,7 @@ loc_enter_time_separator_4:
 	mov	bl, 7
 	call	_write_tty
 loc_enter_second_1:
-	xor     ah, ah
+	xor	ah, ah
 	call	int16h
 	; AL = ASCII Code of the Character
 	cmp	al, 13
