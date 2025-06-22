@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 19/06/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 22/06/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -598,13 +598,13 @@ repeat_ppdn_get_dir_name:
 	cmp	al, '*'
 	je	short loc_ppdn_badname_err
 	cmp	al, '?'
-	je	short loc_ppdn_badname_err		
+	je	short loc_ppdn_badname_err
 	;;;;
 
 	stosb
 	lodsb
 	cmp	al, '/'
-	je	short loc_check_level_dot_conv_dir_name
+	je	short loc_chkl_dot_conv_fs_dir_name
 	cmp	al, 20h
 	jna	short loc_ppdn_end_of_path_scan
 	loop	repeat_ppdn_get_dir_name
@@ -616,7 +616,7 @@ loc_ppdn_retn:
 
 loc_ppdn_end_of_path_scan:
 	dec	esi
-loc_check_level_dot_conv_dir_name:
+loc_chkl_dot_conv_fs_dir_name:
 	xor	eax, eax
 	stosb
 	mov	ebx, esi
@@ -685,6 +685,7 @@ pass_ppdn_set_al_to_ah:
 %endif
 
 change_current_directory:
+	; 22/06/2025
 	; 14/06/2025 (Major Modification)
 	; 13/06/2025
 	; 10/06/2025
@@ -762,21 +763,47 @@ loc_ccd_parse_path_name:
 	rep	stosd
 	pop	eax
 
+	; 22/06/2025
+	;xor	ecx, ecx
+	mov	ch, [Current_Drv]
+	add	ecx, Logical_DOSDisks
+	mov	[CCD_DriveDT], ecx
+
 	mov	edi, PATH_Array
 
 	cmp	byte [esi], 20h
 	cmc
 	jnc	short pass_ccd_parse_dir_name
 
+	; 22/06/2025
+	cmp	byte [ecx+LD_FSType], 0A1h
+			; Singlix FS 1
+	jne	short loc_ccd_parse_pn_fat
+		; ESI = Path name
+		; EBX = [DIR_DDT]
+		;     = Current Dir Number (DDT)
+		; AL = CCD_Level ; Current Dir Level
+		; AH = AL
+	call	parse_fs_dir_name
+		; AH = The Last Dir Level
+		; EBX = [DIR_DDT]
+		;     =	current directory number
+		; (EDI = PATH_Array)
+		; if CF = 1 -> AL = error code
+	jmp	short loc_ccd_parse_pn_ok
+
+loc_ccd_parse_pn_fat:
 		; ESI = Path name
 		; EBX = [DIR_FCluster]
 		; AL = CCD_Level ; Current Dir Level
+		; AH = AL
 	call	parse_dir_name
 		; AH = The Last Dir Level
 		; EBX = [DIR_FCluster]
 		; (EDI = PATH_Array)
 		; if CF = 1 -> AL = error code
 
+loc_ccd_parse_pn_ok:
 	; 14/06/2025
 	mov	[Current_Dir_Level], ah
 	mov	[Current_Dir_FCluster], ebx
@@ -787,10 +814,12 @@ pass_ccd_parse_dir_name:
 	; 14/06/2025
 	; ah = [Current_Dir_Level] ; root dir = 0
 
-	xor	ebx, ebx
-	mov	bh, [Current_Drv]
-	mov	edi, Logical_DOSDisks
-	add	edi, ebx
+	;xor	ebx, ebx
+	;mov	bh, [Current_Drv]
+	;mov	edi, Logical_DOSDisks
+	;add	edi, ebx
+	; 22/06/2025
+	mov	edi, [CCD_DriveDT]
 
 	mov	esi, PATH_Array
 
@@ -984,7 +1013,7 @@ repeat_ppdn_get_dir_name:
 	stosb
 	lodsb
 	cmp	al, '/'
-	je	short loc_check_level_dot_conv_dir_name
+	je	short loc_chkl_dot_conv_fs_dir_name
 	cmp	al, 20h
 	jna	short loc_ppdn_end_of_path_scan
 	loop	repeat_ppdn_get_dir_name
@@ -997,7 +1026,7 @@ loc_ppdn_badname_err:	; 09/06/2025
 
 loc_ppdn_end_of_path_scan:
 	dec	esi
-loc_check_level_dot_conv_dir_name:
+loc_chkl_dot_conv_fs_dir_name:
 	xor	eax, eax
 	stosb
 	mov	ebx, esi
@@ -8460,6 +8489,8 @@ conv_f_fs_ok:
 	mov	edi, [f_target]
 	retn
 
+; -----------------------------------------------
+
 convert_num_to_formalstr:
 	; 20/05/2025 - TRDOS 386 v2.0.10
 	; Singlix FS short name specific procedure
@@ -8503,6 +8534,8 @@ cntfs_@:
 	pop	ebp ; *	
 	retn
 
+; -----------------------------------------------
+
 find_last_dot:
 	; 25/05/2025
 	; 20/05/2025 - TRDOS 386 v2.0.10
@@ -8544,6 +8577,8 @@ f_l_dot_ok:
 	pop	esi
 	sub	ecx, esi
 	retn
+
+; -----------------------------------------------
 
 convert_invalid_chars_@:
 	; 27/05/2025 - TRDOS 386 v2.0.10
@@ -8608,6 +8643,8 @@ cic_4:
 	mov	ah, al
 	retn
 
+; -----------------------------------------------
+
 	; 24/05/2025 - TRDOS 386 v2.0.10
 convert_to_fdt_number:
 	; eax = FDT (or DDT) number text
@@ -8660,6 +8697,8 @@ mfn_@:
 mfn_skip:
 	pop esi
 	retn
+
+; -----------------------------------------------
 
 	; 18/06/2025
 	; 31/05/2025 - TRDOS 386 v2.0.10
@@ -8827,6 +8866,8 @@ cfs_ln_6:
 	; zf = 0
 	retn
 
+; -----------------------------------------------
+
 	; 16/06/2025
 	; 31/05/2025 - TRDOS 386 v2.0.10
 get_fdt_number:
@@ -8881,6 +8922,8 @@ g_fdt_num_2:
 	dec	ebx
 g_fdt_num_3:
 	retn
+
+; -----------------------------------------------
 
 	; 19/06/2025
 	; 17/06/2025
@@ -9007,6 +9050,8 @@ s_fdt_num_dnf:
 			; 'dir not found !'
 	stc
 	retn
+
+; -----------------------------------------------
 
 	; 17/06/2025
 	; 31/05/2025 - TRDOS 386 v2.0.10
@@ -9196,6 +9241,8 @@ gfssdid_ok:
 	mov	ecx, 64 ; 64 indirect tables
 	jmp	get_fs_sector_indirect_@
 
+; -----------------------------------------------
+
 	; 19/06/2025
 	; 18/06/2025
 	; 17/06/2025 - TRDOS 386 v2.0.10
@@ -9235,7 +9282,7 @@ search_fs_shortname:
 	;	((msdos basis name limit: 8 bytes))
 	;	(see: 'convert_name_from_trfs' procedure)
 	;
-	;   edi = FDT/DDT address
+	;   edi = FDT/DDT buffer address
 	;
 	;   If CF = 1 -> error code in EAX
 	;
@@ -9412,6 +9459,8 @@ sfssn_fail:
 	; error code in EAX
 	retn
 
+gfsfdt_5:
+	; 22/06/2025
 sfssn_8:
 	; 19/06/2025
 	; convert FDT/DDT parameters
@@ -9457,7 +9506,7 @@ sfssn_8:
 
 	; edx = LDRVT address
 	mov	edi, esi
-	; edi = File or Dir. Desc. Tbl Addr.
+	; edi = File/Dir. Desc. Tbl. buff. addr.
 
 	mov	esi, [f_target] ; ASCIIZ file name
 			; (Max. 12 bytes + NUL)
@@ -9764,6 +9813,511 @@ validate_FDT:
 ;v_FDT_ok:
 	;retn
 
+; -----------------------------------------------
+
+	; 22/06/2025 - TRDOS 386 v2.0.10
+get_fs_ddt:
+get_fs_fdt:
+	; Get File/Directory Description Table
+	; by using FDT/DDT number in (current) directory
+	; ! (singlix fs) !
+	;
+	; Input:
+	;   eax = FDT/DDT number
+	;
+	;   [Current_Drv] = Logical Dos Drive Number
+	;   ebx = DDT number of the directory
+	;	  which the FDT/DDT will be searched
+	;;;;[Current_Dir_FCluster] = DDT num of the dir
+	;	  which the FDT/DDT will be searched
+	;	          = 0 -> root directory
+	; Output:
+	;   19/06/2025
+	;   eax = file size
+	;    bh = 5th byte of file size
+	;    bl = attributes (FDT.Attributes)
+	;
+	;   ecx = date & time in MSDOS Dir Entry format
+	;    lw = time (16 bits) -HHHHHMMMMMMSSSSS-
+	;    hw = date (16 bits) -YYYYYYYMMMMDDDDD-
+	;
+	;   edx = Logical Dos Drive parameters Table
+	;   esi = ASCIIZ file/directory name
+	;	 (Max. 12 bytes + NUL, capitalized)
+	;
+	;    (diff. than msdos: basis name may be 12 bytes)
+	;	((msdos basis name limit: 8 bytes))
+	;	(see: 'convert_name_from_trfs' procedure)
+	;
+	;   edi = FDT/DDT address
+	;
+	;   If CF = 1 -> error code in EAX
+	;
+	; Modified registers:
+	;	eax, ebx, ecx, edx, esi, edi, ebp
+	;
+
+	mov	[FS_Current_DDT], ebx ; [DIR_FCluster]
+	mov	[FDT_Number], eax
+
+	xor	edx, edx
+	mov	dh, [Current_Drv]
+	add	edx, Logical_DOSDisks
+
+	xor	eax, eax ; 0
+
+	or	ebx, ebx ; root ?
+	jnz	short gfsfdt_1
+
+	; Singlix FS root directory descriptor table
+	mov	ebx, [edx+LD_FS_RootDirD]
+	mov	[FS_Current_DDT], ebx
+gfsfdt_1:
+	xchg	ebx, eax
+
+	; ebx = 0
+	;     =	start value of directory entry index
+	;	(sequence number)
+	; eax = DDT number of the current fs directory
+
+	call	get_fs_direntry
+	jnc	short gfsfdt_2
+gfsfdt_error:
+	retn
+
+	; FDT or DDT is already validated
+	;	(basic validation)
+gfsfdt_2:
+	; esi = FDT or DDT buffer address
+	;     = FS_FDT_BUFFER
+	; eax = 0 -> not found or
+	;	   end of directory (entries)
+	; eax > 0 -> found (FST/DDT number)
+	; ebx = directory entry index number
+
+	mov	[DirEntry_Counter], ebx
+
+	;or	eax, eax
+	;jz	short gfsfdt_not_found
+
+	mov	esi, FS_FDT_BUFFER+FDT.FileNameType
+	lodsb
+
+	cmp	al, 12 ; 12 = MSDOS
+	jne	short gfsfdt_3
+
+	; already MSDOS (8.3) type file name
+	mov	edi, esi
+	jmp	short gfsfdt_4
+
+gfsfdt_3:
+	mov	edi, target_name ; max. 12+1 bytes
+
+	push	edx ; LDRVT address
+
+	;mov	esi, FS_FDT_BUFFER+FDT.FileName
+
+	; esi = long file name (singlix fs, asciiz format)
+	;	(max. 64 chars)
+	; eax = FDT/DDT number
+
+	call	convert_name_from_trfs_@
+
+	; ecx = length of the asciiz file name
+	;	(except NUL tail)
+	; edi = target file name address
+	; eax = 0 if the name does not contain FDT number
+	;     = FDT number (if > 0)
+	;
+	; Modified registers: eax, ebx, ecx, edx
+
+	pop	edx ; LDRVT address
+
+gfsfdt_4:
+	mov	esi, FS_FDT_BUFFER
+
+; 22/06/2025
+%if 0
+	; convert FDT/DDT parameters
+	; to DOS directory entry format
+
+	mov	cl, [esi+FDT.LastModifYear]
+			; year - 1980 ; 7 bits
+	shl	ecx, 4
+	mov	al, [esi+FDT.LastModifMonth]
+			; 1-12
+	and	al, 0Fh ; 4 bits
+	or	cl, al
+	shl	ecx, 5
+	mov	al, [esi+FDT.LastModifDay]
+			; 1-31
+	and	al, 1Fh ; 5 bits
+	or	cl, al
+
+	shl	ecx, 5
+	mov	al, [esi+FDT.LastModifHour]
+			; 0-23
+	and	al, 1Fh ; 5 bits
+	or	cl, al
+	shl	ecx, 6
+	mov	al, [esi+FDT.LastModifMinute]
+			; 0-59
+	and	al, 3Fh ; 6 bits
+	or	cl, al
+	shl	ecx, 5
+	mov	al, [esi+FDT.LastModifSecond]
+	shr	al, 1 ; count of 2 seconds
+			; 0-29 (0-58 seconds)
+	and	al, 1Fh ; 5 bits
+	or	cl, al
+
+	; ecx  = date & time in MSDOS Dir Entry
+	;	format
+	; lw = time (16 bits) -HHHHHMMMMMMSSSSS-
+	; hw = date (16 bits) -YYYYYYYMMMMDDDDD-
+
+	mov	eax, [esi+FDT.FileSize]
+	mov	bh, [esi+FDT.FileSizeHigh]
+
+	; edx = LDRVT address
+	mov	edi, esi
+	; edi = File or Dir. Desc. Tbl Addr.
+
+	mov	esi, [f_target] ; ASCIIZ file name
+			; (Max. 12 bytes + NUL)
+	mov	bl, [Attributes]
+	; cf = 0
+	retn
+%else
+	; 22/06/2025
+	jmp	gfsfdt_5
+%endif
+
+; -----------------------------------------------
+
+parse_fs_dir_name:
+	; 22/06/2025 - TRDOS 386 v2.0.10
+	;
+	; INPUT ->
+	;	ESI = ASCIIZ Directory String Address
+	;	AL = Current Directory Level
+	;	EDI = Destination Adress
+	;	     (8 sub dir levels, each one 12+4 bytes)
+	;	EBX = start directory number (DDT address)
+	;	    = 0 -> root directory
+	;	    > 0 -> [Current_Dir_FCluster]
+	;		   [Current_Dir_DDT]
+	; OUTPUT ->
+	;	EDI = Dir Entry Formatted Array
+	;	     with zero cluster pointer at the last level
+	;	AH = The Last Dir Level
+	;
+	;	EBX = DDT address of the last dir of the path
+	;	If CF = 1 -> AL = error code 
+	;
+	; (eax, ebx, ecx, edx, esi, ebp will be changed)
+
+	;mov	[PATH_Array_Ptr], edi
+	mov	[PATH_CDLevel], al
+
+	; ebx = DDT address (Directory number of) the directory
+	mov	[DIR_FCluster], ebx ; [DIR_DDT]
+
+	; Note: ; (*) (caller: 'change_current_directory')
+	; 1) If the first char is '/' and the 2nd is not >20h,
+	;    cpu does not come here.
+	; 2) And if the 1st char is '/', ESI points to
+	;    the 2nd character here.
+	;    .. also [PATH_CDLevel] = 0 (AL = 0)
+	;       and [DIR_FCluster] = 0 (EBX = 0)
+
+	push	edi
+
+repeat_pfsdn_check_slash:
+	lodsb
+	cmp	al, '/'
+	je	short repeat_pfsdn_check_slash
+
+	cmp	al, 21h
+	jnb	short loc_pfsdn_get_dir_name
+	pop	edi
+	mov	ah, [PATH_CDLevel]
+	clc
+	retn
+
+loc_pfsdn_get_dir_name:
+	; check path (sub directory) level limit
+	; (('..' must be acceptable at level 8))
+	;cmp	byte [PATH_CDLevel], 8
+	;jnb	short loc_pfsdn_badname_err
+	
+	; (chdir "LongName" method)
+	cmp	al, '"' ; the 1st double quote
+			; long name start
+	jne	short loc_pfsdn_get_dir_name_@
+
+	; check path (sub directory) level limit
+	cmp	byte [PATH_CDLevel], 8
+	jnb	short loc_pfsdn_badname_err
+
+parse_fs_dir_long_name:
+	mov	ecx, 128
+	mov	edi, temp_name
+parse_fs_dir_long_name_nch:
+	lodsb
+	cmp	al, '"' ; the 2nd double quote
+			; long name end
+	je	short parse_fs_dir_long_name_@
+	cmp	al, 20h
+	jb	short loc_pfsdn_badname_err
+	stosb
+	loop	parse_fs_dir_long_name_nch
+	;jmp	short loc_pfsdn_badname_err
+
+parse_fs_dir_long_name_@:
+	mov	al, 0 ; zero at the end of string
+	stosb
+
+	push	esi ; *
+	mov	esi, temp_name
+	; ebx = [DIR_FCluster]
+	; ebx = [DIR_DDT] = DDT number of the dir
+	call	search_fs_longname
+	pop	ebx ; *
+	jc	parse_fs_dir_long_name_err
+	; edi = DDT buffer address
+
+	cmp	byte [edi], 'D' ; 'DDT'
+	jne	short loc_pfsdn_badname_err
+
+	; DOS attributes byte must be zero
+	; or contain the correct flag bits
+
+	mov	al, [edi+0Bh] ; MSDOS compatible
+			      ; attributes byte
+
+	test	al, 10h ; directory flag
+	jnz	loc_pfsdn_set_directory
+
+	and	al, al ; 0 ?
+	jnz	short loc_pfsdn_badname_err
+
+	jmp	loc_pfsdn_set_directory
+
+loc_pfsdn_get_dir_name_@:
+	mov	ecx, 12
+	mov	edi, Dir_File_Name
+repeat_pfsdn_get_dir_name:
+	; ! ambiguous file name characters
+	; ('*' and '?') should not be used as they cause
+	; confusion in the pathname text !
+	cmp	al, '*'
+	je	short loc_pfsdn_badname_err
+	cmp	al, '?'
+	je	short loc_pfsdn_badname_err
+
+	call	simple_ucase
+
+	stosb
+	lodsb
+	cmp	al, '/'
+	je	short loc_check_level_dot_conv_dir_name
+	cmp	al, 20h
+	jna	short loc_pfsdn_end_of_path_scan
+	loop	repeat_pfsdn_get_dir_name
+
+loc_pfsdn_badname_err:
+	stc
+	; Bad directory/path name
+	mov	al, ERR_INV_PATH_NAME ; 19
+	jmp	pfsdn_retn
+
+loc_pfsdn_end_of_path_scan:
+	dec	esi
+loc_check_level_dot_conv_dir_name:
+	xor	eax, eax
+	stosb
+	mov	ebx, esi
+	mov	esi, Dir_File_Name
+	lodsb
+repeat_pfsdn_name_check_dot:
+	cmp	al, '.'
+	jne	short loc_pfsdn_convert_sub_dir_name
+repeat_pfsdn_name_dot_dot:
+	lodsb
+	cmp	al, '.'
+	je	loc_pfsdn_dot_dot
+	cmp	al, 21h
+	jb	short pass_pfsdn_convert_sub_dir_name
+
+loc_pfsdn_convert_sub_dir_name:
+	; check path (sub directory) level limit
+	cmp	byte [PATH_CDLevel], 8
+	jnb	short loc_pfsdn_badname_err
+
+	; 22/06/2025
+	push	ebx ; *!
+	mov	ebx, Dir_File_Name
+	; check left square bracket
+pfsdn_chk_sb:
+	mov	al, [ebx]
+	cmp	al, '['
+	jne	short pfsdn_chk_sb_nc
+	call	convert_to_fdt_number
+	and	eax, eax
+	jz	short pfsdn_chk_sb_ok
+	inc	eax ; -1 ?
+	jz	short pfsdn_chk_sb_ok ; yes
+	dec	eax
+	mov	ebx, [DIR_FCluster] ; [DIR_DDT]
+	;   eax = FDT/DDT number
+	;   [Current_Drv] = Logical Dos Drive Number
+	;   ebx = DDT number of the directory
+	;	  which the FDT/DDT will be searched
+	call	get_fs_ddt
+	; esi = ASCIIZ file/directory name
+	; 	(Max. 12 bytes + NUL, capitalized)
+	; edi = DDT buffer address
+	;   eax = file size
+	;;   bh = 5th byte of file size
+	;;   bl = attributes (FDT.Attributes)
+	;   ecx = date & time in MSDOS Dir Entry format
+	;    lw = time (16 bits) -HHHHHMMMMMMSSSSS-
+	;    hw = date (16 bits) -YYYYYYYMMMMDDDDD-
+	jmp	short pfsdn_gfsddt_r
+pfsdn_chk_sb_nc:
+	cmp	al, 21h
+	jb	short pfsdn_chk_sb_ok
+	inc	ebx
+	jmp	short pfsdn_chk_sb
+pfsdn_chk_sb_ok:
+	;pop	ebx
+ 	; Directory attribute : 10h
+
+	mov	al, 10h ; attributes: directory
+	mov	ah, 80h+40h+08h ; negative attributes
+	mov	esi, Dir_File_Name
+	
+	; [DIR_FCluster]
+	; [DIR_DDT] = DDT number of the dir
+	;
+	;   esi = ASCIIZ (dos 8.3 dot) file name address
+	;	  -In fact: Max. 12 bytes + NUL-
+	;    al = attributes (positive)
+	;	  dir entry attribs and AL must be > 0
+	;    ah = negative attributes
+	;	  dir entry attribs or AH must be 0
+	;   [Current_Drv] = Logical Dos Drive Number
+
+	;push	ebx
+	mov	ebx, [DIR_FCluster] ; [DIR_DDT] 
+	call	search_fs_shortname
+	;pop	ebx
+pfsdn_gfsddt_r:
+	pop	ebx ; *!
+	jc	short parse_fs_dir_short_name_err
+			; error code in EAX
+	; esi = ASCIIZ file/directory name
+	; 	(Max. 12 bytes + NUL, capitalized)
+	; edi = DDT buffer address
+	;   eax = file size
+	;;   bh = 5th byte of file size
+	;;   bl = attributes (FDT.Attributes)
+	;   ecx = date & time in MSDOS Dir Entry format
+	;    lw = time (16 bits) -HHHHHMMMMMMSSSSS-
+	;    hw = date (16 bits) -YYYYYYYMMMMDDDDD-
+
+loc_pfsdn_set_directory:
+	movzx	eax, byte [PATH_CDLevel]
+	;cmp	al, 8
+	;jnb	short loc_pfsdn_badname_err
+
+	mov	ecx, [edi+DDT.DirectoryNumber] ; itself
+
+	mov	edi, [esp]
+
+	push	ecx ; *
+
+	; ebx = asciiz string address (esi)
+	; esi = short directory name addr (asciiz)
+	; eax = DDT number (DDT+DDT.DirectoryNumber)
+	; edi = [PATH_Array_Ptr]
+
+	mov	ah, 16
+	mul	ah
+	add	edi, eax
+	mov	ecx, 11
+	rep	movsb
+	mov	al, 0
+	stosb
+
+	pop	eax ; * ;  DDT number
+	stosd	; [PATH_Array_Ptr] + 12
+
+	inc	byte [PATH_CDLevel] ; Last sub dir level
+
+loc_pfsdn_dotdot_root:
+	; eax = 0
+loc_pfsdn_dotdot_subdir:
+	mov	[DIR_FCluster], eax ; [DIR_DDT]
+
+pass_pfsdn_convert_sub_dir_name:
+	mov	esi, ebx
+repeat_pfsdn_check_last_slash:
+	lodsb
+	cmp	al, '/'
+	je	short repeat_pfsdn_check_last_slash
+	cmp	al, 21h
+	jnb	loc_pfsdn_get_dir_name
+
+end_of_parse_fs_dir_name:
+	cmc
+parse_fs_dir_long_name_err:
+parse_fs_dir_short_name_err:
+pfsdn_retn:
+	; al = error code (if cf = 1)
+	pop	edi
+	mov	ah, [PATH_CDLevel]
+	mov	ebx, [DIR_FCluster] ; [DIR_DDT]
+	retn
+
+loc_pfsdn_dot_dot:
+	lodsb
+	cmp	al, 21h
+	;jnb	short loc_pfsdn_badname_err
+	jb	short loc_pfsdn_dot_dot_@
+	cmp	al, '/'
+	je	short loc_pfsdn_dot_dot_@
+	mov	al, ERR_INV_PATH_NAME ; 19
+	stc
+	jmp	short pfsdn_retn
+
+loc_pfsdn_dot_dot_@:
+	mov	al, [PATH_CDLevel]
+	or	al, al
+	jz	short loc_pfsdn_dotdot_root ; eax = 0
+	dec	al
+	mov	[PATH_CDLevel], al
+	jz	short loc_pfsdn_dotdot_root
+	mov	esi, [esp]
+	dec	al
+	jz	short loc_pfsdn_dot_dot_prev_level
+	mov	ah, 16
+	mul	ah
+	add	esi, eax
+loc_pfsdn_dot_dot_prev_level:
+	mov	eax, [esi+12]
+	jmp 	short loc_pfsdn_dotdot_subdir
+
+; -----------------------------------------------
+
+	; 22/06/2025 - TRDOS 386 v2.0.10
+search_fs_longname:
+	; 22/06/2025 - temporary 
+	xor	eax, eax
+	retn
+
+; -----------------------------------------------
 
 ; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 
