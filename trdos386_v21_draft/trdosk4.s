@@ -10652,11 +10652,6 @@ get_fs_longname:
 	; Output:
 	;   esi = ASCIIZ file/directory name (FDT.FileName)
 	;	 (Max. 64 bytes)
-	;
-	;    (diff. than msdos: basis name may be 12 bytes)
-	;	((msdos basis name limit: 8 bytes))
-	;	(see: 'convert_name_from_trfs' procedure)
-	;
 	;   edi = FDT/DDT buffer address
 	;
 	;   If CF = 1 -> error code in EAX
