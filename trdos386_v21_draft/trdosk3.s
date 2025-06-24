@@ -3586,7 +3586,7 @@ loc_lfn_err3:
 ; burada kaldým... 20/05/2025
 
 show_file:
-	; 18/05/2025 (TRDOS 386 Kernel v2.0.10) 
+	; 18/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 07/08/2022
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 18/02/2016

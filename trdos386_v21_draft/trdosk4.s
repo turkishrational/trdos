@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 24/06/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 25/06/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -8679,6 +8679,7 @@ cic_4:
 
 ; -----------------------------------------------
 
+	; 25/06/2025
 	; 24/05/2025 - TRDOS 386 v2.0.10
 convert_to_fdt_number:
 	; eax = FDT (or DDT) number text
@@ -8708,28 +8709,32 @@ cfdtnum_1:
 	xor	eax, eax
 	loop	cfdtnum_1
 cfdtnum_2:
+	; 25/06/2025
+	mov	eax, [fdt_number]
 	pop	esi
 	retn
 cfdtnum_3:
 	mov	dword [fdt_number], 0FFFFFFFFh
 	jmp	short cfdtnum_2
 
+; -----------------------------------------------
+
 move_file_name:
 	; eax = argument, fs file name text
 	; ecx = remain byte count
-	push esi
-	mov esi, eax
+	push	esi
+	mov	esi, eax
 mfn_@:
 	lodsb
-	cmp al, 20h
-	jb  short mfn_skip
+	cmp	al, 20h
+	jb	short mfn_skip
 	stosb
-	loop mfn_@
+	loop	mfn_@
 	; ecx = 0
-	;xor eax, eax
+	;xor	eax, eax
 	;stosb
 mfn_skip:
-	pop esi
+	pop	esi
 	retn
 
 ; -----------------------------------------------
@@ -10098,6 +10103,7 @@ gfsfdt_4:
 ; -----------------------------------------------
 
 parse_fs_dir_name:
+	; 25/06/2025
 	; 24/06/2025
 	; 23/06/2025
 	; 22/06/2025 - TRDOS 386 v2.0.10
@@ -10277,6 +10283,11 @@ pfsdn_chk_sb:
 	cmp	al, '['
 	jne	short pfsdn_chk_sb_nc
 	call	convert_to_fdt_number
+	; 25/06/2025
+	cmp	al, ']'
+	;jne	short pfsdn_chk_sb_ok
+	jne	short loc_pfsdn_badname_err
+	;mov	eax, [fdt_number]
 	and	eax, eax
 	;jz	short pfsdn_chk_sb_ok
 	jz	short loc_pfsdn_badname_err
@@ -10622,6 +10633,9 @@ sfsln_3:
 	; cf = 0
 	retn
 
+; -----------------------------------------------
+
+	; 25/06/2025
 	; 24/06/2025 - TRDOS 386 v2.0.10
 get_fs_longname:
 	; Get file/dir name in current directory
@@ -10659,14 +10673,79 @@ get_fs_longname_@:
 
 	mov	[f_target], esi ; save string address
 
+	; 25/06/2025
+	;;;;
+	; check left square bracket
+	; "longname [numeric]" -> FDT/DDT
+get_fs_longname_sb:
+	lodsb
+	cmp	al, '['
+	jne	short get_fs_longname_sb_nc
+	call	convert_to_fdt_number
+	cmp	al, ']'
+	jne	short gfsln_badname_err
+	;mov	eax, [fdt_number]
+	; [FDT_Number] = eax
+	and	eax, eax
+	;jz	short gfsln_badname_err
+	jz	short gfsln_0
+	inc	eax ; -1 ?
+	;jz	short gfsln_badname_err ; yes
+	jz	short gfsln_0
+	dec	eax
+	;jmp	short get_fs_longname_read_fdt
+
+get_fs_longname_read_fdt:
+	; eax = FDT/DDT number
+	; [Current_LDRVT] = LDRVT address
+
+	;mov	[FDT_Number], eax
+	mov	edx, [Current_LDRVT]
+
+	mov	eax, [FS_Current_DDT] ; [DIR_DDT]
+		; DDT number of the current dir
+	add	eax, [edx+LD_FS_BeginSector]
+		; start LBA of TRFS partition
+
+	mov	ebx, FS_FDT_BUFFER
+	mov	esi, edx
+	push	esi
+	call 	DREAD
+	pop	edx
+	jnc	short get_fs_longname_chk_fdt
+
+	; 'disk read error !'
+	mov	eax, ERR_DRV_READ ; 17
+	retn
+
+get_fs_longname_chk_fdt:
+	mov	esi, FS_FDT_BUFFER
+	mov	ecx, [FDT_Number]
+	call	validate_FDT
+	je	short get_fs_longname_chk_fdt_ok
+	call	validate_DDT
+	jne	short gfsln_badname_err
+get_fs_longname_chk_fdt_ok:
+	jmp	short gfsln_3
+	;;;;
+
+	; 25/06/2025
+get_fs_longname_sb_nc:
+	cmp	al, 21h
+	;jb	short gfsln_0
+	;jmp	short get_fs_longname_sb
+	jnb	short get_fs_longname_sb
+
+	; 25/06/2025
+gfsln_0:
 	; 24/06/2025
 	;xor	edx, edx
 	;mov	dh, [Current_Drv]
 	;add	edx, Logical_DOSDisks
 	; 24/06/2025
-	mov	edx, [Current_LDRVT]
-
-	;mov	ebx, [FS_Current_DDT]
+	;mov	edx, [Current_LDRVT]
+	; 25/06/2025
+	mov	ebx, [FS_Current_DDT]
 
 	xor	eax, eax ; 0
 
@@ -10692,6 +10771,13 @@ gfsln_1:
 	; 19/06/2025
 	jnc	short gfsln_2
 gfsln_error:
+	retn
+
+	; 25/06/2025
+gfsln_badname_err:
+	stc
+	; Bad directory/path name
+	mov	eax, ERR_INV_PATH_NAME ; 19
 	retn
 
 	; FDT or DDT is already validated
