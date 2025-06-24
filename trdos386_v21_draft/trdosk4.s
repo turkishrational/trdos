@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 23/06/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 24/06/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -685,6 +685,7 @@ pass_ppdn_set_al_to_ah:
 %endif
 
 change_current_directory:
+	; 24/06/2025
 	; 22/06/2025
 	; 14/06/2025 (Major Modification)
 	; 13/06/2025
@@ -767,7 +768,9 @@ loc_ccd_parse_path_name:
 	;xor	ecx, ecx
 	mov	ch, [Current_Drv]
 	add	ecx, Logical_DOSDisks
-	mov	[CCD_DriveDT], ecx
+	;mov	[CCD_DriveDT], ecx
+	; 24/06/2025
+	mov	[Current_LDRVT], ecx
 
 	mov	edi, PATH_Array
 
@@ -819,7 +822,9 @@ pass_ccd_parse_dir_name:
 	;mov	edi, Logical_DOSDisks
 	;add	edi, ebx
 	; 22/06/2025
-	mov	edi, [CCD_DriveDT]
+	;mov	edi, [CCD_DriveDT]
+	; 24/06/2025
+	mov	edi, [Current_LDRVT]
 
 	mov	esi, PATH_Array
 
@@ -875,6 +880,7 @@ loc_ccd_retn_c:
 	retn
 
 parse_dir_name:
+	; 24/06/2025
 	; 23/06/2025
 	; 16/06/2025
 	; 14/06/2025
@@ -895,6 +901,9 @@ parse_dir_name:
 	;	EBX = start directory first cluster
 	;	    = 0 -> root directory
 	;	    > 0 -> [Current_Dir_FCluster]
+	;	24/06/2025
+	;	[Current_LDRVT] = Logical DOS Drv. D. Table addr
+	;
 	; OUTPUT ->
 	;	EDI = Dir Entry Formatted Array
 	;	     with zero cluster pointer at the last level
@@ -2318,7 +2327,7 @@ parse_path_name:
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 10/02/2016
 	; 08/02/2016 (TRDOS 386 = TRDOS v2.0)
-	; 10/009/2011 ('proc_parse_pathname')
+	; 10/09/2011 ('proc_parse_pathname')
 	; 27/11/2009
 	; 05/12/2004
 	;
@@ -2459,6 +2468,7 @@ loc_ppn_invalid_drive:
 	retn
 
 find_longname:
+	; 24/06/2025
 	; 20/05/2025 - TRDOS 386 v2.0.10
 	;	-verified-
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -2475,7 +2485,7 @@ find_longname:
 	;	cf = 1 -> error number returns in EAX (AL)
 	;	AL = 0 & CF=1 -> longname not found
 	;	     the file/directory has no longname
-	; 	cf = 0 -> AL = FAT Type 
+	; 	cf = 0 -> AL = FAT Type
 
 	; 17/10/2009
 	; ASCIIZ string will be returned
@@ -2493,25 +2503,26 @@ find_longname:
 	;	(Result of AND must be equal to AL)
 	;   AH = Negative attributes mask
 	;	(Result of AND must be ZERO)
-	mov	ax, 0800h 
+	mov	ax, 0800h
 		; it must not be volume name or longname
 	call	find_first_file
 	jc	short loc_fln_retn
 
-loc_fln_check_FAT_Type:
-	cmp	byte [Current_FATType], 1
-	jnb	short loc_fln_check_longname_yes_sign
-
-	;call	get_fs_longname
-	;retn
-	; 29/07/2022
-	jmp	get_fs_longname
+	; 24/06/2025
+;loc_fln_check_FAT_Type:
+	;cmp	byte [Current_FATType], 1
+	;jnb	short loc_fln_check_longname_yes_sign
+	;
+	;;call	get_fs_longname
+	;;retn
+	;; 29/07/2022
+	;jmp	get_fs_longname
 
 loc_fln_check_longname_yes_sign:
 	or	bh, bh
 	jnz	short loc_fln_check_longnamefound_number
 loc_fln_longname_not_found_retn:
-	xor	eax, eax 
+	xor	eax, eax
 	; cf = 1 & al = 0 -> longname not found
 	stc
 loc_fln_retn:
@@ -2590,12 +2601,6 @@ loc_next_sum:
 	inc	esi
 	;add	al, ah
 	loop	loc_next_sum
-	retn
-
-get_fs_longname:
-	; temporary (13/02/2016)
-	xor	eax, eax
-	stc
 	retn
 
 make_sub_directory:
@@ -7272,6 +7277,7 @@ clfnl_3:
 	sub	eax, ecx
 	retn
 
+	; 24/06/2025
 	; 14/06/2025
 	; 05/06/2025
 	; 04/06/2025
@@ -7284,13 +7290,16 @@ search_longname:
 	;   esi = ASCIIZ long name (not UNICODE!)
 	;   	  (max. 128 bytes, + NUL)
 	;
-	;   [Current_Drv] = Logical Dos Drive Number
+	;;  [Current_Drv] = Logical Dos Drive Number
 	;   14/06/2025
 	;   ebx = the 1st cluster of the directory
 	;		which the LFN will be searched
 	;;;;[Current_Dir_FCluster] = 1st clust of the dir
 	;		which the LFN will be searched
 	;	          = 0 -> root directory
+	;   24/06/2025
+	;   [Current_LDRVT] = Logical DOS Drv. D. Table addr
+	;
 	; Output:
 	;   eax = LFN position (found)
 	;   ebx = the 1st cluster of the directory
@@ -7308,11 +7317,21 @@ search_longname:
 
 	; 14/06/2025
 	mov	[DIR_FCluster], ebx
+	; 24/06/2025
+	;jmp	short search_longname_@@
 search_longname_@:
 	; [DIR_FCluster] = the 1st clust of the dir
-
+	
+	; 24/06/2025
+	mov	edx, [Current_LDRVT]
+search_longname_@@:
 	mov	[f_target], esi ; save string address
 
+	; 24/06/2025
+	;xor	edx, edx
+	;mov	dh, [Current_Drv]
+	;add	edx, Logical_DOSDisks
+	
 	call	check_invalid_lfn_chars
 	;jc	short slfn_invalid
 	jnc	short sln_1
@@ -7345,10 +7364,14 @@ sln_1:
 	or	al, 40h
 	mov	[LDIR_Ord], al
 
-	xor	edx, edx
-	mov	dh, [Current_Drv]
-	; 05/06/2025
-	add	edx, Logical_DOSDisks
+	; 24/06/2025
+	;xor	edx, edx
+	;mov	dh, [Current_Drv]
+	;; 05/06/2025
+	;add	edx, Logical_DOSDisks
+	; 24/06/2025
+	;mov	edx, [Current_LDRVT]
+	; edx = LDRVT address
 
 	;mov	ebx, [Current_Dir_FCluster]
 	; 13/06/2025
@@ -7864,6 +7887,7 @@ gde_17:
 
 	retn
 
+	; 24/06/2025
 	; 14/06/2025
 	; 13/06/2025 - TRDOS 386 v2.0.10
 search_shortname:
@@ -7876,13 +7900,16 @@ search_shortname:
 	;    ah = negative attributes
 	;	  dir entry attribs or AH must be 0
 	;
-	;   [Current_Drv] = Logical Dos Drive Number
+	;;  [Current_Drv] = Logical Dos Drive Number
 	;   14/06/2025
 	;   ebx = the 1st cluster of the directory
 	;		which the name will be searched
 	;;;;[Current_Dir_FCluster] = 1st clust of the dir
 	;		which the name will be searched
 	;	          = 0 -> root directory
+	;   24/06/2025
+	;   [Current_LDRVT] = Logical DOS Drv. D. Table addr
+	;
 	; Output:
 	;   eax = file/dir name position (found)
 	;   ebx = the 1st cluster of the directory
@@ -7907,9 +7934,12 @@ search_shortname_@:
 	mov	edi, target_name
 	call	convert_file_name
 
-	xor	edx, edx
-	mov	dh, [Current_Drv]
-	add	edx, Logical_DOSDisks
+	; 24/06/2025
+	;xor	edx, edx
+	;mov	dh, [Current_Drv]
+	;add	edx, Logical_DOSDisks
+	; 24/06/2025
+	mov	edx, [Current_LDRVT]
 
 	;mov	ebx, [Current_Dir_FCluster]
 	; 14/06/2025
@@ -9303,6 +9333,7 @@ gfssdid_ok:
 
 ; -----------------------------------------------
 
+	; 24/06/2025
 	; 19/06/2025
 	; 18/06/2025
 	; 17/06/2025 - TRDOS 386 v2.0.10
@@ -9318,12 +9349,15 @@ search_fs_shortname:
 	;    ah = negative attributes
 	;	  dir entry attribs or AH must be 0
 	;
-	;   [Current_Drv] = Logical Dos Drive Number
+	;;  [Current_Drv] = Logical Dos Drive Number
 	;   ebx = DDT number of the directory
 	;		which the name will be searched
 	;;;;[Current_Dir_FCluster] = DDT num of the dir
 	;		which the name will be searched
 	;	          = 0 -> root directory
+	;   24/06/2025
+	;   [Current_LDRVT] = Logical DOS Drv. D. Tbl. Addr.
+	;
 	; Output:
 	;   19/06/2025
 	;   eax = file size
@@ -9358,9 +9392,11 @@ search_fs_shortname_@:
 	mov	[Attributes], ax ; mov [NegAttribs], ah
 
 	; 18/06/2025
-	xor	edx, edx
-	mov	dh, [Current_Drv]
-	add	edx, Logical_DOSDisks
+	;xor	edx, edx
+	;mov	dh, [Current_Drv]
+	;add	edx, Logical_DOSDisks
+	; 24/06/2025
+	mov	edx, [Current_LDRVT]
 
 	;mov	ebx, [FS_Current_DDT]
 
@@ -9875,6 +9911,7 @@ validate_FDT:
 
 ; -----------------------------------------------
 
+	; 24/06/2025
 	; 22/06/2025 - TRDOS 386 v2.0.10
 get_fs_ddt:
 get_fs_fdt:
@@ -9885,12 +9922,15 @@ get_fs_fdt:
 	; Input:
 	;   eax = FDT/DDT number
 	;
-	;   [Current_Drv] = Logical Dos Drive Number
+	;;  [Current_Drv] = Logical Dos Drive Number
 	;   ebx = DDT number of the directory
 	;	  which the FDT/DDT will be searched
 	;;;;[Current_Dir_FCluster] = DDT num of the dir
 	;	  which the FDT/DDT will be searched
 	;	          = 0 -> root directory
+	;   24/06/2025
+	;   [Current_LDRVT] = Logical DOS Drv. D. Tbl. Addr.
+	;
 	; Output:
 	;   19/06/2025
 	;   eax = file size
@@ -9920,9 +9960,11 @@ get_fs_fdt:
 	mov	[FS_Current_DDT], ebx ; [DIR_FCluster]
 	mov	[FDT_Number], eax
 
-	xor	edx, edx
-	mov	dh, [Current_Drv]
-	add	edx, Logical_DOSDisks
+	;xor	edx, edx
+	;mov	dh, [Current_Drv]
+	;add	edx, Logical_DOSDisks
+	; 24/06/2025
+	mov	edx, [Current_LDRVT]
 
 	xor	eax, eax ; 0
 
@@ -10056,6 +10098,7 @@ gfsfdt_4:
 ; -----------------------------------------------
 
 parse_fs_dir_name:
+	; 24/06/2025
 	; 23/06/2025
 	; 22/06/2025 - TRDOS 386 v2.0.10
 	;
@@ -10068,6 +10111,9 @@ parse_fs_dir_name:
 	;	    = 0 -> root directory
 	;	    > 0 -> [Current_Dir_FCluster]
 	;		   [Current_Dir_DDT]
+	;	24/06/2025
+	;	[Current_LDRVT] = Logical DOS Drv. D. Table addr
+	;
 	; OUTPUT ->
 	;	EDI = Dir Entry Formatted Array
 	;	     with zero cluster pointer at the last level
@@ -10159,8 +10205,9 @@ parse_fs_dir_long_name_@:
 	; DOS attributes byte must be zero
 	; or contain the correct flag bits
 
-	mov	al, [edi+0Bh] ; MSDOS compatible
-			      ; attributes byte
+	; 24/06/2025
+	mov	al, [edi+DDT.Attributes]
+		 ; MSDOS compatible attributes byte
 
 	test	al, 10h ; directory flag
 	jnz	loc_pfsdn_set_directory
@@ -10376,6 +10423,7 @@ loc_pfsdn_dot_dot_prev_level:
 
 ; -----------------------------------------------
 
+	; 24/06/2025
 	; 23/06/2025 - TRDOS 386 v2.0.10
 search_fs_longname:
 	; Search long file/dir name in current directory
@@ -10384,12 +10432,15 @@ search_fs_longname:
 	; Input:
 	;   esi = ASCIIZ (or 64 bytes) file name to be
 	;	  searched in the (current) directory
-	;   [Current_Drv] = Logical Dos Drive Number
+	;;  [Current_Drv] = Logical Dos Drive Number
 	;   ebx = DDT number of the directory
-	;		which the name will be searched
+	;	  	which the name will be searched
 	;;;;[Current_Dir_FCluster] = DDT num of the dir
 	;		which the name will be searched
 	;	          = 0 -> root directory
+	;   24/06/2025
+	;   [Current_LDRVT] = Logical DOS Drv. D. Table addr
+	;
 	; Output:
 	;   eax = file size
 	;    bh = 5th byte of file size
@@ -10415,15 +10466,19 @@ search_fs_longname:
 	;	eax, ebx, ecx, edx, esi, edi, ebp
 	;
 
-	mov	[FS_Current_DDT], ebx ; [DIR_FCluster]
+	;mov	[FS_Current_DDT], ebx ; [DIR_FCluster]
+	mov	edx, [Current_LDRVT]
 search_fs_longname_@:
+	; edx = LDRVT address
 	; [FS_Current_DDT] = directory description table addr
 
 	mov	[f_target], esi ; save string address
 
-	xor	edx, edx
-	mov	dh, [Current_Drv]
-	add	edx, Logical_DOSDisks
+	;xor	edx, edx
+	;mov	dh, [Current_Drv]
+	;add	edx, Logical_DOSDisks
+	; 24/06/2025
+	;mov	edx, [Current_LDRVT]
 
 	;mov	ebx, [FS_Current_DDT]
 
@@ -10565,6 +10620,129 @@ sfsln_3:
 			; (Max. 64 bytes)
 	mov	bl, [Attributes]
 	; cf = 0
+	retn
+
+	; 24/06/2025 - TRDOS 386 v2.0.10
+get_fs_longname:
+	; Get file/dir name in current directory
+	; ! (singlix fs) !
+	;
+	; Input:
+	;   esi = ASCIIZ (dos 8.3 dot) file name address
+	;	  -In fact: Max. 12 bytes + NUL-
+	;;  [Current_Drv] = Logical Dos Drive Number
+	;   ebx = DDT number of the directory
+	;		which the name will be searched
+	;   [Current_LDRVT] = Logical DOS Drv. D. Tbl. Addr.
+	;
+	; Output:
+	;   esi = ASCIIZ file/directory name (FDT.FileName)
+	;	 (Max. 64 bytes)
+	;
+	;    (diff. than msdos: basis name may be 12 bytes)
+	;	((msdos basis name limit: 8 bytes))
+	;	(see: 'convert_name_from_trfs' procedure)
+	;
+	;   edi = FDT/DDT buffer address
+	;
+	;   If CF = 1 -> error code in EAX
+	;   IF CF = 0 -> EAX = 0
+	;		(FAT Type, AL = 0 -> Singlix FS) 
+	;
+	; Modified registers:
+	;	eax, ebx, ecx, edx, esi, edi, ebp
+	;
+
+	mov	[FS_Current_DDT], ebx ; [DIR_FCluster]
+get_fs_longname_@:
+	; [FS_Current_DDT] = directory description table addr
+
+	mov	[f_target], esi ; save string address
+
+	; 24/06/2025
+	;xor	edx, edx
+	;mov	dh, [Current_Drv]
+	;add	edx, Logical_DOSDisks
+	; 24/06/2025
+	mov	edx, [Current_LDRVT]
+
+	;mov	ebx, [FS_Current_DDT]
+
+	xor	eax, eax ; 0
+
+	or	ebx, ebx ; root ?
+	jnz	short gfsln_1
+
+	; Singlix FS root directory descriptor table
+	mov	ebx, [edx+LD_FS_RootDirD]
+	mov	[FS_Current_DDT], ebx
+gfsln_1:
+	xchg	ebx, eax
+
+	; ebx = 0
+	;     =	start value of directory entry index
+	;	(sequence number)
+	; eax = DDT number of the current fs directory
+
+	; this is called only for the 1st
+	; ('get_fs_direntry_next' is called after this)
+	; return the 1st FDT in the directory
+	call	get_fs_direntry
+	;jc	short gfsln_error
+	; 19/06/2025
+	jnc	short gfsln_2
+gfsln_error:
+	retn
+
+	; FDT or DDT is already validated
+	;	(basic validation)
+gfsln_2:
+	; esi = FDT or DDT buffer address
+	;     = FS_FDT_BUFFER
+	; eax = 0 -> not found or
+	;	   end of directory (entries)
+	; eax > 0 -> found (FST/DDT number)
+	; ebx = directory entry index number
+
+	mov	[DirEntry_Counter], ebx
+
+	;or	eax, eax
+	;jz	short gfsln_not_found
+
+	mov	[FDT_Number], eax
+
+	mov	edi, FS_FDT_BUFFER+FDT.FileName
+	mov	esi, [f_target]
+
+	; esi = (long) name to be searched
+	; edi = (long) name in the FDT/DDT
+
+	call	compare_fs_long_name
+	jz	short gfsln_3  ; (long) name found
+
+	call	get_fs_direntry_next
+	jc	short gfsln_fail ; error code in EAX
+
+	;or	eax, eax
+	;jz	short sfssn_not_found
+
+	; FDT/DDT is ready,
+	; continue with file name checking
+
+	jmp	short gfsln_2
+
+gfsln_3:
+	mov	esi, FS_FDT_BUFFER+FDT.FileName
+	mov	edi, FS_FDT_BUFFER
+	;retn
+	
+	xor	eax, eax
+	; al = 0 -> Singlix FS
+
+gfsln_fail:
+	; ERR_NO_MORE_FILES = 12
+	; ERR_FILE_NOT_FOUND = 12
+	; error code in EAX
 	retn
 
 ; -----------------------------------------------

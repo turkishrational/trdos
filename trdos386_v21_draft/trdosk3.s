@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 16/06/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 24/06/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -3381,6 +3381,7 @@ loc_fnf_stc_retn_@:
 	retn
 
 get_and_print_longname:
+	; 24/06/2025
 	; 14/06/2025
 	; 05/06/2025
 	; 04/06/2025
@@ -3391,6 +3392,15 @@ get_and_print_longname:
 	; 13/02/2016 (TRDOS 386 = TRDOS v2.0)
 	; 24/01/2010
 	; 17/10/2009 (CMD_INTR.ASM, 'cmp_cmd_longname')
+
+	; 24/06/2025
+	xor	edx, edx
+	mov	dh, [Current_Drv]
+	add	edx, Logical_DOSDisks
+	mov	[Current_LDRVT], edx
+	; 24/06/2025
+	mov	dl, [edx+LD_FSType]
+
 get_longname_fchar:
 	cmp	byte [esi], 20h
 	;ja	short loc_find_longname
@@ -3403,6 +3413,8 @@ get_longname_fchar:
 	retn
 
 get_longname_option:
+	; 24/06/2025
+	mov	ebx, [Current_Dir_FCluster] ; [DIR_DDT]
 	; 04/06/2025
 	cmp	byte [esi], '"'
 	jne	short loc_find_longname
@@ -3428,11 +3440,27 @@ get_longname_option_2:
 	xor	al, al
 	stosb
 	mov	esi, temp_name
-	; 14/06/2025
-	mov	ebx, [Current_Dir_FCluster]
-	call	search_longname
-	jnc	short get_longname_option_3
 
+	; 24/06/2025
+	; check for Singlix FS
+	;cmp	byte [edx+LD_FSType], 0A1h
+	cmp	dl, 0A1h
+	jne	short get_longname_option_3
+	;mov	ebx, [Current_Dir_FCluster] ; [DIR_DDT]
+	call	search_fs_longname
+	; 24/06/2025
+	; edx = LDRVT address
+	;call	search_fs_longname_@
+	jc	short get_longname_option_err
+	jmp	loc_print_shortname
+
+get_longname_option_3:
+	; 14/06/2025
+	;mov	ebx, [Current_Dir_FCluster]
+	call	search_longname
+	jnc	short get_longname_option_4
+
+get_longname_option_err: ; 24/06/2025
 	cmp	al, ERR_FILE_NOT_FOUND ; 12
 	je	short loc_longname_not_found
 
@@ -3442,9 +3470,9 @@ get_longname_option_2:
 
 	jmp	short loc_fln_error
 
-get_longname_option_3:
+get_longname_option_4:
 	; convert short name to 8.3 format
-	
+
 	; edi = short dir entry address
 	mov	esi, Dir_File_Name
 	; esi = dos dot (8.3) file name buffer
@@ -3456,6 +3484,11 @@ get_longname_option_3:
 	jmp	loc_print_shortname
 
 loc_find_longname:
+	; check Singlix FS 
+	;cmp	byte [edx+LD_FSType], 0A1h
+	cmp	dl, 0A1h
+	je	short loc_find_fs_longname
+
 	call	find_longname
 	jnc	short loc_print_longname
 
@@ -3494,6 +3527,11 @@ loc_longname_not_found:
 	;jmp	print_msg
 	; 28/07/2022
 	jmp	short loc_lfn_err3
+
+	; 24/06/2025
+loc_find_fs_longname:
+	call	get_fs_longname
+	jc	short loc_fln_error
 
 	; 20/05/2025 - TRDOS 386 v2.0.10
 	; (LongName format here: ASCIIZ string)
