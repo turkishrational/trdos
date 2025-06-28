@@ -2544,6 +2544,16 @@ loc_ppn_get_lfn_ok:
 	stosb
 	retn
 
+loc_ppn_cmd_failed:
+	; File or directory name is not existing
+	mov	[edi], al ; Drv
+	mov	ax, 1 ; eax = 1
+	; TR-DOS Error Code 01h = Bad Command Argument
+	; MS-DOS Error Code 01h : Invalid Function Number
+	;stc
+	; (MainProg ErrMsg: "Bad command or file name!")
+	retn
+
 pass_ppn_cdir:
 	mov	esi, [First_Path_Pos]
 	lodsb
@@ -2575,9 +2585,8 @@ loc_ppn_get_fnchar_next:
 	; 28/06/2025
 	;;;
 	cmp	byte [esi], 20h
-	jb	short loc_ppn_return
-	stc
-	jmp	short loc_ppn_cmd_failed
+	cmc
+	jb	short loc_ppn_cmd_failed
 	;;;
 loc_ppn_return:
 	xor	eax, eax
@@ -2596,17 +2605,9 @@ loc_ppn_change_drive:
 	inc	esi
 	mov	ah, [esi]
 	cmp	ah, 21h
-	jnb	short pass_ppn_change_drive
-
-loc_ppn_cmd_failed:
-	; File or directory name is not existing
-	mov	[edi], al ; Drv
-	mov	ax, 1 ; eax = 1
-	; TR-DOS Error Code 01h = Bad Command Argument
-	; MS-DOS Error Code 01h : Invalid Function Number
-	;stc
-	; (MainProg ErrMsg: "Bad command or file name!")
-	retn
+	;jnb	short pass_ppn_change_drive
+	; 28/06/2025
+	jb	short loc_ppn_cmd_failed
 
 pass_ppn_change_drive:
 	mov	[First_Path_Pos], esi
@@ -2631,6 +2632,12 @@ pass_ppn_change_drive:
 	; edi = Path_Directory (255+NUL bytes)
 
 	mov	al, [esi]
+	; 28/06/2025
+	mov	ah, 21h
+	cmp	al, '"'
+	jne	short loc_scan_ppn_dslash
+	mov	ah, 20h
+	;dec	ah
 loc_scan_ppn_dslash:
 	cmp	al, '/'
   	jne	short loc_scan_next_slash_pos
@@ -2638,8 +2645,13 @@ loc_scan_ppn_dslash:
 loc_scan_next_slash_pos:
 	inc	esi
 	mov	al, [esi]
-	cmp	al, 20h
-	ja	short loc_scan_ppn_dslash
+	;cmp	al, 20h
+	;ja	short loc_scan_ppn_dslash
+	; 28/06/2025
+	cmp	al, ah ; 20h (long) or 21h
+	jnb	short loc_scan_ppn_dslash
+
+loc_scan_ppn_dslash_ok:
 	;cmp	dword [Last_Slash_Pos], 0
 	; 09/08/2022
 	;cmp	[Last_Slash_Pos], ecx ; 0 ?
@@ -2650,6 +2662,9 @@ loc_scan_next_slash_pos:
 	; jcxz	pass_ppn_cdir
 	; 03/06/2025
 	jecxz	pass_ppn_cdir
+	; 28/06/2025
+	;or	ecx, ecx
+	;jz	pass_ppn_cdir
 	mov	esi, [First_Path_Pos]
 	sub	ecx, esi
 	inc	ecx

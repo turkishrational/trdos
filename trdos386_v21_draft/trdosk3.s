@@ -3661,7 +3661,7 @@ loc_show_change_directory:
 	;;mov	[Show_LDDDT], ebx
 	;mov	[Current_LDRVT], ebx
  	;	; Logical DOS Drv Description Table addr
-	
+
 	;cmp	byte [FindFile_Directory], 20h
 	; 28/06/2025
 	cmp	byte [Path_Directory], 20h
