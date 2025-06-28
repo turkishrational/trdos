@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 24/06/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 28/06/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -2470,6 +2470,7 @@ loc_run_err_pass_restore_cdir:
 	retn
 
 print_directory_list:
+	; 28/06/2025 (TRDOS 386 v2.0.10)
 	; 02/12/2023 (TRDOS 386 v2.0.7)
 	; 07/08/2022
 	; 27/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -2565,7 +2566,8 @@ get_dfname_fchar_attr:
 	jmp	loc_print_dir_call_all
 loc_print_dir_call_flt:
 	dec	esi
-	mov	edi, FindFile_Drv
+	; 28/06/2025
+	;mov	edi, FindFile_Drv
 	call	parse_path_name
  	jnc	short loc_print_dir_change_drv_1
 	cmp	al, 1
@@ -2612,9 +2614,12 @@ pass_attr_a:
 	or	byte [AttributesMask], 20h ; archive
 	jmp	short pass_attr_shr
 
+	; 28/06/2025
 	; 07/08/2022
 loc_print_dir_change_drv_1:
-	mov	dl, [FindFile_Drv]
+	;mov	dl, [FindFile_Drv]
+	; 28/06/2025
+	mov	dl, [Path_Drv]
 loc_print_dir_change_drv_2:
 	cmp	dl, [RUN_CDRV]
 	je	short loc_print_dir_change_directory 
@@ -2623,11 +2628,15 @@ loc_print_dir_change_drv_2:
 	; 27/07/2022
 	jc	short pdl_2
 loc_print_dir_change_directory:
-	cmp	byte [FindFile_Directory], 20h ; 0 or 20h ?
+	;cmp	byte [FindFile_Directory], 20h ; 0 or 20h ?
+	; 28/06/2025
+	cmp	byte [Path_Directory], 20h
 	jna	short pass_print_dir_change_directory
 
 	inc	byte [Restore_CDIR]
-	mov	esi, FindFile_Directory
+	;mov	esi, FindFile_Directory
+	; 28/06/2025
+	mov	esi, Path_Directory
 	xor	ah, ah ; CD_COMMAND sign -> 0
 	call	change_current_directory
         ;jc	loc_run_cmd_failed
@@ -2638,7 +2647,9 @@ loc_print_dir_change_prompt_dir_string:
 	call	change_prompt_dir_string
 
 pass_print_dir_change_directory:
-	mov	esi, FindFile_Name
+	;mov	esi, FindFile_Name
+	; 28/06/2025
+	mov	esi, Path_FileName
 	cmp	byte [esi], 20h	; 0 or 20h ?
 	ja	short loc_print_dir_call
 
@@ -3546,7 +3557,7 @@ loc_print_longname:
 	cmp	al, 0
 	ja	short loc_print_longname_1
 		; asciiz name length limit for Singlix FS
-	mov	cl, 64  ; asciiz or full 64 bytes
+	mov	cl, 64 ; asciiz or full 64 bytes
 loc_print_FS_longname: ; Singlix FS (64 byte ASCIIZ file name)
 	;lodsb
 	;stosb
@@ -3583,9 +3594,10 @@ loc_lfn_err3:
 	;retn
 	jmp	print_msg
 
-; burada kaldým... 20/05/2025
-
 show_file:
+	; 28/06/2025
+	;	(Major Modification)
+	; 26/06/2025
 	; 18/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 07/08/2022
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -3596,7 +3608,8 @@ show_file:
 	; 08/11/2009
 
 loc_show_parse_path_name:
-	mov	edi, FindFile_Drv
+	; 28/06/2025
+	;mov	edi, FindFile_Drv
 	call	parse_path_name
 	;jc	loc_cmd_failed
 	; 28/07/2022
@@ -3605,23 +3618,30 @@ show_file_err1:
 	jmp	loc_cmd_failed
 
 loc_show_check_filename_exists:
-	mov	esi, FindFile_Name
+	;mov	esi, FindFile_Name
+	; 28/06/2025
+	mov	al, 1 ; ERR_BAD_CMD_ARG
+		      ; Bad command or file name !
+	mov	esi, Path_FileName
 	cmp	byte [esi], 20h
 	;jna	loc_cmd_failed
 	; 28/07/2022
 	jna	short show_file_err1
 
-	; 15/02/2016 (invalid file name check)
-	call	check_filename 	
-	jnc	short loc_show_change_drv
+	; 26/06/2025
+	;; 15/02/2016 (invalid file name check)
+	;call	check_filename
+	;jnc	short loc_show_change_drv
 
-	mov	esi, Msg_invalid_name_chars
-	jmp	print_msg
+	;mov	esi, Msg_invalid_name_chars
+	;jmp	print_msg
 
 loc_show_change_drv:
 	mov	dh, [Current_Drv]
 	mov	[RUN_CDRV], dh
-	mov	dl, [FindFile_Drv]
+	;mov	dl, [FindFile_Drv]
+	; 28/06/2025
+	mov	dl, [Path_Drv]
 	cmp	dl, dh
 	je	short loc_show_change_directory
 	call	change_current_drive
@@ -3633,11 +3653,24 @@ show_file_err2:
 	jmp	loc_run_cmd_failed
 
 loc_show_change_directory:
-	cmp	byte [FindFile_Directory], 20h
+	; 28/06/2025
+	; 26/06/2025
+	;sub	ebx, ebx
+	;mov	bh, [Current_Drv]
+	;add	ebx, Logical_DOSDisks
+	;;mov	[Show_LDDDT], ebx
+	;mov	[Current_LDRVT], ebx
+ 	;	; Logical DOS Drv Description Table addr
+	
+	;cmp	byte [FindFile_Directory], 20h
+	; 28/06/2025
+	cmp	byte [Path_Directory], 20h
 	jna	short loc_findload_showfile
 
 	inc	byte [Restore_CDIR]
-	mov	esi, FindFile_Directory
+	;mov	esi, FindFile_Directory
+	; 28/06/2025
+	mov	esi, Path_Directory
 	xor	ah, ah ; CD_COMMAND sign -> 0
 	call	change_current_directory
 	;;jc	loc_file_rw_cmd_failed
@@ -3650,10 +3683,32 @@ loc_show_change_directory:
 
 loc_findload_showfile:
 	; 15/02/2016
-	mov	esi, FindFile_Name
+	;mov	esi, FindFile_Name
+	; 28/06/2025
+	mov	esi, Path_FileName
+
+	; 28/06/2025
+	sub	ebx, ebx
+	mov	bh, [Current_Drv]
+	add	ebx, Logical_DOSDisks
+	mov	[Current_LDRVT], ebx
+
+	; 28/06/2025
+	; Check for Singlix FS
+	cmp	byte [Path_FileSystem], 0A1h
+	je	short loc_findload_show_fs_file
+
+	;cmp	byte [esi], '"'
+	;je	short loc_findload_showfile_lfn
+	; 28/06/2025
+	cmp	byte [Path_LongFlag], 0
+	ja	short loc_findload_showfile_lfn
+
 	;mov	edi, Dir_Entry_Name ; Dir Entry Format File Name
 	; 18/05/2025
-	mov	edi, FindFile_DirEntryName
+	;mov	edi, FindFile_DirEntryName
+	; 28/06/2025
+	mov	edi, Dir_File_Name
 	call	convert_file_name
 	mov	esi, edi ; offset Dir_Entry_Name
 	; esi = offset FindFile_DirEntryName
@@ -3683,60 +3738,211 @@ loc_show_load_file:
 	;jz	end_of_show_file
 	; 28/07/2022
 	jnz	short loc_show_load_file_set_size
-	jmp	end_of_show_file 
+	jmp	end_of_show_file
 
-loc_show_load_file_set_size: ; 28/07/2022
+	; 28/06/2025
+loc_findload_showfile_lfn:
+	mov	ebx, [Current_Dir_FCluster]
+	; [Current_LDRVT] = LDRVT address
+	call	search_longname
+	jc	short show_file_err3
+	; edi = short dir entry (in the dir buff)
+	; (except volume name and directory)
+	test	byte [edi+dir_entry.dir_attr], 18h
+	jz	short loc_show_load_file
+	; 28/06/2025
+	; Bad Command or file name !
+	mov	al, 1 ; ERR_BAD_CMD_ARG
+show_file_err3:
+	jmp	loc_run_cmd_failed
+
+	; 28/06/2025
+loc_findload_show_fs_file:
+	mov	ebx, [Current_Dir_FCluster] ; [DIR_DDT]
+	; ebx = Current Dir Number (DDT)
+	; [Current_LDRVT] = Logical DRV Table address
+
+	;cmp	byte [esi], '"'
+	;je	short loc_findload_show_fs_file_lfn
+	; 28/06/2025
+	cmp	byte [Path_LongFlag], 0
+	ja	short loc_findload_show_fs_file_lfn
+
+	; esi = ASCIIZ file name address
+	xor	eax, eax
+	; AL = Attrib AND mask = 0
+	mov	ah, 18h ; Directory + Volume name
+	; 18h (Attrib NAND)
+
+	call	search_fs_shortname
+	jnc	short loc_findload_show_fs_file_ok
+show_file_err4:
+	jmp	loc_run_cmd_failed
+
+loc_findload_show_fs_file_lfn:
+	call	search_fs_longname
+	jc	short show_file_err4
+
+	mov	esi, edi
+	call	validate_FDT
+	jnz	short show_file_err4
+
+loc_findload_show_fs_file_ok:
+	;or	bh, bh
+	;jnz	short show_file_err4
+
+	and	eax, eax
+	jz	end_of_show_file
+
+	; eax = file size
+	;  bh = 5th byte of file size
+	;  bl = attributes (FDT.Attributes)
+	; edx = Logical Dos Drive parameters Table
+	; edi = FDT/DDT buffer address
+	; ecx = date & time in MSDOS Dir Entry format
+
+	mov	ecx, [edx+FDT.FileNumber]
+	mov	[Show_FDT], ecx
+
+	; 28/07/2022
+loc_show_load_file_set_size:
 	mov	[Show_FileSize], eax
 	xor	eax, eax
 	mov	[Show_FilePointer], eax ; 0
-	mov	[Show_ClusterPointer], ax ; 0
-	sub	ebx, ebx
-	mov	bh, [Current_Drv]
-	mov	esi, Logical_DOSDisks
-	add	esi, ebx
-	mov	[Show_LDDDT], esi ; Logical DOS Drv Description Table addr
+	;mov	[Show_ClusterPointer], ax ; 0
+	; 28/06/2025
+	mov	[Show_FileSector], eax ; 0
+	mov	byte [Show_RowCount], 23
 
+	; 28/06/2025
+	;sub	ebx, ebx
+	;mov	bh, [Current_Drv]
+	;mov	esi, Logical_DOSDisks
+	;add	esi, ebx
+	;mov	[Show_LDDDT], esi ; Logical DOS Drv Description Table addr
+	
+	; 28/06/2025
+	mov	esi, [Current_LDRVT]
+
+	; 28/06/2025
 	cmp	byte [esi+LD_FATType], 0
 	ja	short loc_show_calculate_cluster_size
 	; Singlix FS
 	; First Cluster Number is FDT number (in compatibility buffer)
-	mov	edx, [Show_Cluster] ; Compatibility dir. buffer value (FDT)
-	mov	[Show_FDT], edx
-	xor	eax, eax
-	mov	[Show_Cluster], eax ; Sector index  = 0
-				    ; (next time it will be 1)
-loc_show_calculate_cluster_size:
-	mov	bx, [esi+LD_BPB+BPB_BytsPerSec] ; FAT 12-16-32 (512)
-	; BX = 512 = [esi+LD_FS_BytesPerSec] ; Singlix FS
-	mov	al, [esi+LD_BPB+BPB_SecPerClust] ; FAT 12-16-32 (<= 128)
-	; AL = 1 = [esi+LD_FS_Reserved2] ; SectPerClust for Singlix FS
-	mul	ebx
+	;mov	edx, [Show_Cluster] ; Compatibility dir. buffer value (FDT)
+	;mov	[Show_FDT], edx
+	;xor	eax, eax
+	;mov	[Show_Cluster], eax ; Sector index  = 0
+	;			    ; (next time it will be 1)
 
-	;cmp	eax, 65536 ; non-compatible (very big) cluster size
-	;ja	short end_of_show_file
-	mov	[Show_ClusterSize], ax
+	; 28/06/2025
+	mov	eax, [Show_FDT]
+	mov	ebx, FS_FDT_BUFFER
+	add	eax, [esi+LD_FS_BeginSector]
+		; start LBA of TRFS partition
+	push	esi
+	call 	DREAD
+	pop	edx
+	;jc	short show_file_err4
+	jnc	short loc_show_load_fs_file_nsx
+show_file_err5:
+	jmp	loc_run_cmd_failed
+
+	; 28/06/2025
+loc_show_load_fs_file_nsx:
+	; edx = LDRVT address
+	mov	esi, FS_FDT_BUFFER
+	;mov	ebx, [Show_FilePointer]
+	;shr	ebx, 9 ; / 512 
+	mov	ebx, [Show_FileSector]
+	; ebx = sector index number
+	call	get_fs_sector
+	jc	short show_file_err5
+
+	; remain sectors in the extent
+	mov	[Show_SectorCount], ecx
+
+	; edx = LDRVT address
+	; eax = sector address
+	add	eax, [edx+LD_FS_BeginSector]
+		; start LBA of TRFS partition
+loc_show_load_fs_file_ns:
+loc_show_load_fat_file_ns:
+	; 28/06/2025
+	mov	cl, [edx+LD_FS_PhyDrvNo]
+		; physical (rombios) drive number
+loc_show_load_fat_file_nsx:
+	mov	[DIRSEC], eax
+	call	GETBUFFER
+	jc	short show_file_err5
+
+	; esi = buffer header
+	add	esi, BUFINSIZ ; + 24 bytes
+	; esi = buffer data start
+	mov	[Show_Buffer], esi
+	jmp	short loc_start_show_file
+
+loc_show_calculate_cluster_size:
+	; 28/06/2025
+	;mov	bx, [esi+LD_BPB+BPB_BytsPerSec] ; FAT 12-16-32 (512)
+	;; BX = 512 = [esi+LD_FS_BytesPerSec] ; Singlix FS
+	;mov	al, [esi+LD_BPB+BPB_SecPerClust] ; FAT 12-16-32 (<= 128)
+	;; AL = 1 = [esi+LD_FS_Reserved2] ; SectPerClust for Singlix FS
+	;mul	ebx
+	;;cmp	eax, 65536 ; non-compatible (very big) cluster size
+	;;ja	short end_of_show_file
+	;mov	[Show_ClusterSize], ax
+
+	; 28/06/2025
+	sub	ebx, ebx
+	mov	[Show_SectorCount], ebx ; 0
+	mov	bl, [esi+LD_BPB+BPB_SecPerClust]
+	mov	[Show_ClusterSize], ebx
+
+	; 28/06/2025
+	; eax = [Show_Cluster]
+	; esi = LDRVT address
+	;mov	edx, esi
+	mov	edx, [Current_LDRVT]
+	; edx = LDRVT address
+	mov	eax, [Show_Cluster]
+loc_show_load_fat_file_nsx_@:
+	; eax = cluster number
+	call	FIGREC
+	jmp	short loc_show_load_fat_file_nsx
 
 loc_start_show_file:
+	; 28/06/2025
+	cmp	byte [Show_RowCount], 23
+	jne	short loc_show_nc_rc_ok
+
 	mov	esi, nextline
 	call	print_msg
 
-	mov	eax, [Show_Cluster]
-	mov	byte [Show_RowCount], 23
+	; 28/06/2025
+	;mov	eax, [Show_Cluster]
+	;mov	byte [Show_RowCount], 23
 
 	; 17/02/2016
-	mov	esi, [Show_LDDDT]
+	;mov	esi, [Show_LDDDT]
+	; 28/06/2025
+	;mov	esi, [Current_LDRVT]
 
+	; 28/06/2025
 	; 07/08/2022
-loc_show_next_cluster:
+;loc_show_next_cluster:
 	; 15/02/2016
-	mov	ebx, Cluster_Buffer ; 70000h (for current TRDOS 386 version)
+	;mov	ebx, Cluster_Buffer ; 70000h (for current TRDOS 386 version)
+	; 28/06/2025
+	;mov	ebx, [Show_Buffer]
 	; ESI = Logical DOS drv description table address
-	call	read_cluster
-	;;jc	loc_file_rw_cmd_failed
-	;jc	loc_run_cmd_failed
-	; 07/08/2022
-	jnc	short loc_show_nc_rc_ok
-	jmp	loc_run_cmd_failed
+	;call	read_cluster
+	;;;jc	loc_file_rw_cmd_failed
+	;;jc	loc_run_cmd_failed
+	;; 07/08/2022
+	;jnc	short loc_show_nc_rc_ok
+	;jmp	loc_run_cmd_failed
+
 loc_show_nc_rc_ok:
 	xor 	ebx, ebx
 loc_show_next_byte:
@@ -3758,7 +3964,9 @@ loc_show_next_byte:
 pass_exit_show:
 	mov	byte [Show_RowCount], 20
 pass_show_wait_for_key:
-	add	ebx, Cluster_Buffer
+	;add	ebx, Cluster_Buffer
+	; 28/06/2025
+	add	ebx, [Show_Buffer]
 	mov	al, [ebx]
 	cmp	al, 0Dh
  	;jne	loc_show_check_tab_space
@@ -3766,13 +3974,14 @@ pass_show_wait_for_key:
 	je	short loc_show_dec_row_count
 	jmp	loc_show_check_tab_space
 
-	; 07/08/2022
-loc_show_next:
-	;and	bx, bx ; 65536 -> 0
-	; 28/07/2022
-	and	ebx, ebx
-	jnz	short loc_show_next_byte
-	jmp     short loc_show_next_cluster
+	; 28/06/2025
+;	; 07/08/2022
+;loc_show_next:
+;	;and	bx, bx ; 65536 -> 0
+;	; 28/07/2022
+;	and	ebx, ebx
+;	jnz	short loc_show_next_byte
+;	jmp     short loc_show_next_cluster
 
 loc_show_dec_row_count:	; 28/07/2022
 	dec	byte [Show_RowCount]
@@ -3782,31 +3991,56 @@ pass_show_dec_rowcount:
 	call	_write_tty
 loc_show_check_eof:
 	inc	dword [Show_FilePointer]
-	mov	eax, [Show_FilePointer]
-	cmp	eax, [Show_FileSize]
+	; 28/06/2025
+	mov	ebx, [Show_FilePointer]
+	cmp	ebx, [Show_FileSize]
 	jnb	short end_of_show_file
-	inc	word [Show_ClusterPointer]
-	movzx	ebx, word [Show_ClusterPointer]
 
-	; 17/02/2016
-	; (sector boundary -9 bits- check, 512 = 0)
-        test    bx, 1FFh ; 1 to 511
+	; 28/06/2025
+	;inc	word [Show_ClusterPointer]
+	;movzx	ebx, word [Show_ClusterPointer]
+	;mov	ebx, eax ; [Show_FilePointer]
+	and	ebx, 1FFh ; 0 to 511
 	jnz	short loc_show_next_byte
 
+	; 28/06/2025
+	; 17/02/2016
+	; (sector boundary -9 bits- check, 512 = 0)
+        ;test	bx, 1FFh ; 1 to 511
+	;jnz	short loc_show_next_byte
+
+	; 28/06/2025
+	inc	dword [Show_FileSector]
+
 	; 16/02/2016
-	mov	esi, [Show_LDDDT]
+	;mov	esi, [Show_LDDDT]
+	; 28/06/2025
+	mov	edx, [Current_LDRVT]
 	;
-	cmp	byte [esi+LD_FATType], 0
+	;cmp	byte [esi+LD_FATType], 0
+	cmp	byte [edx+LD_FATType], 0
 	ja	short loc_show_check_fat_cluster_size
 
+	; 28/06/2025
 	; Singlix FS
 	; 1 sector, more... (cluster size = 1 sector)
-	mov	eax, [Show_Cluster]
-	inc	eax
-	mov	[Show_Cluster], eax
-
+	;mov	eax, [Show_Cluster]
+	;inc	eax
+	;mov	[Show_Cluster], eax
 	; 07/08/2022
-	jmp	short loc_show_next
+	;jmp	short loc_show_next
+
+	; 28/06/2025
+	; read the next sector
+	mov	ecx, [Show_SectorCount]
+	;jcxz	loc_show_load_fs_file_nsx
+	or	ecx, ecx
+	jz	loc_show_load_fs_file_nsx
+	dec	ecx
+	mov	[Show_SectorCount], ecx
+	mov	eax, [DIRSEC] ; physical sector addr
+	inc	eax ; next
+	jmp	loc_show_load_fs_file_ns
 
 	; 28/07/2022
 end_of_show_file:
@@ -3814,27 +4048,61 @@ pass_show_file:
 	mov	esi, nextline
 	call	print_msg
 	jmp	loc_file_rw_restore_retn
-	 
-loc_show_check_fat_cluster_size:
-	; 17/02/2016
-	cmp	bx, [Show_ClusterSize] ; cluster size in bytes
-        ;jb	short loc_show_next_byte ; 28/07/2022
-	; 07/08/2022
-	jnb	short loc_show_file_cluster_ok
-	jmp	loc_show_next_byte
 
-loc_show_file_cluster_ok:
-	mov	word [Show_ClusterPointer], 0
+loc_show_check_fat_cluster_size:
+	; 28/06/2025
+	; 17/02/2016
+	;cmp	bx, [Show_ClusterSize] ; cluster size in bytes
+        ;;jb	short loc_show_next_byte ; 28/07/2022
+	;; 07/08/2022
+	;jnb	short loc_show_file_cluster_ok
+	;jmp	loc_show_next_byte
+	; 28/06/2025
+	mov	eax, [Show_SectorCount]
+	inc	eax
+	cmp	eax, [Show_ClusterSize]
+	;jnb	short loc_show_file_cluster_ok
+	jnb	short loc_show_get_next_cluster
+	; next sector (of the cluster)
+	mov	[Show_SectorCount], eax
+	mov	eax, [DIRSEC]
+	inc	eax
+	jmp	loc_show_load_fat_file_ns
+
+;loc_show_file_cluster_ok:
+loc_show_get_next_cluster:
+	;mov	word [Show_ClusterPointer], 0
 
 	mov	eax, [Show_Cluster]
 	;mov	esi, [Show_LDDDT]
-loc_show_get_next_cluster:
+	; 28/06/2025
+	;mov	esi, [Current_LDRVT]
+	mov	esi, edx ; [Current_LDRVT]
+;loc_show_get_next_cluster:
 	call	get_next_cluster
 	;;jc	loc_file_rw_cmd_failed
 	;jc	loc_run_cmd_failed
 	; 28/07/2022
 	jnc	short loc_show_update_ccluster
 	jmp	loc_run_cmd_failed
+
+loc_show_update_ccluster:
+	mov	[Show_Cluster], eax
+	;jmp	loc_show_next_cluster
+	; 28/06/2025
+	;mov	dword [Show_SectorCount], 0
+	mov	byte [Show_SectorCount], 0
+
+	; 28/06/2025
+	; eax = [Show_Cluster]
+	; esi = LDRVT address
+	;mov	edx, esi
+	;mov	edx, [Current_LDRVT]
+	;call	FIGREC
+	; eax = Physical sector number
+	;jmp	loc_show_load_fat_file_nsx
+	; 28/06/2025
+	jmp	loc_show_load_fat_file_nsx_@
 
 loc_show_check_tab_space:
 	cmp	al, 09h
@@ -3868,10 +4136,6 @@ loc_show_put_space_chars:
 loc_show_next_tab_space:
 	inc	dl
 	jmp	short loc_show_put_space_chars
-
-loc_show_update_ccluster:
-	mov	[Show_Cluster], eax
-        jmp     loc_show_next_cluster
 
 check_filename:
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -3920,7 +4184,7 @@ loc_scan_invalid_filename_char:
 	je	short loc_invalid_filename_stc
 	loop	loc_scan_invalid_filename_char
 	lodsb
-	cmp	al, 1Fh  ; 20h and above 
+	cmp	al, 1Fh  ; 20h and above
 	ja	short check_filename_next_char
 
 check_filename_dot:

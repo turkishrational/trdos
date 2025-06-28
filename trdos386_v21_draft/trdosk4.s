@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 25/06/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 28/06/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -959,7 +959,7 @@ loc_ppdn_get_dir_name:
 	; (('..' must be acceptable at level 8))
 	;cmp	byte [PATH_CDLevel], 8
 	;jnb	short loc_ppdn_badname_err
-	
+
 	;;;;
 	; 13/06/2025 (chdir "LongName" method)
 	cmp	al, '"' ; the 1st double quote
@@ -2319,6 +2319,8 @@ loc_pslnsc_retn:
 
     	retn
 
+; 26/06/2025
+%if 0
 parse_path_name:
 	; 03/06/2025
 	; 19/05/2025 (TRDOS 386 v2.0.10)
@@ -2399,7 +2401,7 @@ loc_ppn_change_drive:
 
 loc_ppn_cmd_failed:
 	; File or directory name is not existing
-	mov	[edi], al ; Drv 
+	mov	[edi], al ; Drv
 	mov	ax, 1 ; eax = 1
 	; TR-DOS Error Code 01h = Bad Command Argument
 	; MS-DOS Error Code 01h : Invalid Function Number
@@ -2412,7 +2414,7 @@ pass_ppn_change_drive:
 	;mov	dword [Last_Slash_Pos], 0
 	; 29/07/2022
 	mov	[Last_Slash_Pos], ecx ; 0
-	stosb	; drive number (0 = 'A:', 2 = 'c:') 
+	stosb	; drive number (0 = 'A:', 2 = 'c:')
 	mov	al, [esi]
 loc_scan_ppn_dslash:
 	cmp	al, '/'
@@ -2466,6 +2468,225 @@ loc_ppn_invalid_drive:
 	; MS-DOS Error Code 0Fh = Disk Drive Invalid
 	; (MainProg ErrMsg: "Drive not ready or read error!")
 	retn
+%else
+	; 26/06/2025 - TRDOS 386 v2.0.10
+parse_path_name:
+	; 28/06/2025
+	; 27/06/2025
+	; 26/06/2025 (Major Modification)
+	; 03/06/2025
+	; 19/05/2025 (TRDOS 386 v2.0.10)
+	; 03/09/2024 (TRDOS 386 v2.0.9)
+	; 09/08/2022
+	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
+	; 10/02/2016
+	; 08/02/2016 (TRDOS 386 = TRDOS v2.0)
+	; 10/09/2011 ('proc_parse_pathname')
+	; 27/11/2009
+	; 05/12/2004
+	;
+	; INPUT ->
+	;	ESI = Beginning of ASCIIZ pathname string
+	; OUTPUT ->
+	;	Path_FileSystem - 1 byte
+	;	Path_Drv - 1 byte
+	;	Path_Directory - 256 bytes
+	;	Path_FileName - 129 bytes
+	;	Path_LongFlag - 1 byte
+	;
+	;	CF = 1 -> Error
+	;	     EAX = Error Code (AL)
+	;
+	; (Modified registers: eax, ecx, esi, edi)
+
+	; Clear the pathname bytes
+	mov	edi, Path_FileSystem
+	sub	ecx, ecx
+	mov	cl, 388/4 ; 388 bytes
+	xor	eax, eax ; 0
+	rep	stosd	; clear
+
+	lodsb
+	cmp	byte [esi], ':'
+	je	short loc_ppn_change_drive
+	dec	esi
+	mov	al, [Current_Drv]
+	jmp	short pass_ppn_change_drive
+
+	; 28/06/2025
+loc_ppn_get_lfn:
+	;mov	byte [Path_LongFlag], 1
+	inc	byte [Path_LongFlag]
+	;
+	mov	cl, 128 ; '"' + 128 bytes + '"' + 0
+	; 28/06/2025
+	;;;
+	cmp	byte [Path_FileSystem], 0A1h
+	jne	short loc_ppn_get_lfn_next
+	; Singlix FS
+	mov	cl, 64
+	;;;
+loc_ppn_get_lfn_next:
+	lodsb
+	cmp	al, '"' ; the 2nd double quote
+			; long name end
+	je	short loc_ppn_get_lfn_ok
+	cmp	al, 20h
+	jb	short loc_ppn_cmd_failed
+	stosb
+	loop	loc_ppn_get_lfn_next
+
+	cmp	byte [esi], '"'
+	jne	short loc_ppn_cmd_failed
+
+loc_ppn_get_lfn_ok:
+	mov	al, 0 ; zero at the end of string
+	stosb
+	retn
+
+pass_ppn_cdir:
+	mov	esi, [First_Path_Pos]
+	lodsb
+loc_ppn_get_filename:
+	;add	edi, 65 ; FindFile_Name location
+	; 19/05/2025 - TRDOS 386 v2.0.10
+	;add	edi, 104 ; FindFile_Name location
+	; 27/06/2025
+	;add	edi, 256 ; Path_FileName
+	mov	edi, Path_FileName
+	; 28/06/2025
+	;; TRDOS Filename length must not be more than 12 bytes
+	;;mov	ecx, 12
+	;mov	cl, 12
+
+	; 28/06/2025
+	;mov	byte [Path_LongFlag], 0
+	cmp	al, '"'
+	je	short loc_ppn_get_lfn
+
+	mov	cl, 12 ; short name limit
+loc_ppn_get_fnchar_next:
+	stosb
+	lodsb
+	cmp	al, 21h
+	jb	short loc_ppn_return
+        loop    loc_ppn_get_fnchar_next
+
+	; 28/06/2025
+	;;;
+	cmp	byte [esi], 20h
+	jb	short loc_ppn_return
+	stc
+	jmp	short loc_ppn_cmd_failed
+	;;;
+loc_ppn_return:
+	xor	eax, eax
+	retn
+
+loc_ppn_change_drive:
+	; 29/07/2022
+	; ecx = 0
+	and	al, 0DFh
+	sub	al, 'A' ; A:
+	jc	short loc_ppn_invalid_drive
+	cmp	[Last_DOS_DiskNo], al
+	jb	short loc_ppn_invalid_drive
+
+	; 27/06/2025
+	inc	esi
+	mov	ah, [esi]
+	cmp	ah, 21h
+	jnb	short pass_ppn_change_drive
+
+loc_ppn_cmd_failed:
+	; File or directory name is not existing
+	mov	[edi], al ; Drv
+	mov	ax, 1 ; eax = 1
+	; TR-DOS Error Code 01h = Bad Command Argument
+	; MS-DOS Error Code 01h : Invalid Function Number
+	;stc
+	; (MainProg ErrMsg: "Bad command or file name!")
+	retn
+
+pass_ppn_change_drive:
+	mov	[First_Path_Pos], esi
+	;mov	dword [Last_Slash_Pos], 0
+	; 29/07/2022
+	mov	[Last_Slash_Pos], ecx ; 0
+
+	; 27/06/2025
+	; ecx = 0
+	mov	ch, al
+	add	ecx, Logical_DOSDisks
+	; 28/06/2025
+	;mov	[Current_LDRVT], ecx
+	mov	edi, Path_FileSystem
+	mov	cl, [ecx+LD_FSType]
+	mov	[edi], cl
+	inc	edi ; Path_Drv
+
+	stosb	; drive number (0 = 'A:', 2 = 'c:')
+
+	; 27/06/2025
+	; edi = Path_Directory (255+NUL bytes)
+
+	mov	al, [esi]
+loc_scan_ppn_dslash:
+	cmp	al, '/'
+  	jne	short loc_scan_next_slash_pos
+	mov	[Last_Slash_Pos], esi
+loc_scan_next_slash_pos:
+	inc	esi
+	mov	al, [esi]
+	cmp	al, 20h
+	ja	short loc_scan_ppn_dslash
+	;cmp	dword [Last_Slash_Pos], 0
+	; 09/08/2022
+	;cmp	[Last_Slash_Pos], ecx ; 0 ?
+	;jna	short pass_ppn_cdir
+
+	mov	ecx, [Last_Slash_Pos]
+	; 03/09/2024
+	; jcxz	pass_ppn_cdir
+	; 03/06/2025
+	jecxz	pass_ppn_cdir
+	mov	esi, [First_Path_Pos]
+	sub	ecx, esi
+	inc	ecx
+	;;cmp	ecx, 64
+	;cmp	cl, 64
+	; 19/05/2025 - TRDOS 386 v2.0.10
+	;cmp	cl, 103
+	; 27/06/2025
+	;ja	short loc_ppn_invalid_drive_stc
+	jz	short loc_ppn_invalid_drive_stc
+			 ; ecx > 255
+	; 27/06/2025
+	;mov	eax, edi ; Dest Dir String Location (104 bytes)
+			 ; ((It was 65 bytes before v2.0.10))
+	rep	movsb
+	;mov	[edi], cl ; 0, End of Dir String
+	mov	esi, [Last_Slash_Pos]
+	inc	esi
+	;mov	edi, eax
+	lodsb
+	cmp	al, 21h
+	jnb	loc_ppn_get_filename
+loc_ppn_clc_return:
+	;clc
+	xor	eax, eax
+	retn
+
+loc_ppn_invalid_drive_stc:
+	cmc	 ; stc
+loc_ppn_invalid_drive:
+	; cf = 1
+	; The Drive Letter/Char < "A" or > "Z"
+	mov	ax, 0Fh
+	; MS-DOS Error Code 0Fh = Disk Drive Invalid
+	; (MainProg ErrMsg: "Drive not ready or read error!")
+	retn
+%endif
 
 find_longname:
 	; 24/06/2025
@@ -9020,6 +9241,7 @@ g_fdt_num_3:
 
 ; -----------------------------------------------
 
+	; 28/06/2025
 	; 19/06/2025
 	; 17/06/2025
 	; 16/06/2025
@@ -9080,7 +9302,9 @@ search_fdt_number_next_1:
 	; ebx = directory entry index number
 	; edx = LDRVT address
 
-	call 	get_fs_sector
+	;call 	get_fs_sector
+	; 28/06/2025
+	call	get_fs_dir_sector
 
 	; eax = sector address
 
@@ -9148,9 +9372,38 @@ s_fdt_num_dnf:
 
 ; -----------------------------------------------
 
+	; 28/06/2025 - TRDOS 386 v2.0.10
+get_fs_sector:
+	; INPUT:
+	;   esi = FDT buffer address
+	;   ebx = sector index number
+	;   edx = LDRVT address
+	;
+	; OUTPUT:
+	;   esi = FDT buffer address
+	;   ebx = sector index number
+	;   edx = LDRVT address
+	;   eax = sector address
+	;
+	;;  If cf = 0
+	;   ecx = remaining sectors in the extent
+	;	(remaining consecutive sectors)
+	;;  If cf = 1
+	;   eax = error code
+	;   (ecx = any)
+	;
+	; Modified registers: eax, ecx, edi, ebp
+
+	push	ebx ; *
+	jmp	short get_fs_sector_@
+
+; -----------------------------------------------
+
 	; 17/06/2025
 	; 31/05/2025 - TRDOS 386 v2.0.10
-get_fs_sector:
+;get_fs_sector:
+	; 28/06/2025
+get_fs_dir_sector:
 	; INPUT:
 	;   esi = DDT buffer address
 	;   ebx = directory entry index number
@@ -9173,6 +9426,7 @@ get_fs_sector:
 
 	push	ebx ; *
 	shr	ebx, 7 ; / 128
+get_fs_sector_@: ; 28/06/2025
 	; ebx = sector sequence (index) number
 	cmp	ebx, [esi+DDT.SectorCount]
 	jnb	short s_fdt_num_not_found_@
@@ -9696,6 +9950,7 @@ gfsd_no_more_files:
 	stc
 	retn
 
+	; 28/06/2025
 	; 18/06/2025 - TRDOS 386 v2.0.10
 get_fs_direntry_next:
 	; Singlix FS
@@ -9747,7 +10002,9 @@ gfsd_3:
 	; ebx = directory entry index number
 	; edx = LDRVT address
 
-	call 	get_fs_sector
+	;call 	get_fs_sector
+	; 28/06/2025
+	call	get_fs_dir_sector
 	jc	short gfsd_error ; error code in eax
 gfsd_4:
 	; ecx = remaining sectors in the extent

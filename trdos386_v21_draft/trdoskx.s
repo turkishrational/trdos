@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 24/06/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 28/06/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -249,6 +249,12 @@ FindFile_DirEntryName:	  resb 13 ; 18/05/2025
 ; 184 bytes ; 19/05/2025
 ; 25/05/2025
 FindFile_LongName:	  resb 129 ; ASCIIZ (max. 128+NUL)
+; 26/06/2025
+Path_FileSystem:	  resb 1
+Path_Drv:		  resb 1
+Path_Directory:		  resb 256 ; ASCIIZ (max. 256+NUL)
+Path_FileName:		  resb 129
+Path_LongFlag:		  resb 1 ; Flag for using Long Path
 
 First_Path_Pos: resd 1	; DIR.ASM ; 09/10/2011
 Last_Slash_Pos: resd 1	; DIR.ASM
@@ -264,14 +270,21 @@ TFS_Dec_End:    resb 1
 PrintDir_RowCounter: resb 1
 
 alignb 4
+; 28/06/2025
+Show_Buffer:	resd 1
 ; 15/02/2015 ('show' command variables)
 Show_FDT:	resd 1
-Show_LDDDT:	resd 1
+; 26/06/2025
+;Show_LDDDT:	resd 1
 Show_Cluster:	resd 1
 Show_FileSize:	resd 1
 Show_FilePointer: resd 1
-Show_ClusterPointer: resw 1
-Show_ClusterSize: resw 1
+;Show_ClusterPointer: resw 1
+;Show_ClusterSize: resw 1
+; 28/06/2025
+Show_FileSector: resd 1
+Show_ClusterSize: resd 1
+Show_SectorCount: resd 1
 Show_RowCount:	resb 1
 
 alignb 4
