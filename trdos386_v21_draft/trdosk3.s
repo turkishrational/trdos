@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 28/06/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 29/06/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -7472,6 +7472,7 @@ loc_mcfg_load_fs_file:
 	retn
 
 load_and_execute_file:
+	; 29/06/2025 - TRDOS 386 Kernel v2.0.10
 	; 03/09/2024 - TRDOS 386 Kernel v2.0.9
 	; 30/08/2023 - TRDOS 386 Kernel v2.0.6
 	; 25/07/2022 - TRDOS 386 Kernel v2.0.5
@@ -7520,7 +7521,8 @@ loc_run_get_external_arg_pos:
 	mov	byte [CmdArgStart], al
 loc_run_parse_path_name:
 	pop	esi ; *
-	mov	edi, FindFile_Drv
+	; 29/06/2025
+	;mov	edi, FindFile_Drv
 	call	parse_path_name
 	;jc	loc_cmd_failed
 	; 25/07/2022
@@ -7529,7 +7531,9 @@ loc_run_ppn_failed:
 	jmp	loc_cmd_failed
 
 loc_run_check_filename_exists:
-	mov	esi, FindFile_Name
+	;mov	esi, FindFile_Name
+	; 29/06/2025
+	mov	esi, Path_FileName
 	cmp	byte [esi], 20h
 	;jna	loc_cmd_failed
 	; 25/07/2022
@@ -7552,7 +7556,9 @@ loc_run_drv:
 	mov	dh, [Current_Drv]
 	mov	[RUN_CDRV], dh
 
-	mov	dl, [FindFile_Drv]
+	;mov	dl, [FindFile_Drv]
+	; 29/06/2025
+	mov	dl, [Path_Drv]
 	cmp	dl, dh
 	je	short loc_run_change_directory
 
@@ -7565,14 +7571,18 @@ loc_run_drv:
 	jmp	loc_run_cmd_failed
 
 loc_run_change_directory:
-	cmp	byte [FindFile_Directory], 20h
+	;cmp	byte [FindFile_Directory], 20h
+	; 29/06/2025
+	cmp	byte [Path_Directory], 20h
 	jna	short loc_run_find_executable_file
 
 	inc	byte [Run_Manual_Path]
 
 	inc	byte [Restore_CDIR]
 
-	mov	esi, FindFile_Directory
+	;mov	esi, FindFile_Directory
+	; 29/06/2025
+	mov	esi, Path_Directory
 	xor	ah, ah ; CD_COMMAND sign -> 0
 	call	change_current_directory
 	;jc	loc_run_cmd_failed
@@ -7587,7 +7597,9 @@ loc_run_find_executable_file:
 	mov	word [Run_Auto_Path], 0
 
 loc_run_find_executable_file_next:
-	mov	esi, FindFile_Name
+	;mov	esi, FindFile_Name
+	; 29/06/2025
+	mov	esi, Path_FileName
 loc_run_find_program_file_next:
 	mov	ax, 1800h ; Except volume label and dirs
 	call	find_first_file
@@ -7619,7 +7631,9 @@ loc_run_progr_file_chk_prg_ext: ; 25/07/2022
 
 loc_run_change_file_ext_to_prg:
 	movzx	ebx, ah ; count of file name chars
-	mov	esi, FindFile_Name
+	;mov	esi, FindFile_Name
+	; 29/06/2025
+	mov	esi, Path_FileName
 	add	ebx, esi
 	; 07/05/2016
 	mov	dword [ebx],  '.PRG'
@@ -7669,7 +7683,9 @@ loc_run_chk_filename_ext_again:
 
 loc_run_change_file_ext_to_noext_again:
 	movzx	ebx, ah
-	mov	esi, FindFile_Name
+	;mov	esi, FindFile_Name
+	; 29/06/2025
+	mov	esi, Path_FileName
 	add 	ebx, esi
 	sub	eax, eax
 	mov	[ebx], eax ; 0 ; erase extension (.PRG)
@@ -7732,7 +7748,9 @@ loc_run_auto_path_move_ok:
 
 loc_run_auto_path_move_file_name:
 	inc	edi
-	mov	esi, FindFile_Name
+	;mov	esi, FindFile_Name
+	; 29/06/2025
+	mov	esi, Path_FileName
 
 loc_run_auto_path_move_fn_loop:
 	lodsb
@@ -7741,7 +7759,8 @@ loc_run_auto_path_move_fn_loop:
 	jnz	short loc_run_auto_path_move_fn_loop
 
 	mov	esi, TextBuffer
-	mov	edi, FindFile_Drv
+	; 29/06/2025
+	;mov	edi, FindFile_Drv
 	call	parse_path_name
 	;jc	loc_run_cmd_failed
 	; 25/07/2022
@@ -7751,7 +7770,9 @@ loc_run_auto_path_move_fn_loop:
 
 loc_run_change_current_drive:
 	mov	dh, [Current_Drv]
-	mov	dl, [FindFile_Drv]
+	;mov	dl, [FindFile_Drv]
+	; 29/06/2025
+	mov	dl, [Path_Drv]
 	cmp	dl, dh
 	je	short loc_run_change_directory_again
 
@@ -7763,11 +7784,15 @@ loc_run_change_current_drive:
 	jc	short loc_run_path_failed
 
 loc_run_change_directory_again:
-	cmp	byte [FindFile_Directory], 20h
+	;cmp	byte [FindFile_Directory], 20h
+	; 29/06/2025
+	cmp	byte [Path_Directory], 20h
 	jna	short loc_load_executable_cdir_chk_again
 
 	inc	byte [Restore_CDIR]
-	mov	esi, FindFile_Directory
+	;mov	esi, FindFile_Directory
+	; 29/06/2025
+	mov	esi, Path_Directory
 	xor	ah, ah ; CD_COMMAND sign -> 0
 	call	change_current_directory
 	;jc	loc_run_cmd_failed
@@ -7792,11 +7817,14 @@ jmp_loc_run_check_auto_path_again:
 	jmp	loc_run_check_auto_path_again
 
 loc_load_and_run_file:
+	; 29/06/2025 - TRDOS 386 Kernel v2.0.10
 	; 25/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 13/11/2017
 	; 04/01/2017
 	; 23/04/2016
 	mov	esi, FindFile_Name
+	; 29/06/2025
+	;mov	esi, Path_FileName
 	mov	edi, TextBuffer
 
  	; 24/04/2016

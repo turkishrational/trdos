@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 02/06/2025  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 29/06/2025  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1813,6 +1813,7 @@ syscreat_2:
 	jmp	short sysopen_2
 
 sysopen: ;<open file>
+	; 29/06/2025 - TRDOS 386 v2.0.10
 	; 03/09/2024
 	; 19/08/2024 - TRDOS 386 v2.0.9
 	; 23/07/2022 - TRDOS 386 v2.0.5
@@ -1939,7 +1940,9 @@ sysopen_err:
 	jmp	error
 
 sysopen_1:
-	;mov	esi, FindFile_Name
+	;;mov	esi, FindFile_Name
+	; 29/06/2025
+	;mov	esi, Path_FileName
         mov	ax, 1800h ; Only files
 	call	find_first_file
 	pop	edx
@@ -2699,9 +2702,9 @@ rw6:	; 03/09/2024 (check cluster number is valid or not)
 rw7:
 	;;;
 
-	mov	[u.base], ecx 	; buffer address/offset 
+	mov	[u.base], ecx 	; buffer address/offset
 				;(in the user's virtual memory space)
-	mov	[u.count], edx 
+	mov	[u.count], edx
         mov	dword [u.error], 0 ; reset the last error code
 	retn
 
@@ -13713,12 +13716,12 @@ dskr_0:
 	jna	short dskr_4
 	;
 	push	eax ; 01/05/2016
-	cmp     edx, [u.count] 
+	cmp     edx, [u.count]
 	jnb	short dskr_1
 	mov	[u.count], edx
 dskr_1:
 	; EAX = First Cluster
-	; [Current_Drv] = Physical drive number 
+	; [Current_Drv] = Physical drive number
 	call	mget_r
 	; NOTE: in 'mget_r', relevant sector will be read in buffer
 	; if it is not already in buffer !
@@ -13763,7 +13766,7 @@ mget_r:
 	; 22/03/2013 - 31/07/2013 (Retro UNIX 8086 v1)
 	;
 	; Get existing or (allocate) a new disk block for file
-	; 
+	;
 	; INPUTS ->
 	;    [u.fofp] = file offset pointer
 	;    EAX = First Cluster
@@ -13786,13 +13789,13 @@ mget_r:
 
 	cmp	[readi.valid], cl ; 0
 	jna	short mget_r_0
-	
+
 	cmp	ch, [readi.drv]
 	jne	short mget_r_0
 
 	cmp	eax, [readi.fclust]
 	jne	short mget_r_3
-	
+
 	mov	eax, ebx ; file offset
 	mov	cx, [readi.bpc]
 	inc	ecx ; <= 65536
@@ -13821,7 +13824,7 @@ mget_r_0:
 	ja	short mget_r_1
 	mov	cl, [esi+LD_FS_BytesPerSec+1]
 	shr	cl, 1 ;  ; 1 for 512 bytes, 4 for 2048 bytes
-	jmp	short mget_r_2	
+	jmp	short mget_r_2
 mget_r_1:
 	mov	cl, [esi+LD_BPB+BPB_SecPerClust]
 mget_r_2:
@@ -13841,7 +13844,7 @@ mget_r_2:
 	sub	ecx, ecx
 mget_r_3:
 	mov	[readi.fclust], eax ; first cluster (or FDT address)
-	mov	[readi.valid], cl ; 0 
+	mov	[readi.valid], cl ; 0
 	;mov	[readi.s_index], cl ; 0
 	;mov	[readi.offset], cx ; 0
 	mov	[readi.c_index], ecx ; 0
@@ -13953,7 +13956,7 @@ mget_r_12:
 trans_addr_r:
 	; 12/10/2016
 	; 02/05/2016 - TRDOS 386 (TRDOS v2.0)
-	; Translate virtual address to physical address 
+	; Translate virtual address to physical address
 	; for reading from user's memory space
 	; 04/06/2015 - 18/10/2015 (Retro UNIX 386 v1)
 
@@ -14326,10 +14329,10 @@ wswap:  ; < swap out, swap to disk >
 	;	saving 'u' structure and user registers for task switching).
 	;	u.usp - points to kernel stack address which contains
 	;		user's registers while entering system call.
-	;	u.sp  - points to kernel stack address 
+	;	u.sp  - points to kernel stack address
 	;		to return from system call -for IRET-.
 	;	[u.usp]+32+16 = [u.sp] 
-	;	[u.usp] -> edi, esi, ebp, esp (= [u.usp]+32), ebx, 
+	;	[u.usp] -> edi, esi, ebp, esp (= [u.usp]+32), ebx,
 	;		edx, ecx, eax, gs, fs, es, ds, -> [u.sp].
 	;
 	; Retro UNIX 8086 v1 modification ->
@@ -14343,13 +14346,13 @@ wswap:  ; < swap out, swap to disk >
 	;    u.break - points to end of program
 	;    u.usp - stack pointer at the moment of swap
 	;    core - beginning of process program
-	;    ecore - end of core 	
+	;    ecore - end of core
 	;    user - start of user parameter area
 	;    u.uno - user process number
 	;    p.dska - holds block number of process
 	; OUTPUTS ->
 	;    swp I/O queue
-	;    p.break - negative word count of process 
+	;    p.break - negative word count of process
 	;    r1 - process disk address
 	;    r2 - negative word count
 	;
@@ -14411,7 +14414,7 @@ rswap:  ; < swap in, swap from disk >
 	;		user's registers while entering system call.
 	;	u.sp  - points to kernel stack address 
 	;		to return from system call -for IRET-.
-	;	[u.usp]+32+16 = [u.sp] 
+	;	[u.usp]+32+16 = [u.sp]
 	;	[u.usp] -> edi, esi, ebp, esp (= [u.usp]+32), ebx,
 	;		edx, ecx, eax, gs, fs, es, ds, -> [u.sp].
 	;
@@ -14431,7 +14434,7 @@ rswap:  ; < swap in, swap from disk >
 	; OUTPUTS ->
 	;    8 = (u.ilgins)
 	;    24 = (u.emt)
-	;    swp - bit 10 is set to indicate read 
+	;    swp - bit 10 is set to indicate read
 	;		(bit 15=0 when reading is done)
 	;    swp+2 - disk block address
 	;    swp+4 - negative word count
@@ -14477,7 +14480,7 @@ rswap:  ; < swap in, swap from disk >
 	cmp	byte [u.fpsave], 0
 	jna	short rswp_retn
 	frstor	[u.fpregs] ; restore floating point regs (94 bytes)
-			; 108 bytes (22/08/2024)	
+			; 108 bytes (22/08/2024)
 rswp_retn:
 	push	eax	; 'rswap' return address
 	retn
@@ -14811,7 +14814,7 @@ tfub_1:
        	call	get_physical_addr_x ; get physical address
 	;jc	short tfub_5
 	jc	short ttub_5
-	; eax = physical address 
+	; eax = physical address
 	; ecx = remain byte count in page (1-4096)
 	mov	esi, eax
 	mov	eax, [u.count]

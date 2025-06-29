@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 28/06/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 29/06/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2471,6 +2471,7 @@ loc_ppn_invalid_drive:
 %else
 	; 26/06/2025 - TRDOS 386 v2.0.10
 parse_path_name:
+	; 29/06/2025
 	; 28/06/2025
 	; 27/06/2025
 	; 26/06/2025 (Major Modification)
@@ -2674,7 +2675,9 @@ loc_scan_ppn_dslash_ok:
 	;cmp	cl, 103
 	; 27/06/2025
 	;ja	short loc_ppn_invalid_drive_stc
-	jz	short loc_ppn_invalid_drive_stc
+	; 29/06/2025
+	and	ch, ch
+	jnz	short loc_ppn_invalid_drive_stc
 			 ; ecx > 255
 	; 27/06/2025
 	;mov	eax, edi ; Dest Dir String Location (104 bytes)
@@ -7360,7 +7363,7 @@ unicode_from_ascii:
 a_from_u_ok:
 	retn
 %endif	
-	
+
 	; 01/06/2025 - - TRDOS 386 v2.0.10
 check_invalid_lfn_chars:
 	; INPUT:
@@ -7370,14 +7373,14 @@ check_invalid_lfn_chars:
 	;  If cf = 1 -> string/text contains an invalid
 	;	        long name character (in AL)
 	;  If cf = 0 -> proper
-	;		
+	;
 	; Modified registers: EAX, ECX
 
 	push	esi
 	mov	ecx, 128
 cilfnc_1:
 	lodsb
-	
+
 	cmp	al, 128
 	jnb	short cilfnc_5
 
@@ -7557,7 +7560,7 @@ search_longname:
 	;jmp	short search_longname_@@
 search_longname_@:
 	; [DIR_FCluster] = the 1st clust of the dir
-	
+
 	; 24/06/2025
 	mov	edx, [Current_LDRVT]
 search_longname_@@:
@@ -7567,7 +7570,7 @@ search_longname_@@:
 	;xor	edx, edx
 	;mov	dh, [Current_Drv]
 	;add	edx, Logical_DOSDisks
-	
+
 	call	check_invalid_lfn_chars
 	;jc	short slfn_invalid
 	jnc	short sln_1
