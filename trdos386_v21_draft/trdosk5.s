@@ -2168,7 +2168,7 @@ add_new_cluster:
 	;	EDX = 0 (if cf = 0)
 	; NOTE:
 	; This procedure does not update lm date&time !
-	;    ; 30/08/2024	
+	;    ; 30/08/2024
 	; and doesn't update 1st clust and file size fields !
 	;
 	; (Modified registers: EAX, EBX, ECX, EDX, EDI)
@@ -2263,12 +2263,12 @@ loc_add_new_cluster_write_nc_to_disk:
 	mov	eax, edx
         add     eax, [esi+LD_DATABegin]
 	jc	short loc_add_new_cluster_invalid_format_retn
-		
+
 	mov	ecx, ebx ; ECX = sectors per cluster (<256)
 	mov	ebx, Cluster_Buffer
 	call	disk_write
 	jnc	short loc_add_new_cluster_update_fat_nlc
-	
+
 	; 15/10/2016 (1Dh -> 18)
 	;mov	eax, 18 ; Write Error
 	; 25/07/2022
@@ -2383,7 +2383,7 @@ write_fat_file_sectors:
 	; 31/08/2024
 	; ecx = sector count (may be different than sectors per cluster)
 	sub	eax, 2 ; Beginning cluster number is always 2
-	movzx	edx, byte [esi+LD_BPB+BPB_SecPerClust] ; 18/03/2016 
+	movzx	edx, byte [esi+LD_BPB+BPB_SecPerClust] ; 18/03/2016
 	mul	edx
 	add	eax, [esi+LD_DATABegin] ; absolute address of the cluster
 
@@ -2408,12 +2408,12 @@ write_fs_cluster:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 21/03/2016 (TRDOS 386 = TRDOS v2.0)
 	; Singlix FS
-	
+
 	; EAX = Cluster number is sector index number of the file (eax)
-	
+
 	; EDX = File number is the first File Descriptor Table address
 	;	of the file. (Absolute address of the FDT).
-	
+
 	; eax = sector index (0 for the first sector)
 	; edx = FDT0 address
 		; 64 KB buffer = 128 sectors (limit) 
@@ -2431,6 +2431,7 @@ write_fs_sectors:
 	retn
 
 get_cluster_by_index:
+	; 01/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 29/04/2016 (TRDOS 386 = TRDOS v2.0)
 	; INPUT ->
@@ -2440,19 +2441,22 @@ get_cluster_by_index:
 	; 	ECX = Cluster sequence number after the beginning cluster
 	; 	ESI = Logical DOS Drive Description Table address
 	; OUTPUT ->
-	;	EAX = Cluster number 
+	;	EAX = Cluster number
+	;	    = File Sector Number (Singlix File System)
 	;	cf = 1 -> Error code in AL (EAX)
 	;
 	;(Modified registers: EAX, ECX, EBX, EDX)
 	;	
 	cmp	byte [esi+LD_FATType], 1
-        jb      short get_fs_section_by_index 
+        ;jb      short get_fs_section_by_index
+	; 01/07/2025
+	jb      short get_fs_sector_by_index
 
 	cmp	ecx, [esi+LD_Clusters]
 	jb	short gcbi_1
 gcbi_0:
 	;stc
-	;mov	eax, 23h ; Cluster not available ! 
+	;mov	eax, 23h ; Cluster not available !
 			 ; MSDOS error code: FCB unavailable
 	; 25/07/2022
 	sub	eax, eax
@@ -2476,21 +2480,61 @@ gcbi_3:
 	cmc 	; stc
 	retn
 
-get_fs_section_by_index:
+get_fs_sector_by_index:
+	; 01/07/2025 - TRDOS 386 v2.0.10
+	; Get Singlix FS File Sector By Index
+	; (section = extent)
+	; 'get_fs_section_by_index'
 	; 29/04/2016 (TRDOS 386 = TRDOS v2.0)
 	; INPUT ->
 	; 	EAX = Beginning FDT number/address
-	; 	EDX = Sector index in disk/file section
 	; 	ECX = Sector sequence number after the beginning FDT
 	; 	ESI = Logical DOS Drive Description Table address
 	; OUTPUT ->
-	; 	EAX = FDT number/address
-	; 	EDX = Sector index of the section (0,1,2,3,4...)
+	; 	EAX = sector number (not physical)
+	; 	EDX = ESI = LDRVT address
+	;       EBX = Sector sequence/index number (input)
+	;	ECX = Remaining sectors in the section
+	;
 	;	cf = 1 -> Error code in AL (EAX)
 	;
-	;(Modified registers: EAX, ECX, EBX, EDX)
-	;
-	mov	eax, 0FFFFFFFFh
+	; Modified registers: EAX, ECX, EBX, EDX
+
+	; 01/07/2025
+	push	ebp
+	push	edi
+	push	esi
+
+	;mov	[FS_SectorIndex], ecx
+	mov	ebx, ecx
+	mov	[FDT_Number], eax
+	mov	edx, esi
+	add	eax, [esi+LD_FS_BeginSector]
+	mov	cl, [edx+LD_FS_PhyDrvNo]
+		; physical (rombios) drive number
+	call	GETBUFFER
+	jc	short get_fs_sbi_6
+
+	add	esi, BUFINSIZ
+	;mov	ebx, [FS_SectorIndex]
+
+	; ebx = sector sequence/index number
+	; edx = LDRVT address
+	; esi = FDT buffer address
+
+	call	get_fs_sector
+
+	; esi = FDT buffer address
+	; ebx = sector index number
+	; edx = LDRVT address
+	; EAX = sector address (!not physical!)
+	; ecx = remaining sectors in the extent
+	;	(remaining consecutive sectors)
+
+get_fs_sbi_6:
+	pop	esi
+	pop	edi
+	pop	ebp
 	retn
 
 get_last_section:
@@ -3551,7 +3595,7 @@ bufwrt_2:
 	mov	esi, [esi+BUFFINFO.buf_DPB] ; LDRVT address
 
 	; eax = physical disk sector
-	; ebx = buffer (transfer) address 
+	; ebx = buffer (transfer) address
 	; esi = logical dos drive description table address
 
 	call 	DWRITE	; TRDOS 286 v2.0.10
@@ -3568,14 +3612,14 @@ bufwrt_3:
 	add	eax, [esi+BUFFINFO.buf_wrtcntinc]
 
 	loop	bufwrt_2
-	
+
 	or	edx, edx
 	jnz	short bufwrt_4 ; At least one write succeed
 
 	; 28/04/2025
 	; return LDRVT address for failed disk
 	mov	edx, [esi+BUFFINFO.buf_DPB]
-	
+
 	mov	eax, ERR_DRV_WRITE ; 'disk write error !'
 	stc
 bufwrt_4:
@@ -3955,7 +3999,7 @@ BadBye:
 
 bad_path3:
 	mov	eax, ERR_PATH_NOT_FOUND	; 3
-	jmp	short BadBye	
+	jmp	short BadBye
 
 found_entry:
 	; EBX points to start of entry in [CurrentBuffer]
@@ -3983,10 +4027,10 @@ found_entry:
 
 	cmp	[CurrentBuffer], eax ; -1
 	jne	short OkStore
-	
+
 	; The user has specified the root directory itself,
 	; rather than some contents of it. We can't "find" that.
-	
+
 	; Cause DOS_SEARCH_NEXT to fail by stuffing a -1 at Lastent
 	mov	[edi-12], eax ; -1 ; find_buf.LastEnt
 	jmp	short find_no_more

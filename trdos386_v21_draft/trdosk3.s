@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 29/06/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 01/07/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -202,12 +202,12 @@ loc_restore_FAT_current_directory:
 	;or	ah, ah
 	movzx	edx, byte [esi+LD_CDirLevel]
 	mov	[Current_Dir_Level], dl
-	or	dl, dl        
+	or	dl, dl
 	jz	short loc_ccdrv_reset_cdir_FAT_12_16_32_fcluster
 
 	; 14/05/2025 (8 sub dir levels)
 	;movzx	edx, ah
-	dec	edx ; level 1 -> the first field/entry 
+	dec	edx ; level 1 -> the first field/entry
 
 	shl	dl, 4 ; * 16
         add	edx, esi
@@ -240,7 +240,7 @@ loc_ccdrv_reset_cdir_FAT_12_16_fcluster:
 	; 26/07/2022
 	xor	eax, eax
 
-; 14/05/2025	
+; 14/05/2025
 ;	;xor	edx, edx
 ;loc_ccdrv_check_rootdir_sign:
 ;	cmp	byte [esi+LD_CurrentDirectory], 0
@@ -340,7 +340,7 @@ trim_cdir_str_0:
 	lodsd	; add esi, 4
 	; skip excessive chars
 	add	esi, ecx
-	
+
 trim_cdir_str_1:
 	lodsb
 	cmp	al, '/'
@@ -413,7 +413,7 @@ pass_space_control:
 	ja	short pass_capitalize
 	and	al, 0DFh
 pass_capitalize:
-	stosb   
+	stosb
 	inc     cl
 	cmp     esi, CommandBuffer + 79
 	;jb	short next_command_char
@@ -513,7 +513,7 @@ loc_arrow:
 	inc	dl
 	jmp	short set_cursor_pos
 
-rw_char: 
+rw_char:
 	; 26/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 13/05/2016
 	; 30/01/2016
@@ -562,7 +562,7 @@ set_cursor_pos:
 	jmp	short readnextchar
 
 	; 26/07/2022
-;loc_arrow:    
+;loc_arrow:
 ;	cmp	ah, 4Bh
 ;	je	short loc_back
 ;	cmp	ah, 53h
@@ -773,7 +773,7 @@ pass_set_date_separator_1:
 	; 13/05/2016
 	;mov	bx, 7 ; attribute/color (bl)
 		      ; video page 0 (bh)
-	mov	bl, 7	
+	mov	bl, 7
 	call	_write_tty
 loc_enter_month_1:
 	xor	ah, ah ; 0
@@ -821,7 +821,7 @@ pass_set_month_12:
 	; 13/05/2016
 	;mov	bx, 7 ; attribute/color (bl)
 		      ; video page 0 (bh)
-	mov	bl, 7	
+	mov	bl, 7
 	call	_write_tty
 loc_enter_separator_2:
 	sub	ah, ah
@@ -1009,7 +1009,7 @@ loc_set_date_progress:
 ;	jmp	print_msg
 
 	; 26/07/2022
-	jmp	loc_set_date_ok 
+	jmp	loc_set_date_ok
 
 write_backspace:
 	; 18/01/2016 (TRDOS 386 = TRDOS v2.0)
@@ -1432,7 +1432,7 @@ loc_set_time_progress:
 	shl	al, 4 ; * 16
 	mov	dh, al
 	add	dh, ah
-	
+
 	;mov	ah, 03h
 	;call	int1Ah
 	call	RTC_30	; SET RTC TIME
@@ -1459,10 +1459,10 @@ print_volume_info:
 
 	mov	ah, al
 	sub	al, al
-	movzx	esi, ax	
+	movzx	esi, ax
 	add	esi, Logical_DOSDisks
 	mov	al, [esi]
-	cmp	al, 'A'  
+	cmp	al, 'A'
 	jnb	short loc_pvi_set_vol_name
 	mov	ah, [esi+LD_FSType]
 	retn
@@ -1499,7 +1499,7 @@ loc_vol_size_in_kbytes:
 	xor	edx, edx ; 0
 loc_write_vol_size_str:
 	mov	[VolSize_Unit1], ecx
-	; 
+	;
 	mov	edi, Vol_Tot_Sec_Str_End
         ;mov	byte [edi], 0
 	mov	ecx, 10
@@ -1685,7 +1685,7 @@ mvn_0:
 	retn
 mvn_1:
 	cmp	al, 2
-	ja	short mvn_3 
+	ja	short mvn_3
 	;or	al, al
 	;jz	short mvn_2
 	mov	eax, [esi+LD_BPB+VolumeID]
@@ -1722,7 +1722,7 @@ get_volume_serial_number:
 	;
 	; INPUT -> DL = Logical DOS Drive number
 	; OUTPUT -> EAX = Volume serial number
-	;          BL= FAT Type	    
+	;          BL= FAT Type
 	;          BH = Logical DOS drv Number (DL input)
 	; cf = 1 -> Drive not ready
 
@@ -1748,10 +1748,10 @@ loc_gvsn_fat:
 	jmp	short loc_gvsn_return
 loc_gvsn_fat32: 
 	add	esi, LD_BPB + FAT32_VolID
-	jmp	short loc_gvsn_return 
+	jmp	short loc_gvsn_return
 loc_gvsn_fs:
 	cmp	byte [esi+LD_FSType], 0A1h
-	jne	short loc_gvsn_stc_retn 
+	jne	short loc_gvsn_stc_retn
 	add	esi, LD_FS_VolumeSerial
 loc_gvsn_return:
 	mov	eax, [esi]
@@ -2379,6 +2379,7 @@ cmp_cmd_3:
 	retn
 
 loc_run_cmd_failed:
+	; 01/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 26/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 15/03/2016
 	; 15/02/2016 (TRDOS 386 = TRDOS v2.0)
@@ -2401,6 +2402,10 @@ loc_run_dir_not_found:
 
 loc_run_file_notfound_msg:
 	cmp	al, 2 ; File not found
+	;jne	short loc_run_file_drv_read_err
+	; 01/07/2025
+	je	short loc_print_file_notfound_msg
+	cmp	al, 12 ; ERR_FILE_NOT_FOUND
 	jne	short loc_run_file_drv_read_err
 
 loc_print_file_notfound_msg:
@@ -7472,6 +7477,8 @@ loc_mcfg_load_fs_file:
 	retn
 
 load_and_execute_file:
+	; 01/07/2025
+	; 30/06/2025
 	; 29/06/2025 - TRDOS 386 Kernel v2.0.10
 	; 03/09/2024 - TRDOS 386 Kernel v2.0.9
 	; 30/08/2023 - TRDOS 386 Kernel v2.0.6
@@ -7539,6 +7546,35 @@ loc_run_check_filename_exists:
 	; 25/07/2022
 	jna	short loc_run_ppn_failed
 
+	;;;;
+	; 30/06/2025
+	cmp	byte [Path_LongFlag], 0
+	jna	short loc_run_check_exe_filename_ext
+
+	; '.PRG' or '.prg' extension
+	;       is forced for long program/file names
+	; ("longprogramname.prg")
+
+	mov	ecx, 128 ; max. possible filename length
+	call	find_last_dot
+	inc	ebx ; -1 -> no extension
+		    ; (not a dot in file name)
+	jz	short loc_run_ppn_failed
+	dec	ebx
+	sub	ebx, esi ; chars before '.'
+	jna	short loc_run_ppn_failed
+	sub	ecx, ebx ; chars after '.' + 1
+	cmp	ecx, 4 ; '.prg'
+	jne	short loc_run_ppn_failed
+	add	esi, ebx
+	mov	eax, [esi]
+	and	eax, 0DFDFDFFFh ; convert to uppercase
+	cmp	eax, '.PRG'
+	jne	short loc_run_ppn_failed
+	mov	word [EXE_ID], 'P.'
+	jmp	short loc_run_drv
+	;;;;
+
 loc_run_check_exe_filename_ext:
 	call	check_prg_filename_ext
 	;jc	loc_cmd_failed
@@ -7571,6 +7607,12 @@ loc_run_drv:
 	jmp	loc_run_cmd_failed
 
 loc_run_change_directory:
+	;;; 30/06/2025
+	xor	ebx, ebx
+	mov	bh, [Current_Drv]
+	add	ebx, Logical_DOSDisks
+	mov	[Current_LDRVT], ebx
+
 	;cmp	byte [FindFile_Directory], 20h
 	; 29/06/2025
 	cmp	byte [Path_Directory], 20h
@@ -7600,6 +7642,104 @@ loc_run_find_executable_file_next:
 	;mov	esi, FindFile_Name
 	; 29/06/2025
 	mov	esi, Path_FileName
+
+	; 01/07/2025
+	; 30/06/2025
+	;;;;
+	mov	ebx, [Current_Dir_FCluster] ; [DIR_DDT]
+	cmp	byte [Path_LongFlag], 0
+	jna	loc_run_sfn_check_fs
+
+	; 01/07/2025
+	; convert lfn to lowercase before searching
+	; (If lfn does not match exactly, 
+	;  lower case comparison is the default.)
+	;;;
+	call	convert_to_lowercase
+	;;;
+
+	cmp	byte [Path_FileSystem], 0A1h
+	je	short loc_run_lfn_check_fs
+	; 01/07/2025
+	;mov	ebx, [Current_Dir_FCluster]
+ 	; [Current_LDRVT] = Logical DRV Table addr
+	; esi = ASCIIZ long name (not UNICODE!)
+	call	search_longname
+	jc	loc_run_program_file_not_found
+	; except volume name and directories
+	;mov	al, 2
+	mov	bl, [edi+dir_entry.dir_attr]
+	and	bl, 18h
+	;jnz	short loc_run_program_file_not_found
+	jnz	loc_run_check_auto_path
+
+	mov	esi, edi
+	mov	edi, FindFile_Name
+	call	convert_to_8_3_fname
+	xchg	esi, edi
+
+	mov	eax, [edi+dir_entry.dir_file_size]
+loc_load_and_run_file_@:
+	mov	[FindFile_Size], eax
+	;mov	bl, [edi+dir_entry.dir_attr]
+	;mov	[FindFile_Attributes], bl
+	mov	ebx, [Current_LDRVT]
+	mov	bl, [ebx+LD_FATType]
+	mov	[FindFile_FATType], bl
+	mov	bx, [edi+dir_entry.dir_fclus_hi]
+	shl	ebx, 16
+	mov	bx, [edi+dir_entry.dir_fclus]
+	mov	[FindFile_FirstCluster], ebx
+	jmp	loc_load_and_run_file
+
+loc_run_lfn_check_fs:
+	; [Current_LDRVT] = LDRVT address
+	;mov	ebx, [Current_Dir_FCluster] ; [DIR_DDT]
+	call	search_fs_longname
+	jc	short loc_run_program_file_not_found
+		; eax = file size
+		;  bh = 5th byte of file size
+		;  bl = attributes (FDT.Attributes)
+		; edx = Logical Dos Drive parameters Table
+		; esi = ASCIIZ file/directory name
+		;	(Max. 12 bytes + NUL, capitalized)
+		; edi = FDT/DDT buffer address
+		; ecx = date & time in MSDOS Dir Entry format
+		;  lw = time (16 bits) -HHHHHMMMMMMSSSSS-
+		;  hw = date (16 bits) -YYYYYYYMMMMDDDDD-
+	;mov	al, 2
+	test	bl, 18h
+	;jnz	short loc_run_program_file_not_found
+	jnz	short loc_run_check_auto_path
+loc_load_and_run_fs_file_@:
+	mov	[FindFile_Size], eax
+	;mov	[FindFile_Attributes], bl
+	mov	ebx, [edi+FDT.FileNumber]
+	mov	[FindFile_FirstCluster], ebx
+	mov	byte [FindFile_FATType], 0
+	jmp	loc_load_and_run_file
+
+loc_run_sfn_check_fs:
+	cmp	byte [Path_FileSystem], 0A1h
+	jne	short loc_run_find_program_file_next
+	; [Current_LDRVT] = LDRVT address
+	mov	ax, 1800h ; Except volume label and dirs
+	;mov	ebx, [Current_Dir_FCluster] ; [DIR_DDT]
+	call	search_fs_shortname
+	jc	short loc_run_program_file_not_found
+		; eax = file size
+		;  bh = 5th byte of file size
+		;  bl = attributes (FDT.Attributes)
+		; edx = Logical Dos Drive parameters Table
+		; esi = ASCIIZ file/directory name
+		;	(Max. 12 bytes + NUL, capitalized)
+		; edi = FDT/DDT buffer address
+		; ecx = date & time in MSDOS Dir Entry format
+		;  lw = time (16 bits) -HHHHHMMMMMMSSSSS-
+		;  hw = date (16 bits) -YYYYYYYMMMMDDDDD-
+	jmp	loc_load_and_run_fs_file_@
+	;;;;
+
 loc_run_find_program_file_next:
 	mov	ax, 1800h ; Except volume label and dirs
 	call	find_first_file
@@ -7609,9 +7749,23 @@ loc_run_find_program_file_next:
 	;jnc	loc_load_and_run_file
 	; 25/07/2022
 	jc	short loc_run_program_file_not_found
-	jmp	loc_load_and_run_file
 
-loc_run_program_file_not_found:	 
+	; 01/07/2025
+	;mov	[FindFile_Size], eax
+	;;mov	bl, [edi+dir_entry.dir_attr]
+	;;mov	[FindFile_Attributes], bl
+	;mov	ebx, [Current_LDRVT]
+	;mov	bl, [ebx+LD_FATType]
+	;mov	[FindFile_FATType], bl
+	;mov	bx, [edi+dir_entry.dir_fclus_hi]
+	;shl	ebx, 16
+	;mov	bx, [edi+dir_entry.dir_fclus]
+	;mov	[FindFile_FirstCluster], ebx
+	;jmp	loc_load_and_run_file
+	; 01/07/2025
+	jmp	short loc_load_and_run_file_@
+
+loc_run_program_file_not_found:
 	cmp	al, 2 ; file not found
 	;jne	loc_run_cmd_failed
 	; 25/07/2022
@@ -7656,7 +7810,7 @@ loc_run_check_auto_path:
 
 loc_run_check_auto_path_again:
 	cmp	word [Run_Auto_Path], 0FFFFh
-		; 0FFFFh = Not a valid run path (in ENV block) 
+		; 0FFFFh = Not a valid run path (in ENV block)
 	;jnb	loc_cmd_failed
 	; 25/07/2022
 	jnb	short loc_run_cap_failed
@@ -7729,7 +7883,7 @@ loc_run_auto_path_pos_move_next:
 	; 03/09/2024
 	jnb	short loc_run_auto_path_pos_move_next_@
 
-loc_byte_ptr_end_of_path: 
+loc_byte_ptr_end_of_path:
 	mov	word [Run_Auto_Path], 0FFFFh ; end of path
 	jmp	short loc_run_auto_path_move_ok
 
@@ -7817,12 +7971,15 @@ jmp_loc_run_check_auto_path_again:
 	jmp	loc_run_check_auto_path_again
 
 loc_load_and_run_file:
+	; 01/07/2025
 	; 29/06/2025 - TRDOS 386 Kernel v2.0.10
 	; 25/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 13/11/2017
 	; 04/01/2017
 	; 23/04/2016
-	mov	esi, FindFile_Name
+	;mov	esi, FindFile_Name
+	; 01/07/2025
+	; esi = asciiz file name
 	; 29/06/2025
 	;mov	esi, Path_FileName
 	mov	edi, TextBuffer
@@ -7881,7 +8038,7 @@ loc_load_and_run_file_5:
 	stosb
 	inc	dword [u.nread]
 	loop	loc_load_and_run_file_2
-			
+
 loc_load_and_run_file_6:
 	xor	al, al ; 0
 	stosb
@@ -7893,10 +8050,19 @@ loc_load_and_run_file_7:
 	inc	dword [argc]
 	inc	dword [u.nread] ; 24/04/2016
 	mov	esi, TextBuffer
-	mov	edx, [FindFile_DirEntry+DirEntry_FileSize]
-	mov	ax, [FindFile_DirEntry+DirEntry_FstClusHI]
-	shl	eax, 16 ; 13/11/2017
-	mov	ax, [FindFile_DirEntry+DirEntry_FstClusLO]
+	;mov	edx, [FindFile_DirEntry+DirEntry_FileSize]
+	; 01/07/2025
+	mov	edx, [FindFile_Size]
+	;mov	ax, [FindFile_DirEntry+DirEntry_FstClusHI]
+	;shl	eax, 16 ; 13/11/2017
+	;mov	ax, [FindFile_DirEntry+DirEntry_FstClusLO]
+	; 01/07/2025
+	mov	eax, [FindFile_FirstCluster]
+	;
+	; 01/07/2025
+	;cmp	byte [FindFile_FATType], 0
+	;jna	short loc_load_and_run_fs_file
+
 	; EAX = First Cluster number
 	; EDX = File Size
 	; ESI = Argument list address
@@ -7907,9 +8073,14 @@ loc_load_and_run_file_7:
 loc_load_and_run_file_8: ; 06/05/2016
 	jmp	loc_file_rw_restore_retn
 
+	; 01/07/2025
+;loc_load_and_run_fs_file:
+	;call	load_and_run_fs_file
+	;jmp	loc_file_rw_restore_retn
+
 check_prg_filename_ext:
 	; 23/04/2016 (TRDOS 386 = TRDOS v2.0)
-	; 10/09/2011 
+	; 10/09/2011
 	; (TRDOS v1, CMDINTR.ASM, 'proc_check_exe_filename_ext')
 	; 14/11/2009
 	; INPUT ->
@@ -7935,7 +8106,7 @@ loc_run_check_filename_ext:
 
 loc_run_check_filename_ext_dot:
 	cmp	ah, 2  ; .??? is not valid
-	mov	ah, al ; '.' 
+	mov	ah, al ; '.'
 	jb	short loc_check_prg_fn_retn
 
 loc_run_check_filename_ext_dot_ok:

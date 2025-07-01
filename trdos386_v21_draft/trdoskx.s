@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 28/06/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 01/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -249,6 +249,13 @@ FindFile_DirEntryName:	  resb 13 ; 18/05/2025
 ; 184 bytes ; 19/05/2025
 ; 25/05/2025
 FindFile_LongName:	  resb 129 ; ASCIIZ (max. 128+NUL)
+; 01/07/2025
+FindFile_Attributes:	  resb 1
+FindFile_Size:		  resd 1
+FindFile_FirstCluster:	  resd 1
+;FindFile_LmDateTime:	  resd 1
+FindFile_FATType:	  resb 1
+
 ; 26/06/2025
 Path_FileSystem:	  resb 1
 Path_Drv:		  resb 1
@@ -497,7 +504,8 @@ readi.offset:	resw 1 ; byte offset in cluster buffer
 readi.cluster:  resd 1 ; current cluster number
 readi.c_index:	resd 1 ; cluster index of the current cluster (0,1,2,3..)
 readi.fclust:	resd 1 ; first cluster of the current cluster
-readi.fs_index: resd 1 ; sector index in disk/file section (for Singlix FS)
+; 01/07/2025
+;readi.fs_index: resd 1 ; sector index in disk/file section (for Singlix FS)
 ;readi.buffer:	resd 1 ; readi sector buffer address
 
 ;alignb 4
@@ -938,6 +946,7 @@ order_number:	resd 1
 ; 02/06/2025 - TRDOS 386 v2.0.10
 ; Singlix FS file name search parameters
 ;FS_DDT_Buffer:	resd 1
+;FS_SectorIndex: ; 01/07/2025
 FS_Dir_Index:	resd 1
 FS_CurrentDirectory:
 		resd 1

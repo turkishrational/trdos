@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 29/06/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 01/07/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -8366,6 +8366,39 @@ ctodotfn_3:
 	stosb	; 13th byte is zero (NUL tail)
 	pop	esi ; **
 	pop	edi ; *
+	retn
+
+
+; -----------------------------------------------
+
+	; 01/07/2025 - TRDOS 386 v2.0.10
+convert_to_lowercase:
+	; esi = ASCIIZ file name
+	;
+	; Modified registers: eax
+
+	push	esi
+cnvtlc_1:
+	mov	al, [esi]
+	cmp	al, 20h
+	jb	short cnvtlc_3
+%if 0
+	cmp	al, 41h ; 'A'
+	jb	short cnvtlc_2
+	cmp	al, 5Ah ; 'Z'
+	ja	short cnvtlc_2
+	or	al, 20h
+	mov	[esi], al
+cnvtlc_2:
+%else
+	; 01/07/2025
+	call	simple_lcase
+	mov	[esi], al
+%endif
+	inc	esi
+	jmp	short cnvtlc_1
+cnvtlc_3:
+	pop	esi
 	retn
 
 ; 20/05/2025 - TRDOS 386 v2.0.10
