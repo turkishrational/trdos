@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 01/07/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 02/07/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1174,6 +1174,7 @@ loc_ppdn_dot_dot_prev_level:
 	jmp 	short loc_ppdn_dotdot_subdir
 
 locate_current_dir_file:
+	; 02/07/2025
 	; 06/06/2025
 	; 29/05/2025
 	; 18/05/2025
@@ -1365,15 +1366,20 @@ loc_locatefile_file_notfound:
 	; 26/08/2024
 	; eax = 0
 	mov	al, 2
-	stc
-	retn
-
+	; 02/07/2025
 loc_locatefile_drv_not_ready_read_err:
-	;mov	eax, 17 ;Drive not ready or read error
 loc_cdir_locate_file_stc_retn:
-	cmc ;stc
+	stc
 loc_cdir_locate_file_retn:
 	retn
+
+	; 02/07/2025
+;loc_locatefile_drv_not_ready_read_err:
+;	;mov	eax, 17 ;Drive not ready or read error
+;loc_cdir_locate_file_stc_retn:
+;	cmc ;stc
+;loc_cdir_locate_file_retn:
+;	retn
 
 reload_current_directory:
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)

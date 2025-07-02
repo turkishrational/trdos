@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 01/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 02/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -47,6 +47,8 @@ Remark:		resb 78
 CommandBuffer: 	resb 80
 
 TextBuffer:	resb 256
+; 02/07/2025 - TRDOS 386 v2.0.10
+RunPathBuffer:	resb 388
 
 MasterBootBuff:
 MasterBootCode: resb 1BEh
@@ -530,10 +532,16 @@ alignb 4
 
 ; 29/04/2016
 Run_CDirFC:	resd 1
-Run_Auto_Path:	resb 1
-Run_Manual_Path: resb 1 ; 0 -> auto path sequence needed
+;Run_Auto_Path:	resb 1
+; 02/07/2025
+Run_Path_Length:
+		resd 1
+Run_Auto_Path:	resd 1
+Run_Manual_Path: 
+		resb 1 ; 0 -> auto path sequence needed
 EXE_ID:		resb 1
 EXE_dot:	resb 1
+		resb 1 ; 02/07/2025
 
 ; 06/05/2016
 mainprog_return_addr: resd 1
@@ -970,10 +978,10 @@ fdt_number:	resd 1
 f_target:	resd 1
 f_base_count:	resd 1 ; 1 byte is used
 f_ext_start:	resd 1
-f_ext_count:	resd 1 ; 1 byte is used	
+f_ext_count:	resd 1 ; 1 byte is used
 ;f_name_count:	resd 1
 formal_size:	resd 1
-lossy_conversion: ; 28/05/2025	
+lossy_conversion: ; 28/05/2025
 insert_fdtnum:	resb 1
 target_name:	resb 13
 ;temp_name:	resb 65
