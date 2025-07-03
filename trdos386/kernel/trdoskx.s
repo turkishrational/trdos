@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - UNINITIALIZED DATA : trdoskx.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 01/09/2024 (Previous: 05/06/2024 - Kernel v2.0.8)
+; Last Update: 03/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -470,10 +470,16 @@ alignb 4
 
 ; 29/04/2016
 Run_CDirFC:	resd 1
-Run_Auto_Path:	resb 1
-Run_Manual_Path: resb 1 ; 0 -> auto path sequence needed
+;Run_Auto_Path:	resb 1
+; 03/07/2025
+Run_Path_Length:
+		resd 1
+Run_Auto_Path:	resd 1
+Run_Manual_Path: 
+		resb 1 ; 0 -> auto path sequence needed
 EXE_ID:		resb 1
 EXE_dot:	resb 1
+		resb 1 ; 03/07/2025
 
 ; 06/05/2016
 mainprog_return_addr: resd 1

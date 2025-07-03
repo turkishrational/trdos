@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - MAIN PROGRAM : trdosk3.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 26/09/2024  (Previous: 02/12/2023, TRDOS 386 v2.0.7)
+; Last Update: 03/07/2025  (Previous: 26/09/2024, TRDOS 386 v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -6781,6 +6781,7 @@ loc_mcfg_load_fs_file:
 	retn
 
 load_and_execute_file:
+	; 03/07/2025 - TRDOS 386 Kernel v2.0.10
 	; 03/09/2024 - TRDOS 386 Kernel v2.0.9
 	; 30/08/2023 - TRDOS 386 Kernel v2.0.6
 	; 25/07/2022 - TRDOS 386 Kernel v2.0.5
@@ -6849,9 +6850,11 @@ loc_run_check_exe_filename_ext:
 	;jc	loc_cmd_failed
 	; 25/07/2022
 	jc	short loc_run_ppn_failed
+	; 03/07/2025
+	; if al = 0 -> ah = file name length
 
 loc_run_check_exe_filename_ext_ok:
-	mov	word [EXE_ID], ax
+	mov	word [EXE_ID], ax ; 'P.' or 'P'+0
 
 loc_run_drv:
 	mov	byte [Run_Manual_Path], 0
@@ -6917,11 +6920,14 @@ loc_run_program_file_not_found:
 
 loc_run_progr_file_chk_prg_ext: ; 25/07/2022
 	mov	ax, word [EXE_ID]
-	cmp	ah, '.' ; File name has extension sign
-	je	short loc_run_check_auto_path
 
-	or	al, al
-	jnz	short loc_run_check_auto_path
+	;cmp	ah, '.' ; File name has extension sign
+	;je	short loc_run_check_auto_path
+	;or	al, al
+	;jnz	short loc_run_check_auto_path
+	; 03/07/2025
+	cmp	ax, 'P.'
+	je	short loc_run_check_auto_path
 
 	cmp	ah, 8 ; count of file name chars
 	ja	short loc_run_check_auto_path
@@ -6950,28 +6956,49 @@ loc_run_check_auto_path:
 	jnz	short loc_run_cap_failed
 
 loc_run_check_auto_path_again:
-	cmp	word [Run_Auto_Path], 0FFFFh
-		; 0FFFFh = Not a valid run path (in ENV block) 
-	;jnb	loc_cmd_failed
-	; 25/07/2022
-	jnb	short loc_run_cap_failed
+	;cmp	word [Run_Auto_Path], 0FFFFh
+	;	; 0FFFFh = Not a valid run path (in ENV block) 
+	;;jnb	loc_cmd_failed
+	;; 25/07/2022
+	;jnb	short loc_run_cap_failed
+	; 03/07/2025
+	inc	dword [Run_Auto_Path] ; 0FFFFFFFFh -> 0
+	jz	short loc_run_cap_failed ; -1 -> 0
+
+	; 03/07/2025
+	mov	edi, TextBuffer
+	dec	dword [Run_Auto_Path] ; 0 -> init auto path
+	jnz	short loc_run_chk_filename_ext_next
+
 	;xor	al, al
 	mov	esi, Cmd_Path ; 'PATH'
-	mov	edi, TextBuffer
+	; 03/07/2025
+	;mov	edi, TextBuffer
+	; al = 0
 	; 03/09/2024 (bugfix)
 	mov	cx, 256 ; TextBuffer (maximum) length
 	call	get_environment_string
 	jnc	short loc_run_chk_filename_ext_again
-	mov	word [Run_Auto_Path], 0FFFFh ; invalid
+	;mov	word [Run_Auto_Path], 0FFFFh ; invalid
+	; 03/07/2025
+	dec	dword [Run_Auto_Path] ; -1 (invalid)
 loc_run_cap_failed: ; 25/07/2022
 	;jmp	loc_cmd_failed
 	; 30/08/2023
 	mov	al, 1 ; (force jump to loc_cmd_failed at the end)
 	jmp	loc_run_cmd_failed ; (restore cdir if it is needed)
 
+	; 03/07/2025
+loc_run_chk_filename_ext_next:
+	mov	ecx, [Run_Path_Length]
+	jmp	short loc_run_chk_filename_ext_again_@
+
 loc_run_chk_filename_ext_again:
 	mov	ecx, eax ; string length (with zero tail)
 	dec	ecx ; without zero tail
+	; 03/07/2025
+	mov 	[Run_Path_Length], ecx
+loc_run_chk_filename_ext_again_@:
 	mov	ax, [EXE_ID]
 	cmp	ah, '.'
 	je	short loc_run_chk_auto_path_pos
@@ -6981,18 +7008,23 @@ loc_run_change_file_ext_to_noext_again:
 	mov	esi, FindFile_Name
 	add 	ebx, esi
 	sub	eax, eax
-	mov	[ebx], eax ; 0 ; erase extension (.PRG)
+	;mov	[ebx], eax ; 0 ; erase extension (.PRG)
+	; 03/07/2025
+	mov	[ebx], al ; 0
 
 loc_run_chk_auto_path_pos:
-	;movzx	eax, word [Run_Auto_Path]
-	mov	ax, [Run_Auto_Path]
+	;;movzx	eax, word [Run_Auto_Path]
+	;mov	ax, [Run_Auto_Path]
+	; 03/07/2025
+	mov	eax, [Run_Auto_Path]
 	cmp	eax, ecx ; ecx = string length (except zero tail)
 	;jnb	loc_cmd_failed
  	; 25/07/2022
 	jnb	short loc_run_cap_failed
 
-	;or	eax, eax
-	or	ax, ax
+	; 03/07/2025
+	or	eax, eax
+	;or	ax, ax
 	jnz	short loc_run_auto_path_pos_move
 	mov	al, 5
 
@@ -7024,12 +7056,16 @@ loc_run_auto_path_pos_move_next:
 
 loc_byte_ptr_end_of_path: 
 	mov	word [Run_Auto_Path], 0FFFFh ; end of path
+	; 03/07/2025
+	mov	dword [Run_Auto_Path], 0FFFFFFFFh
 	jmp	short loc_run_auto_path_move_ok
 
 loc_run_auto_path_pos_move_last_byte:
 	mov	eax, esi
 	sub	eax, TextBuffer
-	mov	[Run_Auto_Path], ax ; next path position
+	;mov	[Run_Auto_Path], ax ; next path position
+	; 03/07/2025
+	mov	[Run_Auto_Path], eax
 
 loc_run_auto_path_move_ok:
 	dec	edi
@@ -7083,6 +7119,12 @@ loc_run_change_directory_again:
 	; 25/07/2022
 	jnc	short loc_run_chg_prompt_dir_str_again
 
+	; 03/07/2025
+	; ignore 'directory not found' error
+	; if auto path in progress
+	cmp	byte [Run_Manual_Path], 0
+	jna	short jmp_loc_run_find_executable_file_next
+
 loc_run_path_failed: ; 25/07/2022
 	jmp	loc_run_cmd_failed
 
@@ -7090,11 +7132,17 @@ loc_run_chg_prompt_dir_str_again:
 	call	change_prompt_dir_string
 
 loc_load_executable_cdir_chk_again:
+	; 03/07/2025
+	mov	al, [Current_Drv]
+	cmp	al, [RUN_CDRV]
+	jne	short jmp_loc_run_find_executable_file_next
+	;
 	mov	eax, [Current_Dir_FCluster]
 	cmp	eax, [Run_CDirFC]
 	;jne	loc_run_find_executable_file_next
 	; 30/08/2023
 	je	short jmp_loc_run_check_auto_path_again
+jmp_loc_run_find_executable_file_next: ; 03/07/2025
 	jmp	loc_run_find_executable_file_next
 jmp_loc_run_check_auto_path_again:
 	xor	al, al ; 0
