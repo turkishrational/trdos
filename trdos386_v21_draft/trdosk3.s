@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 02/07/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 03/07/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -7477,6 +7477,7 @@ loc_mcfg_load_fs_file:
 	retn
 
 load_and_execute_file:
+	; 03/07/2025
 	; 02/07/2025
 	; 01/07/2025
 	; 30/06/2025
@@ -7671,6 +7672,7 @@ loc_run_find_executable_file_next:
 	; esi = ASCIIZ long name (not UNICODE!)
 	call	search_longname
 	jc	loc_run_program_file_not_found
+
 	; except volume name and directories
 	;mov	al, 2
 	mov	bl, [edi+dir_entry.dir_attr]
@@ -7775,6 +7777,10 @@ loc_run_program_file_not_found:
 	;jne	loc_run_cmd_failed
 	; 25/07/2022
 	je	short loc_run_progr_file_chk_prg_ext
+	; 03/07/2025
+	; ('search_longname:')
+	cmp	al, 12 ; ERR_FILE_NOT_FOUND
+	je	short loc_run_progr_file_chk_prg_ext
 	jmp	loc_run_cmd_failed
 
 loc_run_progr_file_chk_prg_ext: ; 25/07/2022
@@ -7842,7 +7848,9 @@ loc_run_check_auto_path_again:
 	jnc	short loc_run_chk_filename_ext_again
 	;mov	word [Run_Auto_Path], 0FFFFh ; invalid
 	; 02/07/2025
-	mov	dword [Run_Auto_Path], 0FFFFFFFFh ; invalid
+	;mov	dword [Run_Auto_Path], 0FFFFFFFFh ; invalid
+	; 03/07/2025
+	dec	dword [Run_Auto_Path] ; -1 (invalid)
 loc_run_cap_failed: ; 25/07/2022
 	;jmp	loc_cmd_failed
 	; 30/08/2023
@@ -7959,6 +7967,24 @@ loc_run_auto_path_move_file_name:
 	;mov	esi, FindFile_Name
 	; 29/06/2025
 	mov	esi, Path_FileName
+	
+	; 03/07/2025
+	cmp	byte [Path_LongFlag], 0
+	jna	short loc_run_auto_path_move_fn_loop
+	mov	al, '"'	; the 1st double quote
+	stosb
+loc_run_auto_path_move_lfn_loop:
+	lodsb
+	or	al, al
+	jz	short loc_run_auto_path_move_lfn_ok
+	stosb
+	jmp	short loc_run_auto_path_move_lfn_loop	
+
+loc_run_auto_path_move_lfn_ok:
+	mov	byte [edi], '"' ; the 2nd dbl quote
+	inc	edi
+	stosb	; al = 0
+	jmp	short loc_run_auto_path_ppn	
 
 loc_run_auto_path_move_fn_loop:
 	lodsb
@@ -7966,6 +7992,7 @@ loc_run_auto_path_move_fn_loop:
 	or	al, al
 	jnz	short loc_run_auto_path_move_fn_loop
 
+loc_run_auto_path_ppn:	; 03/07/2025
 	;mov	esi, TextBuffer
 	; 02/07/2025
 	mov	esi, RunPathBuffer
