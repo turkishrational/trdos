@@ -8063,8 +8063,7 @@ jmp_loc_run_find_executable_file_next: ; 02/07/2025
 	jmp	loc_run_find_executable_file_next
 
 jmp_loc_run_check_auto_path_again:
-	; 02/07/2025
-	;xor	al, al ; 0
+	xor	al, al ; 0
 	jmp	loc_run_check_auto_path_again
 
 loc_load_and_run_file:
