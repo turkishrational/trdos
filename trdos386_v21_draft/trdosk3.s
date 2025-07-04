@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/07/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 04/07/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -7477,6 +7477,7 @@ loc_mcfg_load_fs_file:
 	retn
 
 load_and_execute_file:
+	; 04/07/2025
 	; 03/07/2025
 	; 02/07/2025
 	; 01/07/2025
@@ -7867,10 +7868,10 @@ loc_run_chk_filename_ext_again:
 	dec	ecx ; without zero tail
 	; 02/07/2025
 	mov 	[Run_Path_Length], ecx
+loc_run_chk_filename_ext_again_@:
 	;mov	ax, [EXE_ID]
 	;cmp	ah, '.'
 	;je	short loc_run_chk_auto_path_pos
-loc_run_chk_filename_ext_again_@:
 	; 02/07/2025
 	cmp	byte [Path_LongFlag], 0
 	ja	short loc_run_chk_auto_path_pos
@@ -8049,6 +8050,8 @@ loc_run_chg_prompt_dir_str_again:
 	call	change_prompt_dir_string
 
 loc_load_executable_cdir_chk_again:
+; 04/07/2025
+%if 0
 	; 02/07/2025
 	mov	al, [Current_Drv]
 	cmp	al, [RUN_CDRV]
@@ -8065,6 +8068,11 @@ jmp_loc_run_find_executable_file_next: ; 02/07/2025
 jmp_loc_run_check_auto_path_again:
 	xor	al, al ; 0
 	jmp	loc_run_check_auto_path_again
+%else
+	; 04/07/2025
+jmp_loc_run_find_executable_file_next:
+	jmp	loc_run_find_executable_file_next
+%endif
 
 loc_load_and_run_file:
 	; 01/07/2025
