@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 04/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -44,7 +44,10 @@ Remark:		resb 78
 
 CommandBuffer: 	resb 80
 
-TextBuffer:	resb 256
+;TextBuffer:	;resb 256
+; 04/07/2025
+TextBuffer:	resb 128
+RunPathBuffer:	resb 128
 
 MasterBootBuff:
 MasterBootCode: resb 1BEh

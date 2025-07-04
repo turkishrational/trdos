@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/07/2025  (Previous: 26/09/2024, TRDOS 386 v2.0.9)
+; Last Update: 04/07/2025  (Previous: 26/09/2024, TRDOS 386 v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -70,7 +70,7 @@ loc_ccdrv_dos_drive_name_check_ok:
 	ja	short loc_gmcs_init_drv_hd
 
 loc_gmcs_init_drv_fd:
-	or	ah, ah 
+	or	ah, ah
 	; AH = 1 is initialization sign (invalid_fd_parameter)
 	jnz	short loc_ccdrv_call_fd_init
 
@@ -118,10 +118,10 @@ loc_ccdrv_get_FAT_volume_name_0:
 	or	al, al
 	jz	short loc_change_current_drv2
 
-	push	esi 
+	push	esi
 	cmp	al, 2
 	ja	short loc_ccdrv_get_FAT32_vol_name
-             
+
 loc_ccdrv_get_FAT2_16_vol_name:
 	add	esi, LD_BPB + VolumeLabel
 	jmp	short loc_ccdrv_get_FAT_volume_name_1
@@ -176,7 +176,7 @@ restore_current_directory:
 	mov	al, [esi+LD_FATType]
 	mov	[Current_FATType], al
 
-	mov	ah, [esi+LD_Name] 
+	mov	ah, [esi+LD_Name]
 	mov	[Current_Dir_Drv], ah
 
 	and	al, al
@@ -206,7 +206,7 @@ loc_ccdrv_reset_cdir_FAT_12_16_32_fcluster:
 loc_ccdrv_reset_cdir_FAT32_fcluster:
 	mov	eax, [esi+LD_BPB+FAT32_RootFClust]
 	jmp	short loc_ccdrv_check_rootdir_sign
-loc_ccdrv_reset_cdir_FAT_12_16_fcluster:   
+loc_ccdrv_reset_cdir_FAT_12_16_fcluster:
 	;xor	al, al  ; xor eax, eax
 	; 26/07/2022
 	xor	eax, eax
@@ -228,9 +228,9 @@ loc_ccdrv_reset_cdir_FAT_fcluster:
 	rep	movsd
 
 	call	change_prompt_dir_string
-	
+
 	mov	esi, edx
-	
+
         sub	eax, eax
        ;sub	edx, edx
 	mov	edi, Current_Dir_Drv
@@ -277,7 +277,7 @@ loc_prompt_current_directory:
 pass_prompt_current_directory:
 	mov	byte [edi], '>'
 	inc	edi
-	mov	byte [edi], 0  
+	mov	byte [edi], 0
 	mov	esi, TextBuffer
 	call	print_msg
 
@@ -679,12 +679,12 @@ loc_set_date_stc_4:
 loc_set_date_bs_4:
 	call	write_backspace
 	jmp	short loc_enter_month_1
-	
+
 pass_set_date_separator_1:
 	; 13/05/2016
 	;mov	bx, 7 ; attribute/color (bl)
 		      ; video page 0 (bh)
-	mov	bl, 7	
+	mov	bl, 7
 	call	_write_tty
 loc_enter_month_1:
 	xor     ah, ah ; 0
@@ -732,7 +732,7 @@ pass_set_month_12:
 	; 13/05/2016
 	;mov	bx, 7 ; attribute/color (bl)
 		      ; video page 0 (bh)
-	mov	bl, 7	
+	mov	bl, 7
 	call	_write_tty
 loc_enter_separator_2:
 	sub     ah, ah
@@ -929,7 +929,7 @@ write_backspace:
 	mov	bx, 7 ; bl = attribute/color
 		      ; bh = video page = 0
 	call	_write_tty
-	mov	al, 20h ; BLANK/SPACE char 
+	mov	al, 20h ; BLANK/SPACE char
 	;mov	bx, 7 ; attribute/color
 	;call	_write_c_current
 	;retn
@@ -955,7 +955,7 @@ show_time:
 	;mov	ah, 02h
 	;call	int1Ah
 	call	RTC_20	; GET RTC TIME
-	
+
 	mov	al, ch
 	call	bcd_to_ascii
 	mov	[Hour], ax
@@ -1343,7 +1343,7 @@ loc_set_time_progress:
 	shl	al, 4 ; * 16
 	mov	dh, al
 	add	dh, ah
-	
+
 	;mov	ah, 03h
 	;call	int1Ah
 	call	RTC_30	; SET RTC TIME
@@ -1409,7 +1409,7 @@ loc_vol_size_in_kbytes:
 	xor	edx, edx ; 0
 loc_write_vol_size_str:
 	mov	[VolSize_Unit1], ecx
-	; 
+	;
 	mov	edi, Vol_Tot_Sec_Str_End
         ;mov	byte [edi], 0
 	mov	ecx, 10
@@ -1621,7 +1621,7 @@ loc_gvsn_start:
 loc_gvsn_fat:
 	add	esi, LD_BPB + VolumeID
 	jmp	short loc_gvsn_return
-loc_gvsn_fat32: 
+loc_gvsn_fat32:
 	add	esi, LD_BPB + FAT32_VolID
 	jmp	short loc_gvsn_return 
 loc_gvsn_fs:
@@ -1650,10 +1650,10 @@ command_interpreter:
 	; 29/01/2016 (TRDOS 386 = TRDOS 2.0)
 	; 15/09/2011
 	; 29/01/2005
-        
+
 	; Input: ecx = command word length (CL)
 	;	 CommandBuffer = Command string offset
- 
+
 	mov	byte [Program_Exit], 0
 
 	;cmp	cl, 4
@@ -1686,7 +1686,7 @@ cmp_cmd_cls:
 cmp_cmd_ver:
 	mov	cl, 3
 	mov	edi, Cmd_Ver
-	call	cmp_cmd	
+	call	cmp_cmd
 	jc	short cmp_cmd_mem
 
 	mov	esi, mainprog_Version
@@ -1697,7 +1697,7 @@ cmp_cmd_ver:
 cmp_cmd_mem:
 	mov	cl, 3
 	mov	edi, Cmd_Mem
-	call	cmp_cmd	
+	call	cmp_cmd
 	;jnc	memory_info
 	; 26/07/2022
 	jc	short cmp_cmd_del
@@ -1706,7 +1706,7 @@ cmp_cmd_mem:
 cmp_cmd_del:
 	mov	cl, 3
 	mov	edi, Cmd_Del
-	call	cmp_cmd	
+	call	cmp_cmd
         ;jnc	delete_file
 	; 26/07/2022
 	jc	short cmp_cmd_set
@@ -1715,7 +1715,7 @@ cmp_cmd_del:
 cmp_cmd_set:
 	mov	cl, 3
 	mov	edi, Cmd_Set
-	call	cmp_cmd	
+	call	cmp_cmd
 	;jnc	set_get_env
 	; 26/07/2022
 	jc	short cmp_cmd_run
@@ -1731,7 +1731,7 @@ c_4:
 cmp_cmd_run:
 	mov	cl, 3
 	mov	edi, Cmd_Run
-	call	cmp_cmd	
+	call	cmp_cmd
 	; 07/05/2016
         ;jc	cmp_cmd_external
 	; 26/07/2022
@@ -1744,7 +1744,7 @@ cmp_cmd_4:
 	; 26/07/2022
 cmp_cmd_exit:
 	mov	edi, Cmd_Exit
-	call	cmp_cmd	
+	call	cmp_cmd
 	jc	short cmp_cmd_date
 
         mov     byte [Program_Exit], 1
@@ -1753,7 +1753,7 @@ cmp_cmd_exit:
 cmp_cmd_date:
 	mov	cl, 4
 	mov	edi, Cmd_Date
-	call	cmp_cmd	
+	call	cmp_cmd
         jc	short cmp_cmd_time
 	
 	call	show_date
@@ -1765,7 +1765,7 @@ cmp_cmd_date:
 cmp_cmd_time:
 	mov	cl, 4
 	mov	edi, Cmd_Time
-   	call	cmp_cmd	
+   	call	cmp_cmd
 	jc	short cmp_cmd_show
 
 	call	show_time
@@ -1777,7 +1777,7 @@ cmp_cmd_time:
 cmp_cmd_show:
 	mov	cl, 4
 	mov	edi, Cmd_Show
-   	call	cmp_cmd	
+   	call	cmp_cmd
         ;jnc	show_file
 	; 26/07/2022
 	jc	short cmp_cmd_echo
@@ -1786,9 +1786,9 @@ cmp_cmd_show:
 cmp_cmd_echo:
 	mov	cl, 4
 	mov	edi, Cmd_Echo
-   	call	cmp_cmd	
+   	call	cmp_cmd
 	jc	short cmp_cmd_copy
-	
+
 	; 22/11/2017
 	; AL = 0
 	cmp	byte [esi], 20h
@@ -1817,7 +1817,7 @@ cmd_echo_nextline:
 cmp_cmd_copy:
 	mov	cl, 4
 	mov	edi, Cmd_Copy
-   	call	cmp_cmd	
+   	call	cmp_cmd
 	;jnc	copy_file
 	; 26/07/2022
 	jc	short cmp_cmd_move
@@ -1826,7 +1826,7 @@ cmp_cmd_copy:
 cmp_cmd_move:
 	mov	cl, 4
 	mov	edi, Cmd_Move
-   	call	cmp_cmd	
+   	call	cmp_cmd
 	;jnc	move_file
 	; 26/07/2022
 	jc	short cmp_cmd_path
@@ -1835,7 +1835,7 @@ cmp_cmd_move:
 cmp_cmd_path:
 	mov	cl, 4
 	mov	edi, Cmd_Path
-   	call	cmp_cmd	
+   	call	cmp_cmd
 	;jnc	set_get_path
 	; 26/07/2022
 	jc	short cmp_cmd_beep
@@ -1941,7 +1941,7 @@ cd_1:	; change current directory
 			; 0CDh sign is for saving cdir into
 			; DOS drv description table cdir area
 
-	mov	ah, 0CDh ; mov byte [CD_COMMAND], 0CDh 
+	mov	ah, 0CDh ; mov byte [CD_COMMAND], 0CDh
 
 	call	change_current_directory
 	;jnc	change_prompt_dir_string
@@ -1999,7 +1999,7 @@ cd_failed:
 cd_3:
         cmp     al, [Last_DOS_DiskNo]
         ja	short cd_drive_not_ready
-	
+
 	mov	dl, al
 	call 	change_current_drive
 	jc	short cd_drive_not_ready
@@ -2032,7 +2032,7 @@ cmp_cmd_mkdir:
 cmp_cmd_rmdir:
 	mov	cl, 5
 	mov	edi, Cmd_Rmdir
-	call	cmp_cmd	
+	call	cmp_cmd
 	;jnc	delete_directory
 	; 26/07/2022
 	jc	short cmp_cmd_chdir
@@ -2041,7 +2041,7 @@ cmp_cmd_rmdir:
 cmp_cmd_chdir:
 	mov	cl, 5
 	mov	edi, Cmd_Chdir
-	call	cmp_cmd	
+	call	cmp_cmd
 	;jc	cmp_cmd_external
 	; 26/07/2022
 	jc	short cmd_ext
@@ -2059,7 +2059,7 @@ c_6:
 cmd_6:
 cmp_cmd_prompt:
 	mov	edi, Cmd_Prompt
-	call	cmp_cmd	
+	call	cmp_cmd
         jc	short cmp_cmd_volume
 get_prompt_name_fchar:
 	lodsb
@@ -2069,7 +2069,7 @@ get_prompt_name_fchar:
 default_command_prompt: ; 31/12/2017 ('sysprompt')
 	mov	esi, TRDOSPromptLabel
 	mov	dword [esi], "TRDO"
-       	mov	word [esi+4], "S" 
+       	mov	word [esi+4], "S"
 loc_cmd_prompt_return:
 	retn
 
@@ -2094,7 +2094,7 @@ pass_put_new_prompt_label:
 cmp_cmd_volume:
 	mov	cl, 6
 	mov	edi, Cmd_Volume
-	call	cmp_cmd	
+	call	cmp_cmd
         jc	short cmp_cmd_attrib
 
 cmd_vol1:
@@ -2157,7 +2157,7 @@ cmd_vol4:
 cmp_cmd_attrib:
 	mov	cl, 6
 	mov	edi, Cmd_Attrib
-	call	cmp_cmd	
+	call	cmp_cmd
 	;jnc	set_file_attributes
 	; 26/07/2022
 	jc	short cmp_cmd_rename
@@ -2166,7 +2166,7 @@ cmp_cmd_attrib:
 cmp_cmd_rename:
 	mov	cl, 6
 	mov	edi, Cmd_Rename
-	call	cmp_cmd	
+	call	cmp_cmd
 	;jnc	rename_file
 	; 26/07/2022
 	jc	short cmp_cmd_device
@@ -2175,7 +2175,7 @@ cmp_cmd_rename:
 cmp_cmd_device:
 	mov	cl, 6
 	mov	edi, Cmd_Device
-	call	cmp_cmd	
+	call	cmp_cmd
 	jc	short cmp_cmd_external
 	; 26/07/2022
 cmd_vol5:
@@ -2185,7 +2185,7 @@ cmd_dev:
 c_7:
 cmp_cmd_devlist:
 	mov	edi, Cmd_DevList
-	call	cmp_cmd	
+	call	cmp_cmd
         jc	short cmp_cmd_external
 
 loc_cmd_return:
@@ -2198,7 +2198,7 @@ c_8:
 
 cmp_cmd_longname:
 	mov	edi, Cmd_LongName
-	call	cmp_cmd	
+	call	cmp_cmd
 	;jnc	get_and_print_longname
 	; 26/07/2022
 	jc	short cmp_cmd_external
@@ -2307,7 +2307,7 @@ loc_run_misc_error:
 	; AL = Error code
 	call	bytetohex
         mov     [error_code_hex], ax
-	
+
 	mov	esi, Msg_Error_Code 
 	;call	print_msg 
 	;retn
@@ -2342,7 +2342,7 @@ print_directory_list:
 	; 27/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 10/02/2016
 	; 08/02/2016 (TRDOS 386 = TRDOS v2.0)
-	; 06/12/2009 ('cmp_cmd_dir')	
+	; 06/12/2009 ('cmp_cmd_dir')
 	;
 	mov	word [AttributesMask], 0800h ; ..except volume names..
 	mov	al, [Current_Drv]
@@ -2534,7 +2534,7 @@ print_directory:
 	; 08/02/2016 (TRDOS 386 = TRDOS v2.0)
 	; 30/10/2010 ('proc_print_directory')
 	; 19/09/2009
-	; 2005 
+	; 2005
 	; INPUT ->
 	;	ESI = Asciiz File/Dir Name Address
 
@@ -2550,7 +2550,7 @@ print_directory:
 
 	xor	ecx, ecx
 	mov     ch, [Current_Drv] ; DirBuff_Drv - 'A'
-	mov     al, [Current_Dir_Drv] 
+	mov     al, [Current_Dir_Drv]
 	mov     [Dir_Drive_Name], al
 	mov	esi, Logical_DOSDisks
 	add	esi, ecx
@@ -2567,7 +2567,7 @@ print_directory:
 print_dir_strlen_check:
 	mov	esi, Current_Dir_Root
 	mov	edi, Dir_Str_Root
-	
+
 	;xor	ecx, ecx
         mov     cl, [Current_Dir_StrLen]
 	inc	cl
@@ -2575,11 +2575,11 @@ print_dir_strlen_check:
 	jna	short pass_print_dir_strlen_shorting
 	inc	esi
 	add	esi, ecx
-	sub	esi, 64 
+	sub	esi, 64
 	inc	edi
 	mov	eax, '... '
 	stosd
- 
+
 pass_print_dir_strlen_shorting:
 	rep	movsb
 
@@ -2591,7 +2591,7 @@ pass_print_dir_strlen_shorting:
 
 	mov	esi, Dir_Str_Header
 	call	print_msg
-	
+
 	mov	esi, next2line
 	call	print_msg
 
@@ -2605,7 +2605,7 @@ loc_print_dir_first_file:
 	; 27/07/2022
 	jnc	short loc_dfname_use_this
 	jmp	loc_dir_ok
-	 
+
 loc_dfname_use_this:
 	; bl =	File Attributes (bh = Long Name Entry Length)
 	test	bl, 10h  ; Is it a directory?
@@ -2861,7 +2861,7 @@ rediv_tfs_hex:
 	mov     [edi], dl
 	and	eax, eax
 	jnz	short rediv_tfs_hex
-	
+
 	mov	[TFS_Dec_Begin], edi
 	mov	esi, Decimal_File_Count_Header
 	call	print_msg
@@ -2918,12 +2918,12 @@ find_first_file:
 	xor	ecx, ecx
 	mov	cl, 11
 	rep	stosd	; 44 bytes
-	;stosw		; +2 bytes 
+	;stosw		; +2 bytes
 
 	mov	edi, FindFile_Name ; FFF structure, offset 66
 	cmp	esi, edi
 	je	short loc_fff_mfn_ok
-	mov	edx, edi 
+	mov	edx, edi
 	; move 13 bytes
 	movsd
 	movsd
@@ -2937,7 +2937,7 @@ loc_fff_mfn_ok:
 
 	mov	ax, [FindFile_AttributesMask]
 	;xor	ecx, ecx
-	xor	cl, cl  
+	xor	cl, cl
 	call	locate_current_dir_file
 	jc	short loc_fff_retn
 	; EDI = Directory Entry
@@ -2952,7 +2952,7 @@ loc_fff_fnf_ln_check:
 
 loc_fff_longname_yes:
 	;inc	byte [FindFile_LongNameYes]
-	mov	cl, [LFN_EntryLength]  
+	mov	cl, [LFN_EntryLength]
 	mov	[FindFile_LongNameEntryLength], cl ; FindFile_LongNameYes
 
 loc_fff_longname_no:
@@ -2963,7 +2963,7 @@ loc_fff_longname_no:
 	mov	edx, eax
 
 	mov	al, [Current_Drv]
-	mov	[FindFile_Drv], al 
+	mov	[FindFile_Drv], al
 
 	mov	eax, [Current_Dir_FCluster]
 	mov	[FindFile_DirFirstCluster], eax
@@ -3188,7 +3188,7 @@ loc_show_check_filename_exists:
 	jna	short show_file_err1
 
 	; 15/02/2016 (invalid file name check)
-	call	check_filename 	
+	call	check_filename
 	jnc	short loc_show_change_drv
 
 	mov	esi, Msg_invalid_name_chars
@@ -3387,7 +3387,7 @@ pass_show_file:
 	mov	esi, nextline
 	call	print_msg
 	jmp	loc_file_rw_restore_retn
-	 
+
 loc_show_check_fat_cluster_size:
 	; 17/02/2016
 	cmp	bx, [Show_ClusterSize] ; cluster size in bytes
@@ -3462,7 +3462,7 @@ check_filename:
 	;	     AL = ERR_INV_FILE_NAME (=26)
 	;		  Invalid file name chars
 	;	cf = 0 -> valid file name
-	; 
+	;
 	; (EAX, ECX, EDI will be changed)
 
 check_invalid_filename_chars:
@@ -3478,9 +3478,9 @@ check_invalid_filename_chars:
 	; OUTPUT ->
 	;	cf = 1 -> invalid
 	;	cf = 0 -> valid
-	; 
+	;
 	;(EAX, ECX, EDI will be changed)
-  
+
 	push	esi
 
         mov     edi, invalid_fname_chars
@@ -3489,11 +3489,11 @@ check_filename_next_char:
 	mov	ecx, sizeInvFnChars
 	mov	edi, invalid_fname_chars
 loc_scan_invalid_filename_char:
-	scasb 
+	scasb
 	je	short loc_invalid_filename_stc
 	loop	loc_scan_invalid_filename_char
 	lodsb
-	cmp	al, 1Fh  ; 20h and above 
+	cmp	al, 1Fh  ; 20h and above
 	ja	short check_filename_next_char
 
 check_filename_dot:
@@ -3567,7 +3567,7 @@ loc_file_rw_restore_retn:
 	; 15/02/2016 (TRDOS 386 = TRDOS v2.0)
 	; 28/02/2010 (CMD_INTR.ASM)
 loc_file_rw_cmd_failed:
-	pushf 
+	pushf
 	call	restore_cdir_after_cmd_fail
 	popf
 	jc	short loc_file_rw_check_write_fault
@@ -3631,7 +3631,7 @@ loc_mkdir_check_dirname_exists:
 loc_mkdir_drv:
 	mov	dh, [Current_Drv]
 	mov	[RUN_CDRV], dh
-	
+
 	mov	dl, [FindFile_Drv]
 	cmp	dl, dh
 	je	short loc_mkdir_change_directory
@@ -4061,7 +4061,7 @@ loc_rmdir_delete_fs_directory:
 	;jz	loc_rmdir_directory_not_empty_2
 	;;stc
 	;;jmp	loc_file_rw_cmd_failed
-	
+
 loc_delete_sub_dir_retn:
 	retn
 
@@ -4106,12 +4106,12 @@ loc_rmdir_dot_entry_check:
 loc_rmdir_dotdot_entry_check:
 	cmp	word [edi+1], '. '
 pass_rmdir_dot_entry_check:
-	jne	short loc_rmdir_directory_not_empty_1 
+	jne	short loc_rmdir_directory_not_empty_1
 	inc	bl
-	jmp	short loc_rmdir_find_last_dir_entry_next 
+	jmp	short loc_rmdir_find_last_dir_entry_next
 
 loc_rmdir_directory_not_empty_1:
-	pop	eax ; pushed esi 
+	pop	eax ; pushed esi
 	xor	eax, eax ; 0
 loc_rmdir_directory_not_empty_2:
 loc_delete_sub_dir_stc_retn:
@@ -4133,10 +4133,10 @@ loc_rmdir_set_prev_cluster_dir_last_cluster:
 
 	; 01/03/2016
 	;cmp	eax, 1  ; eax = 0 -> end of cluster chain
-	;cmc 
+	;cmc
 	;jc	short loc_rmdir_cmd_failed
 	;jmp	short loc_rmdir_save_fat_buffer
-	; 29/12/2017 
+	; 29/12/2017
 	and	eax, eax
 	jnz	short loc_delete_sub_dir_stc_retn
 	jmp	short loc_rmdir_save_fat_buffer
@@ -4469,7 +4469,7 @@ loc_sfa_1:
 	cmp	al, '+'
 	;jne	loc_cmd_failed
 	je	short loc_attr_space
-loc_sfa_2: 
+loc_sfa_2:
 	jmp	loc_cmd_failed
 loc_attr_space:
 	mov	ah, [esi+1]
@@ -4669,7 +4669,7 @@ loc_attr_file_ambgfn_check:
 	;	(Note: It was BX in TRDOS v1)
 	;;jz	short loc_attr_file_found
 	;jnz	loc_file_not_found ; 06/03/2016
-	; 28/07/2022 
+	; 28/07/2022
 	jz	short loc_attr_file_found
 	jmp	loc_file_not_found
 
@@ -4679,7 +4679,7 @@ loc_attr_file_ambgfn_check:
 
 loc_attr_file_found:
 	; EDI = Directory buffer entry offset/address
-	; BL = File (or Directory) Attributes 
+	; BL = File (or Directory) Attributes
 	;	(Note: It was 'CL' in TRDOS v1)
 	; mov	bl, [EDI+0Bh]
 
@@ -4705,7 +4705,7 @@ loc_attr_file_change_attributes:
 	; TRDOS v1 has a bug here! it does not set
 	; 'DirBuff_ValidData' to 2; as result of this bug,
 	; 'save_directory_buffer' would not save the new attributes !
-	
+
 	mov	byte [DirBuff_ValidData], 2
 
 	call 	save_directory_buffer
@@ -4714,7 +4714,7 @@ loc_attr_file_change_attributes:
 	; 28/07/2022
 	jnc	short loc_print_attr_changed_message
 loc_sfa_5:
-	jmp	loc_file_rw_cmd_failed 
+	jmp	loc_file_rw_cmd_failed
 
 loc_attr_file_fs_check:
 	sub	eax, eax
@@ -4782,7 +4782,7 @@ rename_scan_destination_file_1:
 	mov	byte [esi], 0
 
 rename_scan_destination_file_2:
-	inc	esi  
+	inc	esi
 	cmp	byte [esi], 20h
 	je	short rename_scan_destination_file_2
 	;;jb	short loc_rename_nofilename_retn
@@ -4876,7 +4876,7 @@ loc_rename_sf_ambgfn_check:
 
 loc_rename_sf_found:
 	; EDI = Directory buffer entry offset/address
-	; BL = File (or Directory) Attributes 
+	; BL = File (or Directory) Attributes
 	;	(Note: It was 'CL' in TRDOS v1)
 	; mov	bl, [EDI+0Bh]
 
@@ -5143,7 +5143,7 @@ move_scan_destination_2:
 	mov	[DestinationFilePath], esi
 
 move_scan_destination_3:
-	inc	esi  
+	inc	esi
 	cmp	byte [esi], 20h
 	ja	short move_scan_destination_3
 	mov	byte [esi], 0
@@ -5555,7 +5555,7 @@ set_get_env:
 	; 25/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 11/04/2016 (TRDOS 386 = TRDOS v2.0)
 	; 02/09/2011 (TRDOS v1, CMD_INTR.ASM, 'cmp_cmd_set')
-	; 2005 - 28/08/2011 
+	; 2005 - 28/08/2011
 get_setenv_fchar:
 	; esi = environment variable/string
 	mov	al, [esi]
@@ -5776,8 +5776,8 @@ get_env_string_seq_number_ok:
 get_env_string_stc_retn:
 	pop	esi ; **
 	pop	ecx ; *
-	retn   
-	
+	retn
+
 get_env_string_seq_number_next:
 	lodsb
 	or	al, al
@@ -6234,7 +6234,7 @@ set_env_change_variable_calc3:
 	inc	edx ; length of ASCIIZ string (after the '=')
 
 	jmp	short set_env_change_variable_calc3
-	
+
 set_env_change_variable_calc4:
 	mov	byte [esi-1], 0  ; put ZERO instead of CR
 
@@ -6271,7 +6271,7 @@ set_env_change_variable_calc5:
 	mov	esi, edi
 
 set_env_change_variable_calc6:
-	lodsb 
+	lodsb
 	and	al, al
 	jnz	short set_env_change_variable_calc6
 
@@ -6459,7 +6459,7 @@ set_env_change_variable_calc21:
 
 	mov	eax, ecx ; old variable's address (after '=')
 
-	mov	ecx, esi 
+	mov	ecx, esi
 	sub	ecx, edi ; count of bytes to move backward
 
 	mov	esi, edi ; next variable's address
@@ -6781,6 +6781,7 @@ loc_mcfg_load_fs_file:
 	retn
 
 load_and_execute_file:
+	; 04/07/2025
 	; 03/07/2025 - TRDOS 386 Kernel v2.0.10
 	; 03/09/2024 - TRDOS 386 Kernel v2.0.9
 	; 30/08/2023 - TRDOS 386 Kernel v2.0.6
@@ -6799,7 +6800,7 @@ load_and_execute_file:
 	; OUTPUT ->
 	;	none (error message will be shown if an error will occur)
 	;
-	; (EAX, EBX, ECX, EDX, ESI, EDI, EBP will be changed) 
+	; (EAX, EBX, ECX, EDX, ESI, EDI, EBP will be changed)
 	;
 loc_run_check_filename:
 	cmp	byte [esi], 20h
@@ -6911,7 +6912,7 @@ loc_run_find_program_file_next:
 	jc	short loc_run_program_file_not_found
 	jmp	loc_load_and_run_file
 
-loc_run_program_file_not_found:	 
+loc_run_program_file_not_found:
 	cmp	al, 2 ; file not found
 	;jne	loc_run_cmd_failed
 	; 25/07/2022
@@ -6957,7 +6958,7 @@ loc_run_check_auto_path:
 
 loc_run_check_auto_path_again:
 	;cmp	word [Run_Auto_Path], 0FFFFh
-	;	; 0FFFFh = Not a valid run path (in ENV block) 
+	;	; 0FFFFh = Not a valid run path (in ENV block)
 	;;jnb	loc_cmd_failed
 	;; 25/07/2022
 	;jnb	short loc_run_cap_failed
@@ -6999,18 +7000,29 @@ loc_run_chk_filename_ext_again:
 	; 03/07/2025
 	mov 	[Run_Path_Length], ecx
 loc_run_chk_filename_ext_again_@:
-	mov	ax, [EXE_ID]
-	cmp	ah, '.'
-	je	short loc_run_chk_auto_path_pos
+	; 04/07/2025
+	;mov	ax, [EXE_ID]
+	;cmp	ah, '.'
+	;je	short loc_run_chk_auto_path_pos
 
 loc_run_change_file_ext_to_noext_again:
-	movzx	ebx, ah
+	; 04/07/2025
+	;movzx	ebx, ah
 	mov	esi, FindFile_Name
-	add 	ebx, esi
-	sub	eax, eax
-	;mov	[ebx], eax ; 0 ; erase extension (.PRG)
-	; 03/07/2025
-	mov	[ebx], al ; 0
+	;add 	ebx, esi
+	xor	eax, eax
+loc_run_change_file_ext_to_noext_@:
+	inc	esi
+	inc	ah
+	;cmp	al, '.'
+	cmp	byte [esi], '.'
+	jne	short loc_run_change_file_ext_to_noext_@
+	mov	[EXE_ID], ax
+		; al = 0, ah = file name length
+	;sub	eax, eax
+	;;mov	[ebx], eax ; 0 ; erase extension (.PRG)
+	;mov	[esi], eax ; 0
+	mov	[esi], al ; 0
 
 loc_run_chk_auto_path_pos:
 	;;movzx	eax, word [Run_Auto_Path]
@@ -7030,6 +7042,8 @@ loc_run_chk_auto_path_pos:
 
 loc_run_auto_path_pos_move:
 	mov	esi, edi ; offset TextBuffer
+	; 04/07/2025
+	mov	edi, RunPathBuffer
 	add	esi, eax
 
 loc_run_auto_path_pos_space_loop:
@@ -7054,7 +7068,7 @@ loc_run_auto_path_pos_move_next:
 	; 03/09/2024
 	jnb	short loc_run_auto_path_pos_move_next_@
 
-loc_byte_ptr_end_of_path: 
+loc_byte_ptr_end_of_path:
 	mov	word [Run_Auto_Path], 0FFFFh ; end of path
 	; 03/07/2025
 	mov	dword [Run_Auto_Path], 0FFFFFFFFh
@@ -7076,7 +7090,7 @@ loc_run_auto_path_move_ok:
 	mov	[edi], al
 
 loc_run_auto_path_move_file_name:
-	inc	edi   
+	inc	edi
 	mov	esi, FindFile_Name
 
 loc_run_auto_path_move_fn_loop:
@@ -7085,7 +7099,9 @@ loc_run_auto_path_move_fn_loop:
 	or	al, al
 	jnz	short loc_run_auto_path_move_fn_loop
 
-	mov	esi, TextBuffer
+	;mov	esi, TextBuffer
+	; 04/07/2025
+	mov	esi, RunPathBuffer
 	mov	edi, FindFile_Drv
 	call	parse_path_name
 	;jc	loc_run_cmd_failed
@@ -7132,6 +7148,8 @@ loc_run_chg_prompt_dir_str_again:
 	call	change_prompt_dir_string
 
 loc_load_executable_cdir_chk_again:
+; 04/07/2025
+%if 0
 	; 03/07/2025
 	mov	al, [Current_Drv]
 	cmp	al, [RUN_CDRV]
@@ -7142,11 +7160,17 @@ loc_load_executable_cdir_chk_again:
 	;jne	loc_run_find_executable_file_next
 	; 30/08/2023
 	je	short jmp_loc_run_check_auto_path_again
+
 jmp_loc_run_find_executable_file_next: ; 03/07/2025
 	jmp	loc_run_find_executable_file_next
 jmp_loc_run_check_auto_path_again:
 	xor	al, al ; 0
 	jmp	loc_run_check_auto_path_again
+%else
+	; 04/07/2025
+jmp_loc_run_find_executable_file_next:
+	jmp	loc_run_find_executable_file_next
+%endif
 
 loc_load_and_run_file:
 	; 25/07/2022 - TRDOS 386 Kernel v2.0.5
@@ -7210,7 +7234,7 @@ loc_load_and_run_file_5:
 	stosb
 	inc	dword [u.nread]
 	loop	loc_load_and_run_file_2
-			
+
 loc_load_and_run_file_6:
 	xor	al, al ; 0
 	stosb
@@ -7248,7 +7272,7 @@ check_prg_filename_ext:
 	;	ESI = Last char + 1 position
 	;     cf = 1 -> Invalid executable file name
 	;	or no file name extension if AH<=8
-	;	AL = Last file name char     
+	;	AL = Last file name char
 	;     cf = 0 -> AL='P' (PRG), AL=0 (no extension)
 	;
 	; (Modified registers: EAX, ESI)
@@ -7257,7 +7281,7 @@ check_prg_filename_ext:
 loc_run_check_filename_ext:
 	lodsb
 	cmp	al, 21h
-	jb	short loc_check_exe_fn_retn 
+	jb	short loc_check_exe_fn_retn
 	inc	ah
 	cmp	al, '.'
 	jne	short loc_run_check_filename_ext
