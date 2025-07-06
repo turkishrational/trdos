@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 02/07/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 06/07/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2638,13 +2638,18 @@ pass_ppn_change_drive:
 	; 27/06/2025
 	; edi = Path_Directory (255+NUL bytes)
 
-	mov	al, [esi]
+	;mov	al, [esi]
 	; 28/06/2025
 	mov	ah, 21h
+loc_scan_ppn_dslash_lfn:
+	; 06/07/2025
+	mov	al, [esi]
 	cmp	al, '"'
-	jne	short loc_scan_ppn_dslash
+	;jne	short loc_scan_ppn_dslash
+	; 06/07/2025
+	jne	short loc_scan_ppn_dslash_@
 	mov	ah, 20h
-	;dec	ah
+	;;dec	ah
 loc_scan_ppn_dslash:
 	cmp	al, '/'
   	jne	short loc_scan_next_slash_pos
@@ -2710,6 +2715,16 @@ loc_ppn_invalid_drive:
 	; MS-DOS Error Code 0Fh = Disk Drive Invalid
 	; (MainProg ErrMsg: "Drive not ready or read error!")
 	retn
+
+	; 06/07/2025
+loc_scan_ppn_dslash_@:
+	;;;;
+	cmp	al, '/'
+	jne	short loc_scan_next_slash_pos
+	mov	[Last_Slash_Pos], esi
+	inc	esi
+	jmp	loc_scan_ppn_dslash_lfn
+	;;;;
 %endif
 
 find_longname:

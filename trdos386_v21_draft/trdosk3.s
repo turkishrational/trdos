@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 04/07/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 06/07/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -6573,6 +6573,7 @@ get_env_string_compare_not_ok:
 	jmp	short get_env_string_stc_retn1
 
 set_environment_string:
+	; 06/07/2025 - TRDOS 386 Kernel v2.0.10
 	; 25/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 13/04/2016
 	; 12/04/2016
@@ -6688,6 +6689,10 @@ set_env_chk_validation3:
 
 	; 12/04/2016
 set_env_chk_validation3n:
+	;;;; 06/07/2025 (long directory name)
+	cmp	al, '"' ; the 1st dbl quote
+	je	short set_env_chk_validation3l
+	;;;;
 	cmp	al, 'a'
 	jb	short set_env_chk_validation3c
 	cmp	al, 'z'
@@ -6699,10 +6704,21 @@ set_env_chk_validation3x:
 	lodsb
 	jmp	short set_env_chk_validation3n
 
+	; 06/07/2025
+set_env_chk_validation3l:
+	lodsb
+	cmp	al, 20h
+	jb	short set_env_chk_validation3s
+	cmp	al, '"' ; the 2nd dbl quote
+	je	short set_env_chk_validation3x
+	jmp	short set_env_chk_validation3l
+	
 set_env_chk_validation3c:
 	cmp	al, 20h
 	jnb	short set_env_chk_validation3x
 
+	; 06/07/2025
+set_env_chk_validation3s:
 	cmp	byte [edi], 0
 	ja	short set_env_chk_validation4
 
@@ -7477,6 +7493,7 @@ loc_mcfg_load_fs_file:
 	retn
 
 load_and_execute_file:
+	; 06/07/2025
 	; 04/07/2025
 	; 03/07/2025
 	; 02/07/2025
@@ -7934,6 +7951,9 @@ loc_run_auto_path_pos_move_next:
 	lodsb
 	cmp	al, ';'
 	je	short loc_run_auto_path_pos_move_last_byte
+
+; 06/07/2025
+%if 0
 	cmp	al, 20h
 	je	short loc_run_auto_path_pos_move_next
 	;jb	short loc_byte_ptr_end_of_path
@@ -7941,6 +7961,11 @@ loc_run_auto_path_pos_move_next:
 	;jmp	short loc_run_auto_path_pos_move_next
 	; 03/09/2024
 	jnb	short loc_run_auto_path_pos_move_next_@
+%else
+	; 06/07/2025
+	cmp	al, 20h
+	jnb	short loc_run_auto_path_pos_move_next_@
+%endif
 
 loc_byte_ptr_end_of_path:
 	;mov	word [Run_Auto_Path], 0FFFFh ; end of path
