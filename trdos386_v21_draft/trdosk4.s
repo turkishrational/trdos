@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 06/07/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 07/07/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2477,6 +2477,7 @@ loc_ppn_invalid_drive:
 %else
 	; 26/06/2025 - TRDOS 386 v2.0.10
 parse_path_name:
+	; 07/07/2025
 	; 06/07/2025
 	; 29/06/2025
 	; 28/06/2025
@@ -2640,29 +2641,39 @@ pass_ppn_change_drive:
 	; edi = Path_Directory (255+NUL bytes)
 
 	;mov	al, [esi]
+loc_scan_ppn_dslash_@:
 	; 28/06/2025
 	mov	ah, 21h
-loc_scan_ppn_dslash_lfn:
 	; 06/07/2025
 	mov	al, [esi]
 	cmp	al, '"'
-	;jne	short loc_scan_ppn_dslash
-	; 06/07/2025
-	jne	short loc_scan_ppn_dslash_@
+	jne	short loc_scan_ppn_dslash
+	; 07/07/2025
+	; long directory name
 	mov	ah, 20h
-	;;dec	ah
+	;dec	ah
+loc_scan_next_slash_pos_@:
+	inc	esi
+	mov	al, [esi]
 loc_scan_ppn_dslash:
 	cmp	al, '/'
   	jne	short loc_scan_next_slash_pos
 	mov	[Last_Slash_Pos], esi
-loc_scan_next_slash_pos:
 	inc	esi
-	mov	al, [esi]
+	; 07/07/2025
+	jmp	short loc_scan_ppn_dslash_@
+loc_scan_next_slash_pos:
+	; 07/07/2025
+	;inc	esi
+	;mov	al, [esi]
+	;
 	;cmp	al, 20h
 	;ja	short loc_scan_ppn_dslash
 	; 28/06/2025
 	cmp	al, ah ; 20h (long) or 21h
-	jnb	short loc_scan_ppn_dslash
+	;jnb	short loc_scan_ppn_dslash
+	; 07/07/2025
+	jnb	short loc_scan_next_slash_pos_@
 
 loc_scan_ppn_dslash_ok:
 	;cmp	dword [Last_Slash_Pos], 0
@@ -2716,16 +2727,6 @@ loc_ppn_invalid_drive:
 	; MS-DOS Error Code 0Fh = Disk Drive Invalid
 	; (MainProg ErrMsg: "Drive not ready or read error!")
 	retn
-
-	; 06/07/2025
-loc_scan_ppn_dslash_@:
-	;;;;
-	cmp	al, '/'
-	jne	short loc_scan_next_slash_pos
-	mov	[Last_Slash_Pos], esi
-	inc	esi
-	jmp	loc_scan_ppn_dslash_lfn
-	;;;;
 %endif
 
 find_longname:
@@ -11146,7 +11147,7 @@ gfsln_3:
 	mov	esi, FS_FDT_BUFFER+FDT.FileName
 	mov	edi, FS_FDT_BUFFER
 	;retn
-	
+
 	xor	eax, eax
 	; al = 0 -> Singlix FS
 

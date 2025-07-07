@@ -768,7 +768,7 @@ loc_set_date_stc_4:
 loc_set_date_bs_4:
 	call	write_backspace
 	jmp	short loc_enter_month_1
-	
+
 pass_set_date_separator_1:
 	; 13/05/2016
 	;mov	bx, 7 ; attribute/color (bl)
@@ -5401,7 +5401,7 @@ loc_attr_file_change_attributes:
 	; TRDOS v1 has a bug here! it does not set
 	; 'DirBuff_ValidData' to 2; as result of this bug,
 	; 'save_directory_buffer' would not save the new attributes !
-	
+
 	mov	byte [DirBuff_ValidData], 2
 
 	call 	save_directory_buffer
@@ -5489,7 +5489,7 @@ rename_scan_destination_file_2:
 	mov	[DestinationFilePath], esi
 
 rename_scan_destination_file_3:
-	inc	esi  
+	inc	esi
 	cmp	byte [esi], 20h
 	ja	short rename_scan_destination_file_3
 
@@ -7993,7 +7993,7 @@ loc_run_auto_path_move_file_name:
 	;mov	esi, FindFile_Name
 	; 29/06/2025
 	mov	esi, Path_FileName
-	
+
 	; 03/07/2025
 	cmp	byte [Path_LongFlag], 0
 	jna	short loc_run_auto_path_move_fn_loop
@@ -8277,8 +8277,3 @@ set_exec_arguments:
 delete_fs_directory:
 	xor	eax, eax
 	retn
-
-burasi1:
-	db '#1 ',0
-burasi2:
-	db '#2 ',0
