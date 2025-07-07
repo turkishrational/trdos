@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 06/07/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 07/07/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -7493,6 +7493,7 @@ loc_mcfg_load_fs_file:
 	retn
 
 load_and_execute_file:
+	; 07/07/2025
 	; 06/07/2025
 	; 04/07/2025
 	; 03/07/2025
@@ -7787,6 +7788,8 @@ loc_run_find_program_file_next:
 	;mov	bx, [edi+dir_entry.dir_fclus]
 	;mov	[FindFile_FirstCluster], ebx
 	;jmp	loc_load_and_run_file
+	; 07/07/2025
+	mov	esi, Path_FileName
 	; 01/07/2025
 	jmp	short loc_load_and_run_file_@
 
@@ -8112,7 +8115,6 @@ loc_load_and_run_file:
 	; 29/06/2025
 	;mov	esi, Path_FileName
 	mov	edi, TextBuffer
-
  	; 24/04/2016
 	xor	edx, edx
 	;mov	word [argc], dx ; 0
