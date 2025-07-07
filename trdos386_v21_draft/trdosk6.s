@@ -1734,12 +1734,12 @@ skip_truncate:
 
 sysmkdir_err:
 	; 1 = write, 2 = read & write, >2 = invalid
-        mov	eax, ERR_FILE_ACCESS  ; 11 ; 'permission denied !'
-        jmp	short sysopen_err
+	mov	eax, ERR_FILE_ACCESS  ; 11 ; 'permission denied !'
+	jmp	short sysopen_err
 
 syscreate_truncate_err:
 	mov	eax, ERR_DRV_WRITE ; 18 ; 'disk write error !'
-        jmp	short sysopen_err
+	jmp	short sysopen_err
 
 syscreat_inv_fname:  ; invalid file name chars
 	; 16/10/2016
@@ -1749,8 +1749,8 @@ syscreat_inv_fname:  ; invalid file name chars
 
 syscreat_1:
 	; Error code in EAX
-        cmp	al, 02h ; 'File not found' error
-        jne	short sysopen_err
+	cmp	al, 02h ; 'File not found' error
+	jne	short sysopen_err
 
 	test	cl, 10h ; Directory
 	;jnz	sysmkdir_2
@@ -1760,8 +1760,8 @@ syscreat_1:
 
 syscreat_2:
 	mov	esi, FindFile_Name
-        ;xor	edx, edx
-        xor	eax, eax ; File Size  = 0
+	;xor	edx, edx
+	xor	eax, eax ; File Size  = 0
 	xor	ebx, ebx
 	dec 	ebx ; FFFFFFFFh -> create empty file
 	            ;              (only for FAT fs)
@@ -1813,6 +1813,7 @@ syscreat_2:
 	jmp	short sysopen_2
 
 sysopen: ;<open file>
+	; 07/07/2025
 	; 29/06/2025 - TRDOS 386 v2.0.10
 	; 03/09/2024
 	; 19/08/2024 - TRDOS 386 v2.0.9
@@ -11783,6 +11784,7 @@ wdir: ; 29/04/2013
 		; rts r0
 
 sysexec:
+	; 07/07/2025 - TRDOS 386 v2.0.10
 	; 21/08/2024 - TRDOS 386 v2.0.9
 	; 23/07/2022 - TRDOS 386 v2.0.5
 	; 06/02/2022 - Retro UNIX 386 v1.2
@@ -12259,8 +12261,9 @@ sysexec_16:
 	mov	ecx, [u.nread]
 	add	[u.break], ecx
 sysexec_17:
-	mov	eax, [ii] ; first cluster
-	call	iclose
+	; 07/07/2025
+	;mov	eax, [ii] ; first cluster
+	;call	iclose
 	xor     eax, eax
 
 	; 21/08/2024
@@ -18304,10 +18307,10 @@ isintr:
 
 iget:
 	;retn
-iopen:
-	;retn
-iclose:
-	;retn
+;iopen:
+;	;retn
+;iclose:
+;	;retn
 sndc:
 	;retn
 access:

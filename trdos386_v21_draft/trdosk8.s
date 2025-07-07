@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 29/06/2025  (Previous: 29/12/2024)
+; Last Update: 07/07/2025  (Previous: 29/12/2024)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -894,6 +894,7 @@ wakeup:
 	retn
 
 set_working_path_x:
+	; 07/07/2025
 	; 29/06/2025 - TRDOS 386 Kernel v2.0.10
 	; 17/10/2016 (TRDOS 386 - FFF & FNF)
 	;mov	ax, 1 
@@ -911,6 +912,7 @@ set_working_path_xx: ; 30/12/2017 (syschdir)
 	mov	[FFF_Valid], ah ; 0 ; reset ; 17/10/2016
 
 set_working_path:
+	; 07/07/2025
 	; 29/06/2025 - TRDOS 386 Kernel v2.0.10
 	; 08/08/2022
 	; 29/07/2022 - TRDOS 386 Kernel v2.0.5
@@ -1051,6 +1053,7 @@ loc_swp_check_lfn:
 	call	check_invalid_lfn_chars
 	jc	short loc_swp_inv_fn
 	jmp	short loc_swp_drv
+
 loc_swp_check_sfn:
 	;call	check_invalid_filename_chars
 	;;;;
@@ -1090,7 +1093,10 @@ loc_swp_change_directory:
 	; 29/06/2025
 	mov	esi, Path_Directory
 	mov	ah, [SWP_Mode+1]
+	; 07/07/2025
+	push	ebp
 	call	change_current_directory
+	pop	ebp
 	;jc	short loc_swp_retn ; eax = error code
 	; 08/08/2022
 	jnc	short loc_swp_change_prompt_dir_string
