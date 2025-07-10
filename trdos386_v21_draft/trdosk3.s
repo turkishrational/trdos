@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 07/07/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 08/07/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -4290,6 +4290,7 @@ loc_file_rw_fault:
 	jmp	print_msg
 
 make_directory:
+	; 08/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 21/02/2016 (TRDOS 386 = TRDOS v2.0)
 	; 12/03/2011 (CMD_INTR.ASM, 'cmp_cmd_mkdir')
@@ -4306,7 +4307,8 @@ loc_mkdir_nodirname_retn:
 	retn
 
 loc_mkdir_parse_path_name:
-	mov	edi, FindFile_Drv
+	; 08/07/2025
+	;mov	edi, FindFile_Drv
         call    parse_path_name
 	;jc	loc_cmd_failed
 	; 28/07/2022
@@ -4315,12 +4317,15 @@ loc_mkdir_cmd_failed:
 	jmp	loc_cmd_failed
 
 loc_mkdir_check_dirname_exists:
-	mov	esi, FindFile_Name
+	;mov	esi, FindFile_Name
+	; 08/07/2025
+	mov	esi, Path_FileName
 	cmp	byte [esi], 20h
 	;jna	loc_cmd_failed
 	; 28/07/2022
 	jna	short loc_mkdir_cmd_failed
-	mov	[DelFile_FNPointer], esi
+	; 08/07/2025
+	;mov	[DelFile_FNPointer], esi
 	call	check_filename
 	jc	short loc_mkdir_invalid_dir_name_chars
 
@@ -4328,7 +4333,9 @@ loc_mkdir_drv:
 	mov	dh, [Current_Drv]
 	mov	[RUN_CDRV], dh
 
-	mov	dl, [FindFile_Drv]
+	;mov	dl, [FindFile_Drv]
+	; 08/07/2025
+	mov	dl, [Path_Drv]
 	cmp	dl, dh
 	je	short loc_mkdir_change_directory
 
@@ -4339,11 +4346,15 @@ loc_mkdir_drv:
 	jmp	loc_file_rw_cmd_failed
 
 loc_mkdir_change_directory:
-	cmp	byte [FindFile_Directory], 20h
+	;cmp	byte [FindFile_Directory], 20h
+	; 08/07/2025
+	cmp	byte [Path_Directory], 20h
 	jna	short loc_mkdir_find_directory
 
 	inc	byte [Restore_CDIR]
-	mov	esi, FindFile_Directory
+	;mov	esi, FindFile_Directory
+	; 08/07/2025
+	mov	esi, Path_Directory
 	xor	ah, ah ; CD_COMMAND sign -> 0
 	call	change_current_directory
 	jc	short loc_mkdir_check_error_code
@@ -4352,10 +4363,12 @@ loc_mkdir_change_directory:
 	;call	change_prompt_dir_string
 
 loc_mkdir_find_directory:
-	;mov	esi, FindFile_Name
-	mov	esi, [DelFile_FNPointer]
-	;xor	eax, eax
-	xor	ax, ax ; any name (dir, file, volume)
+	;;mov	esi, FindFile_Name
+	;mov	esi, [DelFile_FNPointer]
+	; 08/07/2025
+	mov	esi, Path_FileName
+	xor	eax, eax
+	;xor	ax, ax ; any name (dir, file, volume)
 	call	find_first_file
 	jc	short loc_mkdir_check_error_code
 
@@ -4383,7 +4396,9 @@ loc_mkdir_directory_not_found:
 loc_mkdir_ask_for_yes_no:
 	mov	esi, Msg_DoYouWantMkdir
 	call	print_msg
-	mov	esi, [DelFile_FNPointer]
+	;mov	esi, [DelFile_FNPointer]
+	; 08/07/2025
+	mov	esi, Path_FileName
 	call	print_msg
 	mov	esi, Msg_YesNo
 	call	print_msg
@@ -4415,8 +4430,10 @@ loc_mkdir_yes_make_directory:
 	jmp	loc_file_rw_restore_retn
 
 loc_mkdir_call_make_sub_dir:
-	mov	esi, [DelFile_FNPointer]
-	mov	cl, 10h ; Directory attributes 
+	;mov	esi, [DelFile_FNPointer]
+	; 08/07/2025
+	mov	esi, Path_FileName
+	mov	cl, 10h ; Directory attributes
 	call	make_sub_directory
 loc_rename_file_ok: ; 06/03/2016
         ;jc	loc_file_rw_cmd_failed

@@ -397,10 +397,10 @@ struc FSINFO		; Offset ;
 endstruc
 
 ; 03/05/2025
-FAT32_FreeClusters   equ BPB_Reserved ; 52
-FAT32_FirstFreeClust equ BPB_Reserved+4 ; 56 ; (NextFreeCluster)
+FAT32_FreeClusters   equ BPB_Reserved	; 52
+FAT32_FirstFreeClust equ BPB_Reserved+4	; 56 ; (NextFreeCluster)
 ; 04/05/2025
-FAT32_fsinfo_sector  equ BPB_Reserved+8 ; 60
+FAT32_fsinfo_sector  equ BPB_Reserved+8	; 60
 FAT_FreeClusters     equ 64
 FAT_FirstFreeClust   equ 68
 

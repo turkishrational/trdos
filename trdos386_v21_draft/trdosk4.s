@@ -1230,7 +1230,7 @@ locate_current_dir_file:
 	; 	If cf = 0 ->
 	; 	[DirEntry_Counter] = directory entry index number
 	;		from the start of the directory (found)
-	; 	If cf= 1 ->
+	; 	If cf = 1 ->
 	;   	[DirEntry_Counter] = the last direntry index number
 	;		from the start of the directory (not found)
 
@@ -2866,6 +2866,7 @@ loc_next_sum:
 	retn
 
 make_sub_directory:
+	; 08/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 07/08/2022
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 16/10/2016
@@ -2897,7 +2898,7 @@ make_sub_directory:
 	add	esi, ebx
 	pop	ebx
 
-	; 10/07/2010 -> 1st writable disk check for trdos
+	; 10/07/2010 -> at 1st, writable disk check for trdos
 	; LD_DiskType = 0 for write protection (read only)
 	cmp	byte [esi+LD_DiskType], 1 ; 0 = Invalid
 	jnb	short loc_mkdir_check_file_sytem
@@ -2906,11 +2907,11 @@ make_sub_directory:
 	;mov	edx, 0
 	; 29/07/2022
 	sub	eax, eax
-	mov	al, 30
+	mov	al, ERR_DISK_WRITE ; 30
 	sub	edx, edx ; 0
 	stc
 	; err retn: EDX = 0, EBX = Dir name offset
-	;ESI = Logical DOS drive description table address
+	; ESI = Logical DOS drive description table address
 	retn
 
 ;loc_make_directory_access_denied:
@@ -2948,14 +2949,16 @@ loc_make_fat_directory:
 	mov	byte [mkdir_SecPerClust], al
 
 loc_mkdir_gffc_1:
-	call	get_first_free_cluster
+	; 08/07/2025
+	;call	get_first_free_cluster
+	call	get_first_free_cluster_@
 	jc	short loc_mkdir_gffc_retn
 
-;loc_mkdir_gffc_1_cont: 
+;loc_mkdir_gffc_1_cont:
 	;cmp	eax, 2
 	;jb	short loc_mkdir_gffc_insufficient_disk_space
 
-;loc_mkdir_gffc_1_save_fcluster:  
+;loc_mkdir_gffc_1_save_fcluster:
 	mov	[mkdir_FFCluster], eax
 
 loc_mkdir_locate_ffe:
@@ -2967,7 +2970,7 @@ loc_mkdir_locate_ffe:
 	;push	esi ; 27/02/2016
 	xor	eax, eax
         mov	ecx, eax
-	dec	cx ; FFFFh  
+	dec	cx ; FFFFh
 	; CX = FFFFh -> find first deleted or free entry
 	; ESI would be ASCIIZ filename address if the call
 	; would not be for first free or deleted dir entry
@@ -2986,7 +2989,7 @@ loc_mkdir_add_new_cluster:
 	;cmp	byte [esi+LD_CDirLevel], 1
 	jnb	short loc_mkdir_add_new_cluster_check_fsc
 
-	mov	al, 12 ; No more files 
+	mov	al, 12 ; No more files
 loc_mkdir_gffc_retn:
 	retn
 

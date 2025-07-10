@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 08/06/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 10/07/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -696,6 +696,40 @@ read_fs_sectors:
 	stc
 	retn
 
+	;;;;
+	; 08/07/2025 - TRDOS 386 v2.0.10
+get_first_free_cluster_@:
+	; set start cluster number
+	; for 'get_first_free_cluster'
+	; INPUT:
+	;   ESI = Logical DOS Drv Description Table addr
+	; OUTPUT:
+	;   get_first_free_cluster output
+
+	cmp	byte [esi+LD_FATType], 2
+	jna	short get_fat_first_free_cluster ; FAT fs
+
+get_fat32_first_free_cluster:
+	; FAT32 fs
+	mov	eax, [esi+LD_BPB+FAT32_FirstFreeClust]
+	jmp	short gfatffc_1
+
+get_fat_first_free_cluster:
+	; FAT16 or FAT12 fs
+	mov	eax, [esi+LD_BPB+FAT_FirstFreeClust]
+gfatffc_1:
+	or	eax, eax
+	jz	short gfatffc_2
+
+	cmp	eax, -1 ; invalid
+	jb	short get_first_free_cluster ; valid
+
+	sub	eax, eax
+gfatffc_2:
+	; reset to the default
+	mov	al, 2
+	;;;;
+
 get_next_free_cluster:	; 04/05/2025
 get_first_free_cluster:
 	; 04/05/2025 (TRDOS 386 Kernel v2.0.10)
@@ -709,7 +743,7 @@ get_first_free_cluster:
 	;	EAX = start cluster number ; 04/05/2025
 	; OUTPUT ->
 	;	cf = 1 -> Error code in AL (EAX)
-	;	cf = 0 -> 
+	;	cf = 0 ->
 	;	  EAX = Cluster number
 	;	  If EAX = FFFFFFFFh -> no free space
 	;	;;If the drive has FAT32 fs:
@@ -838,7 +872,7 @@ loc_gffc_set_ffree_fat32_cluster:
 	; eax = start cluster number
 	; ebx = last cluster number
 
-	cmp	eax, ebx ; [gffc_last_free_cluster] 
+	cmp	eax, ebx ; [gffc_last_free_cluster]
 	jna	short gffc_1
 
 gffc_0:
@@ -850,7 +884,7 @@ gffc_2:
 	; eax = current (next) cluster number
 	call	get_next_cluster
 	jnc	short gffc_3
-	
+
 	or	eax, eax
 	jz	short gffc_7 ; eof
 
@@ -862,6 +896,22 @@ gffc_3:
 	mov	eax, ecx
 	jnz	short gffc_4
 
+; 08/07/2025
+%if 0
+	;;;;
+	; 08/07/2025
+	; update First Free Cluster field of the LDRVT
+	; for fast search
+	cmp	byte [esi+LD_FATType], 2
+	jna	short gffc_8 ; FAT fs
+	; FAT32 fs
+	mov	[esi+LD_BPB+FAT32_FirstFreeClust], eax
+	retn
+gffc_8:
+	; FAT16 or FAT12 fs
+	mov	[esi+LD_BPB+FAT_FirstFreeClust], eax
+	;;;;
+%endif
 	; eax = first free cluster
 	retn
 gffc_4:
@@ -3030,7 +3080,7 @@ UNPACK:
 	; OUTPUT:
 	;	eax = Content of FAT for given cluster
 	;	      (next/new cluster number)
-	;	esi = Start of the buffer
+	;	esi = Start of the buffer (buffer header address)
 	;	ebx = buffer offset (not used)
 	;
 	;	Note: if EAX input is 0
@@ -3071,6 +3121,7 @@ up_1:
 ; 27/04/2025 - TRDOS 386 v2.0.10
 
 MAPCLUSTER:
+	; 10/07/2025
 	; 27/04/2025
 	; (MSDOS -> MAPCLUSTER) - Ref: Retro DOS v5 - ibmdos7.s
 	; Buffer a FAT sector
@@ -3081,8 +3132,12 @@ MAPCLUSTER:
 	; OUTPUT:
 	;	eax = Content of FAT for given cluster
 	;	      (next/new cluster number)
-	;	esi = Start of the buffer
+	;	esi = Start of the (FAT) buffer
 	;	ebx = buffer offset (not used)
+	;	10/07/2025
+	;	[CLUSNUM] = eax input
+	;	edi = (FAT) buffer (data/cluster) address
+	;	[ClusSave], [ClusSec], [ClusSplit]
 	;
 	;	If CF = 0 and ZF = 1 (EAX = 0) -> Free Cluster
 	;
@@ -3156,7 +3211,10 @@ mapcl_3:
 	jc	short mapcl_5	; eax = error code
 
 	mov	al, [ClusSave]
-	mov	ah, [esi+BUFINSIZ]
+	; 10/07/2025
+	;mov	ah, [esi+BUFINSIZ]
+	lea	edi, [esi+BUFINSIZ]
+	mov	ah, [edi]
 
 	jmp	short mapcl_7
 
@@ -4792,4 +4850,119 @@ chk_lname_@:
 
 NEXTENTRY:
 	stc
+	retn
+
+; --------------------------------------------------------------------
+
+; 10/07/2025 - TRDOS 386 v2.0.10
+
+PACK:
+	; 10/07/2025
+	; (MSDOS -> PACK) - Ref: Retro DOS v5 - ibmdos7.s
+	; Pack FAT entries (ALLOCATE)
+	;
+	; INPUT:
+	;	edx = Logical DOS Drive Description Table address
+	;	eax = Cluster Number (28bit for FAT32 fs)
+	;	ebx = Data
+	; OUTPUT:
+	;	The data is stored in the FAT at the given cluster.
+	;
+	;	if cf = 1, eax = error code
+	;
+	; Modified registers:
+	;	eax, ecx, ebx, esi, edi, ebp
+
+	or	eax, eax
+	jnz	short pack_1
+
+	mov	[CL0FATENTRY], ebx
+pack_0:
+	retn
+pack_1:
+	push	ebx
+	call	MAPCLUSTER
+	pop	ebx
+	jc	short pack_0
+
+	; EAX = content of FAT for given cluster
+	; EDI = buffer data (cluster pos) address
+	; ESI = buffer header address
+	; [CLUSNUM] = EAX input
+	; [ClusSplit], [ClusSec], [ClusSave]
+
+	cmp	byte [edx+LD_FATType], 2
+	ja	short pack_6 ; FAT32
+	je	short pack_7 ; FAT16
+
+	; FAT12
+	test	byte [CLUSNUM], 1 ; odd ?
+	jz	short pack_2	; no, even
+
+	; move data to upper 12 bits
+	shl	ebx, 4  ; shl bx, 4
+	; leave in original low 4 bits
+	and	eax, 0Fh
+	;jmp	short PACKIN
+	jmp	short pack_3
+
+	; FAT12
+pack_2:
+	; leave upper 4 bits original
+	and	eax, 0F000h
+	; store only 12 bits
+	;and	ebx, 0FFFh
+	;jmp	short PACKIN ; pack_3
+
+pack_3:	; (MSDOS -> PACKIN)
+	or	eax, ebx  ; or ax, bx
+
+	cmp	byte [ClusSplit], 0
+	jz	short pack_7
+
+	mov	[edi], ah
+	mov	[ClusSave], al	; (*)
+
+	mov	eax, [ClusSec]
+	mov	cl, [edx+LD_PhyDrvNo]
+	call	GETFATBUFFER
+	jc	short pack_5
+
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+				; if already dirty
+	jnz	short pack_4	; don't increment dirty count
+
+	;call	INC_DIRTY_COUNT
+	;inc	word [DirtyBufferCount]
+	inc	dword [DirtyBufferCount]
+
+	;or	byte [esi+9],40h
+	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
+pack_4:
+	lea	edi, [esi+BUFINSIZ+511]
+	mov	al, [ClusSave]	; (*)
+	mov	[edi], al
+pack_5:
+	retn
+pack_6:
+	and	eax, 0F0000000h
+	;and	ebx, 00FFFFFFFh
+	or	ebx, eax
+	mov	[edi], ebx
+	jmp	short pack_8
+pack_7:
+	mov	[edi], bx
+pack_8:
+	;mov	esi, [CurrentBuffer]
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+				; if already dirty
+	jnz	short pack_9	; don't increment dirty count
+
+	;call	INC_DIRTY_COUNT
+	;inc	word [DirtyBufferCount]
+	inc	dword [DirtyBufferCount]
+
+	;or	byte [esi+9], 40h
+	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
+pack_9:
 	retn
