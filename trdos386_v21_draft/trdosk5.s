@@ -4947,11 +4947,11 @@ pack_5:
 pack_6:
 	and	eax, 0F0000000h
 	;and	ebx, 00FFFFFFFh
-	or	ebx, eax
-	mov	[edi], ebx
+	or	eax, ebx
+	mov	[edi], eax
 	jmp	short pack_8
 pack_7:
-	mov	[edi], bx
+	mov	[edi], ax
 pack_8:
 	;mov	esi, [CurrentBuffer]
 	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
