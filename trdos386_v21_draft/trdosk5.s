@@ -4915,17 +4915,22 @@ pack_2:
 	;jmp	short PACKIN ; pack_3
 
 pack_3:	; (MSDOS -> PACKIN)
-	or	eax, ebx  ; or ax, bx
+	or	ebx, eax  ; or bx, ax
 
 	cmp	byte [ClusSplit], 0
 	jz	short pack_7
 
-	mov	[edi], ah
-	mov	[ClusSave], al	; (*)
+	mov	[edi], bh
+	;mov	[ClusSave], bl	; (*)
 
+	;;mov	esi, [CurrentBuffer]
+	;mov	eax, [esi+BUFFINFO.buf_sector]
+	;dec	eax
 	mov	eax, [ClusSec]
 	mov	cl, [edx+LD_PhyDrvNo]
+	;pop	ebx
 	call	GETFATBUFFER
+	;pop	ebx
 	jc	short pack_5
 
 	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
@@ -4940,18 +4945,18 @@ pack_3:	; (MSDOS -> PACKIN)
 	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
 pack_4:
 	lea	edi, [esi+BUFINSIZ+511]
-	mov	al, [ClusSave]	; (*)
-	mov	[edi], al
+	;mov	bl, [ClusSave]	; (*)
+	mov	[edi], bl
 pack_5:
 	retn
 pack_6:
 	and	eax, 0F0000000h
 	;and	ebx, 00FFFFFFFh
-	or	eax, ebx
-	mov	[edi], eax
+	or	ebx, eax
+	mov	[edi], ebx
 	jmp	short pack_8
 pack_7:
-	mov	[edi], ax
+	mov	[edi], bx
 pack_8:
 	;mov	esi, [CurrentBuffer]
 	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
