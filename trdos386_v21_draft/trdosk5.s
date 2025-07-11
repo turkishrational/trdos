@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 10/07/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 11/07/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -4970,4 +4970,332 @@ pack_8:
 	;or	byte [esi+9], 40h
 	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
 pack_9:
+	retn
+
+; --------------------------------------------------------------------
+
+; 11/07/2025 - TRDOS 386 v2.0.10
+
+ADD_NEW_CLUSTER:
+	mov	ecx, 1
+ADD_NEW_CLUSTERS:
+	; 11/07/2025
+	; (MSDOS -> ALLOCATE) - Ref: Retro DOS v5 - ibmdos7.s
+	; Allocate disk clusters
+	;
+	; ALLOCATE is called to allocate disk clusters.
+	; The new clusters are FAT-chained
+	;  onto the end of the existing file.
+	;
+	; INPUT:
+	;     edx = Logical DOS Drive Description Table address
+	;     eax = Last cluster of file (0 if null file)
+	;     ecx = Number of clusters to allocate
+	;     [current_file] = file (SFT) number
+	;
+	; OUTPUT:
+	;  If cf = 0
+	;     eax = First cluster allocated
+	;     FAT is fully updated
+	;     OF_FCLUST field of [current_file]
+	;		is set if file was null
+	;
+	;  If cf = 1 and eax = 39 ; ERR_DISK_SPACE (disk full)
+	;     ecx = max. no. of clusters that could be added to file
+	;
+	; Modified registers:
+	;	eax, ecx, ebx, esi, edi, ebp
+
+;ALLOCATE:
+	; edx = Logical DOS Drive Description Table address
+	; eax = Last cluster of file (0 if null file)
+	; ecx = Number of clusters to allocate
+	mov 	[NEXTCLUSTER], eax
+	mov	[LASTCLUSTER], eax
+	mov	[CLUSTERS], ecx
+	mov	[CLUSTCOUNT], ecx
+
+	xor	eax, eax ; 0
+	call	UNPACK
+	; eax = [CL0FATENTRY]
+	mov	[FATBYT], eax	; save correct cluster 0 value
+	;jc	short figrec_retn ; abort if error
+
+	cmp	byte [edx+LD_FATType], 2
+	jna	short adc_1 ; FAT fs
+
+	; FAT32 fs
+	mov	eax, [edx+LD_BPB+FAT32_FirstFreeClust]
+	jmp	short adc_2
+
+adc_1:
+	; FAT16 or FAT12 fs
+	mov	eax, [edx+LD_BPB+FAT_FirstFreeClust]
+adc_2:
+	and	eax, eax
+	jz	short adc_3
+
+	mov	[FCS_START], eax
+
+	cmp	eax, -1 ; invalid
+	jb	short adc_7 ; FINDFRE
+
+	xor	eax, eax
+adc_3:
+	; reset to the default
+	mov	al, 2
+adc_4:
+	mov	[FCS_START], eax
+adc_5:
+	cmp	byte [edx+LD_FATType], 2
+	jna	short adc_6
+	mov	[edx+LD_BPB+FAT32_FirstFreeClust], eax
+	jmp	short adc_7  ; FINDFRE
+adc_6:
+	mov	[edx+LD_BPB+FAT_FirstFreeClust], eax
+
+adc_7:	; (MSDOS -> FINDFRE)
+	; eax = first free cluster candidate to be checked
+	; edx = LDRVT address
+	mov	[FREECLUSTER], eax
+	call	UNPACK
+	jc	short adc_10
+	jz	short adc_11 ; free cluster (eax = 0)
+
+	mov	eax, [FREECLUSTER]
+adc_8:
+	;inc	eax  ; next cluster to be checked
+	;mov	ecx, [edx+LD_Clusters] ; last cluster - 1
+	;inc	ecx  ; disk's last cluster
+	;cmp	eax, ecx
+	;jna	short adc_5
+	cmp	eax, [edx+LD_Clusters]
+	ja	short adc_9
+	inc	eax
+	jmp	short adc_5
+adc_9:
+; We're at the end of the disk, and not satisfied.
+; See if we've scanned ALL of the disk...
+
+	mov	eax, 2
+	cmp	[FCS_START], eax ; 2
+	ja	short adc_4
+	jmp	adc_17 ; disk full !
+adc_10:
+	retn
+adc_11:
+	; free cluster (eax = 0)
+	mov	eax, [FREECLUSTER]
+	; eax = cluster number
+	;mov	ebx, 1
+	sub	ebx, ebx
+	inc	ebx 	; 1 ; mark this free guy as "1"
+	call	PACK	; set special "temporary" mark
+	jc	short adc_10
+
+	cmp	byte [edx+LD_FATType], 2
+	jna	short adc_12 ; not FAT32
+
+	; FAT32 fs
+	lea	ebx, [edx+LD_BPB+FAT32_FreeClusters]
+	jmp	short adc_13
+
+adc_12:
+	; FAT16 or FAT12 fs
+	lea	ebx, [edx+LD_BPB+FAT_FreeClusters]
+adc_13:
+	mov	eax, [ebx]
+	inc	eax
+	;jz	short NO_ALLOC ; Free count not valid
+	jz	short adc_14
+	dec	eax
+
+	dec	eax
+	; Reduce free count by 1
+	mov	[ebx], eax
+	movzx	eax, byte [edx+LD_BPB+SecPerClust]
+	sub	[edx+LD_BPB+LD_FreeSectors], eax
+
+adc_14: ; (MSDOS -> NO_ALLOC)
+	mov	ebx, [FREECLUSTER]
+	mov	eax, [NEXTCLUSTER]
+	call	PACK
+	jc	short adc_10
+
+	dec	dword [CLUSTCOUNT]
+	jz	short adc_15
+
+	mov	eax, [FREECLUSTER]
+	mov	[NEXTCLUSTER], eax
+	jmp	short adc_8
+
+; We've successfully extended the file. Clean up and exit
+
+adc_15:
+	mov	eax, [FREECLUSTER] ; (new) last cluster
+	mov	ebx, -1 ; 0FFFFFFFFh
+	call	PACK	; mark last cluster EOF
+	jc	short adc_10
+
+	mov	eax, [LASTCLUSTER]
+	call	UNPACK		; Get first cluster allocated for return
+	jc	short adc_10
+	mov	[NEXTCLUSTER], eax
+	call    RESTFATBYT      ; Restore correct cluster 0 value
+	jc	short adc_10
+	
+	mov	ebx, [LASTCLUSTER]
+	mov	eax, [NEXTCLUSTER]
+		; EAX = first cluster allocated
+	or 	ebx, ebx
+	jnz	short adc_16	; we were extending an existing file
+		; EBX = 0
+
+; We were doing the first allocation for a new file.
+; Update the SFT cluster info
+
+dofastk:
+	movzx	esi, byte [current_file]
+	shl	esi, 2 ; * 4	
+	mov	[esi+OF_FCLUSTER], eax ; first cluster
+	mov	[esi+OF_LCLUSTER], eax ; last cluster
+adc_16:
+	retn
+
+; Sorry, we've gone over the whole disk, with insufficient luck. Lets give
+; the space back to the free list and tell the caller how much he could have
+; had. We have to make sure we remove the "special mark" we put on the last
+; cluster we were able to allocate, so it doesn't become orphaned.
+
+adc_17:
+	mov	eax, [LASTCLUSTER] ; EAX = last cluster of file
+	mov	ebx, -1 ; 0FFFFFFFFh ; cluster content (data)
+				; last cluster sign
+	call	RELBLKS         ; give back any clusters just alloced
+	call	RESTFATBYT	; Alloc failed.
+	mov	ecx, [CLUSTERS] ; Number of clusters to allocate
+	sub	ecx, [CLUSTCOUNT]
+		; ECX = max. no. of clusters that could be added to file
+Disk_Full_Return:
+        ; MSDOS 6.0
+	;mov	byte [DISK_FULL], 1 ; indicating disk full
+	; 11/07/2025
+	mov	eax, ERR_DISK_SPACE ; 39 ; 'out of volume !'
+	stc
+        retn
+
+; --------------------------------------------------------------------
+
+; 11/07/2025 - TRDOS 386 v2.0.10
+
+RESTFATBYT:
+	; 11/07/2025
+	; (MSDOS -> RESTFATBYT) - Ref: Retro DOS v5 - ibmdos7.s
+	;
+	; INPUT:
+	;     edx = Logical DOS Drive Description Table address
+	;     [FATBYT] = Cluster 0 value
+	;
+	; OUTPUT:
+	;  If cf = 0
+	;     NONE (cluster 0 will be updated)
+	;
+	;  If cf = 1 and eax = error code
+	;
+	; Modified registers:
+	;	eax, ecx, ebx, esi, edi, ebp
+
+	;xor	eax, eax ; cluster 0
+	;mov	ebx, [FATBYT]
+	;call	PACK
+	;retn
+	;jmp	PACK
+	; 11/07/2025
+	mov	eax, [FATBYT]
+	mov	[CL0FATENTRY], eax
+	retn
+
+; --------------------------------------------------------------------
+
+; 11/07/2025 - TRDOS 386 v2.0.10
+
+RELEASE:
+	; (MSDOS -> RELEASE) 
+       	xor	ebx, ebx
+RELBLKS:
+	; 11/07/2025
+	; (MSDOS -> RELBLKS) - Ref: Retro DOS v5 - ibmdos7.s
+	; Deassign (Deallocate) disk space
+	;
+	; Frees cluster chain starting with EAX
+	;
+	; INPUT:
+	;     edx = Logical dos drive parameters table address
+	;     eax = Cluster in file
+	; OUTPUT:
+	;  If cf = 0
+	;     FAT is updated
+	;  If cf = 1 -> eax = error code
+	;
+	; Modified registers:
+	;	eax, ecx, ebx, esi, edi, ebp
+
+; Enter here with EBX=0FFFFFFFFh to put an end-of-file mark
+; in the first cluster and free the rest in the chain.
+
+	push	ebx
+	push	eax
+	call	UNPACK
+	pop	ecx
+	pop	ebx
+        jbe	short rblks_4 ; jna short rblks_4
+
+	mov	[NEXTCLUSTER], eax
+	mov	eax, ecx
+
+	; eax = Content of FAT
+	;	for given cluster (next cluster)
+	; ebx = -1 -> put eof mark
+	;     = 0 -> release (set as free cluster)
+
+	push	ebx
+	call	PACK
+	pop	ebx
+	jc	short rblks_4
+
+	or	ebx, ebx
+	jnz	short rblks_3 ; Was putting EOF mark
+
+	cmp	byte [edx+LD_FATType], 2
+	jna	short rblks_1 ; not FAT32
+
+	; FAT32 fs
+	lea	ebx, [edx+LD_BPB+FAT32_FreeClusters]
+	jmp	short rblks_2
+
+rblks_1:
+	; FAT16 or FAT12 fs
+	lea	ebx, [edx+LD_BPB+FAT_FreeClusters]
+rblks_2:
+	mov	eax, [ebx]
+	inc	eax ; -1 -> 0
+	;jz	short NO_DEALLOC ; Free count not valid
+	jz	short rblks_3
+
+	; Increase free count by 1
+	mov	[ebx], eax
+	movzx	eax, byte [edx+LD_BPB+SecPerClust]
+	add	[edx+LD_BPB+LD_FreeSectors], eax
+
+rblks_3: ; (MSDOS -> NO_DEALLOC)
+	mov	eax, [NEXTCLUSTER]
+	; check for 1
+	; is last cluster of incomplete chain
+	dec	eax
+	jz	short rblks_4
+
+	inc	eax
+	call	IsEOF
+        jb	short RELEASE
+rblks_4:
 	retn

@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 02/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 11/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -628,6 +628,9 @@ fpready:	resb 1	; '80387 fpu is ready' flag
 ;device_name:	resb 9  ; capitalized (and zero padded) device name
 			; (example: "TTY0",0,0,0,0,0")
 
+; 11/07/2025 - TRDOS 386 v2.0.10
+current_file:	resb 1	; open file number (SFT number)
+
 alignb 4
 
 ; 08/10/2016
@@ -748,6 +751,8 @@ OF_DIRPOS:	resb OPENFILES	; Directory entry index in directory sector
 OF_NAME:	resb OPENFILES*12 ; File name in directory entry format
 OF_ATTRIB:	resb OPENFILES	; File attributes
 OF_DATETIME:	resd OPENFILES	; Last modification time (LW) and date (hw)
+; 11/07/2025
+OF_LCLUSTER:	resd OPENFILES  ; Last clusters of open files
 
 ;alignb 2
 
@@ -927,6 +932,16 @@ ENTLAST:	resd 1	; (MSDOS -> ENTLAST)
 ENTFREE:	resd 1	; (MSDOS -> ENTFREE)
 ENTLAST_PREV:	resd 1	; (PCDOS 7.1 -> ? -LFN search-)
 LNE_COUNT:	resb 1	; (PCDOS 7.1 -> ? -LFN entry count-)
+
+; 11/07/2025 - TRDOS 386 v2.0.10
+; (ADD_NEW_CLUSTERS)
+FATBYT:		resd 1
+FCS_START:	resd 1
+LASTCLUSTER:	resd 1
+FREECLUSTER:	resd 1
+NEXTCLUSTER:	resd 1
+CLUSTERS:	resd 1
+CLUSTCOUNT:	resd 1
 
 ; 02/06/2025 - TRDOS 386 v2.0.10
 ; get_direntry parameters
