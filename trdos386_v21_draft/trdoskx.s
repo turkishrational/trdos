@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 11/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 12/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -329,7 +329,10 @@ UPDLMDT_CDirFCluster:	resd 1
 alignb 4
 ; DRV_FAT.ASM ; 21/08/2011
 gffc_next_free_cluster:  resd 1
+; 12/07/2025
+FCS_START:	
 gffc_first_free_cluster: resd 1
+FCS_END:
 gffc_last_free_cluster:  resd 1
 
 ;29/04/2016
@@ -936,7 +939,8 @@ LNE_COUNT:	resb 1	; (PCDOS 7.1 -> ? -LFN entry count-)
 ; 11/07/2025 - TRDOS 386 v2.0.10
 ; (ADD_NEW_CLUSTERS)
 FATBYT:		resd 1
-FCS_START:	resd 1
+;FCS_START:	resd 1
+;FCS_END:	resd 1	; 12/07/2025
 LASTCLUSTER:	resd 1
 FREECLUSTER:	resd 1
 NEXTCLUSTER:	resd 1

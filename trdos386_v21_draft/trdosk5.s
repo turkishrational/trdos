@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 11/07/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 12/07/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -4979,6 +4979,7 @@ pack_9:
 ADD_NEW_CLUSTER:
 	mov	ecx, 1
 ADD_NEW_CLUSTERS:
+	; 12/07/2025
 	; 11/07/2025
 	; (MSDOS -> ALLOCATE) - Ref: Retro DOS v5 - ibmdos7.s
 	; Allocate disk clusters
@@ -5032,19 +5033,25 @@ adc_1:
 	; FAT16 or FAT12 fs
 	mov	eax, [edx+LD_BPB+FAT_FirstFreeClust]
 adc_2:
+	; 12/07/2025
+	;;;
+	mov	ecx, [edx+LD_Clusters]
+	inc	ecx
+	mov	[FCS_END], ecx ; Last Cluster (search end)
+	;;;
+
 	and	eax, eax
-	jz	short adc_3
+	jz	short adc_4
 
 	mov	[FCS_START], eax
 
 	cmp	eax, -1 ; invalid
 	jb	short adc_7 ; FINDFRE
-
-	xor	eax, eax
 adc_3:
+	xor	eax, eax
+adc_4:
 	; reset to the default
 	mov	al, 2
-adc_4:
 	mov	[FCS_START], eax
 adc_5:
 	cmp	byte [edx+LD_FATType], 2
@@ -5069,18 +5076,27 @@ adc_8:
 	;inc	ecx  ; disk's last cluster
 	;cmp	eax, ecx
 	;jna	short adc_5
-	cmp	eax, [edx+LD_Clusters]
-	ja	short adc_9
+	; 12/07/2025
+	;cmp	eax, [edx+LD_Clusters]
+	;ja	short adc_9
+	;inc	eax
+	;jmp	short adc_5
 	inc	eax
-	jmp	short adc_5
-adc_9:
+	cmp	eax, [FCS_END]
+	jna	short adc_5
+
 ; We're at the end of the disk, and not satisfied.
 ; See if we've scanned ALL of the disk...
 
-	mov	eax, 2
-	cmp	[FCS_START], eax ; 2
-	ja	short adc_4
-	jmp	adc_17 ; disk full !
+	; 12/07/2025
+	mov	ecx, [FCS_START]
+	cmp	ecx, 2
+	ja	short adc_9
+	jmp	adc_17  ; disk full !
+adc_9:
+	dec	ecx
+	mov	[FCS_END], ecx
+	jmp	short adc_3
 adc_10:
 	retn
 adc_11:
@@ -5299,3 +5315,11 @@ rblks_3: ; (MSDOS -> NO_DEALLOC)
         jb	short RELEASE
 rblks_4:
 	retn
+
+; --------------------------------------------------------------------
+
+; 12/07/2025 - TRDOS 386 v2.0.10
+
+;CL0FATENTRY:	dd -1 ;  0FFFFFFFFh
+
+; --------------------------------------------------------------------
