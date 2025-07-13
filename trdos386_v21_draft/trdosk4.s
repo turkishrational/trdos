@@ -3409,7 +3409,9 @@ NEWDIR:
 	call	FIGREC
 	;mov	[DIRSEC], eax
 	; cl = physical drive/disk number
-	movzx	ebx, byte [edx+LD_BPB+BPB_SecPerClust]
+	;movzx	ebx, byte [edx+LD_BPB+BPB_SecPerClust]
+	; 14/07/2025
+	movzx	ebx, byte [mkdir_SecPerClust]
 
 	call	GETBUFFER_NPR ; no pre-read
 	jc	short zerodir_error
@@ -3503,7 +3505,9 @@ loc_mkdir_dec_fat32_fc:
 	dec	eax
 	; Reduce free count by 1
 	mov	[ebx], eax
-	movzx	eax, byte [edx+LD_BPB+SecPerClust]
+	;movzx	eax, byte [edx+LD_BPB+SecPerClust]
+	; 14/07/2025
+	movzx	eax, byte [mkdir_SecPerClust]
 	sub	[edx+LD_BPB+LD_FreeSectors], eax
 
 loc_mkdir_skip_dec_fc:
