@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 12/07/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 14/07/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2884,7 +2884,7 @@ getb_9:
 
 	mov	ebp, eax	; save sector number
 
-	call	BUFWRITE		; write out the dirty buffer
+	call	BUFWRITE	; write out the dirty buffer
 	;jc	short getb_11
 	; 05/06/2025
 	jc	short getb_12
@@ -3688,6 +3688,7 @@ bufwrt_4:
 ; 29/04/2025 - TRDOS 386 v2.0.10
 
 FLUSHBUFFERS:
+	; 13/07/2025
 	; 29/04/2025
 	; (MSDOS -> FLUSHBUF) - Ref: Retro DOS v5 - ibmdos7.s
 	; Write out all dirty buffers for disk and flag them as clean
@@ -3712,7 +3713,10 @@ FLUSHBUFFERS:
 	;call	GETCURHEAD ; (MSDOS)
 	call	GETCURRENTHEAD
 
+	; 13/07/2025
+	push	eax
 	call	BUFWRITE
+	pop	eax
 
 	cmp	al, -1
 	je	short scan_buf_queue
@@ -3722,7 +3726,7 @@ FLUSHBUFFERS:
 
 	cmp	dword [DirtyBufferCount], 0
 	je	short end_scan
-	
+
 scan_buf_queue:
 	call	CHECKFLUSH
 	;jc	short dont_free_the_buf ; already invalidated
@@ -3741,7 +3745,7 @@ scan_buf_queue:
 	jne	short dont_free_the_buf	; not same disk/drive
 
 free_the_buf:
-	; free the buffer (invalidate) 
+	; free the buffer (invalidate)
 	mov	dword [esi+BUFFINFO.buf_ID], 0FFh
 
 dont_free_the_buf:
@@ -5236,7 +5240,7 @@ RESTFATBYT:
 ; 11/07/2025 - TRDOS 386 v2.0.10
 
 RELEASE:
-	; (MSDOS -> RELEASE) 
+	; (MSDOS -> RELEASE)
        	xor	ebx, ebx
 RELBLKS:
 	; 11/07/2025
@@ -5321,5 +5325,68 @@ rblks_4:
 ; 12/07/2025 - TRDOS 386 v2.0.10
 
 ;CL0FATENTRY:	dd -1 ;  0FFFFFFFFh
+
+; --------------------------------------------------------------------
+
+; 14/07/2025 - TRDOS 386 v2.0.10
+
+SETDOTENT:
+	; 14/07/2025
+	; (MSDOS -> SETDOTENT) - Ref: Retro DOS v5 - ibmdos7.s
+	; set up a . or .. directory entry for a directory
+	;
+	; INPUT:
+	;     edi = points to the beginning of a directory entry
+	;     eax contains ".   " or "..  "
+	;     [mkdir_datetime] = date (hw) and time (lw)
+	;			 in MSDOS directory entry format
+	;     ecx = first cluster
+	; OUTPUT:
+	;     edi = next directory entry position
+	;     eax = 0
+	;
+	; Modified registers: eax, edi
+
+	; Fill in name field
+	stosd	; char 1,2,3,4	; 0 to 3
+	mov	eax, 20202020h
+	stosd	; char 5,6,7,8	; 4 to 7
+	; and Set up attribute
+	mov	al, 10h ; attr_directory
+	ror	eax, 8
+	stosd	; char 9,10,11	; 8 to 10
+		; and attr_directory ; 11
+
+	sub	eax, eax
+	stosw		; NTReserved, 12
+			; CrtTimeTenth, 13
+
+	; Set up last creation time & date
+	mov	eax, [mkdir_datetime]
+	push	eax
+	stosd		; CrtTime, 14
+			; CrtDate, 16
+
+	; Set up last access date
+	; and first cluster field (hw)
+	push	ecx
+	ror	ecx, 16
+	mov	ax, cx
+	ror	eax, 16
+	stosd		; LastAccDate, 18
+			; FClusterHw, 20
+	pop	ecx
+	pop	eax
+	; Set up last modification time & date
+	stosd		; WrtTime, 22
+			; WrtDate, 24
+	; Set up first cluster field (lw)
+	mov	ax, cx
+	stosw		; FClusterLw, 26
+	; Set up file size (dword) to zero
+	xor	eax, eax ; 0
+	stosd		; FileSize, 28
+
+	retn
 
 ; --------------------------------------------------------------------

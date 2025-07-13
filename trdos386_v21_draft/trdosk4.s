@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 07/07/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 14/07/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2866,6 +2866,13 @@ loc_next_sum:
 	retn
 
 make_sub_directory:
+	; 14/07/2025
+	; 13/07/2025
+	; (Ref: 'DOS_MKDIR', Retro DOS v5.0 - ibmdos7.s)
+	; (('MakeNode','NEWENTRY','BUILDDIR','NEWDIR'))
+	; Note: Highly modified code, 
+	;	partially different than msdos/pcdos methods.
+	;	(mix of TRDOS 8086/386 and PCDOS 7.1 methods)
 	; 08/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 07/08/2022
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -2967,7 +2974,8 @@ loc_mkdir_locate_ffe:
 	; 'locate_current_dir_file' procedure
 	;
 	; ESI = Logical DOS Drive Description Table Address
-	;push	esi ; 27/02/2016
+	; 13/07/2025
+	push	esi ; 27/02/2016
 	xor	eax, eax
         mov	ecx, eax
 	dec	cx ; FFFFh
@@ -2975,6 +2983,8 @@ loc_mkdir_locate_ffe:
 	; ESI would be ASCIIZ filename address if the call
 	; would not be for first free or deleted dir entry
 	call	locate_current_dir_file
+	; 13/07/2025
+	pop	esi
 	jnc	short loc_mkdir_set_ff_dir_entry_1
 	;pop	esi
 	; ESI = Logical DOS Drive Description Table Address
@@ -3044,14 +3054,57 @@ loc_mkdir_set_ff_dir_entry_1:
 	; 27/02/2016
 	push	esi ; Logical DOS Drv Desc. Tbl. address
 	; EDI = Directory Entry Address
+	;;;
+	; 13/07/2025
+	mov	al, [esi+LD_PhyDrvNo]
+	mov	[mkdir_phydrv], al
+	; 14/07/2025
+	mov	eax, edi
+	sub	eax, [CurrentBuffer]  ; from 'GETBUFFER'
+	mov	[mkdir_entrypos], eax ; offset in buffer
+	;;;
 	mov	esi, [mkdir_DirName_Offset]
+; 13/07/2025
+%if 0
 	mov	eax, [mkdir_FFCluster]
 
 	mov	cx, 10h	; CL = Directory attribute
 			; CH = 0 -> File size is 0
 	or	cl, [mkdir_attrib] ; S, H, R
 	call	make_directory_entry
+%else
+	; 13/07/2025
+	; cluster number and fize size = 0
+	mov	bl, 10h	; Directory attribute/flag
+	or	bl, [mkdir_attrib] ; S, H, R
+	call	make_new_directory_entry
+	mov	[mkdir_datetime], edx
+		; hw = date, lw = time
+%endif
+	;;;
+	; 13/07/2025 - TRDOS 386 v2.0.10
+	; [CurrentBuffer] = directory buffer header address
+	mov	esi, [CurrentBuffer]
+	or	byte [esi+BUFFINFO.buf_flags], buf_isDIR
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+	jnz	short loc_mkdir_set_ff_dir_entry_fb
+	;call	INC_DIRTY_COUNT
+	inc	dword [DirtyBufferCount]
+	;or	byte [esi+9], 40h
+	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
+loc_mkdir_set_ff_dir_entry_fb:
+	mov	eax, [esi+BUFFINFO.buf_sector]
+	mov	[mkdir_dirsector], eax
+	;
+	mov	al, [mkdir_phydrv] ; only current phy drive
+	mov	ah, 1 ; do not invalidate buffers
+	call	FLUSHBUFFERS
+	; top of stack = LDRVT address ; esi ; !*!
+	;jmp	short NEWDIR	; 13/07/2025
+	;;;
 
+; 13/07/2025
+%if 0
 	pop	esi
 
 	mov	byte [DirBuff_ValidData], 2
@@ -3342,6 +3395,156 @@ clear_directory_buffer:
 	rep	stosd ; clear directory buffer
 	retn
 
+%endif
+
+	; temporary - 14/07/2025
+loc_mkdir_add_new_subdir_cluster:  ; temporary !!!!!
+	
+	; 13/07/2025 - TRDOS 386 v2.0.10
+NEWDIR:
+	; 13/07/2025
+	pop	edx ; !*! LDRVT address (esi)
+
+	mov	eax, [mkdir_FFCluster]
+	call	FIGREC
+	;mov	[DIRSEC], eax
+	; cl = physical drive/disk number
+	movzx	ebx, byte [edx+LD_BPB+BPB_SecPerClust]
+
+	call	GETBUFFER_NPR ; no pre-read
+	jc	short zerodir_error
+
+	lea	edi, [esi+BUFINSIZ]
+	; 14/07/2025
+	mov	ecx, [mkdir_FFCluster]  ; Point at itself
+	mov	eax, '.   ' ; 2020202Eh ; DOT
+	call	SETDOTENT
+	mov	ecx, [Current_Dir_FCluster] ; Parent
+	mov	eax, '..  ' ; 20202E2Eh ; DOTDOT
+	call	SETDOTENT
+	mov	ecx, (512-64)/4
+		; (512-(2*dir_entry.size))/4
+	jmp	short zerodir_@
+
+ZERODIR:
+	call	GETBUFFER_NPR ; no pre-read
+	jnc	short zerodir_sector
+zerodir_error:
+	mov	esi, edx	; LDRVT address
+	; eax = error code
+	retn
+zerodir_sector:
+	mov	ecx, 512/4
+	lea	edi, [esi+BUFINSIZ]
+zerodir_@:
+	xor	eax, eax
+	rep	stosd
+
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+	jnz	short loop_zerodir
+	;call	INC_DIRTY_COUNT
+	inc	dword [DirtyBufferCount]
+	;or	byte [esi+9], 40h
+	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
+loop_zerodir:
+	dec	ebx
+	jz	short zerodir_ok
+
+	mov	eax, [esi+BUFFINFO.buf_sector]
+	inc	eax
+	mov	cl, [edx+LD_PhyDrvNo]
+	jmp	short ZERODIR
+
+zerodir_ok:
+	mov	eax, [mkdir_FFCluster]
+	; EAX = free cluster for making new sub directory
+	; which found at the beginning of this procedure
+	mov	ebx, -1 ; 0FFFFFFFFh
+	call	PACK	; mark last cluster EOF
+	jc	short zerodir_error
+
+	cmp	byte [edx+LD_FATType], 2
+	jna	short loc_mkdir_dec_fat_fc ; not FAT32
+
+	; FAT32 fs
+	lea	ebx, [edx+LD_BPB+FAT32_FreeClusters]
+	mov	ecx, [edx+LD_BPB+FAT32_FirstFreeClust]
+	cmp	ecx, [mkdir_FFCluster]
+	jne	short loc_mkdir_dec_fat32_fc
+	inc	ecx
+	mov	[edx+LD_BPB+FAT32_FirstFreeClust], ecx
+	mov	eax, [edx+LD_Clusters] ; Last Cluster - 1
+	inc	eax  ; last cluster
+	cmp	ecx, eax
+	jna	short loc_mkdir_dec_fat32_fc
+	mov	dword [edx+LD_BPB+FAT32_FirstFreeClust], 2
+	jmp	short loc_mkdir_dec_fat32_fc
+
+loc_mkdir_dec_fat_fc:
+	; FAT16 or FAT12 fs
+	lea	ebx, [edx+LD_BPB+FAT_FreeClusters]
+	mov	ecx, [edx+LD_BPB+FAT_FirstFreeClust]
+	cmp	ecx, [mkdir_FFCluster]
+	jne	short loc_mkdir_dec_fat_fc_@
+	inc	ecx
+	mov	[edx+LD_BPB+FAT_FirstFreeClust], ecx
+	mov	eax, [edx+LD_Clusters] ; Last Cluster - 1
+	inc	eax  ; last cluster
+	cmp	ecx, eax
+	jna	short loc_mkdir_dec_fat_fc_@
+	mov	dword [edx+LD_BPB+FAT_FirstFreeClust], 2
+loc_mkdir_dec_fat_fc_@:
+loc_mkdir_dec_fat32_fc:
+	mov	eax, [ebx]
+	inc	eax
+	jz	short loc_mkdir_skip_dec_fc
+			; Free count not valid
+	dec	eax
+	dec	eax
+	; Reduce free count by 1
+	mov	[ebx], eax
+	movzx	eax, byte [edx+LD_BPB+SecPerClust]
+	sub	[edx+LD_BPB+LD_FreeSectors], eax
+
+loc_mkdir_skip_dec_fc:
+	; 14/07/2025
+	; update first cluster field of the directory entry
+	; (of the parent directory)
+	mov	eax, [mkdir_dirsector]
+	mov	cl, [edx+LD_PhyDrvNo]
+	call	GETBUFFER  ; Pre read
+	jc	short loc_mkdir_error
+	lea	edi, [esi+BUFINSIZ]
+	add	edi, [mkdir_entrypos]
+	mov	eax, [mkdir_FFCluster]
+	ror	eax, 16
+	mov	[edi+20], ax ; DirEntry_FstClusHI
+	rol	eax, 16
+	mov	[edi+26], ax ; DirEntry_FstClusLO
+	;mov	dword [edi+28], 0 ; zero size
+DIRUP:
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+	jnz	short dirup_@
+	;call	INC_DIRTY_COUNT
+	inc	dword [DirtyBufferCount]
+	;or	byte [esi+9], 40h
+	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
+dirup_@:
+	mov	esi, edx
+	push	esi
+	call	update_fat32_fsinfo
+	mov	al, [esi+LD_PhyDrvNo]
+	mov	ah, 1 ; do not invalidate buffers
+	call	FLUSHBUFFERS
+	pop	esi
+	retn
+
+loc_mkdir_error:	 ; error code in EAX
+	mov	esi, edx ; LDRVT address
+	retn
+
+; 13/07/2025
+%if 0
 make_directory_entry:
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 02/03/2016
@@ -3394,9 +3597,63 @@ loc_make_direntry_set_filesize:
 	mov	[edi+14], ax ; CrtTime, 14
 	mov	[edi+16], dx ; CrtDate, 16
 	mov	[edi+18], dx ; LastAccDate, 18
-	mov	[edi+22], ax ; WrtTime, 14
-	mov	[edi+24], dx ; WrtDate, 16
+	mov	[edi+22], ax ; WrtTime, 22
+	mov	[edi+24], dx ; WrtDate, 24
 	pop	ecx
+
+	retn
+%endif
+	; 14/07/2025 - temporary !
+make_directory_entry: ; temporary !!!!!!
+
+make_new_directory_entry:
+	; 13/07/2025 - TRDOS 386 v2.0.10
+	; INPUT ->
+	; 	EDI = Directory Entry Address
+	;	ESI = Dot File Name Location
+	;	BL = Attributes
+	; OUTPUT ->
+	;;;	EDI = Directory Entry Address
+	;	ESI = Dot File Name Location (Capitalized)
+	;	DX = Date, AX = Time in DOS Dir Entry format
+	;	
+	; Modified registers: EAX, ECX, EDX, EDI
+
+	call	convert_file_name
+	; EDI = Dir Entry Format File Name Location
+	; ESI = Dot File Name Location (capitalized)
+
+	mov	[edi+11], bl ; dir_entry.dir_attr
+
+	call	convert_current_date_time
+	; OUTPUT -> DX = Date in dos dir entry format
+        ; 	    AX = Time in dos dir entry format
+
+	;push	edi
+
+	add	edi, 12
+	shl	edx, 16
+	mov	dx, ax
+	; edx hw = date, lw = time
+	push	edx ; **
+	push	edx ; *
+	xor	eax, eax
+	stosw	; [edi+12] = 0 ; NTReserved, 12
+			       ; CrtTimeTenth, 13
+	pop	eax ; *
+	stosd	; [edi+14] = CrtTime, [edi+16] = CrtDate
+
+	shr	eax, 16
+	stosd	; [edi+18] = LastAccDate
+		; [edi+20] = 0 ; FClusterHw
+	pop	eax ; **
+	stosd	; [edi+22] = WrtTime
+		; [edi+24] = WrtDate
+	xor	eax, eax
+	stosw	; [edi+26] = 0 ; FClusterLw
+	stosd	; [edi+28] = 0 ; FileSize
+
+	;pop	edi
 
 	retn
 
