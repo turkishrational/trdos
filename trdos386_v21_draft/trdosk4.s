@@ -3106,10 +3106,18 @@ loc_mkdir_set_ff_dir_entry_fb:
 	mov	al, [mkdir_phydrv] ; only current phy drive
 	mov	ah, 1 ; do not invalidate buffers
 	call	FLUSHBUFFERS
+	; 14/07/2025
+	jc	short loc_mkdir_failerr
 	; top of stack = LDRVT address ; esi ; !*!
 	; 14/07/2025
 	jmp	NEWDIR	; 13/07/2025
 	;;;
+
+	; 14/07/2025
+loc_mkdir_failerr:
+	; cf = 1
+	movzx	eax, byte [FAILERR]
+	retn
 
 ; 13/07/2025
 %if 0
@@ -3455,6 +3463,17 @@ loop_clear_dir_sector:
 	mov	cl, [mkdir_phydrv]
 	jmp	short get_new_dir_sector
 
+loc_mkdir_anc_error:
+	push	eax ; error code
+	mov	eax, [mkdir_LastDirCluster]
+	mov	ebx, -1 ; last cluster
+	call	RELBLKS
+	pop	eax
+	mov	esi, edx
+	stc
+loc_mkdir_dirup_err:	; 14/07/2025
+	retn
+
 loc_mkdir_anc_@:
 	cmp	byte [edx+LD_FATType], 2
 	jna	short loc_mkdir_anc_1 ; not FAT32
@@ -3482,23 +3501,23 @@ loc_mkdir_anc_3:
 	; [mkdir_phydrv] = physical drive number
 	mov	dword [mkdir_entrypos], 0
 	; [mkdir_entrypos] = directory entry offset
-	jmp	short NEWDIR_@
+	; 14/07/2025
+	call	dirup_@ ; update FAT32 fs info sector
+			; and flush buffers
+	
+	;jnc	short NEWDIR_@
+	; eax = error code
+	;retn
+	jc	short loc_mkdir_dirup_err
 
-loc_mkdir_anc_error:
-	push	eax ; error code
-	mov	eax, [mkdir_LastDirCluster]
-	mov	ebx, -1 ; last cluster
-	call	RELBLKS
-	pop	eax
-	mov	esi, edx
-	stc
-	retn
-
+	; 14/07/2025
+NEWDIR_@:
+	push	esi ; LDRVT address
+	
 	; 13/07/2025 - TRDOS 386 v2.0.10
 NEWDIR:
 	; 13/07/2025
 	pop	edx ; !*! LDRVT address (esi)
-NEWDIR_@:	; 14/07/2025
 	mov	eax, [mkdir_FFCluster]
 	call	FIGREC
 	;mov	[DIRSEC], eax
@@ -3638,7 +3657,13 @@ dirup_@:
 	mov	al, [esi+LD_PhyDrvNo]
 	mov	ah, 1 ; do not invalidate buffers
 	call	FLUSHBUFFERS
+	; 14/07/2025
+	; 'BUFWRITE' sets [FAILERR]
+	; if cf = 1 -> [FAILERR] = error code
+	; if cf = 0 -> [FAILERR] = 0
 	pop	esi
+	; 14/07/2025
+	movzx	eax, byte [FAILERR]
 	retn
 
 loc_mkdir_error:	 ; error code in EAX

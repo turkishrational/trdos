@@ -639,6 +639,8 @@ fpready:	resb 1	; '80387 fpu is ready' flag
 
 ; 11/07/2025 - TRDOS 386 v2.0.10
 current_file:	resb 1	; open file number (SFT number)
+; 14/07/2025
+FAILERR:	resb 1	; ('BUFWRITE' error return)	
 
 alignb 4
 

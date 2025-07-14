@@ -3609,6 +3609,7 @@ fatsecrd_4:
 ; 28/04/2025 - TRDOS 386 v2.0.10
 
 BUFWRITE:
+	; 14/07/2025
 	; 28/04/2025
 	; (MSDOS -> BUFWRITE) - Ref: Retro DOS v5 - ibmdos7.s
 	; Write out a buffer if dirty
@@ -3618,13 +3619,16 @@ BUFWRITE:
 	; OUTPUT:
 	;	Buffer marked free
 	;
-	;	if cf = 1 -> eax = error code
+	;	if cf = 1 -> eax = [FAILERR] = error code
 	;		  -> edx = LDRVT addr for failed drive
-	;
+	;;	if cf = 0 -> [FAILERR] = 0 ; 14/07/2025
+
 	; Modified registers:
 	;	EAX, EBX, ECX, EDX
 
 	xor	ecx, ecx
+	; 14/07/2025
+	mov	[FAILERR], cl
 	mov	cl, 0FFh ; -1
 	xchg	ecx, [esi+BUFFINFO.buf_ID]
 	cmp	cl, 0FFh
@@ -3679,6 +3683,8 @@ bufwrt_3:
 	mov	edx, [esi+BUFFINFO.buf_DPB]
 
 	mov	eax, ERR_DRV_WRITE ; 'disk write error !'
+	; 14/07/2025
+	mov	[FAILERR], al
 	stc
 bufwrt_4:
 	retn
@@ -3688,6 +3694,7 @@ bufwrt_4:
 ; 29/04/2025 - TRDOS 386 v2.0.10
 
 FLUSHBUFFERS:
+	; 14/07/2025
 	; 13/07/2025
 	; 29/04/2025
 	; (MSDOS -> FLUSHBUF) - Ref: Retro DOS v5 - ibmdos7.s
@@ -3755,6 +3762,11 @@ dont_free_the_buf:
 	jne	short scan_buf_queue
 
 end_scan:
+	;;;
+	; 14/07/2025
+	cmp	byte [FAILERR], 1
+	cmc
+	;;;
 	retn
 
 	; 29/04/2025
@@ -3769,6 +3781,7 @@ flushbuf_err:
 ; 29/04/2025 - TRDOS 386 v2.0.10
 
 CHECKFLUSH:
+	; 14/07/2025	
 	; 29/04/2025
 	; (MSDOS -> CHECKFLUSH) - Ref: Retro DOS v5 - ibmdos7.s
 	; Write out a buffer if it is dirty
@@ -3780,8 +3793,8 @@ CHECKFLUSH:
 	;
 	; OUTPUT:
 	;	none
-	;
-	;	if cf = 1 -> edx = LDRVT addr for failed drive
+	;	if cf = 1 -> [FAILERR] = error code ; 14/07/2025
+	;	             edx = LDRVT addr for failed drive
 	;
 	; Modified registers:
 	;	EBX, ECX, EDX
