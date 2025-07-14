@@ -3604,7 +3604,7 @@ loc_mkdir_dec_fat32_fc:
 	;movzx	eax, byte [edx+LD_BPB+SecPerClust]
 	; 14/07/2025
 	movzx	eax, byte [mkdir_SecPerClust]
-	sub	[edx+LD_BPB+LD_FreeSectors], eax
+	sub	[edx+LD_FreeSectors], eax
 
 loc_mkdir_skip_dec_fc:
 	; 14/07/2025
