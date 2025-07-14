@@ -3011,7 +3011,10 @@ loc_mkdir_add_new_cluster_check_fsc:
 	; 29/07/2022
 	shl	eax, 1
 	cmp	ecx, eax
-	jnb	short loc_mkdir_add_new_subdir_cluster
+	;jnb	short loc_mkdir_add_new_subdir_cluster
+	; 14/07/2025
+	jb	short loc_mkdir_insufficient_disk_space
+	jmp	loc_mkdir_add_new_subdir_cluster
 
 loc_mkdir_insufficient_disk_space:
 	;mov	edx, ecx
@@ -3033,6 +3036,8 @@ loc_mkdir_stc_return:
 	stc
 	retn
 
+; 14/07/2025
+%if 0
 loc_mkdir_gffc_2:
 	call	get_first_free_cluster
 	jc	short loc_mkdir_gffc_retn
@@ -3050,6 +3055,8 @@ loc_mkdir_gffc_2:
 	jc	short loc_mkdir_gffc_retn
 
 	xor	edi, edi
+%endif
+
 loc_mkdir_set_ff_dir_entry_1:
 	; 27/02/2016
 	push	esi ; Logical DOS Drv Desc. Tbl. address
@@ -3059,7 +3066,7 @@ loc_mkdir_set_ff_dir_entry_1:
 	mov	al, [esi+LD_PhyDrvNo]
 	mov	[mkdir_phydrv], al
 	; 14/07/2025
-	mov	eax, edi
+	lea	eax, [edi-BUFINSIZ]
 	sub	eax, [CurrentBuffer]  ; from 'GETBUFFER'
 	mov	[mkdir_entrypos], eax ; offset in buffer
 	;;;
@@ -3100,7 +3107,8 @@ loc_mkdir_set_ff_dir_entry_fb:
 	mov	ah, 1 ; do not invalidate buffers
 	call	FLUSHBUFFERS
 	; top of stack = LDRVT address ; esi ; !*!
-	;jmp	short NEWDIR	; 13/07/2025
+	; 14/07/2025
+	jmp	NEWDIR	; 13/07/2025
 	;;;
 
 ; 13/07/2025
@@ -3397,14 +3405,100 @@ clear_directory_buffer:
 
 %endif
 
-	; temporary - 14/07/2025
-loc_mkdir_add_new_subdir_cluster:  ; temporary !!!!!
-	
+loc_mkdir_add_new_subdir_cluster:
+	; 14/07/2025
+	; the directory does'nt have a free (deleted) entry
+	; (a new cluster will be added to it's last cluster)
+	mov	eax, [DirBuff_Cluster]
+		; Last cluster of the current directory
+		; (from 'locate_current_dir_file')
+	mov	[mkdir_LastDirCluster], eax
+	mov	edx, esi ; LDRVT address
+	call	ADD_NEW_CLUSTER
+	jc	short loc_mkdir_anc_error
+	; eax = First cluster allocated
+
+	call	FIGREC
+
+	mov	[mkdir_phydrv], cl
+	mov	[mkdir_dirsector], eax
+
+	;movzx	ebx, byte [edx+LD_BPB+SecPerClust]
+	movzx	ebx, byte [mkdir_SecPerClust]
+
+get_new_dir_sector:
+	; eax = physical disk sector
+	;  cl = physical drive number
+	; edx = LDRVT address 
+
+	call	GETBUFFER_NPR ; no pre-read
+	jc	short loc_mkdir_anc_error
+
+	; clear buffer sector 
+	lea	edi, [esi+BUFINSIZ]
+	mov	ecx, 512/4
+	xor	eax, eax ; 0
+	rep	stosd
+
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+	jnz	short loop_clear_dir_sector
+	;call	INC_DIRTY_COUNT
+	inc	dword [DirtyBufferCount]
+	;or	byte [esi+9], 40h
+	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
+loop_clear_dir_sector:
+	dec	ebx
+	jz	short loc_mkdir_anc_@
+	mov	eax, [esi+BUFFINFO.buf_sector]
+	inc	eax
+	;mov	cl, [edx+LD_PhyDrvNo]
+	mov	cl, [mkdir_phydrv]
+	jmp	short get_new_dir_sector
+
+loc_mkdir_anc_@:
+	cmp	byte [edx+LD_FATType], 2
+	jna	short loc_mkdir_anc_1 ; not FAT32
+	; FAT32 fs
+	lea	esi, [edx+LD_BPB+FAT32_FirstFreeClust]
+	jmp	short loc_mkdir_anc_2
+loc_mkdir_anc_1:
+	; FAT16 or FAT12 fs
+	lea	esi, [edx+LD_BPB+FAT_FirstFreeClust]
+loc_mkdir_anc_2:
+	mov	ecx, [mkdir_LastDirCluster]
+	cmp	[esi], ecx
+	jne	short loc_mkdir_anc_3
+	; change first free cluster number
+	inc	ecx
+	mov	[esi], ecx
+	mov	ebx, [edx+LD_Clusters] ; Last Cluster - 1
+	inc	ebx  ; last cluster
+	cmp	ecx, ebx
+	jna	short loc_mkdir_anc_3
+	mov	dword [esi], 2
+loc_mkdir_anc_3:
+	; [mkdir_dirsector] = phys sector address
+	;	of the 1st sector of the new cluster	
+	; [mkdir_phydrv] = physical drive number
+	mov	dword [mkdir_entrypos], 0
+	; [mkdir_entrypos] = directory entry offset
+	jmp	short NEWDIR_@
+
+loc_mkdir_anc_error:
+	push	eax ; error code
+	mov	eax, [mkdir_LastDirCluster]
+	mov	ebx, -1 ; last cluster
+	call	RELBLKS
+	pop	eax
+	mov	esi, edx
+	stc
+	retn
+
 	; 13/07/2025 - TRDOS 386 v2.0.10
 NEWDIR:
 	; 13/07/2025
 	pop	edx ; !*! LDRVT address (esi)
-
+NEWDIR_@:	; 14/07/2025
 	mov	eax, [mkdir_FFCluster]
 	call	FIGREC
 	;mov	[DIRSEC], eax
@@ -3454,7 +3548,9 @@ loop_zerodir:
 
 	mov	eax, [esi+BUFFINFO.buf_sector]
 	inc	eax
-	mov	cl, [edx+LD_PhyDrvNo]
+	;mov	cl, [edx+LD_PhyDrvNo]
+	; 14/07/2025
+	mov	cl, [mkdir_phydrv]
 	jmp	short ZERODIR
 
 zerodir_ok:
@@ -3515,7 +3611,9 @@ loc_mkdir_skip_dec_fc:
 	; update first cluster field of the directory entry
 	; (of the parent directory)
 	mov	eax, [mkdir_dirsector]
-	mov	cl, [edx+LD_PhyDrvNo]
+	;mov	cl, [edx+LD_PhyDrvNo]
+	; 14/07/2025
+	mov	cl, [mkdir_phydrv]
 	call	GETBUFFER  ; Pre read
 	jc	short loc_mkdir_error
 	lea	edi, [esi+BUFINSIZ]
@@ -3560,7 +3658,7 @@ loc_mkdir_error:	 ; error code in EAX
 	jmp	short loc_mkdir_error_2
 loc_mkdir_error_1:
 	; FAT16 or FAT12 fs
-	lea	ebx, [edx+LD_BPB+FAT_FreeClusters]
+	lea	ebx, [edx+LD_BPB+FAT_FirstFreeClust]
 loc_mkdir_error_2:
 	mov	eax, [mkdir_FFCluster]
 	cmp	[ebx], eax

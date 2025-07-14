@@ -4983,6 +4983,7 @@ pack_9:
 ADD_NEW_CLUSTER:
 	mov	ecx, 1
 ADD_NEW_CLUSTERS:
+	; 14/07/2025
 	; 12/07/2025
 	; 11/07/2025
 	; (MSDOS -> ALLOCATE) - Ref: Retro DOS v5 - ibmdos7.s
@@ -5002,8 +5003,10 @@ ADD_NEW_CLUSTERS:
 	;  If cf = 0
 	;     eax = First cluster allocated
 	;     FAT is fully updated
-	;     OF_FCLUST field of [current_file]
-	;		is set if file was null
+	;     ; 14/07/2025	
+	;     ebx = eax input
+	;;;;  OF_FCLUST field of [current_file]
+	;;;;		is set if file was null
 	;
 	;  If cf = 1 and eax = 39 ; ERR_DISK_SPACE (disk full)
 	;     ecx = max. no. of clusters that could be added to file
@@ -5071,9 +5074,11 @@ adc_7:	; (MSDOS -> FINDFRE)
 	mov	[FREECLUSTER], eax
 	call	UNPACK
 	jc	short adc_10
+	; 14/07/2025
+	mov	eax, [FREECLUSTER]
 	jz	short adc_11 ; free cluster (eax = 0)
 
-	mov	eax, [FREECLUSTER]
+	;mov	eax, [FREECLUSTER] ; 14/07/2025
 adc_8:
 	;inc	eax  ; next cluster to be checked
 	;mov	ecx, [edx+LD_Clusters] ; last cluster - 1
@@ -5105,7 +5110,7 @@ adc_10:
 	retn
 adc_11:
 	; free cluster (eax = 0)
-	mov	eax, [FREECLUSTER]
+	;mov	eax, [FREECLUSTER] ; 14/07/2025
 	; eax = cluster number
 	;mov	ebx, 1
 	sub	ebx, ebx
@@ -5167,6 +5172,8 @@ adc_15:
 	mov	ebx, [LASTCLUSTER]
 	mov	eax, [NEXTCLUSTER]
 		; EAX = first cluster allocated
+; 14/07/2025
+%if 0
 	or 	ebx, ebx
 	jnz	short adc_16	; we were extending an existing file
 		; EBX = 0
@@ -5179,6 +5186,8 @@ dofastk:
 	shl	esi, 2 ; * 4	
 	mov	[esi+OF_FCLUSTER], eax ; first cluster
 	mov	[esi+OF_LCLUSTER], eax ; last cluster
+%endif
+
 adc_16:
 	retn
 
