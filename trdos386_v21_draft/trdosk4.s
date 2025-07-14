@@ -3544,7 +3544,36 @@ dirup_@:
 	retn
 
 loc_mkdir_error:	 ; error code in EAX
+	;;;
+	; 14/07/2025
+	; free/release the cluster again
+	; edx = LDRVT address
+	push	eax
+	mov	eax, [mkdir_FFCluster]
+	call	RELEASE
+	jc	short loc_mkdir_error_3
+	;;;;
+	cmp	byte [edx+LD_FATType], 2
+	jna	short loc_mkdir_error_1 ; not FAT32
+	; FAT32 fs
+	lea	ebx, [edx+LD_BPB+FAT32_FirstFreeClust]
+	jmp	short loc_mkdir_error_2
+loc_mkdir_error_1:
+	; FAT16 or FAT12 fs
+	lea	ebx, [edx+LD_BPB+FAT_FreeClusters]
+loc_mkdir_error_2:
+	mov	eax, [mkdir_FFCluster]
+	cmp	[ebx], eax
+	jna	short loc_mkdir_error_3
+	; change first free cluster number
+	mov	[ebx], eax
+loc_mkdir_error_3:
 	mov	esi, edx ; LDRVT address
+	;call	dirup_@
+	;;;;
+	pop	eax ; error code
+	stc
+	;;;
 	retn
 
 ; 13/07/2025
