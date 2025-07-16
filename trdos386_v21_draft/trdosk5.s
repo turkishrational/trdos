@@ -3632,7 +3632,7 @@ BUFWRITE:
 	mov	cl, 0FFh ; -1
 	xchg	ecx, [esi+BUFFINFO.buf_ID]
 	cmp	cl, 0FFh
-	je	short bufwrt_4 ; Buffer is clean, carry clear
+	je	short bufwrt_4 ; Buffer is free, carry clear.
 	
 	test	ch, buf_dirty
 	jz	short bufwrt_4 ; Buffer is clean, carry clear.

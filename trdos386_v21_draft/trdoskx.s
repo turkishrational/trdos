@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 15/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 16/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -329,8 +329,8 @@ RmDir_ParentDirCluster: resd 1
 RmDir_DirLastCluster:   resd 1
 RmDir_PreviousCluster:  resd 1
 
-; 15/07/2025
-;LMDT_Flag:	resb 1  ; Last Modification Date & Time update flag
+; 16/07/2025
+LMDT_Flag:	resb 1  ; Last Modification Date & Time update flag
 ; 22/02/2016
 UPDLMDT_CDirLevel:	resb 1
 UPDLMDT_CDirFCluster:	resd 1

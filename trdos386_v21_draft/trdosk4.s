@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 15/07/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 16/07/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -3517,10 +3517,14 @@ loc_mkdir_anc_3:
 NEWDIR_@:
 	push	esi ; LDRVT address
 	; 15/07/2025
-	mov 	byte [LMDT_Flag], 1 ; (****)
+	;mov 	byte [LMDT_Flag], 1 ; (****)
 	
 	; 13/07/2025 - TRDOS 386 v2.0.10
 NEWDIR:
+	; 16/07/2025
+	; 'mkdir' always changes LMDT 
+	;		of the parent directory
+	mov 	byte [LMDT_Flag], 1
 	; 13/07/2025
 	pop	edx ; !*! LDRVT address (esi)
 	mov	eax, [mkdir_FFCluster]
@@ -4042,6 +4046,7 @@ loc_save_dir_buff_validate_retn:
 	jmp	short loc_save_dir_buff_retn
 
 update_parent_dir_lmdt:
+	; 16/07/2025
 	; 15/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 29/12/2017
@@ -4149,12 +4154,15 @@ loc_update_parent_dir_lmdt_load_sub_dir_3:
 	mov	edi, Dir_File_Name
 	rep	movsb
 
+; 16/07/2025
+%if 0
 	mov	esi, Logical_DOSDisks
 	sub	ebx, ebx
 	mov	bh, [Current_Drv]
 	add	esi, ebx
 	call	reload_current_directory
 	jc	short loc_update_parent_dir_lmdt_restore_cdirlevel
+%endif
 
 loc_update_parent_dir_lmdt_locate_dir:
 	mov	esi, Dir_File_Name
