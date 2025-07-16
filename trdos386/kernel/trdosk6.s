@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 24/04/2025  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 07/07/2025  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -11774,6 +11774,7 @@ wdir: ; 29/04/2013
 		; rts r0
 
 sysexec:
+	; 07/07/2025 - TRDOS 386 v2.0.10
 	; 21/08/2024 - TRDOS 386 v2.0.9
 	; 23/07/2022 - TRDOS 386 v2.0.5
 	; 06/02/2022 - Retro UNIX 386 v1.2
@@ -12250,8 +12251,9 @@ sysexec_16:
 	mov	ecx, [u.nread]
 	add	[u.break], ecx
 sysexec_17:
-	mov	eax, [ii] ; first cluster
-	call	iclose
+	; 07/07/2025
+	;mov	eax, [ii] ; first cluster
+	;call	iclose
 	xor     eax, eax
 	
 	; 21/08/2024
@@ -13480,6 +13482,7 @@ glerr_3:
 	jmp	short glerr_1
 
 load_and_run_file:
+	; 07/07/2025 - TRDOS 386 Kernel v2.0.10
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 18/11/2017
 	; 22/01/2017
@@ -13542,7 +13545,7 @@ load_and_run_file:
 	mov	[u.usp], esp
 	;
 	call	wswap ; Save MainProg (process 1) 'u' structure
-		      ; and registers for return (from program)	
+		      ; and registers for return (from program)
 	mov	esp, ebp ; **
 	;;22/01/2017
 	;;sti ; 07/01/2017
@@ -13568,7 +13571,7 @@ cnpm_2:
 	;jc	panic
 	; 23/07/2022
 	jc	short cnpm_panic
-	
+
 	; EAX = UPAGE (user structure page) address
 	mov	[u.upage], eax ; memory page for 'user' struct (child)
 	mov	edi, esi
@@ -13584,7 +13587,7 @@ cnpm_2:
 	mov     [esi+p.ttyc-1], ax ; al - set child's console tty
 				   ; ah - reset child's wait channel
 	mov 	[u.ttyp], ax ; 0
-	
+
 	mov	edx, esi
 	mov	[u.uno], dl ; child process number
         inc     byte [esi+p.stat-1] ; 1, SRUN
@@ -13593,22 +13596,23 @@ cnpm_2:
 	shl	esi, 1
 	inc	word [mpid] ; increment m.pid; get a new process name
 
-	; 23/07/2022	
+	; 23/07/2022
 	;mov	ax, [p.pid]  ; get process name of MainProg
 	;mov	ax, 1
 	inc	al ; eax = 1
-	mov	[esi+p.ppid-2], ax ; put parent process name 
+	mov	[esi+p.ppid-2], ax ; put parent process name
 			           ; in parent process slot for child
 	mov	[u.pri], al ; 1	; normal priority
-	
+
 	;dec	ax ; 0
 	;mov 	[u.ttyp], ax ; 0
 
 	mov	ax, [mpid]
-	mov	[esi+p.pid-2], ax ; put new process name 
+	mov	[esi+p.pid-2], ax ; put new process name
 				  ; in child process' name slot
 	;;;
-	mov 	eax, [ii]
+	; 07/07/2025
+	;mov 	eax, [ii]
 	; 23/07/2022
 	; Retro UNIX 386 v1, 'sysexec' (u2.s)
 	;call	iopen
@@ -17812,10 +17816,10 @@ isintr:
 
 iget:
 	;retn
-iopen:
-	;retn
-iclose:
-	;retn
+;iopen:
+;	;retn
+;iclose:
+;	;retn
 sndc:
 	;retn
 access:

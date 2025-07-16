@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - Directory Functions : trdosk4.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/09/2024  (Previous: 29/08/2023)
+; Last Update: 16/07/2025  (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2344,6 +2344,7 @@ loc_save_dir_buff_validate_retn:
 	jmp	short loc_save_dir_buff_retn
 
 update_parent_dir_lmdt:
+	; 16/07/2025 (TRDOS 386 Kernel v2.0.10) (BugFix)
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 29/12/2017
 	; 22/02/2016 (TRDOS 386 = TRDOS v2.0)
@@ -2404,9 +2405,11 @@ loc_update_parent_dir_lmdt_load_sub_dir_3:
 	mov	[Current_Dir_FCluster], eax
 
 	add	esi, 16
-	mov	di, Dir_File_Name
+	;mov	di, Dir_File_Name
+	; 16/07/2025 (BugFix)
+	mov	edi, Dir_File_Name
 	rep	movsb
-	
+
 	mov	esi, Logical_DOSDisks
 	sub	ebx, ebx
 	mov	bh, [Current_Drv]
