@@ -383,8 +383,8 @@ load_DirBuff_error:
  	mov	eax, [esi+LD_ROOTBegin]
 	mov	[DIRSEC], eax
 	; 13/05/2025
-	xor	ecx, ecx	
-	mov	[CLUSNUM], ecx ; 0 ; root directory	
+	xor	ecx, ecx
+	mov	[CLUSNUM], ecx ; 0 ; root directory
 	mov	cx, [esi+LD_BPB+RootDirEnts]
 	; ecx = 512 or 224 or 112
 	dec	ecx

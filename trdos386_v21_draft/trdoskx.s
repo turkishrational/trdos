@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 14/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 15/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -328,6 +328,9 @@ RmDir_DirEntryOffset:	resd 1 ; 01/03/2016 (word -> dword)
 RmDir_ParentDirCluster: resd 1
 RmDir_DirLastCluster:   resd 1
 RmDir_PreviousCluster:  resd 1
+
+; 15/07/2025
+;LMDT_Flag:	resb 1  ; Last Modification Date & Time update flag
 ; 22/02/2016
 UPDLMDT_CDirLevel:	resb 1
 UPDLMDT_CDirFCluster:	resd 1
@@ -640,7 +643,7 @@ fpready:	resb 1	; '80387 fpu is ready' flag
 ; 11/07/2025 - TRDOS 386 v2.0.10
 current_file:	resb 1	; open file number (SFT number)
 ; 14/07/2025
-FAILERR:	resb 1	; ('BUFWRITE' error return)	
+FAILERR:	resb 1	; ('BUFWRITE' error return)
 
 alignb 4
 

@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 14/07/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 15/07/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2866,6 +2866,7 @@ loc_next_sum:
 	retn
 
 make_sub_directory:
+	; 15/07/2025
 	; 14/07/2025
 	; 13/07/2025
 	; (Ref: 'DOS_MKDIR', Retro DOS v5.0 - ibmdos7.s)
@@ -3109,6 +3110,8 @@ loc_mkdir_set_ff_dir_entry_fb:
 	; 14/07/2025
 	jc	short loc_mkdir_failerr
 	; top of stack = LDRVT address ; esi ; !*!
+	; 15/07/2025
+	;mov 	byte [LMDT_Flag], 0 ; (****)
 	; 14/07/2025
 	jmp	NEWDIR	; 13/07/2025
 	;;;
@@ -3513,6 +3516,8 @@ loc_mkdir_anc_3:
 	; 14/07/2025
 NEWDIR_@:
 	push	esi ; LDRVT address
+	; 15/07/2025
+	mov 	byte [LMDT_Flag], 1 ; (****)
 	
 	; 13/07/2025 - TRDOS 386 v2.0.10
 NEWDIR:
@@ -3662,6 +3667,8 @@ dirup_@:
 	; if cf = 1 -> [FAILERR] = error code
 	; if cf = 0 -> [FAILERR] = 0
 	pop	esi
+	; 15/07/2025
+	call	update_parent_dir_lmdt
 	; 14/07/2025
 	movzx	eax, byte [FAILERR]
 	retn
@@ -4035,6 +4042,7 @@ loc_save_dir_buff_validate_retn:
 	jmp	short loc_save_dir_buff_retn
 
 update_parent_dir_lmdt:
+	; 15/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 29/12/2017
 	; 22/02/2016 (TRDOS 386 = TRDOS v2.0)
@@ -4043,6 +4051,11 @@ update_parent_dir_lmdt:
 	;
 	; INPUT ->
 	;	none
+	;	; 15/07/2025
+	;	[LMDT_Flag] = 0 -> only Last Access Date update
+	;			(only dir entry modification)
+	;	[LMDT_Flag] > 0 -> Last Modification Date & Time
+	;			and Last Access Date update
  	; OUTPUT ->
 	;	(last modification date & time of the parent dir
 	;	will be changed/updated)
@@ -4050,21 +4063,43 @@ update_parent_dir_lmdt:
 	; (EAX, EBX, ECX, EDX, EDI will be changed)
 
 	sub	eax, eax
-	mov	ah, [Current_Dir_Level]
-	mov	al, [Current_FATType]
-	cmp	al, 1
-	jb	short loc_UPDLMDT_proc_retn
+	;mov	ah, [Current_Dir_Level]
+	; 15/07/2025
+	mov	al, [Current_Dir_Level]
+	;
+	;mov	al, [Current_FATType]
+	;cmp	al, 1
+	;;jb	short loc_UPDLMDT_proc_retn
+	; 15/07/2025
+	;jnb	short loc_update_parent_dir_lm_date_time
+	
+	; 15/07/2025
+	;cmp	byte [Current_FATType], 1
+	;jnb	short loc_update_parent_dir_lm_date_time
+
+	; 15/07/2025
+	or	al, al
+	jnz	short loc_update_parent_dir_lm_date_time
+
+loc_UPDLMDT_proc_retn:
+	retn
 
 loc_update_parent_dir_lm_date_time:
-	or	ah, ah
-	jz	short loc_UPDLMDT_proc_retn
+	; 15/07/2025
+	;or	ah, ah
+	;jz	short loc_UPDLMDT_proc_retn
 
 	push	esi ; *
-	mov	[UPDLMDT_CDirLevel], ah
+	;mov	[UPDLMDT_CDirLevel], ah
+	; 15/07/2025
+	mov	[UPDLMDT_CDirLevel], al
 	mov	edx, [Current_Dir_FCluster]
 	mov	[UPDLMDT_CDirFCluster], edx
 
-	dec	ah
+	;dec	ah
+	; 15/07/2025
+	dec	al
+
 	;mov	ecx, 12
         ; 29/07/2022
 	sub	ecx, ecx
@@ -4072,32 +4107,48 @@ loc_update_parent_dir_lm_date_time:
 	;
 	mov     esi, PATH_Array
 
-	mov	[Current_Dir_Level], ah
-	or	ah, ah
-	jnz	short loc_update_parent_dir_lmdt_load_sub_dir_1
-	cmp	byte [Current_FATType], 2
-	ja	short loc_update_parent_dir_lmdt_load_sub_dir_2
-	sub	al, al ; eax = 0
-	jmp	short loc_update_parent_dir_lmdt_load_sub_dir_3
-
-loc_UPDLMDT_proc_retn:
-	retn
+	;mov	[Current_Dir_Level], ah
+	; 15/07/2025
+	mov	[Current_Dir_Level], al
+	
+	;or	ah, ah
+	;jnz	short loc_update_parent_dir_lmdt_load_sub_dir_1
+	;cmp	byte [Current_FATType], 2
+	;ja	short loc_update_parent_dir_lmdt_load_sub_dir_2
+	;sub	al, al ; eax = 0
+	;jmp	short loc_update_parent_dir_lmdt_load_sub_dir_3
+	; 15/07/2025
+	;or	ah, ah
+	and	al, al
+	jz	short loc_update_parent_dir_lmdt_load_sub_dir_3	
 
 loc_update_parent_dir_lmdt_load_sub_dir_1:
-	mov	al, 16
-	mul	ah
+	;;;
+	; 15/07/2025 (TRDOS 386 v2.0.10 -> 8 sub dir levels)
+	;dec	ah (level 0 to 7 -> sub directory level 1 to 8)
+	dec	al
+	jz	short loc_update_parent_dir_lmdt_load_sub_dir_2
+	;;;
+	;mov	al, 16
+	;mul	ah
+	shl	eax, 4 ; * 16
 	add	esi, eax
 
 loc_update_parent_dir_lmdt_load_sub_dir_2:
 	mov	eax, [esi+12] ; Parent Dir First Cluster
+	; 15/07/2025
+	add	esi, 16
 
 loc_update_parent_dir_lmdt_load_sub_dir_3:
 	mov	[Current_Dir_FCluster], eax
 
-	add	esi, 16
-	mov	di, Dir_File_Name
+	; 15/07/2025
+	;add	esi, 16
+	;mov	di, Dir_File_Name
+	; 15/07/2025 (BugFix)
+	mov	edi, Dir_File_Name
 	rep	movsb
-	
+
 	mov	esi, Logical_DOSDisks
 	sub	ebx, ebx
 	mov	bh, [Current_Drv]
@@ -4107,6 +4158,7 @@ loc_update_parent_dir_lmdt_load_sub_dir_3:
 
 loc_update_parent_dir_lmdt_locate_dir:
 	mov	esi, Dir_File_Name
+
 	;xor	cx, cx
 	; 29/07/2022
 	xor	ecx, ecx
@@ -4117,19 +4169,49 @@ loc_update_parent_dir_lmdt_locate_dir:
 
 	call	convert_current_date_time
 	mov	[edi+18], dx ; Last Access Date
+
+	; 15/07/2025
+	cmp	byte [LMDT_Flag], 0
+	jna	short loc_update_parent_dir_lmdt_skip
 	mov	[edi+24], dx ; Last Write Date
 	mov	[edi+22], ax ; Last Write Time
+	mov	byte [LMDT_Flag], 0
+loc_update_parent_dir_lmdt_skip:
+	;;;;
+	; 15/07/2025
+	mov	esi, [CurrentBuffer]
 
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+	jnz	short loc_update_parent_dir_lmdt_bw
+	;call	INC_DIRTY_COUNT
+	inc	dword [DirtyBufferCount]
+	;or	byte [esi+9], 40h
+	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
+
+loc_update_parent_dir_lmdt_bw:
+	push	dword [esi+BUFFINFO.buf_ID]
+	call	BUFWRITE
+	pop	eax
+	; ignore error
+	and	ah, ~buf_dirty
+	mov	dword [esi+BUFFINFO.buf_ID], eax
+	;;;;
+
+;15/07/2025
+%if 0
 	mov	byte [DirBuff_ValidData], 2
 	call	save_directory_buffer
 	; 29/12/2017
 	;jc	short loc_update_parent_dir_lmdt_restore_cdirlevel
 	;xor	al, al
+%endif
 loc_update_parent_dir_lmdt_restore_cdirlevel:
  	;current directory level restoration
+	; 15/07/2025
+	xor	eax, eax ; 0 ; clc
 	mov	ah, [UPDLMDT_CDirLevel]
 	mov	[Current_Dir_Level], ah
-        mov     edx, [UPDLMDT_CDirFCluster]
+	mov     edx, [UPDLMDT_CDirFCluster]
 	mov	[Current_Dir_FCluster], edx
 
 	pop	esi ; *
