@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 16/07/2025  (Previous: 26/09/2024, TRDOS 386 v2.0.9)
+; Last Update: 17/07/2025  (Previous: 26/09/2024, TRDOS 386 v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -3748,6 +3748,7 @@ y_n_answer:
 	retn
 
 delete_directory:
+	; 17/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 29/12/2017
 	; 15/10/2016
@@ -3785,6 +3786,13 @@ loc_rmdir_check_dirname_exists:
 loc_rmdir_drv:
 	mov	dh, [Current_Drv]
 	mov	[RUN_CDRV], dh
+
+	;;;;
+	; 17/07/2025 - TRDOS 386 v2.0.10
+	mov	[rmdir_drv], dh
+	mov	ebx, [Current_Dir_FCluster]
+	mov	[rmdir_dir_fcluster], ebx
+	;;;;
 
 	mov	dl, [FindFile_Drv]
 	cmp	dl, dh
@@ -3961,7 +3969,7 @@ loc_rmdir_directory_not_empty:
 	;jmp	loc_file_rw_restore_retn
 
 delete_sub_directory:
-	; 16/07/2025 (TRDOS 386 Kernel v2.0.10)
+	; 17/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 29/12/2017 
 	; (moved here from 'delete_directory' for 'sysrmdir' )
@@ -3974,10 +3982,22 @@ loc_rmdir_delete_short_name_check_dir_empty:
 	mov	ax, [edi+26] ; First Cluster Low Word
 
 	;;;
-	; 16/07/2025
+	; 17/07/2025
  	; (sure it is not the current directory)
-	cmp	eax, [Current_Dir_FCluster]
+	mov	dl, [rmdir_drv]
+	cmp	dl, [Current_Drv]
+	jne	short loc_rmdir_delete_short_name_check_dot
+	cmp	eax, [rmdir_dir_fcluster]
 	je	short loc_rmdir_permission_denied
+loc_rmdir_delete_short_name_check_dot:
+ 	; (DOT and DOTDOT can not be deleted)
+	cmp	byte [edi], '.'
+	jne	short loc_rmdir_delete_short_name_skip_dot
+	cmp	word [edi], '. '
+	je	short loc_rmdir_permission_denied
+	cmp	dword [edi], '..  '
+	je	short loc_rmdir_permission_denied
+loc_rmdir_delete_short_name_skip_dot:
 	;;;
 
 	;mov 	[DelFile_FCluster], eax

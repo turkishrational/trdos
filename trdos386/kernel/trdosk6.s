@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 07/07/2025  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 17/07/2025  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -16651,6 +16651,7 @@ sysrmdir_5:
 	jmp	sysret
 
 sysrmdir: ; Remove (Unlink) Directory
+	; 17/07/2025 - TRDOS 386 v2.0.10
 	; 23/07/2022 - TRDOS 386 v2.0.5
 	; 19/01/2021
 	; 29/12/2017 (TRDOS 386 = TRDOS v2.0)
@@ -16676,6 +16677,15 @@ sysrmdir: ; Remove (Unlink) Directory
 
 sysrmdir_0:
 	mov	esi, ebx
+
+	;;;;
+	; 17/07/2025 - TRDOS 386 v2.0.10
+	mov	al, [Current_Drv]
+	mov	[rmdir_drv], al
+	mov	eax, [Current_Dir_FCluster]
+	mov	[rmdir_dir_fcluster], eax
+	;;;;
+
 	; file name is forced, change directory as temporary
 	;mov	ax, 1
 	;mov	[FFF_Valid], ah ; 0 ; reset
