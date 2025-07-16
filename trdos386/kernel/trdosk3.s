@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 04/07/2025  (Previous: 26/09/2024, TRDOS 386 v2.0.9)
+; Last Update: 16/07/2025  (Previous: 26/09/2024, TRDOS 386 v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -3960,8 +3960,8 @@ loc_rmdir_directory_not_empty:
 	jmp	short loc_rmdir_rw_restore_retn
 	;jmp	loc_file_rw_restore_retn
 
-
 delete_sub_directory:
+	; 16/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 29/12/2017 
 	; (moved here from 'delete_directory' for 'sysrmdir' )
@@ -3972,6 +3972,13 @@ loc_rmdir_delete_short_name_check_dir_empty:
 	mov	ax, [edi+20] ; First Cluster High Word
         shl	eax, 16
 	mov	ax, [edi+26] ; First Cluster Low Word
+
+	;;;
+	; 16/07/2025
+ 	; (sure it is not the current directory)
+	cmp	eax, [Current_Dir_FCluster]
+	je	short loc_rmdir_permission_denied
+	;;;
 
 	;mov 	[DelFile_FCluster], eax
 
