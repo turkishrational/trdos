@@ -5002,6 +5002,7 @@ pack_9:
 ADD_NEW_CLUSTER:
 	mov	ecx, 1
 ADD_NEW_CLUSTERS:
+	; 17/07/2025
 	; 14/07/2025
 	; 12/07/2025
 	; 11/07/2025
@@ -5158,7 +5159,8 @@ adc_13:
 	; Reduce free count by 1
 	mov	[ebx], eax
 	movzx	eax, byte [edx+LD_BPB+SecPerClust]
-	sub	[edx+LD_BPB+LD_FreeSectors], eax
+	; 17/07/2025
+	sub	[edx+LD_FreeSectors], eax
 
 adc_14: ; (MSDOS -> NO_ALLOC)
 	mov	ebx, [FREECLUSTER]
@@ -5271,6 +5273,7 @@ RELEASE:
 	; (MSDOS -> RELEASE)
        	xor	ebx, ebx
 RELBLKS:
+	; 17/07/2025
 	; 11/07/2025
 	; (MSDOS -> RELBLKS) - Ref: Retro DOS v5 - ibmdos7.s
 	; Deassign (Deallocate) disk space
@@ -5333,7 +5336,8 @@ rblks_2:
 	; Increase free count by 1
 	mov	[ebx], eax
 	movzx	eax, byte [edx+LD_BPB+SecPerClust]
-	add	[edx+LD_BPB+LD_FreeSectors], eax
+	; 17/07/2025
+	add	[edx+LD_FreeSectors], eax
 
 rblks_3: ; (MSDOS -> NO_DEALLOC)
 	mov	eax, [NEXTCLUSTER]

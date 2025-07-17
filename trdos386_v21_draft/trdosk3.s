@@ -4651,6 +4651,8 @@ loc_rmdir_cmd_failed:
 	or	eax, eax ; EAX = 0 -> Directory not empty!
 	jz	short loc_rmdir_directory_not_empty
 
+; 17/07/2025
+%if 0
 	; EAX > 0 -> Error code in AL (or AX or EAX)
 
 	cmp	dword [FAT_ClusterCounter], 1
@@ -4676,10 +4678,18 @@ loc_rmdir_cmd_return:
 	; 28/07/2022
 	jnc	short loc_rmdir_rw_restore_retn
 	jmp	loc_file_rw_cmd_failed
+%else
+	; 17/07/2025
+	stc
+	jmp	loc_file_rw_cmd_failed
+%endif
 
 loc_rmdir_directory_not_empty:
 	mov	esi, Msg_Dir_Not_Empty
 	call	print_msg
+
+; 17/07/2025
+%if 0
 	; 01/03/2016
 	mov	eax, [FAT_ClusterCounter]
 	or	eax, eax ; 0 ?
@@ -4699,6 +4709,10 @@ loc_rmdir_directory_not_empty:
 	jnz	short loc_rmdir_cmd_return
 	jmp	short loc_rmdir_rw_restore_retn
 	;jmp	loc_file_rw_restore_retn
+%else
+	; 17/07/2025
+	jmp	loc_file_rw_restore_retn	
+%endif
 
 delete_sub_directory:
 	; 17/07/2025
@@ -5160,6 +5174,7 @@ del_sub_dir_11:
 	;call	update_fat32_fsinfo
 	;pop	edx
 	pop	eax ; **
+	mov	cl, [edx+LD_PhyDrvNo]
 	;
 	call	GETBUFFER ; Pre Read
 	jc	short NOTDIRPATHPOP2
