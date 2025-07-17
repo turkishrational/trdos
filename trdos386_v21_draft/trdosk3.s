@@ -5090,11 +5090,11 @@ rmdir_get_buf:
 	add	esi, BUFINSIZ
 	lodsd
 	cmp	eax, 2020202Eh ; '.   ' ;  First entry '.' ?
-	jne	short NOTDIRPATHPOP
+	jne	short NOTDIRPATHPOP_err
 	add	esi, 28 ; dir_entry.size-4
 	lodsd
 	cmp	eax, 20202E2Eh ; '..  ' ;  Second entry '..' ?
-	jne	short NOTDIRPATHPOP
+	jne	short NOTDIRPATHPOP_err
 
 	mov	eax, 2  ; skip '.' and '..'
 	mov	ebx, [rmdir_FCluster]
@@ -5122,6 +5122,12 @@ NOTDIRPATHPOP2:
 	pop	ebx ; *
 	; eax = error code
 	retn
+
+	; 17/07/2025
+NOTDIRPATHPOP_err:
+	; 'permission denied !' error 
+	mov	eax, ERR_PERM_DENIED
+	jmp	short del_sub_dir_err
 
 del_sub_dir_6:
 	; eax = file/dir entry (found) index number
