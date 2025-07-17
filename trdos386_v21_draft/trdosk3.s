@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 08/07/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 17/07/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -4461,6 +4461,8 @@ y_n_answer:
 	retn
 
 delete_directory:
+	; 17/07/2025
+	; 16/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 29/12/2017
 	; 15/10/2016
@@ -4479,7 +4481,8 @@ loc_rmdir_nodirname_retn:
 	retn
 
 loc_rmdir_parse_path_name:
-	mov	edi, FindFile_Drv
+	; 16/07/2025
+	;mov	edi, FindFile_Drv
 	call	parse_path_name
 	;jc	loc_cmd_failed
 	; 28/07/2022
@@ -4488,18 +4491,31 @@ lc_del_dir_failed:
 	jmp	loc_cmd_failed
 
 loc_rmdir_check_dirname_exists:
-	mov	esi, FindFile_Name
+	;mov	esi, FindFile_Name
+	; 16/07/2025
+	mov	esi, Path_FileName
 	cmp	byte [esi], 20h
 	;jna	loc_cmd_failed
 	; 28/07/2022
 	jna	short lc_del_dir_failed
-	mov	[DelFile_FNPointer], esi
+	;mov	[DelFile_FNPointer], esi
+	; 16/07/2025
+	mov	[rmdir_DirName_Offset], esi
 
 loc_rmdir_drv:
 	mov	dh, [Current_Drv]
 	mov	[RUN_CDRV], dh
 
-	mov	dl, [FindFile_Drv]
+	;;;;
+	; 17/07/2025
+	mov	[rmdir_drv], dh
+	mov	ebx, [Current_Dir_FCluster]
+	mov	[rmdir_dir_fcluster], ebx
+	;;;;
+
+	;mov	dl, [FindFile_Drv]
+	; 16/07/2025
+	mov	dl, [Path_Drv]
 	cmp	dl, dh
 	je	short loc_rmdir_change_directory
 
@@ -4511,11 +4527,15 @@ loc_rmdir_drv:
 	jc	short loc_rmdir_chdrv_failed
 
 loc_rmdir_change_directory:
-	cmp	byte [FindFile_Directory], 20h
+	;cmp	byte [FindFile_Directory], 20h
+	; 16/07/2025
+	cmp	byte [Path_Directory], 20h
 	jna	short loc_rmdir_find_directory
 
 	inc	byte [Restore_CDIR]
-	mov	esi, FindFile_Directory
+	;mov	esi, FindFile_Directory
+	; 16/07/2025
+	mov	esi, Path_Directory
 	xor	ah, ah ; CD_COMMAND sign -> 0
 	call	change_current_directory
 	jc	short loc_rmdir_check_error_code
@@ -4524,8 +4544,10 @@ loc_rmdir_change_directory:
 	;call	change_prompt_dir_string
 
 loc_rmdir_find_directory:
-	;mov	esi, FindFile_Name
-	mov	esi, [DelFile_FNPointer]
+	;;mov	esi, FindFile_Name
+	;mov	esi, [DelFile_FNPointer]
+	; 16/07/2025
+	mov	esi, [rmdir_DirName_Offset]
 	mov	ax, 0810h ; Only directories
 	call	find_first_file
 	jnc	short loc_rmdir_ambgfn_check
@@ -4552,11 +4574,14 @@ loc_rmdir_directory_found:
 	;jnz	loc_permission_denied
 	; 28/07/2022
 	jz	short loc_rmdir_save_lnel
+loc_rmdir_permission_denied: ; 16/07/2025
 	jmp	loc_permission_denied
 
 loc_rmdir_save_lnel: ; 28/02/2016
-       ;mov	bh, [LongName_EntryLength]
-	mov	[DelFile_LNEL], bh ; Long name entry length (if > 0)
+        ;;mov	bh, [LongName_EntryLength]
+	;mov	[DelFile_LNEL], bh ; Long name entry length (if > 0)
+	; 16/07/2025
+	mov	[rmdir_LNEL], bh
 	; edi = Directory Entry Offset (DirBuff)
 	; esi = Directory Entry (FFF Structure)
 	;mov	[DelFile_DirEntryAddr], edi ; not required
@@ -4572,7 +4597,9 @@ pass_rmdir_fc_check:
 
 	mov	esi, Msg_DoYouWantRmDir
 	call	print_msg
-	mov	esi, [DelFile_FNPointer]
+	;mov	esi, [DelFile_FNPointer]
+	; 16/07/2025
+	mov	esi, [rmdir_DirName_Offset]
 	call	print_msg
 	mov	esi, Msg_YesNo
 	call	print_msg
@@ -4641,7 +4668,7 @@ loc_rmdir_cmd_return:
 	mov	bx, 0FF00h ; BH = FFh -> use ESI for Drive parameters
 	           ; BL = 0 -> Recalculate free cluster count
 	push	eax
-	call	calculate_fat_freespace	
+	call	calculate_fat_freespace
 	pop	eax
 	popf
 	;jc	loc_file_rw_cmd_failed
@@ -4658,7 +4685,7 @@ loc_rmdir_directory_not_empty:
 	or	eax, eax ; 0 ?
 	;jz	loc_file_rw_restore_retn
 	; 28/07/2022
-	jz	short loc_rmdir_rw_restore_retn	
+	jz	short loc_rmdir_rw_restore_retn
 
 	; ESI = Logical DOS Drive Description Table address
 	mov	bx, 0FF01h ; BH = FFh -> use ESI for Drive parameters
@@ -4673,18 +4700,44 @@ loc_rmdir_directory_not_empty:
 	jmp	short loc_rmdir_rw_restore_retn
 	;jmp	loc_file_rw_restore_retn
 
-
 delete_sub_directory:
+	; 17/07/2025
+	; (Ref: 'DOS_RMDIR', Retro DOS v5.0 - ibmdos7.s)
+	; 16/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 29/12/2017 
 	; (moved here from 'delete_directory' for 'sysrmdir' )
 
 	; EDI = Directory buffer entry offset/address
 
-loc_rmdir_delete_short_name_check_dir_empty:
+	; 17/07/2025
+	; [CurrentBuffer] = directory buffer header address
+
+;loc_rmdir_delete_short_name_check_dir_empty:
+del_sub_dir_0:
 	mov	ax, [edi+20] ; First Cluster High Word
         shl	eax, 16
 	mov	ax, [edi+26] ; First Cluster Low Word
+
+	;;;
+	; 17/07/2025
+ 	; (sure it is not the current directory)
+	mov	dl, [rmdir_drv]
+	cmp	dl, [Current_Drv]
+	jne	short del_sub_dir_1
+	cmp	eax, [rmdir_dir_fcluster]
+	;je	short loc_rmdir_permission_denied
+	je	short del_sub_dir_perm_denied
+del_sub_dir_1:
+ 	; (DOT and DOTDOT can not be deleted)
+	cmp	byte [edi], '.'
+	jne	short del_sub_dir_2
+	cmp	word [edi], '. '
+	je	short del_sub_dir_perm_denied
+	cmp	dword [edi], '..  '
+	je	short del_sub_dir_perm_denied
+del_sub_dir_2:
+	;;;
 
 	;mov 	[DelFile_FCluster], eax
 
@@ -4696,40 +4749,53 @@ loc_rmdir_delete_short_name_check_dir_empty:
 	; 29/12/2017
 	mov	[FAT_ClusterCounter], ebx ; 0 ; Reset
 
-	mov	bh, [FindFile_Drv]
+	;mov	bh, [FindFile_Drv]
+	; 17/07/2025
+	mov	bh, [Current_Drv] ; [Path_Drv]
 	mov	esi, Logical_DOSDisks
 	add	esi, ebx
 
-	cmp	word [edi+DirEntry_NTRes], 01A1h
-	je	short loc_rmdir_check_fs_directory
+	; 17/07/2025
+	;cmp	word [edi+DirEntry_NTRes], 01A1h
+	;je	short loc_rmdir_check_fs_directory
 
 	;cmp	byte [esi+LD_FATType], 1
 	;jb	short loc_rmdir_get__last_cluster_0
 
 	; 29/12/2017
 	cmp	eax, 2
-	jnb	short loc_rmdir_get_last_cluster_1
+	;jnb	short loc_rmdir_get_last_cluster_1
+	; 17/07/2025
+	jnb	short del_sub_dir_3
 	; eax < 2
-loc_rmdir_get_last_cluster_0:
+;loc_rmdir_get_last_cluster_0:
 	;mov	eax, ERR_INV_FORMAT ; invalid format!
 	mov	eax, ERR_NOT_DIR ; not a valid directory!
 	;stc
 	retn
 
-loc_rmdir_get_last_cluster_1:
+;loc_rmdir_get_last_cluster_1:
+del_sub_dir_3:	; 17/07/2025
 	cmp	byte [esi+LD_FATType], 3 ; FAT32
-	jne	short loc_rmdir_get_last_cluster_2
+	;jne	short loc_rmdir_get_last_cluster_2
+	; 17/07/2025
+	jne	short del_sub_dir_4
 
 	; is it root directory ?
 	cmp	eax, [esi+LD_BPB+BPB_RootClus]
-	jne	short loc_rmdir_get_last_cluster_2
+	;jne	short loc_rmdir_get_last_cluster_2
+	; 17/07/2025
+	jne	short del_sub_dir_4
 
 	; root directory can not be deleted !!
-loc_rmdir_permission_denied:
+;loc_rmdir_permission_denied:
+del_sub_dir_perm_denied: ; 17/07/2025
 	mov	eax, ERR_PERM_DENIED ; permission denied!
 	stc
 	retn
 
+; 17/07/2025 - TRDOS 386 v2.0.10
+%if 0
 loc_rmdir_get_last_cluster_2:
 	; 29/12/2017
 	mov 	[DelFile_FCluster], eax
@@ -4982,6 +5048,130 @@ loc_delete_sub_directory_ok:
 	; 29/12/2017
 	xor	eax, eax ;  0 ;  cf = 0
 	retn
+%else
+	; 17/07/2025 - TRDOS 386 v2.0.10
+del_sub_dir_4:
+	; 29/12/2017
+	;mov 	[DelFile_FCluster], eax
+	; 17/07/2025
+	mov	[rmdir_FCluster], eax
+rmdir_get_buf:
+	mov	edx, esi ; LDRVT address
+	mov	esi, [CurrentBuffer]
+	; compute true offset
+	mov	ebx, edi
+	sub	ebx, esi
+	push	ebx ; * ; save entry pointer
+	push	dword [esi+BUFFINFO.buf_sector] ; **
+	
+	; edx = LDRVT address
+	; eax = the 1st clust of the dir will be removed
+	call	FIGREC 	
+	
+	; eax = physical disk sector (LBA)
+	;  cl = physical drive number
+	call	GETBUFFER
+	jc	short NOTDIRPATHPOP
+	; esi = buffer header address
+	add	esi, BUFINSIZ
+	lodsd
+	cmp	eax, 2020202Eh ; '.   ' ;  First entry '.' ?
+	jne	short NOTDIRPATHPOP
+	add	esi, 28 ; dir_entry.size-4
+	lodsd
+	cmp	eax, 20202E2Eh ; '..  ' ;  Second entry '..' ?
+	jne	short NOTDIRPATHPOP
+
+	mov	eax, 2  ; skip '.' and '..'
+	mov	ebx, [rmdir_FCluster]
+
+	; edx = LDRVT address 
+	; ebx = 1st cluster of the directory
+	; eax = directory entry index number
+del_sub_dir_5:
+	; search for valid directory entry
+	;	(except deleted and free entries)
+	call	search_directory_entry
+	jnc	short del_sub_dir_6
+
+	; check error reason
+	cmp	al, ERR_NOT_FOUND ; 2
+	je	short del_sub_dir_8 ; remove directory
+
+	; (disk read error)
+
+del_sub_dir_err:
+	stc
+NOTDIRPATHPOP:
+	pop	ebx ; **
+NOTDIRPATHPOP2:
+	pop	ebx ; *
+	; eax = error code
+	retn
+
+del_sub_dir_6:
+	; eax = file/dir entry (found) index number
+	; ebx = the 1st cluster of the directory
+	; edx = Logical Dos Drive parameters Table
+	; edi = directory entry (in the dir buff)
+	; ecx = current (last) cluster of the dir
+	; esi = [CurrentBuffer] = dir buffer header
+
+	; check if it is long name entry
+	cmp	byte [edi+dir_entry.dir_attr], 0Fh
+	jne	short del_sub_dir_7 ; directory not empty !
+	; ignore long name entry
+	; (there must be a short name entry for it)
+	inc	eax ; search for next dir entry
+	jmp	short del_sub_dir_5
+
+del_sub_dir_7:
+	xor	eax, eax
+	; eax = 0  & cf = 1 -> directory not empty !
+	jmp	short del_sub_dir_err
+
+del_sub_dir_8:
+	; edx = LDRVT address
+	mov	eax, [rmdir_FCluster]
+	call	RELEASE
+	jc	short NOTDIRPATHPOP
+
+	cmp	byte [edx+LD_FATType], 2
+	jna	short del_sub_dir_9 ; not FAT32
+
+	; FAT32 fs
+	lea	ebx, [edx+LD_BPB+FAT32_FirstFreeClust]
+	jmp	short del_sub_dir_10
+
+del_sub_dir_9:
+	; FAT16 or FAT12 fs
+	lea	ebx, [edx+LD_BPB+FAT_FirstFreeClust]
+del_sub_dir_10:
+	mov	eax, [rmdir_FCluster]
+	cmp	eax, [ebx]
+	jnb	short del_sub_dir_11
+	; replace first free cluster value
+	mov	[ebx], eax
+del_sub_dir_11:
+	; 17/07/2025
+	; (fsinfo sector will updated in 'DIRUP:')
+	;mov	esi, edx
+	;push	esi
+	;call	update_fat32_fsinfo
+	;pop	edx
+	pop	eax ; **
+	;
+	call	GETBUFFER ; Pre Read
+	jc	short NOTDIRPATHPOP2
+rmdir_fde:
+	or	byte [esi+BUFFINFO.buf_flags], buf_isDIR
+	pop	ebx ; *	; Pointer to start of entry
+	add	ebx, esi	; Corrected
+	mov	byte [ebx], 0E5h ; Free the entry
+	mov	byte [LMDT_Flag], 1
+			; update parent dir LMDT
+	jmp	DIRUP
+%endif
 
 delete_file:
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)

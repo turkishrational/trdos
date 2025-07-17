@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 16/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 17/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -301,12 +301,15 @@ alignb 4
 DelFile_FNPointer:	resd 1 ; ; CMD_INTR.ASM (word) ; 09/11/2011
 ; 27/02/2016
 ; DIR.ASM (09/10/2011)
+rmdir_FCluster:	; 17/07/2025
 DelFile_FCluster:	resd 1
 DelFile_EntryCounter:	resw 1
+rmdir_LNEL: ; 16/07/2025		
 DelFile_LNEL:		resb 1
 			resb 1
 
 ; DIR.ASM
+rmdir_DirName_Offset:	; 16/07/2025
 mkdir_DirName_Offset: 	resd 1
 mkdir_FFCluster:	resd 1
 mkdir_LastDirCluster:	resd 1
@@ -329,6 +332,10 @@ RmDir_ParentDirCluster: resd 1
 RmDir_DirLastCluster:   resd 1
 RmDir_PreviousCluster:  resd 1
 
+; 17/07/2025
+rmdir_dir_fcluster:	resd 1
+rmdir_drv:		resb 1
+
 ; 16/07/2025
 LMDT_Flag:	resb 1  ; Last Modification Date & Time update flag
 ; 22/02/2016
@@ -344,7 +351,7 @@ gffc_first_free_cluster: resd 1
 FCS_END:
 gffc_last_free_cluster:  resd 1
 
-;29/04/2016
+; 29/04/2016
 Cluster_Index: ; resd 1
 ; 22/02/2016
 ClusterValue:	resd 1

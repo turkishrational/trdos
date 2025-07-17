@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 14/07/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 17/07/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -3411,6 +3411,7 @@ figrec_2:
 ; 27/04/2025 - TRDOS 386 v2.0.10
 
 DIRREAD:
+	; 17/07/2025
 	; 01/06/2025
 	; 27/04/2025
 	; (MSDOS -> DIRREAD) - Ref: Retro DOS v5 - ibmdos7.s
@@ -3476,10 +3477,15 @@ drd_skipcl:
 drd_skipped:
 	mov	[NXTCLUSNUM], eax
 
-	movzx	ebx, byte [SECCLUSPOS]
+	;movzx	ebx, byte [SECCLUSPOS]
 	mov	eax, [CLUSNUM]
 
 	call	FIGREC
+
+	; 17/07/2025
+	movzx	ebx, byte [SECCLUSPOS]
+	add	eax, ebx
+
 	; eax = physical sector number
 	;  cl = physical drive/disk number
 drd_getbuf:

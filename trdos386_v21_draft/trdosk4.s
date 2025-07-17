@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 16/07/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 17/07/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -8450,6 +8450,7 @@ get_direntry_@:
 	mov	dword [GDE_CCLUST], -1
 	;mov	dword [GDE_CINDEX], 0
 
+	; 17/07/2025
 	; 03/06/2025
 	; 02/06/2025
 	; 01/06/2025 - TRDOS 386 v2.0.10
@@ -8467,6 +8468,9 @@ get_direntry:
 	;  esi = directory buffer header
 	;  (eax = directory entry offset)
 	;  edx = LDRVT
+	;  17/07/2025
+	;  ecx = current (last) cluster
+	;      = [GDE_CCLUST]	
 	;
 	;  if cf = 1 -> error code in eax
 	;
@@ -8652,6 +8656,8 @@ gde_17:
 	mov	eax, [GDE_BINDEX]
 	shl	eax, 5 ; * 32
 	add	edi, eax
+	; 17/07/2025
+	mov	ecx, [GDE_CCLUST]
 
 	retn
 
@@ -8897,7 +8903,6 @@ ctodotfn_3:
 	pop	edi ; *
 	retn
 
-
 ; -----------------------------------------------
 
 	; 01/07/2025 - TRDOS 386 v2.0.10
@@ -8928,6 +8933,82 @@ cnvtlc_2:
 	jmp	short cnvtlc_1
 cnvtlc_3:
 	pop	esi
+	retn
+
+; -----------------------------------------------
+
+	; 17/07/2025 - TRDOS 386 v2.0.10
+search_directory_entry:
+	; Search a valid directory entry with index number
+	;
+	; Input:
+	;   eax = entry index number (dir entry counter)
+	;   ebx = 1st cluster of the directory
+	;   edx = LDRVT address
+	;
+	; Output:
+	;   eax = file/dir entry (found) index number
+	;   ebx = the 1st cluster of the directory
+	;   edx = Logical Dos Drive parameters Table
+	;   edi = directory entry (in the dir buff)
+	;   ecx = current (last) cluster of the dir
+	;   esi = [CurrentBuffer] = dir buffer header
+	;
+	;   If CF = 1 -> error code in EAX
+	;
+	; Modified registers:
+	;	eax, ebx, ecx, edx, esi, edi, ebp
+
+	mov	[DIR_FCluster], ebx
+	mov	[DirEntry_Counter], eax
+
+	call	get_direntry_@
+	jc	short sde_fail
+sde_1:
+	; edi = directory entry
+	; esi = directory buffer header
+	; eax = directory entry offset (0-480)
+
+	lea	ebx, [esi+BUFINSIZ+512]
+
+	; 17/07/2025
+	; ecx = current (last) cluster
+sde_2:
+	mov	al, [edi]
+	or	al, al
+	jz	short sde_not_found ; end of directory
+
+	cmp	al, 0E5h	; deleted file
+	je	short sde_3
+sde_found:
+	clc
+	mov	eax, [DirEntry_Counter]
+	mov	ebx, [DIR_FCluster]
+	; edi = directory entry address
+	; edx = LDRVT
+	; 17/07/2025
+	; ecx = current (last) cluster ([GDE_CCLUST])
+	retn
+sde_3:
+	inc	dword [DirEntry_Counter]
+	add	edi, 32
+
+	cmp	edi, ebx ; buffer end
+	jb	short sde_2
+
+	mov	eax, [DirEntry_Counter]
+	mov	ebx, [DIR_FCluster]
+	call	get_direntry
+	jnc	short sde_1
+sde_fail:
+	; error code in EAX
+	retn
+
+sde_not_found:
+	; File/Directory/Volume name not found
+	;mov	eax, ERR_FILE_NOT_FOUND ; 12
+	mov	eax, ERR_NOT_FOUND ; 2
+	stc
 	retn
 
 ; 20/05/2025 - TRDOS 386 v2.0.10
