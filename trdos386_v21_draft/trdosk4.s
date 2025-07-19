@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 17/07/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 19/07/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1425,11 +1425,12 @@ loc_reload_FAT_sub_directory:
 	jmp	load_FAT_sub_directory
 
 find_directory_entry:
+	; 19/07/2025
 	; 02/06/2025
 	; 29/05/2025
 	; 18/05/2025
 	; 17/05/2025
-	; 16/05/2025 (TRDOS 386 Kernel v2.0.10)	
+	; 16/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 02/03/2021 (TRDOS 386 v2.0.3) ((BugFix))
 	; 14/02/2016
@@ -1538,6 +1539,8 @@ loc_ffde_stc_retn_255:
 	mov	cx, 0FFFFh
 	;xor	ecx, ecx
 	;dec	ecx ; 0FFFFFFFFh
+	; 19/07/2025 (*)
+	; bl = 0 
 	;xor	eax, eax
 loc_find_direntry_stc_retn:
 loc_check_ffde_retn_1:
@@ -1576,9 +1579,13 @@ loc_find_dir_next_entry_1:
 	;cmp	bx, [DirBuff_LastEntry]
 	;ja	short loc_ffde_stc_retn_255
 	; 16/05/2025
-	cmp	bl, 16 ; 512/32
-	jnb	short loc_ffde_stc_retn_255
-        ; 28/07/2022
+	;cmp	bl, 16 ; 512/32
+	;jnb	short loc_ffde_stc_retn_255
+	; 19/07/2025 (*)
+	and	bl, 15
+	jz	short loc_ffde_stc_retn_255        
+
+	; 28/07/2022
 	;jmp	short check_find_dir_entry
 
 check_find_dir_entry:
@@ -1598,8 +1605,10 @@ loc_fde_check_attrib:
 
 	cmp	dl, 0Fh ; longname sub component check
 	jne	short loc_check_attributes_mask
+	; 19/07/2025
+	;push	ecx
 	call	save_longname_sub_component
-
+	;pop	ecx
 loc_check_attributes_mask:
 	mov	dh, al
 	and	dh, dl
@@ -2167,6 +2176,7 @@ simple_ucase_skip:
 %endif
 
 save_longname_sub_component:
+	; 19/07/2025
 	; 25/05/2025
 	; 20/05/2025 (TRDOS 386 v2.0.10)
 	;	-Major Modification-
@@ -2220,24 +2230,25 @@ save_longname_sub_component:
 	;	(ASCIIZ name buffer size will be 129 bytes)
 	;	((unicode LFN buffer will be 260 bytes))
 	;
-	; Modified registers: ECX ; 20/05/2025
+	; Modified registers: NONE ; 19/07/2025 
+	;	ECX ; 20/05/2025
 	;
 
 	push	edi
 	push	esi
 	;push	ebx
-	;push	ecx
+	push	ecx ; 19/07/2025
 	;push	edx
 	push	eax
 
 	sub	ecx, ecx
 	;sub	eax, eax
-	
+
 	; 25/05/2025
 	mov	cl, 26
-	
+
 	movzx	eax, byte [edi] ; LDIR_Order
-	
+
 	;cmp	al, 41h  ; 40h (last long entry sign) + 1
 	;jb	short pass_pslnsc_last_long_entry
 	; 20/05/2025
@@ -2275,9 +2286,9 @@ save_longname_sub_component:
 	;	; with eax+26 bytes length
 	;add	esi, LongFileName
 	;mov	word [esi], 0
-	
+
 	; 25/05/2025
-	; eax = offset from beginning of LongFileName 
+	; eax = offset from beginning of LongFileName
 
 	jmp	short loc_pslsc_move_ldir_name2
 
@@ -2305,7 +2316,7 @@ loc_pslsc_move_ldir_name2:
 	inc	esi
 	mov	cl, 5 ; chars 1 to 5
 	rep	movsw
-	
+
 	add	esi, 3
 
 	movsd	; char 6 & 7
@@ -2318,7 +2329,7 @@ loc_pslsc_move_ldir_name2:
 loc_pslnsc_retn:
  	pop	eax
 	;pop	edx
-	;pop	ecx
+	pop	ecx ; 19/07/2025
 	;pop	ebx
 	pop	esi
 	pop	edi
@@ -4225,6 +4236,8 @@ loc_update_parent_dir_lmdt_restore_cdirlevel:
 	pop	esi ; *
 	retn
 
+; 18/07/2025 - TRDOS 386 v2.0.10
+%if 0
 delete_longname:
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 27/02/2016 (TRDOS 386 = TRDOS v2.0)
@@ -4289,6 +4302,113 @@ loc_dln_longname_retn:
 loc_dln_longname_retn_xor_eax:
 	xor	eax, eax
 	retn
+%else
+	; 18/07/2025 - TRDOS 386 v2.0.10
+delete_longname:
+	; Delete long directory entries.
+	;
+	; Input:
+	;   eax = the last long directory entry index number
+	;	  (the 1st entry in the directory order)
+	;   ebx = 1st cluster of the directory
+	;   edx = LDRVT address
+	;
+	; Output:
+	;   eax = file/dir entry (found) index number
+	;   ebx = the 1st cluster of the directory
+	;   edx = Logical Dos Drive parameters Table
+	;   edi = directory entry (in the dir buff)
+	;   ecx = current (last) cluster of the dir
+	;   esi = [CurrentBuffer] = dir buffer header
+	;
+	;   If CF = 1 -> error code in EAX
+	;
+	; Modified registers:
+	;	eax, ebx, ecx, edx, esi, edi, ebp
+
+	mov	[DIR_FCluster], ebx
+	mov	[DirEntry_Counter], eax
+
+	call	get_direntry_@
+	jc	short dln_fail
+
+	;mov	eax, ERR_FILE_NOT_FOUND ; 12
+	mov	eax, ERR_NOT_FOUND ; 2
+	cmp	byte [edi+dir_entry.dir_attr], 0Fh
+	jne	short dln_fail_stc
+	cmp	byte [edi], 41h
+	jb	short dln_fail
+	; this may not be necessary !
+	mov	eax, ERR_PERM_DENIED ; 11
+	cmp	byte [edi], 4Ah
+	jna	short dln_1
+
+dln_fail_stc:
+	stc
+dln_fail:
+	retn
+dln_1:
+	; edi = directory entry
+	; esi = directory buffer header
+	; eax = directory entry offset (0-480)
+	; ecx = current (last) cluster
+
+	lea	ebx, [esi+BUFINSIZ+512]
+dln_2:
+	mov	al, [edi]
+	mov	byte [edi], 0E5h ; deleted entry sign
+
+	inc	dword [DirEntry_Counter]
+	add	edi, 32
+
+	cmp	edi, ebx ; buffer end
+	jnb	short dln_4
+
+	; if al = 01h or al = 41h it is the 1st LFN entry
+	; (the last in directory entry order)
+	dec	al
+	and	al, 0Fh
+	jz	short dln_3 ; the next must be a short name
+
+	; safety
+	cmp	byte [edi+dir_entry.dir_attr], 0Fh
+	je	short dln_2
+dln_3:
+	; stop here
+	xor	ebx, ebx ; 0 ; sign to stop
+dln_4:
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+	jnz	short dln_5
+	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
+	;call	INC_DIRTY_COUNT
+	inc	dword [DirtyBufferCount]
+dln_5:
+	; esi = buffer header address
+	push	ebx
+	push	dword [esi+BUFFINFO.buf_ID] ; *
+	call	BUFWRITE
+	; BUFWRITE invalidates the buffer
+	; so, BUFFINFO.buf_ID must be restored here
+	; (but, this is not necessary) ; *
+	pop	ecx ; *
+	pop	ebx
+	jc	short dln_fail
+	and	ch, ~buf_dirty
+	mov	[esi+BUFFINFO.buf_ID], ecx ; *
+	; clear dirty flag ; *
+	;and	byte [esi+BUFFINFO.buf_flags], ~buf_dirty
+	or	ebx, ebx ; stop sign ?
+	jz	short dln_ok ; yes ; cf = 0
+
+	mov	eax, [DirEntry_Counter]
+	mov	ebx, [DIR_FCluster]
+	call	get_direntry
+	jnc	short dln_1
+
+	; error code in EAX
+dln_ok:
+	retn
+%endif
 
 locate_current_dir_entry:
 	; 30/07/2022

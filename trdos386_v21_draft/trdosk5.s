@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 17/07/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 19/07/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -3615,6 +3615,7 @@ fatsecrd_4:
 ; 28/04/2025 - TRDOS 386 v2.0.10
 
 BUFWRITE:
+	; 19/07/2025
 	; 14/07/2025
 	; 28/04/2025
 	; (MSDOS -> BUFWRITE) - Ref: Retro DOS v5 - ibmdos7.s
@@ -3624,9 +3625,10 @@ BUFWRITE:
 	; 	ESI = Buffer header address
 	; OUTPUT:
 	;	Buffer marked free
+	;	EDX = LDRVT address ; 19/07/2025
 	;
 	;	if cf = 1 -> eax = [FAILERR] = error code
-	;		  -> edx = LDRVT addr for failed drive
+	;		     edx = LDRVT addr for failed drive
 	;;	if cf = 0 -> [FAILERR] = 0 ; 14/07/2025
 
 	; Modified registers:
@@ -3682,11 +3684,14 @@ bufwrt_3:
 	loop	bufwrt_2
 
 	or	edx, edx
-	jnz	short bufwrt_4 ; At least one write succeed
+	;jnz	short bufwrt_4 ; At least one write succeed
 
 	; 28/04/2025
-	; return LDRVT address for failed disk
+	; return LDRVT address ; 19/07/2025
 	mov	edx, [esi+BUFFINFO.buf_DPB]
+
+	; 19/07/2025
+	jnz	short bufwrt_4 ; At least one write succeed
 
 	mov	eax, ERR_DRV_WRITE ; 'disk write error !'
 	; 14/07/2025
@@ -4759,7 +4764,7 @@ GETENTRY:
 	;	EAX, EBX, ECX, ESI, EDI, EBP
 	;
 
-GETENTRY:
+;GETENTRY:
 	mov	eax, [LASTENT]
 	; 11/05/2025
 	jmp	short GETENT_@

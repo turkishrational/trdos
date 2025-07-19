@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 17/07/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 19/07/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -3235,6 +3235,7 @@ loc_fff_fnf_inc_mc:
 	retn
 
 find_next_file:
+	; 19/07/2025
 	; 29/05/2025
 	; 19/05/2025
 	; 18/05/2025
@@ -3334,11 +3335,14 @@ loc_cont_search_next_file_@:
 	or	ecx, ecx
 	jz	short loc_fnf_stc_retn ; end of dir
 
+	; 19/07/2025
+	mov	byte [FindFile_DirEntryNumber], 0
+
 loc_cont_search_next_file:
 	; 17/05/2025
 	dec	byte [FindFile_DirSectorCount]
 	jz	short loc_cont_search_next_file_nc
-
+	
 	inc	dword [FindFile_DirSector]
 	;mov	eax, [FindFile_DirSector]
 	; 19/05/2025
@@ -3390,8 +3394,10 @@ loc_fnf_load_next_dir_cluster:
 
 loc_fnf_check_err_reason:
 	cmp	eax, 2 ; file not found
-	jne	short loc_fnf_stc_retn_@
-	jmp	short loc_fnf_stc_retn ; no more files !
+	;jne	short loc_fnf_stc_retn_@
+	;jmp	short loc_fnf_stc_retn ; no more files !
+	; 19/07/2025
+	je	short loc_fnf_stc_retn
 loc_fnf_stc_retn_@:
 	stc
 	retn
@@ -4582,6 +4588,12 @@ loc_rmdir_save_lnel: ; 28/02/2016
 	;mov	[DelFile_LNEL], bh ; Long name entry length (if > 0)
 	; 16/07/2025
 	mov	[rmdir_LNEL], bh
+	;;;
+	; 18/07/2025
+	mov	eax, [DirEntry_Counter] 
+		; from 'find_directory_entry'
+	mov	[rmdir_EntryNumber], eax
+	;;;
 	; edi = Directory Entry Offset (DirBuff)
 	; esi = Directory Entry (FFF Structure)
 	;mov	[DelFile_DirEntryAddr], edi ; not required
@@ -4711,7 +4723,7 @@ loc_rmdir_directory_not_empty:
 	;jmp	loc_file_rw_restore_retn
 %else
 	; 17/07/2025
-	jmp	loc_file_rw_restore_retn	
+	jmp	loc_file_rw_restore_retn
 %endif
 
 delete_sub_directory:
@@ -4720,7 +4732,7 @@ delete_sub_directory:
 	; 16/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 29/12/2017 
-	; (moved here from 'delete_directory' for 'sysrmdir' )
+	; (moved here from 'delete_directory' for 'sysrmdir')
 
 	; EDI = Directory buffer entry offset/address
 
@@ -5173,6 +5185,24 @@ del_sub_dir_10:
 	; replace first free cluster value
 	mov	[ebx], eax
 del_sub_dir_11:
+	;;;;
+	; 18/07/2025
+	movzx	ecx, byte [rmdir_LNEL]
+	or	cl, cl
+	jz	short del_sub_dir_skip_dln
+	; ecx = long name entry count
+	mov	eax, [rmdir_EntryNumber]
+		; entry number of the short name
+	sub	eax, ecx
+	;jc	short del_sub_dir_skip_dln
+	mov	ebx, [rmdir_dir_fcluster]
+ 	; eax = directory entry number
+	;	of the long name last entry
+	call	delete_longname
+	; ignore error
+del_sub_dir_skip_dln:
+	;;;;
+
 	; 17/07/2025
 	; (fsinfo sector will updated in 'DIRUP:')
 	;mov	esi, edx
