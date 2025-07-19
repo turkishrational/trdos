@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 02/06/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 19/07/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -383,8 +383,8 @@ load_DirBuff_error:
  	mov	eax, [esi+LD_ROOTBegin]
 	mov	[DIRSEC], eax
 	; 13/05/2025
-	xor	ecx, ecx	
-	mov	[CLUSNUM], ecx ; 0 ; root directory	
+	xor	ecx, ecx
+	mov	[CLUSNUM], ecx ; 0 ; root directory
 	mov	cx, [esi+LD_BPB+RootDirEnts]
 	; ecx = 512 or 224 or 112
 	dec	ecx
@@ -471,8 +471,9 @@ load_FAT32_root_dir0:
 	;jmp	short load_FAT_sub_dir0
 
 load_FAT32_sub_directory:
-		
+
 load_FAT_sub_directory:
+	; 08/06/2025
 	; 13/05/2025
 	; 08/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -569,11 +570,12 @@ load_fat_subdir_@:
 
 	; 13/05/2025
 	mov	edx, esi
-	xor	ebx, ebx ; 0
+	; 08/06/2025
+	;xor	ebx, ebx ; 0
 
 	; edx = Logical DOS Drive Description Table address
 	; eax = Cluster Number (28bit for FAT32 fs)
-	; ebx = Sector position in cluster
+	;; ebx = Sector position in cluster
 
 	call	FIGREC
 
@@ -694,6 +696,40 @@ read_fs_sectors:
 	stc
 	retn
 
+	;;;;
+	; 08/07/2025 - TRDOS 386 v2.0.10
+get_first_free_cluster_@:
+	; set start cluster number
+	; for 'get_first_free_cluster'
+	; INPUT:
+	;   ESI = Logical DOS Drv Description Table addr
+	; OUTPUT:
+	;   get_first_free_cluster output
+
+	cmp	byte [esi+LD_FATType], 2
+	jna	short get_fat_first_free_cluster ; FAT fs
+
+get_fat32_first_free_cluster:
+	; FAT32 fs
+	mov	eax, [esi+LD_BPB+FAT32_FirstFreeClust]
+	jmp	short gfatffc_1
+
+get_fat_first_free_cluster:
+	; FAT16 or FAT12 fs
+	mov	eax, [esi+LD_BPB+FAT_FirstFreeClust]
+gfatffc_1:
+	or	eax, eax
+	jz	short gfatffc_2
+
+	cmp	eax, -1 ; invalid
+	jb	short get_first_free_cluster ; valid
+
+	sub	eax, eax
+gfatffc_2:
+	; reset to the default
+	mov	al, 2
+	;;;;
+
 get_next_free_cluster:	; 04/05/2025
 get_first_free_cluster:
 	; 04/05/2025 (TRDOS 386 Kernel v2.0.10)
@@ -707,7 +743,7 @@ get_first_free_cluster:
 	;	EAX = start cluster number ; 04/05/2025
 	; OUTPUT ->
 	;	cf = 1 -> Error code in AL (EAX)
-	;	cf = 0 -> 
+	;	cf = 0 ->
 	;	  EAX = Cluster number
 	;	  If EAX = FFFFFFFFh -> no free space
 	;	;;If the drive has FAT32 fs:
@@ -836,7 +872,7 @@ loc_gffc_set_ffree_fat32_cluster:
 	; eax = start cluster number
 	; ebx = last cluster number
 
-	cmp	eax, ebx ; [gffc_last_free_cluster] 
+	cmp	eax, ebx ; [gffc_last_free_cluster]
 	jna	short gffc_1
 
 gffc_0:
@@ -848,7 +884,7 @@ gffc_2:
 	; eax = current (next) cluster number
 	call	get_next_cluster
 	jnc	short gffc_3
-	
+
 	or	eax, eax
 	jz	short gffc_7 ; eof
 
@@ -860,6 +896,22 @@ gffc_3:
 	mov	eax, ecx
 	jnz	short gffc_4
 
+; 08/07/2025
+%if 0
+	;;;;
+	; 08/07/2025
+	; update First Free Cluster field of the LDRVT
+	; for fast search
+	cmp	byte [esi+LD_FATType], 2
+	jna	short gffc_8 ; FAT fs
+	; FAT32 fs
+	mov	[esi+LD_BPB+FAT32_FirstFreeClust], eax
+	retn
+gffc_8:
+	; FAT16 or FAT12 fs
+	mov	[esi+LD_BPB+FAT_FirstFreeClust], eax
+	;;;;
+%endif
 	; eax = first free cluster
 	retn
 gffc_4:
@@ -2166,7 +2218,7 @@ add_new_cluster:
 	;	EDX = 0 (if cf = 0)
 	; NOTE:
 	; This procedure does not update lm date&time !
-	;    ; 30/08/2024	
+	;    ; 30/08/2024
 	; and doesn't update 1st clust and file size fields !
 	;
 	; (Modified registers: EAX, EBX, ECX, EDX, EDI)
@@ -2261,12 +2313,12 @@ loc_add_new_cluster_write_nc_to_disk:
 	mov	eax, edx
         add     eax, [esi+LD_DATABegin]
 	jc	short loc_add_new_cluster_invalid_format_retn
-		
+
 	mov	ecx, ebx ; ECX = sectors per cluster (<256)
 	mov	ebx, Cluster_Buffer
 	call	disk_write
 	jnc	short loc_add_new_cluster_update_fat_nlc
-	
+
 	; 15/10/2016 (1Dh -> 18)
 	;mov	eax, 18 ; Write Error
 	; 25/07/2022
@@ -2381,7 +2433,7 @@ write_fat_file_sectors:
 	; 31/08/2024
 	; ecx = sector count (may be different than sectors per cluster)
 	sub	eax, 2 ; Beginning cluster number is always 2
-	movzx	edx, byte [esi+LD_BPB+BPB_SecPerClust] ; 18/03/2016 
+	movzx	edx, byte [esi+LD_BPB+BPB_SecPerClust] ; 18/03/2016
 	mul	edx
 	add	eax, [esi+LD_DATABegin] ; absolute address of the cluster
 
@@ -2406,12 +2458,12 @@ write_fs_cluster:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 21/03/2016 (TRDOS 386 = TRDOS v2.0)
 	; Singlix FS
-	
+
 	; EAX = Cluster number is sector index number of the file (eax)
-	
+
 	; EDX = File number is the first File Descriptor Table address
 	;	of the file. (Absolute address of the FDT).
-	
+
 	; eax = sector index (0 for the first sector)
 	; edx = FDT0 address
 		; 64 KB buffer = 128 sectors (limit) 
@@ -2429,6 +2481,7 @@ write_fs_sectors:
 	retn
 
 get_cluster_by_index:
+	; 01/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 29/04/2016 (TRDOS 386 = TRDOS v2.0)
 	; INPUT ->
@@ -2438,19 +2491,22 @@ get_cluster_by_index:
 	; 	ECX = Cluster sequence number after the beginning cluster
 	; 	ESI = Logical DOS Drive Description Table address
 	; OUTPUT ->
-	;	EAX = Cluster number 
+	;	EAX = Cluster number
+	;	    = File Sector Number (Singlix File System)
 	;	cf = 1 -> Error code in AL (EAX)
 	;
 	;(Modified registers: EAX, ECX, EBX, EDX)
 	;	
 	cmp	byte [esi+LD_FATType], 1
-        jb      short get_fs_section_by_index 
+        ;jb      short get_fs_section_by_index
+	; 01/07/2025
+	jb      short get_fs_sector_by_index
 
 	cmp	ecx, [esi+LD_Clusters]
 	jb	short gcbi_1
 gcbi_0:
 	;stc
-	;mov	eax, 23h ; Cluster not available ! 
+	;mov	eax, 23h ; Cluster not available !
 			 ; MSDOS error code: FCB unavailable
 	; 25/07/2022
 	sub	eax, eax
@@ -2474,21 +2530,61 @@ gcbi_3:
 	cmc 	; stc
 	retn
 
-get_fs_section_by_index:
+get_fs_sector_by_index:
+	; 01/07/2025 - TRDOS 386 v2.0.10
+	; Get Singlix FS File Sector By Index
+	; (section = extent)
+	; 'get_fs_section_by_index'
 	; 29/04/2016 (TRDOS 386 = TRDOS v2.0)
 	; INPUT ->
 	; 	EAX = Beginning FDT number/address
-	; 	EDX = Sector index in disk/file section
 	; 	ECX = Sector sequence number after the beginning FDT
 	; 	ESI = Logical DOS Drive Description Table address
 	; OUTPUT ->
-	; 	EAX = FDT number/address
-	; 	EDX = Sector index of the section (0,1,2,3,4...)
+	; 	EAX = sector number (not physical)
+	; 	EDX = ESI = LDRVT address
+	;       EBX = Sector sequence/index number (input)
+	;	ECX = Remaining sectors in the section
+	;
 	;	cf = 1 -> Error code in AL (EAX)
 	;
-	;(Modified registers: EAX, ECX, EBX, EDX)
-	;
-	mov	eax, 0FFFFFFFFh
+	; Modified registers: EAX, ECX, EBX, EDX
+
+	; 01/07/2025
+	push	ebp
+	push	edi
+	push	esi
+
+	;mov	[FS_SectorIndex], ecx
+	mov	ebx, ecx
+	mov	[FDT_Number], eax
+	mov	edx, esi
+	add	eax, [esi+LD_FS_BeginSector]
+	mov	cl, [edx+LD_FS_PhyDrvNo]
+		; physical (rombios) drive number
+	call	GETBUFFER
+	jc	short get_fs_sbi_6
+
+	add	esi, BUFINSIZ
+	;mov	ebx, [FS_SectorIndex]
+
+	; ebx = sector sequence/index number
+	; edx = LDRVT address
+	; esi = FDT buffer address
+
+	call	get_fs_sector
+
+	; esi = FDT buffer address
+	; ebx = sector index number
+	; edx = LDRVT address
+	; EAX = sector address (!not physical!)
+	; ecx = remaining sectors in the extent
+	;	(remaining consecutive sectors)
+
+get_fs_sbi_6:
+	pop	esi
+	pop	edi
+	pop	ebp
 	retn
 
 get_last_section:
@@ -2651,6 +2747,7 @@ ude_4:
 ; 21/04/2025 - TRDOS 386 v2.0.10
 
 GETFATBUFFER:
+	; 05/06/2025
 	; 28/04/2025
 	; 21/04/2025
 	; (MSDOS -> GETBUFFRB) - Ref: Retro DOS v5 - ibmdos7.s
@@ -2659,15 +2756,17 @@ GETFATBUFFER:
 	jmp	short getb_x
 
 GETBUFFER_NPR:
+	; 05/06/2025
 	; 28/04/2025
 	; 21/04/2025
 	; (MSDOS -> GETBUFFR) - Ref: Retro DOS v5 - ibmdos7.s
-	
+
 	mov	ch, 80h		; bit 7 is 1 = no pre-read
 				; not fat buffer (bit 0)
 	jmp	short getb_x
 
 GETBUFFER:
+	; 05/06/2025
 	; 28/04/2025
 	; 24/04/2025
 	; 21/04/2025
@@ -2715,7 +2814,7 @@ getb_1:
 getb_2:
 	cmp	eax, [esi+BUFFINFO.buf_sector]	; (phy) sector num
 	jne	short getb_7
-	
+
 	cmp	cl, [esi+BUFFINFO.buf_ID]	; (phy) drive num
 	jne	short getb_7
 
@@ -2754,6 +2853,7 @@ getb_6:
 	jmp	short getb_0
 
 getb_7:
+	; eax = physical sector number
 	cmp	byte [esi+BUFFINFO.buf_ID], 0FFh ; -1 ; Free buffer ?
 	jne	short getb_8		; no
 
@@ -2763,6 +2863,11 @@ getb_8:
 	mov	esi, [esi]
 	cmp	esi, [FIRST_BUFF_ADDR]	; back at the front again?
 	jne	short getb_2		; no, continue looking
+
+	; 05/06/2025
+	; 28/04/2025
+	push	ebx ; *
+	push	edx ; **
 
 	cmp	ebp, -1		; 0FFFFFFFFh ; invalid (not free buf)
 	je	short getb_9
@@ -2777,60 +2882,71 @@ getb_9:
 	;
 	; Flush the first buffer & read in the new sector into it.
 
-	; 28/04/2025
-	push	ebx ; *
-	push	edx ; **
+	mov	ebp, eax	; save sector number
+
+	call	BUFWRITE	; write out the dirty buffer
+	;jc	short getb_11
+	; 05/06/2025
+	jc	short getb_12
+	mov	eax, ebp	; restore sector number
+getb_10:
+	; 05/06/2025
 	push	esi ; ***
 
-	mov	ebp, eax ; save disk sector number
-
-	call	BUFWRITE		; write out the dirty buffer
-	jc	short getb_11
-getb_10:
+	; eax = physical sector number
 	mov	ch, [pre_read]	; bit 7 = no pre-read flag
 				; bit 0 = fat buffer flag
 	test	ch, 80h			; read in new sector ?
-	jnz	short getb_13		; no, done
+	;jnz	short getb_14		; no, done
+	; 05/06/2025
+	jnz	short getb_15
 
 	; 28/04/2025
 	lea	ebx, [esi+BUFINSIZ]	; buffer data address
 	mov	esi, edx
 
+	; 05/06/2025
+	push	eax ; **** ; save disk sector number
+
 	and	ch, ch			; fat sector ?
-	jz	short getb_12		; no
+	jz	short getb_13		; no
 
 	; input: eax = phy sector, ebx = buffer, esi = ldrv table
 	call	FATSECRD
 	; modified registers: (eax), ecx, edx
 	jc	short getb_11
 	mov	ch, buf_isFAT		; set buf_flags
-	jmp	short getb_13
+	jmp	short getb_14
 
 getb_11:
+	; 05/06/2025
+	pop	ebp ; **** ; disk sector number
 	; 28/04/2025
 	pop	esi ; ***
+getb_12:
 	pop	edx ; **
 	pop	ebx ; *
 	; eax = error code (if CF = 1)
 	retn
 
-getb_12:
+getb_13:
 	; 28/04/2025 - TRDOS 386 v2.0.10
 	; read 1 disk sector ('trdosk7.s')
 	;   --- mov ecx, 1
 	;   --- call disk_read
-	; input: eax = phy sector, ebx = buffer, esi = ldrv table 
+	; input: eax = phy sector, ebx = buffer, esi = ldrv table,
 	call	DREAD
 	; modified registers: eax, ebx, ecx, edx
 	jc	short getb_11
 	mov	ch, 0			; set buf_flags to no type
-getb_13:
+getb_14:
+	; 05/06/2025
+	pop	eax ; **** ; restore disk sector number
+getb_15:
 	; 28/04/2025
 	pop	esi ; ***
 	pop	edx ; **
 	pop	ebx ; *
-
-	mov	eax, ebp ; restore disk sector number
 
 	; eax = disk sector
 	; ch = buf_flags
@@ -2842,7 +2958,7 @@ getb_13:
 	mov	[esi+BUFFINFO.buf_ID], cx ; set ID and flags
 	mov	ch, [pre_read]	; bit 0 -> fat buffer flag
 				; bit 7 -> no pre-read flag
-	jmp	getb_3				
+	jmp	getb_3
 
 ; --------------------------------------------------------------------
 
@@ -2920,7 +3036,6 @@ pb_ret:
 pb_x:
 	retn
 
-
 ; --------------------------------------------------------------------
 
 ; 24/04/2025 - TRDOS 386 v2.0.10
@@ -2944,7 +3059,7 @@ WildCrd:
 	repe	cmpsb
 	jz	short MetaRet 	; most of the time we will fail.
 
-	cmp	byte [esi-1],"?"
+	cmp	byte [esi-1], "?"
 	je	short WildCrd
 MetaRet:
  	retn			; Zero set, Match
@@ -2965,7 +3080,7 @@ UNPACK:
 	; OUTPUT:
 	;	eax = Content of FAT for given cluster
 	;	      (next/new cluster number)
-	;	esi = Start of the buffer
+	;	esi = Start of the buffer (buffer header address)
 	;	ebx = buffer offset (not used)
 	;
 	;	Note: if EAX input is 0
@@ -3006,6 +3121,7 @@ up_1:
 ; 27/04/2025 - TRDOS 386 v2.0.10
 
 MAPCLUSTER:
+	; 10/07/2025
 	; 27/04/2025
 	; (MSDOS -> MAPCLUSTER) - Ref: Retro DOS v5 - ibmdos7.s
 	; Buffer a FAT sector
@@ -3016,8 +3132,12 @@ MAPCLUSTER:
 	; OUTPUT:
 	;	eax = Content of FAT for given cluster
 	;	      (next/new cluster number)
-	;	esi = Start of the buffer
+	;	esi = Start of the (FAT) buffer
 	;	ebx = buffer offset (not used)
+	;	10/07/2025
+	;	[CLUSNUM] = eax input
+	;	edi = (FAT) buffer (data/cluster) address
+	;	[ClusSave], [ClusSec], [ClusSplit]
 	;
 	;	If CF = 0 and ZF = 1 (EAX = 0) -> Free Cluster
 	;
@@ -3091,7 +3211,10 @@ mapcl_3:
 	jc	short mapcl_5	; eax = error code
 
 	mov	al, [ClusSave]
-	mov	ah, [esi+BUFINSIZ]
+	; 10/07/2025
+	;mov	ah, [esi+BUFINSIZ]
+	lea	edi, [esi+BUFINSIZ]
+	mov	ah, [edi]
 
 	jmp	short mapcl_7
 
@@ -3288,6 +3411,7 @@ figrec_2:
 ; 27/04/2025 - TRDOS 386 v2.0.10
 
 DIRREAD:
+	; 17/07/2025
 	; 01/06/2025
 	; 27/04/2025
 	; (MSDOS -> DIRREAD) - Ref: Retro DOS v5 - ibmdos7.s
@@ -3353,10 +3477,15 @@ drd_skipcl:
 drd_skipped:
 	mov	[NXTCLUSNUM], eax
 
-	movzx	ebx, byte [SECCLUSPOS]
+	;movzx	ebx, byte [SECCLUSPOS]
 	mov	eax, [CLUSNUM]
 
 	call	FIGREC
+
+	; 17/07/2025
+	movzx	ebx, byte [SECCLUSPOS]
+	add	eax, ebx
+
 	; eax = physical sector number
 	;  cl = physical drive/disk number
 drd_getbuf:
@@ -3486,6 +3615,8 @@ fatsecrd_4:
 ; 28/04/2025 - TRDOS 386 v2.0.10
 
 BUFWRITE:
+	; 19/07/2025
+	; 14/07/2025
 	; 28/04/2025
 	; (MSDOS -> BUFWRITE) - Ref: Retro DOS v5 - ibmdos7.s
 	; Write out a buffer if dirty
@@ -3494,18 +3625,22 @@ BUFWRITE:
 	; 	ESI = Buffer header address
 	; OUTPUT:
 	;	Buffer marked free
+	;	EDX = LDRVT address ; 19/07/2025
 	;
-	;	if cf = 1 -> eax = error code
-	;		  -> edx = LDRVT addr for failed drive
-	;
+	;	if cf = 1 -> eax = [FAILERR] = error code
+	;		     edx = LDRVT addr for failed drive
+	;;	if cf = 0 -> [FAILERR] = 0 ; 14/07/2025
+
 	; Modified registers:
 	;	EAX, EBX, ECX, EDX
 
 	xor	ecx, ecx
+	; 14/07/2025
+	mov	[FAILERR], cl
 	mov	cl, 0FFh ; -1
 	xchg	ecx, [esi+BUFFINFO.buf_ID]
 	cmp	cl, 0FFh
-	je	short bufwrt_4 ; Buffer is clean, carry clear
+	je	short bufwrt_4 ; Buffer is free, carry clear.
 	
 	test	ch, buf_dirty
 	jz	short bufwrt_4 ; Buffer is clean, carry clear.
@@ -3530,7 +3665,7 @@ bufwrt_2:
 	mov	esi, [esi+BUFFINFO.buf_DPB] ; LDRVT address
 
 	; eax = physical disk sector
-	; ebx = buffer (transfer) address 
+	; ebx = buffer (transfer) address
 	; esi = logical dos drive description table address
 
 	call 	DWRITE	; TRDOS 286 v2.0.10
@@ -3547,15 +3682,20 @@ bufwrt_3:
 	add	eax, [esi+BUFFINFO.buf_wrtcntinc]
 
 	loop	bufwrt_2
-	
+
 	or	edx, edx
-	jnz	short bufwrt_4 ; At least one write succeed
+	;jnz	short bufwrt_4 ; At least one write succeed
 
 	; 28/04/2025
-	; return LDRVT address for failed disk
+	; return LDRVT address ; 19/07/2025
 	mov	edx, [esi+BUFFINFO.buf_DPB]
-	
+
+	; 19/07/2025
+	jnz	short bufwrt_4 ; At least one write succeed
+
 	mov	eax, ERR_DRV_WRITE ; 'disk write error !'
+	; 14/07/2025
+	mov	[FAILERR], al
 	stc
 bufwrt_4:
 	retn
@@ -3565,6 +3705,8 @@ bufwrt_4:
 ; 29/04/2025 - TRDOS 386 v2.0.10
 
 FLUSHBUFFERS:
+	; 14/07/2025
+	; 13/07/2025
 	; 29/04/2025
 	; (MSDOS -> FLUSHBUF) - Ref: Retro DOS v5 - ibmdos7.s
 	; Write out all dirty buffers for disk and flag them as clean
@@ -3589,7 +3731,10 @@ FLUSHBUFFERS:
 	;call	GETCURHEAD ; (MSDOS)
 	call	GETCURRENTHEAD
 
+	; 13/07/2025
+	push	eax
 	call	BUFWRITE
+	pop	eax
 
 	cmp	al, -1
 	je	short scan_buf_queue
@@ -3599,7 +3744,7 @@ FLUSHBUFFERS:
 
 	cmp	dword [DirtyBufferCount], 0
 	je	short end_scan
-	
+
 scan_buf_queue:
 	call	CHECKFLUSH
 	;jc	short dont_free_the_buf ; already invalidated
@@ -3618,7 +3763,7 @@ scan_buf_queue:
 	jne	short dont_free_the_buf	; not same disk/drive
 
 free_the_buf:
-	; free the buffer (invalidate) 
+	; free the buffer (invalidate)
 	mov	dword [esi+BUFFINFO.buf_ID], 0FFh
 
 dont_free_the_buf:
@@ -3628,6 +3773,11 @@ dont_free_the_buf:
 	jne	short scan_buf_queue
 
 end_scan:
+	;;;
+	; 14/07/2025
+	cmp	byte [FAILERR], 1
+	cmc
+	;;;
 	retn
 
 	; 29/04/2025
@@ -3642,6 +3792,7 @@ flushbuf_err:
 ; 29/04/2025 - TRDOS 386 v2.0.10
 
 CHECKFLUSH:
+	; 14/07/2025	
 	; 29/04/2025
 	; (MSDOS -> CHECKFLUSH) - Ref: Retro DOS v5 - ibmdos7.s
 	; Write out a buffer if it is dirty
@@ -3653,8 +3804,8 @@ CHECKFLUSH:
 	;
 	; OUTPUT:
 	;	none
-	;
-	;	if cf = 1 -> edx = LDRVT addr for failed drive
+	;	if cf = 1 -> [FAILERR] = error code ; 14/07/2025
+	;	             edx = LDRVT addr for failed drive
 	;
 	; Modified registers:
 	;	EBX, ECX, EDX
@@ -3934,7 +4085,7 @@ BadBye:
 
 bad_path3:
 	mov	eax, ERR_PATH_NOT_FOUND	; 3
-	jmp	short BadBye	
+	jmp	short BadBye
 
 found_entry:
 	; EBX points to start of entry in [CurrentBuffer]
@@ -3962,10 +4113,10 @@ found_entry:
 
 	cmp	[CurrentBuffer], eax ; -1
 	jne	short OkStore
-	
+
 	; The user has specified the root directory itself,
 	; rather than some contents of it. We can't "find" that.
-	
+
 	; Cause DOS_SEARCH_NEXT to fail by stuffing a -1 at Lastent
 	mov	[edi-12], eax ; -1 ; find_buf.LastEnt
 	jmp	short find_no_more
@@ -3982,6 +4133,7 @@ OkStore:
 ; 11/05/2025 - TRDOS 386 v2.0.10
 
 GETPATH:
+	; 05/06/2025
 	; 11/05/2025
 	; (MSDOS -> GETPATH) - Ref: Retro DOS v5 - ibmdos7.s
 	;
@@ -4051,6 +4203,8 @@ GetPathNoSet:
 	mov	[CurrentBuffer], eax	; -1 ; initial setting
 	xor	edx, edx
 	mov	dh, [Current_Drv]
+	; 05/06/2025
+	add	edx, Logical_DOSDisks
 	; edx = LDRVT address		; (MSDOS -> [THISDPB])
 CrackIt:
 	mov	byte [ATTRIB],attr_directory+attr_system+attr_hidden
@@ -4064,19 +4218,20 @@ CrackIt:
 	;	This number is -1 if the media has been uncertainly changed.
 	; ESI = Path offset to end of current directory text.
 	;	This may be -1 if no current directory part has been used.
-	
+
 	cmp	esi, eax		; if Current directory is not part
 	je	short NO_CURR_D		; then we must crack from root
-	
+
 	cmp	ebx, eax	; is the current directory cluster valid ?
 	jne	short short Got_Search_Cluster ; yes
-	
+
 	; no, crack from the root
 NO_CURR_D:
 	mov	esi, [WFP_START]
 	add	esi, 3			; skip 'd:/'
 	;xor	edx, edx
 	;mov	dh, [Current_Drv]
+	;add	edx, Logical_DOSDisks
 	; edx = LDRVT address		; (MSDOS -> [THISDPB])
 	jmp	short ROOTPATH
 
@@ -4084,6 +4239,7 @@ NO_CURR_D:
 Got_Search_Cluster:
 	;xor	edx, edx
 	;mov	dh, [Current_Drv]
+	;add	edx, Logical_DOSDisks
 	; edx = LDRVT address		; (MSDOS -> [THISDPB])
 	call	SETDIRSRCH
 	jnc	short FINDPATH
@@ -4608,7 +4764,7 @@ GETENTRY:
 	;	EAX, EBX, ECX, ESI, EDI, EBP
 	;
 
-GETENTRY:
+;GETENTRY:
 	mov	eax, [LASTENT]
 	; 11/05/2025
 	jmp	short GETENT_@
@@ -4723,3 +4879,551 @@ chk_lname_@:
 NEXTENTRY:
 	stc
 	retn
+
+; --------------------------------------------------------------------
+
+; 10/07/2025 - TRDOS 386 v2.0.10
+
+PACK:
+	; 10/07/2025
+	; (MSDOS -> PACK) - Ref: Retro DOS v5 - ibmdos7.s
+	; Pack FAT entries (ALLOCATE)
+	;
+	; INPUT:
+	;	edx = Logical DOS Drive Description Table address
+	;	eax = Cluster Number (28bit for FAT32 fs)
+	;	ebx = Data
+	; OUTPUT:
+	;	The data is stored in the FAT at the given cluster.
+	;
+	;	if cf = 1, eax = error code
+	;
+	; Modified registers:
+	;	eax, ecx, ebx, esi, edi, ebp
+
+	or	eax, eax
+	jnz	short pack_1
+
+	mov	[CL0FATENTRY], ebx
+pack_0:
+	retn
+pack_1:
+	push	ebx
+	call	MAPCLUSTER
+	pop	ebx
+	jc	short pack_0
+
+	; EAX = content of FAT for given cluster
+	; EDI = buffer data (cluster pos) address
+	; ESI = buffer header address
+	; [CLUSNUM] = EAX input
+	; [ClusSplit], [ClusSec], [ClusSave]
+
+	cmp	byte [edx+LD_FATType], 2
+	ja	short pack_6 ; FAT32
+	je	short pack_7 ; FAT16
+
+	; FAT12
+	test	byte [CLUSNUM], 1 ; odd ?
+	jz	short pack_2	; no, even
+
+	; move data to upper 12 bits
+	shl	ebx, 4  ; shl bx, 4
+	; leave in original low 4 bits
+	and	eax, 0Fh
+	;jmp	short PACKIN
+	jmp	short pack_3
+
+	; FAT12
+pack_2:
+	; leave upper 4 bits original
+	and	eax, 0F000h
+	; store only 12 bits
+	;and	ebx, 0FFFh
+	;jmp	short PACKIN ; pack_3
+
+pack_3:	; (MSDOS -> PACKIN)
+	or	ebx, eax  ; or bx, ax
+
+	cmp	byte [ClusSplit], 0
+	jz	short pack_7
+
+	mov	[edi], bh
+	;mov	[ClusSave], bl	; (*)
+
+	;;mov	esi, [CurrentBuffer]
+	;mov	eax, [esi+BUFFINFO.buf_sector]
+	;dec	eax
+	mov	eax, [ClusSec]
+	mov	cl, [edx+LD_PhyDrvNo]
+	;pop	ebx
+	call	GETFATBUFFER
+	;pop	ebx
+	jc	short pack_5
+
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+				; if already dirty
+	jnz	short pack_4	; don't increment dirty count
+
+	;call	INC_DIRTY_COUNT
+	;inc	word [DirtyBufferCount]
+	inc	dword [DirtyBufferCount]
+
+	;or	byte [esi+9],40h
+	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
+pack_4:
+	lea	edi, [esi+BUFINSIZ+511]
+	;mov	bl, [ClusSave]	; (*)
+	mov	[edi], bl
+pack_5:
+	retn
+pack_6:
+	and	eax, 0F0000000h
+	;and	ebx, 00FFFFFFFh
+	or	ebx, eax
+	mov	[edi], ebx
+	jmp	short pack_8
+pack_7:
+	mov	[edi], bx
+pack_8:
+	;mov	esi, [CurrentBuffer]
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+				; if already dirty
+	jnz	short pack_9	; don't increment dirty count
+
+	;call	INC_DIRTY_COUNT
+	;inc	word [DirtyBufferCount]
+	inc	dword [DirtyBufferCount]
+
+	;or	byte [esi+9], 40h
+	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
+pack_9:
+	retn
+
+; --------------------------------------------------------------------
+
+; 11/07/2025 - TRDOS 386 v2.0.10
+
+ADD_NEW_CLUSTER:
+	mov	ecx, 1
+ADD_NEW_CLUSTERS:
+	; 17/07/2025
+	; 14/07/2025
+	; 12/07/2025
+	; 11/07/2025
+	; (MSDOS -> ALLOCATE) - Ref: Retro DOS v5 - ibmdos7.s
+	; Allocate disk clusters
+	;
+	; ALLOCATE is called to allocate disk clusters.
+	; The new clusters are FAT-chained
+	;  onto the end of the existing file.
+	;
+	; INPUT:
+	;     edx = Logical DOS Drive Description Table address
+	;     eax = Last cluster of file (0 if null file)
+	;     ecx = Number of clusters to allocate
+	;     [current_file] = file (SFT) number
+	;
+	; OUTPUT:
+	;  If cf = 0
+	;     eax = First cluster allocated
+	;     FAT is fully updated
+	;     ; 14/07/2025	
+	;     ebx = eax input
+	;;;;  OF_FCLUST field of [current_file]
+	;;;;		is set if file was null
+	;
+	;  If cf = 1 and eax = 39 ; ERR_DISK_SPACE (disk full)
+	;     ecx = max. no. of clusters that could be added to file
+	;
+	; Modified registers:
+	;	eax, ecx, ebx, esi, edi, ebp
+
+;ALLOCATE:
+	; edx = Logical DOS Drive Description Table address
+	; eax = Last cluster of file (0 if null file)
+	; ecx = Number of clusters to allocate
+	mov 	[NEXTCLUSTER], eax
+	mov	[LASTCLUSTER], eax
+	mov	[CLUSTERS], ecx
+	mov	[CLUSTCOUNT], ecx
+
+	xor	eax, eax ; 0
+	call	UNPACK
+	; eax = [CL0FATENTRY]
+	mov	[FATBYT], eax	; save correct cluster 0 value
+	;jc	short figrec_retn ; abort if error
+
+	cmp	byte [edx+LD_FATType], 2
+	jna	short adc_1 ; FAT fs
+
+	; FAT32 fs
+	mov	eax, [edx+LD_BPB+FAT32_FirstFreeClust]
+	jmp	short adc_2
+
+adc_1:
+	; FAT16 or FAT12 fs
+	mov	eax, [edx+LD_BPB+FAT_FirstFreeClust]
+adc_2:
+	; 12/07/2025
+	;;;
+	mov	ecx, [edx+LD_Clusters]
+	inc	ecx
+	mov	[FCS_END], ecx ; Last Cluster (search end)
+	;;;
+
+	and	eax, eax
+	jz	short adc_4
+
+	mov	[FCS_START], eax
+
+	cmp	eax, -1 ; invalid
+	jb	short adc_7 ; FINDFRE
+adc_3:
+	xor	eax, eax
+adc_4:
+	; reset to the default
+	mov	al, 2
+	mov	[FCS_START], eax
+adc_5:
+	cmp	byte [edx+LD_FATType], 2
+	jna	short adc_6
+	mov	[edx+LD_BPB+FAT32_FirstFreeClust], eax
+	jmp	short adc_7  ; FINDFRE
+adc_6:
+	mov	[edx+LD_BPB+FAT_FirstFreeClust], eax
+
+adc_7:	; (MSDOS -> FINDFRE)
+	; eax = first free cluster candidate to be checked
+	; edx = LDRVT address
+	mov	[FREECLUSTER], eax
+	call	UNPACK
+	jc	short adc_10
+	; 14/07/2025
+	mov	eax, [FREECLUSTER]
+	jz	short adc_11 ; free cluster (eax = 0)
+
+	;mov	eax, [FREECLUSTER] ; 14/07/2025
+adc_8:
+	;inc	eax  ; next cluster to be checked
+	;mov	ecx, [edx+LD_Clusters] ; last cluster - 1
+	;inc	ecx  ; disk's last cluster
+	;cmp	eax, ecx
+	;jna	short adc_5
+	; 12/07/2025
+	;cmp	eax, [edx+LD_Clusters]
+	;ja	short adc_9
+	;inc	eax
+	;jmp	short adc_5
+	inc	eax
+	cmp	eax, [FCS_END]
+	jna	short adc_5
+
+; We're at the end of the disk, and not satisfied.
+; See if we've scanned ALL of the disk...
+
+	; 12/07/2025
+	mov	ecx, [FCS_START]
+	cmp	ecx, 2
+	ja	short adc_9
+	jmp	adc_17  ; disk full !
+adc_9:
+	dec	ecx
+	mov	[FCS_END], ecx
+	jmp	short adc_3
+adc_10:
+	retn
+adc_11:
+	; free cluster (eax = 0)
+	;mov	eax, [FREECLUSTER] ; 14/07/2025
+	; eax = cluster number
+	;mov	ebx, 1
+	sub	ebx, ebx
+	inc	ebx 	; 1 ; mark this free guy as "1"
+	call	PACK	; set special "temporary" mark
+	jc	short adc_10
+
+	cmp	byte [edx+LD_FATType], 2
+	jna	short adc_12 ; not FAT32
+
+	; FAT32 fs
+	lea	ebx, [edx+LD_BPB+FAT32_FreeClusters]
+	jmp	short adc_13
+
+adc_12:
+	; FAT16 or FAT12 fs
+	lea	ebx, [edx+LD_BPB+FAT_FreeClusters]
+adc_13:
+	mov	eax, [ebx]
+	inc	eax
+	;jz	short NO_ALLOC ; Free count not valid
+	jz	short adc_14
+	dec	eax
+
+	dec	eax
+	; Reduce free count by 1
+	mov	[ebx], eax
+	movzx	eax, byte [edx+LD_BPB+SecPerClust]
+	; 17/07/2025
+	sub	[edx+LD_FreeSectors], eax
+
+adc_14: ; (MSDOS -> NO_ALLOC)
+	mov	ebx, [FREECLUSTER]
+	mov	eax, [NEXTCLUSTER]
+	call	PACK
+	jc	short adc_10
+
+	dec	dword [CLUSTCOUNT]
+	jz	short adc_15
+
+	mov	eax, [FREECLUSTER]
+	mov	[NEXTCLUSTER], eax
+	jmp	short adc_8
+
+; We've successfully extended the file. Clean up and exit
+
+adc_15:
+	mov	eax, [FREECLUSTER] ; (new) last cluster
+	mov	ebx, -1 ; 0FFFFFFFFh
+	call	PACK	; mark last cluster EOF
+	jc	short adc_10
+
+	mov	eax, [LASTCLUSTER]
+	call	UNPACK		; Get first cluster allocated for return
+	jc	short adc_10
+	mov	[NEXTCLUSTER], eax
+	call    RESTFATBYT      ; Restore correct cluster 0 value
+	jc	short adc_10
+	
+	mov	ebx, [LASTCLUSTER]
+	mov	eax, [NEXTCLUSTER]
+		; EAX = first cluster allocated
+; 14/07/2025
+%if 0
+	or 	ebx, ebx
+	jnz	short adc_16	; we were extending an existing file
+		; EBX = 0
+
+; We were doing the first allocation for a new file.
+; Update the SFT cluster info
+
+dofastk:
+	movzx	esi, byte [current_file]
+	shl	esi, 2 ; * 4	
+	mov	[esi+OF_FCLUSTER], eax ; first cluster
+	mov	[esi+OF_LCLUSTER], eax ; last cluster
+%endif
+
+adc_16:
+	retn
+
+; Sorry, we've gone over the whole disk, with insufficient luck. Lets give
+; the space back to the free list and tell the caller how much he could have
+; had. We have to make sure we remove the "special mark" we put on the last
+; cluster we were able to allocate, so it doesn't become orphaned.
+
+adc_17:
+	mov	eax, [LASTCLUSTER] ; EAX = last cluster of file
+	mov	ebx, -1 ; 0FFFFFFFFh ; cluster content (data)
+				; last cluster sign
+	call	RELBLKS         ; give back any clusters just alloced
+	call	RESTFATBYT	; Alloc failed.
+	mov	ecx, [CLUSTERS] ; Number of clusters to allocate
+	sub	ecx, [CLUSTCOUNT]
+		; ECX = max. no. of clusters that could be added to file
+Disk_Full_Return:
+        ; MSDOS 6.0
+	;mov	byte [DISK_FULL], 1 ; indicating disk full
+	; 11/07/2025
+	mov	eax, ERR_DISK_SPACE ; 39 ; 'out of volume !'
+	stc
+        retn
+
+; --------------------------------------------------------------------
+
+; 11/07/2025 - TRDOS 386 v2.0.10
+
+RESTFATBYT:
+	; 11/07/2025
+	; (MSDOS -> RESTFATBYT) - Ref: Retro DOS v5 - ibmdos7.s
+	;
+	; INPUT:
+	;     edx = Logical DOS Drive Description Table address
+	;     [FATBYT] = Cluster 0 value
+	;
+	; OUTPUT:
+	;  If cf = 0
+	;     NONE (cluster 0 will be updated)
+	;
+	;  If cf = 1 and eax = error code
+	;
+	; Modified registers:
+	;	eax, ecx, ebx, esi, edi, ebp
+
+	;xor	eax, eax ; cluster 0
+	;mov	ebx, [FATBYT]
+	;call	PACK
+	;retn
+	;jmp	PACK
+	; 11/07/2025
+	mov	eax, [FATBYT]
+	mov	[CL0FATENTRY], eax
+	retn
+
+; --------------------------------------------------------------------
+
+; 11/07/2025 - TRDOS 386 v2.0.10
+
+RELEASE:
+	; (MSDOS -> RELEASE)
+       	xor	ebx, ebx
+RELBLKS:
+	; 17/07/2025
+	; 11/07/2025
+	; (MSDOS -> RELBLKS) - Ref: Retro DOS v5 - ibmdos7.s
+	; Deassign (Deallocate) disk space
+	;
+	; Frees cluster chain starting with EAX
+	;
+	; INPUT:
+	;     edx = Logical dos drive parameters table address
+	;     eax = Cluster in file
+	; OUTPUT:
+	;  If cf = 0
+	;     FAT is updated
+	;  If cf = 1 -> eax = error code
+	;
+	; Modified registers:
+	;	eax, ecx, ebx, esi, edi, ebp
+
+; Enter here with EBX=0FFFFFFFFh to put an end-of-file mark
+; in the first cluster and free the rest in the chain.
+
+	push	ebx
+	push	eax
+	call	UNPACK
+	pop	ecx
+	pop	ebx
+        jbe	short rblks_4 ; jna short rblks_4
+
+	mov	[NEXTCLUSTER], eax
+	mov	eax, ecx
+
+	; eax = Content of FAT
+	;	for given cluster (next cluster)
+	; ebx = -1 -> put eof mark
+	;     = 0 -> release (set as free cluster)
+
+	push	ebx
+	call	PACK
+	pop	ebx
+	jc	short rblks_4
+
+	or	ebx, ebx
+	jnz	short rblks_3 ; Was putting EOF mark
+
+	cmp	byte [edx+LD_FATType], 2
+	jna	short rblks_1 ; not FAT32
+
+	; FAT32 fs
+	lea	ebx, [edx+LD_BPB+FAT32_FreeClusters]
+	jmp	short rblks_2
+
+rblks_1:
+	; FAT16 or FAT12 fs
+	lea	ebx, [edx+LD_BPB+FAT_FreeClusters]
+rblks_2:
+	mov	eax, [ebx]
+	inc	eax ; -1 -> 0
+	;jz	short NO_DEALLOC ; Free count not valid
+	jz	short rblks_3
+
+	; Increase free count by 1
+	mov	[ebx], eax
+	movzx	eax, byte [edx+LD_BPB+SecPerClust]
+	; 17/07/2025
+	add	[edx+LD_FreeSectors], eax
+
+rblks_3: ; (MSDOS -> NO_DEALLOC)
+	mov	eax, [NEXTCLUSTER]
+	; check for 1
+	; is last cluster of incomplete chain
+	dec	eax
+	jz	short rblks_4
+
+	inc	eax
+	call	IsEOF
+        jb	short RELEASE
+rblks_4:
+	retn
+
+; --------------------------------------------------------------------
+
+; 12/07/2025 - TRDOS 386 v2.0.10
+
+;CL0FATENTRY:	dd -1 ;  0FFFFFFFFh
+
+; --------------------------------------------------------------------
+
+; 14/07/2025 - TRDOS 386 v2.0.10
+
+SETDOTENT:
+	; 14/07/2025
+	; (MSDOS -> SETDOTENT) - Ref: Retro DOS v5 - ibmdos7.s
+	; set up a . or .. directory entry for a directory
+	;
+	; INPUT:
+	;     edi = points to the beginning of a directory entry
+	;     eax contains ".   " or "..  "
+	;     [mkdir_datetime] = date (hw) and time (lw)
+	;			 in MSDOS directory entry format
+	;     ecx = first cluster
+	; OUTPUT:
+	;     edi = next directory entry position
+	;     eax = 0
+	;
+	; Modified registers: eax, edi
+
+	; Fill in name field
+	stosd	; char 1,2,3,4	; 0 to 3
+	mov	eax, 20202020h
+	stosd	; char 5,6,7,8	; 4 to 7
+	; and Set up attribute
+	mov	al, 10h ; attr_directory
+	ror	eax, 8
+	stosd	; char 9,10,11	; 8 to 10
+		; and attr_directory ; 11
+
+	sub	eax, eax
+	stosw		; NTReserved, 12
+			; CrtTimeTenth, 13
+
+	; Set up last creation time & date
+	mov	eax, [mkdir_datetime]
+	push	eax
+	stosd		; CrtTime, 14
+			; CrtDate, 16
+
+	; Set up last access date
+	; and first cluster field (hw)
+	push	ecx
+	ror	ecx, 16
+	mov	ax, cx
+	ror	eax, 16
+	stosd		; LastAccDate, 18
+			; FClusterHw, 20
+	pop	ecx
+	pop	eax
+	; Set up last modification time & date
+	stosd		; WrtTime, 22
+			; WrtDate, 24
+	; Set up first cluster field (lw)
+	mov	ax, cx
+	stosw		; FClusterLw, 26
+	; Set up file size (dword) to zero
+	xor	eax, eax ; 0
+	stosd		; FileSize, 28
+
+	retn
+
+; --------------------------------------------------------------------

@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 28/01/2025  (Previous: 29/12/2024)
+; Last Update: 07/07/2025  (Previous: 29/12/2024)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -894,6 +894,8 @@ wakeup:
 	retn
 
 set_working_path_x:
+	; 07/07/2025
+	; 29/06/2025 - TRDOS 386 Kernel v2.0.10
 	; 17/10/2016 (TRDOS 386 - FFF & FNF)
 	;mov	ax, 1 
 		; File name is needed/forced (AL=1)
@@ -910,6 +912,8 @@ set_working_path_xx: ; 30/12/2017 (syschdir)
 	mov	[FFF_Valid], ah ; 0 ; reset ; 17/10/2016
 
 set_working_path:
+	; 07/07/2025
+	; 29/06/2025 - TRDOS 386 Kernel v2.0.10
 	; 08/08/2022
 	; 29/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 16/10/2016
@@ -974,13 +978,19 @@ set_working_path:
 
 	;mov	ecx, 128 ; maximum path length = 128 bytes
 	; 29/07/2022
-	xor	ecx, ecx
-	mov	cl, 128
+	;xor	ecx, ecx
+	;mov	cl, 128
+	; 29/06/2025 - TRDOS 386 v2.0.10
+	; (long file name modification, A:"..."/"...")
+	; directory name length <= 256 bytes
+	; file name length <= 130 bytes (with 2 dbl quotes)
+	mov	ecx, 388 ; maximum path length = 388 bytes
 	sub	esp, ecx ; reserve 128 bytes (buffer) on stack
+		; reserve 388 bytes (buffer) on stack
 	mov	edi, esp ; destination address (kernel space)
 	; esi = source address (virtual, in user's memory space)
 	call	transfer_from_user_buffer
-	jc	short loc_swp_xor_retn 
+	jc	short loc_swp_xor_retn
 
 	mov	esi, esp ; temporary buffer (the path) on stack
 loc_swp_fchar:
@@ -997,13 +1007,17 @@ loc_swp_fchar_next:
 
 loc_swp_xor_retn:
 	xor	eax, eax
+	; 29/06/2025
+	;mov	[Path_FileName], al ; 0
 	stc
 loc_swp_retn:
 	mov	esp, ebp
 	pop	ebp
 
-	;mov	esi, FindFile_Drv
-	mov	esi, FindFile_Name ; 12/10/2016
+	;;mov	esi, FindFile_Drv
+	;mov	esi, FindFile_Name ; 12/10/2016
+	; 29/06/2025
+	mov	esi, Path_FileName
 	retn
 
 ;loc_swp_fchar_next:
@@ -1011,7 +1025,8 @@ loc_swp_retn:
 ;	jmp	short loc_swp_fchar
 
 loc_swp_parse_path_name:
-	mov	edi, FindFile_Drv
+	; 29/06/2025
+	;mov	edi, FindFile_Drv
 	call	parse_path_name
 	jc	short loc_swp_retn
 
@@ -1020,22 +1035,42 @@ loc_swp_checkfile_name:
 	jna	short loc_swp_drv
 
 	; 10/10/2016 (valid file name checking)
-	mov	esi, FindFile_Name
+	;mov	esi, FindFile_Name
+	; 29/06/2025
+	mov	esi, Path_FileName
 	cmp	byte [esi], 20h
 	jna	short loc_swp_xor_retn
 
 	; 16/10/2016
 	mov	byte [SWP_inv_fname], 0 ; reset
 	; esi = file name address (ASCIIZ)
+
+	;;;;
+	; 29/06/2025
+	cmp	byte [Path_LongFlag], 0
+	jna	short loc_swp_check_sfn
+loc_swp_check_lfn:
+	call	check_invalid_lfn_chars
+	jc	short loc_swp_inv_fn
+	jmp	short loc_swp_drv
+
+loc_swp_check_sfn:
+	;call	check_invalid_filename_chars
+	;;;;
+
 	call	check_filename
 	jnc	short loc_swp_drv
 
+loc_swp_inv_fn: ; 29/06/2025
 	inc	byte [SWP_inv_fname] ; set
 loc_swp_drv:
-	mov	dh, [Current_Drv]
-	;mov	[RUN_CDRV], dh
+	; 29/06/2025
+	;mov	dh, [Current_Drv]
+	;;mov	[RUN_CDRV], dh
 
-	mov	dl, [FindFile_Drv]
+	;mov	dl, [FindFile_Drv]
+	; 29/06/2025
+	mov	dl, [Path_Drv]
 	;cmp	dl, dh
 	cmp	dl, [Current_Drv]
 	je	short loc_swp_change_directory
@@ -1046,15 +1081,22 @@ loc_swp_drv:
 	; eax = 0
 
 loc_swp_change_directory:
-	cmp	byte [FindFile_Directory], 21h
+	;cmp	byte [FindFile_Directory], 21h
+	; 29/06/2025
+	cmp	byte [Path_Directory], 21h
 	cmc
 	jnc	short loc_swp_retn
 
 	inc	byte [SWP_DRV_chg]
 	inc	byte [Restore_CDIR]
-	mov	esi, FindFile_Directory
+	;mov	esi, FindFile_Directory
+	; 29/06/2025
+	mov	esi, Path_Directory
 	mov	ah, [SWP_Mode+1]
+	; 07/07/2025
+	push	ebp
 	call	change_current_directory
+	pop	ebp
 	;jc	short loc_swp_retn ; eax = error code
 	; 08/08/2022
 	jnc	short loc_swp_change_prompt_dir_string

@@ -1208,7 +1208,7 @@ loc_gfc_get_fat_free_clusters:
 	mov	[CLUSNUM], eax ; next cluster to search
 
 	inc	dword [FreeClusterCount] ; 1
-	
+
 loc_gfc_loop_get_next_cluster:
 	call	get_next_cluster
 	jnc	short loc_gfc_free_fat_clusters_cont
@@ -1246,7 +1246,7 @@ retn_from_get_free_fat32_clusters:
 gffs_4:
 	; 04/05/2025
 	cmp	eax, -1
-	je	short gffc_err	
+	je	short gffc_err
 
         movzx	ebx, byte [esi+LD_BPB+BPB_SecPerClust]
       	mul	ebx

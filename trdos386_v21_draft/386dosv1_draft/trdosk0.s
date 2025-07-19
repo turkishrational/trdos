@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - DEFINITIONS : trdosk0.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/06/2025 (Previous: 29/02/2016, v2.0.0)
+; Last Update: 17/06/2025 (Previous: 29/02/2016, v2.0.0)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -344,7 +344,15 @@ buf_type_0	EQU	11110001B	; AND sets type to "none"
 
 ; 04/05/2025
 ; 17/04/2025
-BUFFERS		EQU	Directory_Buffer ; start address of disk buffers
+;BUFFERS	EQU	Directory_Buffer ; start address of disk buffers
+; 05/06/2025 - temporary !
+BUFFERS		EQU	Directory_Buffer + 32768
+
+; 17/06/2025 - temporary
+FS_DDT_BUFFER	EQU	Cluster_Buffer
+FS_FDT_BUFFER	EQU	Cluster_Buffer+512
+; 18/06/2025 - temporary
+FS_DIR_BUFFER	EQU	Cluster_Buffer+1024
 
 ; 03/05/2025
 ; directory entry size
@@ -389,10 +397,10 @@ struc FSINFO		; Offset ;
 endstruc
 
 ; 03/05/2025
-FAT32_FreeClusters   equ BPB_Reserved ; 52
-FAT32_FirstFreeClust equ BPB_Reserved+4 ; 56 ; (NextFreeCluster)
+FAT32_FreeClusters   equ BPB_Reserved	; 52
+FAT32_FirstFreeClust equ BPB_Reserved+4	; 56 ; (NextFreeCluster)
 ; 04/05/2025
-FAT32_fsinfo_sector  equ BPB_Reserved+8 ; 60
+FAT32_fsinfo_sector  equ BPB_Reserved+8	; 60
 FAT_FreeClusters     equ 64
 FAT_FirstFreeClust   equ 68
 

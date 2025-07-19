@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/06/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 18/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -47,6 +47,8 @@ Remark:		resb 78
 CommandBuffer: 	resb 80
 
 TextBuffer:	resb 256
+; 02/07/2025 - TRDOS 386 v2.0.10
+RunPathBuffer:	resb 388
 
 MasterBootBuff:
 MasterBootCode: resb 1BEh
@@ -150,10 +152,16 @@ RUN_CDRV: resb 1 ; CMD_INTR.ASM  ; 09/11/2011
 
 ; 24/01/2016
 PATH_Array:     resb 128 ; DIR.ASM ; 09/10/2011
+
+; 22/06/2025
 ; 06/02/2016
-CCD_DriveDT:	resd 1 ; DIR.ASM ; (word)
-CCD_Level:	resb 1 ; DIR.ASM
-Last_Dir_Level:	resb 1 ; DIR.ASM
+;CCD_DriveDT:	resd 1 ; DIR.ASM ; (word)
+; 24/06/2025
+Current_LDRVT:	resd 1
+
+; 14/06/2025
+;CCD_Level:	resb 1 ; DIR.ASM
+;Last_Dir_Level: resb 1 ; DIR.ASM
 ;
 CDLF_FNAddress:	resd 1 ; DIR.ASM (word)
 CDLF_AttributesMask: resw 1 ; DIR.ASM
@@ -192,9 +200,15 @@ LFN_CheckSum:	 resb 1   ; DIR.ASM
 ; 25/05/2025 - TRDOS 386 v2.0.10
 LongFileName:	 resb 260 ; 130 UNICODE (2-byte) chars
 
+; 16/06/2025
+Current_DDT:
+; 13/06/2025 - TRDOS 386 v2.0.10
+DIR_FCluster:	resd 1
+ 
 ;PATH_Array_Ptr: resw 1 ; DIR.ASM
 PATH_CDLevel:	 resb 1 ; DIR.ASM
-PATH_Level:	 resb 1 ; DIR.ASM
+; 14/06/2025
+;PATH_Level:	 resb 1 ; DIR.ASM
 
 ; 07/02/2016
 Dir_File_Name:	resb 13 ; DIR.ASM ; 09/10/2011
@@ -237,6 +251,19 @@ FindFile_DirEntryName:	  resb 13 ; 18/05/2025
 ; 184 bytes ; 19/05/2025
 ; 25/05/2025
 FindFile_LongName:	  resb 129 ; ASCIIZ (max. 128+NUL)
+; 01/07/2025
+FindFile_Attributes:	  resb 1
+FindFile_Size:		  resd 1
+FindFile_FirstCluster:	  resd 1
+;FindFile_LmDateTime:	  resd 1
+FindFile_FATType:	  resb 1
+
+; 26/06/2025
+Path_FileSystem:	  resb 1
+Path_Drv:		  resb 1
+Path_Directory:		  resb 256 ; ASCIIZ (max. 256+NUL)
+Path_FileName:		  resb 129
+Path_LongFlag:		  resb 1 ; Flag for using Long Path
 
 First_Path_Pos: resd 1	; DIR.ASM ; 09/10/2011
 Last_Slash_Pos: resd 1	; DIR.ASM
@@ -252,14 +279,21 @@ TFS_Dec_End:    resb 1
 PrintDir_RowCounter: resb 1
 
 alignb 4
+; 28/06/2025
+Show_Buffer:	resd 1
 ; 15/02/2015 ('show' command variables)
 Show_FDT:	resd 1
-Show_LDDDT:	resd 1
+; 26/06/2025
+;Show_LDDDT:	resd 1
 Show_Cluster:	resd 1
 Show_FileSize:	resd 1
 Show_FilePointer: resd 1
-Show_ClusterPointer: resw 1
-Show_ClusterSize: resw 1
+;Show_ClusterPointer: resw 1
+;Show_ClusterSize: resw 1
+; 28/06/2025
+Show_FileSector: resd 1
+Show_ClusterSize: resd 1
+Show_SectorCount: resd 1
 Show_RowCount:	resb 1
 
 alignb 4
@@ -267,12 +301,16 @@ alignb 4
 DelFile_FNPointer:	resd 1 ; ; CMD_INTR.ASM (word) ; 09/11/2011
 ; 27/02/2016
 ; DIR.ASM (09/10/2011)
+rmdir_FCluster:	; 17/07/2025
 DelFile_FCluster:	resd 1
-DelFile_EntryCounter:	resw 1
+rmdir_EntryNumber: ; 18/07/2025
+DelFile_EntryCounter:	resd 1
+rmdir_LNEL: ; 16/07/2025
 DelFile_LNEL:		resb 1
-resb 1
+			resb 1
 
 ; DIR.ASM
+rmdir_DirName_Offset:	; 16/07/2025
 mkdir_DirName_Offset: 	resd 1
 mkdir_FFCluster:	resd 1
 mkdir_LastDirCluster:	resd 1
@@ -281,13 +319,26 @@ mkdir_attrib:		resw 1
 mkdir_SecPerClust:	resb 1
 mkdir_add_new_cluster:	resb 1
 mkdir_Name:		resb 13
-resw 1 ; 01/03/2016
+			resw 1 ; 01/03/2016
+; 14/07/2025 - TRDOS 386 v2.0.10
+mkdir_phydrv:		resb 1
+mkdir_dirsector:	resd 1
+mkdir_datetime:		resd 1
+mkdir_entrypos:		resd 1
+
 ; 27/02/2016
 RmDir_MultiClusters:	resb 1
 RmDir_DirEntryOffset:	resd 1 ; 01/03/2016 (word -> dword)
 RmDir_ParentDirCluster: resd 1
 RmDir_DirLastCluster:   resd 1
 RmDir_PreviousCluster:  resd 1
+
+; 17/07/2025
+rmdir_dir_fcluster:	resd 1
+rmdir_drv:		resb 1
+
+; 16/07/2025
+LMDT_Flag:	resb 1  ; Last Modification Date & Time update flag
 ; 22/02/2016
 UPDLMDT_CDirLevel:	resb 1
 UPDLMDT_CDirFCluster:	resd 1
@@ -295,17 +346,23 @@ UPDLMDT_CDirFCluster:	resd 1
 alignb 4
 ; DRV_FAT.ASM ; 21/08/2011
 gffc_next_free_cluster:  resd 1
+; 12/07/2025
+FCS_START:	
 gffc_first_free_cluster: resd 1
+FCS_END:
 gffc_last_free_cluster:  resd 1
 
-;29/04/2016
+; 29/04/2016
 Cluster_Index: ; resd 1
 ; 22/02/2016
 ClusterValue:	resd 1
+
 ; 04/03/2016
 Attributes:	resb 1
 ;;CFS_error:  resb 1 ;; 01/03/2016
-resb 1
+; 13/06/2025 (negative attributes)
+NegAttribs:	resb 1
+
 CFS_OPType: resb 1
 CFS_Drv:    resb 1
 CFS_CC:	    resd 1
@@ -358,7 +415,6 @@ SourceFile_MatchCounter:	resw 1
 SourceFile_SecPerClust:		resb 1
 SourceFile_Reserved:		resb 1
 ; Above is 128 bytes
-
 ;Destination File Structure (same with 'Find File' Structure)
 DestinationFile_Drv:		resb 1
 DestinationFile_Directory: 	resb 65
@@ -470,7 +526,8 @@ readi.offset:	resw 1 ; byte offset in cluster buffer
 readi.cluster:  resd 1 ; current cluster number
 readi.c_index:	resd 1 ; cluster index of the current cluster (0,1,2,3..)
 readi.fclust:	resd 1 ; first cluster of the current cluster
-readi.fs_index: resd 1 ; sector index in disk/file section (for Singlix FS)
+; 01/07/2025
+;readi.fs_index: resd 1 ; sector index in disk/file section (for Singlix FS)
 ;readi.buffer:	resd 1 ; readi sector buffer address
 
 ;alignb 4
@@ -495,10 +552,16 @@ alignb 4
 
 ; 29/04/2016
 Run_CDirFC:	resd 1
-Run_Auto_Path:	resb 1
-Run_Manual_Path: resb 1 ; 0 -> auto path sequence needed
+;Run_Auto_Path:	resb 1
+; 02/07/2025
+Run_Path_Length:
+		resd 1
+Run_Auto_Path:	resd 1
+Run_Manual_Path: 
+		resb 1 ; 0 -> auto path sequence needed
 EXE_ID:		resb 1
 EXE_dot:	resb 1
+		resb 1 ; 02/07/2025
 
 ; 06/05/2016
 mainprog_return_addr: resd 1
@@ -584,6 +647,11 @@ fpready:	resb 1	; '80387 fpu is ready' flag
 ; 08/10/2016
 ;device_name:	resb 9  ; capitalized (and zero padded) device name
 			; (example: "TTY0",0,0,0,0,0")
+
+; 11/07/2025 - TRDOS 386 v2.0.10
+current_file:	resb 1	; open file number (SFT number)
+; 14/07/2025
+FAILERR:	resb 1	; ('BUFWRITE' error return)
 
 alignb 4
 
@@ -705,6 +773,8 @@ OF_DIRPOS:	resb OPENFILES	; Directory entry index in directory sector
 OF_NAME:	resb OPENFILES*12 ; File name in directory entry format
 OF_ATTRIB:	resb OPENFILES	; File attributes
 OF_DATETIME:	resd OPENFILES	; Last modification time (LW) and date (hw)
+; 11/07/2025
+OF_LCLUSTER:	resd OPENFILES  ; Last clusters of open files
 
 ;alignb 2
 
@@ -846,7 +916,8 @@ sb16_dma_buffer: resb 65536 ; DMA buffer for sb16 audio playing.
 BufferQueue:	resd 1	; (MSDOS -> BufferQueue)
 DirtyBufferCount:
 		resd 1	; (MSDOS -> DirtyBufferCount)
-buf_prev_off:	resd 1
+; 05/06/2025
+;buf_prev_off:	resd 1
 
 ; 03/05/2025
 LastBuffer:	resd 1 	; (MSDOS -> LastBuffer)
@@ -884,6 +955,17 @@ ENTFREE:	resd 1	; (MSDOS -> ENTFREE)
 ENTLAST_PREV:	resd 1	; (PCDOS 7.1 -> ? -LFN search-)
 LNE_COUNT:	resb 1	; (PCDOS 7.1 -> ? -LFN entry count-)
 
+; 11/07/2025 - TRDOS 386 v2.0.10
+; (ADD_NEW_CLUSTERS)
+FATBYT:		resd 1
+;FCS_START:	resd 1
+;FCS_END:	resd 1	; 12/07/2025
+LASTCLUSTER:	resd 1
+FREECLUSTER:	resd 1
+NEXTCLUSTER:	resd 1
+CLUSTERS:	resd 1
+CLUSTCOUNT:	resd 1
+
 ; 02/06/2025 - TRDOS 386 v2.0.10
 ; get_direntry parameters
 GDE_BINDEX:	resd 1
@@ -909,25 +991,35 @@ order_number:	resd 1
 
 ; 02/06/2025 - TRDOS 386 v2.0.10
 ; Singlix FS file name search parameters
-FS_DDT_Buffer:	resd 1
+;FS_DDT_Buffer:	resd 1
+;FS_SectorIndex: ; 01/07/2025
 FS_Dir_Index:	resd 1
-FS_CurrenDirectory:
+FS_CurrentDirectory:
 		resd 1
+; 17/06/2025
+FS_Consequtive: resd 1
+FS_CurrentSector:
+		resd 1
+; 18/06/2025
+FS_Dir_Buffer:	resd 1
+; 19/06/2025
+FS_Current_DDT: resd 1
 
 ; 25/05/2025 - TRDOS 386 v2.0.10
 ; Singlix FS file name conversion parameters
 
 FDT_Number:	; 02/06/2025
 fdt_number:	resd 1
-f_name_limit:	resd 1
+; 17/06/2025
+;f_name_limit:	resd 1
 ;f_base_start:	resd 1
 f_target:	resd 1
-f_base_count:	resd 1
+f_base_count:	resd 1 ; 1 byte is used
 f_ext_start:	resd 1
-f_ext_count:	resd 1
+f_ext_count:	resd 1 ; 1 byte is used
 ;f_name_count:	resd 1
 formal_size:	resd 1
-lossy_conversion: ; 28/05/2025	
+lossy_conversion: ; 28/05/2025
 insert_fdtnum:	resb 1
 target_name:	resb 13
 ;temp_name:	resb 65

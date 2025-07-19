@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - SYS INIT : trdosk1.s
 ; ----------------------------------------------------------------------------
-; Last Update: 08/05/2025 (Previous: 26/09/2024, v2.0.9)
+; Last Update: 05/06/2025 (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -782,6 +782,7 @@ stime1:
 
 ; ----------------------------------------------------------------------
 
+	; 05/06/2025
 	; 03/05/2025
 	; 17/04/2025 - TRDOS 386 v2.0.10
 	; ref: Retro DOS v5.0 (PCDOS 7.1)
@@ -790,9 +791,17 @@ set_buffers:
 	; output: buffers Queue established
 	mov	edi, BUFFERS
 	mov	[BufferQueue], edi		; head of Buff Q
-	xor	ecx, ecx ; 0
+
+	; 05/06/2025
+	mov	[FIRST_BUFF_ADDR], edi
+	mov	ecx, -1
+	mov	[LastBuffer], ecx ; -1
+	;xor	ecx, ecx ; 0
+	inc	ecx ; 0
 	mov	[DirtyBufferCount], ecx ; 0	; set dirty_count to 0.
-	mov	[buf_prev_off], ecx ; 0
+	;mov	[buf_prev_off], ecx ; 0
+	; 05/06/2025
+	mov	ebx, edi
 
 	;mov	ecx, nbuf			; number of buffers
 	mov	cl, nbuf
@@ -800,19 +809,28 @@ set_buffers:
 nxt_buff:
 	call	set_buffer_info 		; set buf_link,buf_id...
 	loop	nxt_buff
+	; 05/06/2025
+	mov	eax, [FIRST_BUFF_ADDR]
+	mov	[eax+BUFFINFO.buf_prev], edi	; first->prev = last
+	;mov	[edi+BUFFINFO.buf_next], eax	; last->next = first
+	mov	[edi], eax
+
 	retn
 
+	; 05/06/2025
 	; 17/04/2025 - TRDOS 386 v2.0.10
 	; ref: Retro DOS v5.0 (PCDOS 7.1)
 set_buffer_info:
 	; function: set buf_link,buf_id,buf_sector
-	mov	ebx, [buf_prev_off]
+	;mov	ebx, [buf_prev_off]
+	; 05/06/2025
 	mov	[edi+BUFFINFO.buf_prev], ebx
 	mov	eax, edi
 	add	eax, edx
 	;mov	[edi+BUFFINFO.buf_next], eax
 	mov	[edi], eax
-	mov	[buf_prev_off], edi
+	;mov	[buf_prev_off], edi
+	mov	ebx, edi
 	mov	edi, eax
 	mov	dword [edi+BUFFINFO.buf_ID], 00FFh  ; new buffer free
 	mov	dword [edi+BUFFINFO.buf_sector], 0
