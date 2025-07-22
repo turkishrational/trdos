@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 19/07/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 22/07/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -254,7 +254,7 @@ gnc_@:
 	; if cf = 1 -> eax = error code ; eax = 0 -> eof
 	; ecx = current (previous) cluster number
 
-	retn	
+	retn
 %endif
 
 load_FAT_root_directory:
@@ -1995,6 +1995,8 @@ loc_glc_stc_retn:
 	cmc	;stc
         jmp	short loc_glc_prev_cluster_retn
 
+; 21/07/2025 - TRDOS 386 v2.0.10
+%if 0
 truncate_cluster_chain:
 	; 31/08/2024 - TRDOS 386 v2.0.9
 	; 01/03/2016
@@ -2003,7 +2005,7 @@ truncate_cluster_chain:
 	; 11/09/2010
 	; INPUT ->
 	;	ESI = Logical dos drive description table address
-	;	EAX = First cluster to be truncated/unlinked 
+	;	EAX = First cluster to be truncated/unlinked
 	; OUTPUT ->
 	;	ESI = Logical dos drive description table address
 	; 	ECX = Count of truncated/removed clusters
@@ -2027,7 +2029,7 @@ loc_truncate_cc:
 
 	; (possible FAT32) EOF signature...
 	;	not a valid cluster number
-	;	
+	;
 	; NOTE: update_cluster returns EOF (if eax > [LastCluster])
 	;	instead of invalid data error
 
@@ -2071,7 +2073,7 @@ loc_tcc_calculate_FAT_freespace:
 loc_tcc_recalculate_FAT_freespace:
 	mov	bx, 0FF00h ; recalculate !
 	call	calculate_fat_freespace
-              
+
 loc_tcc_calculate_FAT_freespace_err:
 pass_truncate_cc_recalc_FAT_freespace:
 	mov	ecx, [FAT_ClusterCounter]
@@ -2084,6 +2086,13 @@ loc_tcc_unlink_clusters_error:
 	stc
 loc_tcc_unlink_clusters_retn:
 	retn
+%else
+	; 21/07/2025 - temporary !
+truncate_cluster_chain:
+	mov	eax, ERR_MISC ; 27
+	stc
+	retn
+%endif
 
 set_fat32_fsinfo_sector_parms:
 	; 15/10/2016
@@ -2747,6 +2756,7 @@ ude_4:
 ; 21/04/2025 - TRDOS 386 v2.0.10
 
 GETFATBUFFER:
+	; 22/07/2025
 	; 05/06/2025
 	; 28/04/2025
 	; 21/04/2025
@@ -2756,6 +2766,7 @@ GETFATBUFFER:
 	jmp	short getb_x
 
 GETBUFFER_NPR:
+	; 22/07/2025
 	; 05/06/2025
 	; 28/04/2025
 	; 21/04/2025
@@ -2766,6 +2777,7 @@ GETBUFFER_NPR:
 	jmp	short getb_x
 
 GETBUFFER:
+	; 22/07/2025
 	; 05/06/2025
 	; 28/04/2025
 	; 24/04/2025
@@ -2776,9 +2788,8 @@ GETBUFFER:
 	;	eax = Physical sector number (LBA)
 	;	 cl = Physical Disk Number
 	;	edx = Logical DOS Drive Table address
-	; OUTPUT:
+	; OUTPUT: ; 22/07/2025
 	;	esi = Buffer Header address
-	;	 cl = Physical Disk Number
 	;	edx = Logical DOS Drive Table address
 	;
 	; Modified registers:
@@ -3121,6 +3132,7 @@ up_1:
 ; 27/04/2025 - TRDOS 386 v2.0.10
 
 MAPCLUSTER:
+	; 22/07/2025
 	; 10/07/2025
 	; 27/04/2025
 	; (MSDOS -> MAPCLUSTER) - Ref: Retro DOS v5 - ibmdos7.s
@@ -3134,6 +3146,8 @@ MAPCLUSTER:
 	;	      (next/new cluster number)
 	;	esi = Start of the (FAT) buffer
 	;	ebx = buffer offset (not used)
+	;	22/07/2025
+	;	[ClusSave] = cluster data (16 bit or 32 bit)
 	;	10/07/2025
 	;	[CLUSNUM] = eax input
 	;	edi = (FAT) buffer (data/cluster) address
@@ -3204,7 +3218,8 @@ mapcl_3:
 	;mov	[ClusSec], eax
 
 	mov	eax, [ClusSec]
-	;mov	cl, [edx+LD_PhyDrvNo]
+	; 22/07/2025
+	mov	cl, [edx+LD_PhyDrvNo]
 	inc	eax
 
 	call	GETFATBUFFER
@@ -3215,12 +3230,12 @@ mapcl_3:
 	;mov	ah, [esi+BUFINSIZ]
 	lea	edi, [esi+BUFINSIZ]
 	mov	ah, [edi]
-
 	jmp	short mapcl_7
 
 mapcl_4:
 	mov	eax, [edi]
-
+	; 22/07/2025
+	mov	[ClusSave], eax
 	cmp	byte [edx+LD_FATType], 2
 	ja	short mapcl_6	; FAT32
 	jb	short mapcl_7	; FAT12
@@ -4885,6 +4900,7 @@ NEXTENTRY:
 ; 10/07/2025 - TRDOS 386 v2.0.10
 
 PACK:
+	; 22/07/2025
 	; 10/07/2025
 	; (MSDOS -> PACK) - Ref: Retro DOS v5 - ibmdos7.s
 	; Pack FAT entries (ALLOCATE)
@@ -4917,11 +4933,19 @@ pack_1:
 	; EDI = buffer data (cluster pos) address
 	; ESI = buffer header address
 	; [CLUSNUM] = EAX input
-	; [ClusSplit], [ClusSec], [ClusSave]
+	; 22/07/2025
+	; [ClusSave] = 16 bit or 32 bit cluster data
+	; [ClusSplit], [ClusSec]
 
 	cmp	byte [edx+LD_FATType], 2
 	ja	short pack_6 ; FAT32
 	je	short pack_7 ; FAT16
+
+	; 22/07/2025
+	; Note: EAX contains 12 bit next cluster number
+	;       but we need all of the 16 bit cluster data
+	;	(it is in [ClusSave])
+	mov	ax, [ClusSave]
 
 	; FAT12
 	test	byte [CLUSNUM], 1 ; odd ?
@@ -4978,6 +5002,11 @@ pack_4:
 pack_5:
 	retn
 pack_6:
+	; 22/07/2025
+	; Note: EAX contains 28 bit next cluster number
+	;       32 bit cluster data is in [ClusSave]
+	mov	eax, [ClusSave]
+	;;;
 	and	eax, 0F0000000h
 	;and	ebx, 00FFFFFFFh
 	or	ebx, eax
@@ -5276,6 +5305,7 @@ RESTFATBYT:
 
 RELEASE:
 	; (MSDOS -> RELEASE)
+RELEASE_nc:	; 21/07/2025
        	xor	ebx, ebx
 RELBLKS:
 	; 17/07/2025
@@ -5339,6 +5369,7 @@ rblks_2:
 	jz	short rblks_3
 
 	; Increase free count by 1
+
 	mov	[ebx], eax
 	movzx	eax, byte [edx+LD_BPB+SecPerClust]
 	; 17/07/2025
@@ -5353,7 +5384,9 @@ rblks_3: ; (MSDOS -> NO_DEALLOC)
 
 	inc	eax
 	call	IsEOF
-        jb	short RELEASE
+        ;jb	short RELEASE
+	; 21/07/2025
+        jb	short RELEASE_nc
 rblks_4:
 	retn
 

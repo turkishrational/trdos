@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 19/07/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 21/07/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -4324,7 +4324,7 @@ delete_longname:
 	;   If CF = 1 -> error code in EAX
 	;
 	; Modified registers:
-	;	eax, ebx, ecx, edx, esi, edi, ebp
+	;	eax, ebx, ecx, esi, edi, ebp
 
 	mov	[DIR_FCluster], ebx
 	mov	[DirEntry_Counter], eax
@@ -4645,6 +4645,8 @@ loc_lcde_load_dir_cluster_1:
 	jmp	short loc_lcde_retn
 
 remove_file:
+	; 21/07/2025 (TRDOS 386 Kernel v2.0.10)
+	;  (Ref: DOS_DELETE, Retro DOS v5.0 - ibmdos7.s)
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 15/10/2016
 	; 28/02/2016 (TRDOS 386 = TRDOS v2.0)
@@ -4652,9 +4654,16 @@ remove_file:
 	; 09/08/2010
 	; INPUT ->
 	;	EDI = Directory Buffer Entry Address
-	;	 CX = Directory Buffer Entry Counter/Index
+	;	21/07/2025
+	;	ECX = Directory Buffer Entry Counter/Index
 	;	 BL = Longname Entry Length
 	;	 BH = Logical DOS Drive Number
+	;
+	; 21/07/2025
+	;  If CF = 1 -> Error code in EAX (AL)
+	;     if EAX = 5 ; ERR_ACCESS_DENIED
+	;	 file is open
+	;     if EAX = 11 ; ERR_PERM_DENIED
 
 	sub	eax, eax
 	mov	ah, bh
@@ -4671,7 +4680,7 @@ loc_del_file_invalid_format:
 	xor	ah, ah
 	; 15/10/2016 (0Bh -> 28)
 	mov	al, 28  ; Invalid Format
-	stc 
+	stc
 	retn
 
 loc_del_fs_file:
@@ -4685,34 +4694,103 @@ loc_del_fat_file:
 	jc	short loc_del_file_err_retn
 
 loc_delfile_unlink_cluster_chain:
+
+; 21/07/2025 - TRDOS 386 v2.0.10
+%if 0
 	call	truncate_cluster_chain
 	;jc	short loc_del_file_err_retn
+%else
+	; 21/07/2025
+	; check cluster value
+	; esi = LDRVT address
+	; eax = cluster number
+	cmp	eax, 2
+	jb	short remove_file_3
+	mov	ecx, [esi+LD_Clusters]
+	inc	ecx ; last cluster number
+	cmp	ecx, eax
+	jb	short remove_file_3
+	mov	edx, esi
+	call	RELEASE
+	jc	short loc_del_file_err_retn
+
+	cmp	byte [edx+LD_FATType], 2
+	jna	short remove_file_1 ; not FAT32
+
+	; FAT32 fs
+	lea	ebx, [edx+LD_BPB+FAT32_FirstFreeClust]
+	jmp	short remove_file_2
+
+remove_file_1:
+	; FAT16 or FAT12 fs
+	lea	ebx, [edx+LD_BPB+FAT_FirstFreeClust]
+remove_file_2:
+	mov	eax, [DelFile_FCluster]
+	cmp	eax, [ebx]
+	jnb	short remove_file_3
+	; replace first free cluster value
+	mov	[ebx], eax
+remove_file_3:
+	;;;;
+	; 21/07/2025
+	movzx	ecx, byte [DelFile_LNEL]
+	or	cl, cl
+	jz	short remove_file_skip_dln
+	; ecx = long name entry count
+	mov	eax, [DelFile_EntryNumber]
+		; entry number of the short name
+	sub	eax, ecx
+	;jc	short remove_file_skip_dln
+	mov	ebx, [delfile_dir_fcluster]
+ 	; eax = directory entry number
+	;	of the long name last entry
+	call	delete_longname
+	; ignore error
+remove_file_skip_dln:
+	;;;;
+	mov	byte [LMDT_Flag], 1
+			; update parent dir LMDT
+	; update FAT32 fsinfo sector
+	; and last modification date &time
+	;     of the parent directory.
+	jmp	dirup_@
 
 loc_delfile_return:
 loc_del_file_err_retn:
 	retn
+%endif
 
 delete_directory_entry:
+	; 21/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 15/10/2016
 	; 28/02/2016 (TRDOS 386 = TRDOS v2.0)
 	; 01/08/2011 (DIR.ASM, 'proc_delete_directory_entry')
 	; 10/04/2011
 	; INPUT ->
-	; 	ESI = Logical Dos Drive Descripton Table Address 
+	; 	ESI = Logical Dos Drive Descripton Table Address
 	;	EDI = Directory Buffer Entry Address
-	;	 CX = Directory Buffer Entry Counter/Index
+	;	21/07/2025
+	;	ECX = Directory Buffer Entry Counter/Index
 	;	 BL = Longname Entry Length
-	; OUTPUT ->
-	; 	ESI = Logical dos drive descripton table address 
-	;	EAX = First cluster to be truncated/unlinked
-	;       CF = 1 -> Error code in EAX (AL)
-	;       CF = 0 & BH <> 0 -> LMDT write error  (BH = 1)
-	;       CF = 0 & BL <> 0 -> Long name delete error (BL = FFh) 
+	;	 BH = Logical DOS Drive Number
 	;
-	;  (EDI, EBX, ECX register contents will be changed)
+	;	[CurrentBuffer] = Directory Buffer header addr
+	;
+	; OUTPUT ->
+	; 	ESI = Logical dos drive descripton table address
+	;	EAX = First cluster to be truncated/unlinked
+	;;;     CF = 1 -> Error code in EAX (AL)
+	;;;     CF = 0 & BH <> 0 -> LMDT write error  (BH = 1)
+	;;;     CF = 0 & BL <> 0 -> Long name delete error (BL = FFh)
+	;
+	;;;  (EDI, EBX, ECX, EDX register contents will be changed)
+	;
+	; Modified registers: EAX, EBX, ECX, EDX
 
 	mov	[DelFile_LNEL], bl
-	mov	[DelFile_EntryCounter], cx
+	;mov	[DelFile_EntryCounter], cx
+	; 21/07/2025
+	mov	[DelFile_EntryNumber], ecx
 
 	mov	ax, [edi+20] ; First Cluster High Word
 	shl	eax, 16
@@ -4720,9 +4798,40 @@ delete_directory_entry:
 
 	mov	[DelFile_FCluster], eax
 
+	; 21/07/2025
+	;;;;
+	; check if the file is open
+	; (do not delete open file)
+	mov	ecx, OPENFILES
+	mov	edx, OF_MODE
+dde_cfo_1:
+	cmp	byte [edx], 0
+	jz	short dde_cfo_4 ; not open
+dde_cfo_2:
+	push	edx
+	sub	edx, OF_MODE
+	cmp	[edx+OF_DRIVE], bh
+	jne	short dde_cfo_3
+	shl	edx, 2 ; dword
+	cmp	[edx+OF_FCLUSTER], eax
+	jne	short dde_cfo_3
+	; set file open error
+	pop	edx
+	mov	eax, ERR_ACCESS_DENIED ; 5
+	stc
+	retn
+dde_cfo_3:
+	pop	edx
+dde_cfo_4:
+	inc	edx
+	loop	dde_cfo_1
+	;;;;
+
 loc_del_short_name:
 	mov	byte [edi], 0E5h  ; Deleted sign
 
+; 21/07/2025 - TRDOS 386 v2.0.10
+%if 0
 	mov	byte [DirBuff_ValidData], 2
 	call	save_directory_buffer
 	jc	short loc_delete_direntry_err_return
@@ -4761,8 +4870,21 @@ loc_delete_direntry_return:
 	mov	eax, [DelFile_FCluster]
 loc_delete_direntry_err_return:
 	retn
+%else
+	; 21/07/2025
+	mov	ebx, [CurrentBuffer]
+	test	byte [ebx+BUFFINFO.buf_flags], buf_dirty
+	jnz	short loc_del_short_name_sbd_skip
+	;call	INC_DIRTY_COUNT
+	inc	dword [DirtyBufferCount]
+	;or	byte [ebx+9], 40h
+	or	byte [ebx+BUFFINFO.buf_flags], buf_dirty
+loc_del_short_name_sbd_skip:
+	retn
+%endif
 
 rename_directory_entry:
+	; 21/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 13/11/2017
 	; 15/10/2016
@@ -4770,7 +4892,7 @@ rename_directory_entry:
 	; 01/08/2011 (DIR.ASM, 'proc_rename_directory_entry')
 	; 19/11/2010
 	; INPUT -> (Current Directory)
-	;	CX = Directory Entry Number
+	;      ECX = Directory Entry Number ; 21/07/2025
 	;      EAX = First Cluster number of file or directory
 	;      EBX = Longname Length (dir entry count) (< 256)
 	;      ESI = New file (or directory) name (no path).
@@ -4791,7 +4913,9 @@ rename_directory_entry:
 	
 loc_rename_directory_entry:
 	mov	[DelFile_LNEL], bl
-	mov	[DelFile_EntryCounter], cx
+	;mov	[DelFile_EntryCounter], cx
+	; 21/07/2025
+	mov	[DelFile_EntryNumber], ecx
 	mov	[DelFile_FCluster], eax
 
 	movzx	eax, cx
@@ -4840,7 +4964,9 @@ loc_rename_direntry_del_ln:
 	or	dl, dl
 	jz	short loc_rename_direntry_update_parent_dir_lm_date
 
-	movzx	eax, word [DelFile_EntryCounter]
+	;movzx	eax, word [DelFile_EntryCounter]
+	; 21/07/2025
+	mov	eax, [DelFile_EntryNumber]
 	sub	eax, edx
 	jc	short loc_rename_direntry_invd_retn
 

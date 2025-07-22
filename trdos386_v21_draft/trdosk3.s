@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 19/07/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 21/07/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -5225,11 +5225,27 @@ rmdir_fde:
 %endif
 
 delete_file:
+	; 21/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 29/02/2016
 	; 28/02/2016 (TRDOS 386 = TRDOS v2.0)
 	; 09/08/2010 (CMD_INTR.ASM, 'cmp_cmd_del')
 	; 28/02/2010
+	;
+	; INPUT ->
+	;	ESI = Asciiz file name (path name)
+	; OUTPUT:
+	;  If CF = 0 -> FILE has been DELETED
+	;  If CF = 1 -> Error code in EAX (AL)
+	;     if EAX = 5 ; ERR_ACCESS_DENIED
+	;	 file is open
+	;     if EAX = 11 ; ERR_PERM_DENIED
+	;	 attribute (S,H,R) error
+	;     if EAX = 2  ; ERR_NOT_FOUND
+	;	 file not found
+	;
+	; Modifed registers: 
+	;	EAX, EBX, ECX, EDX, ESI, EDI, EBP
 
 get_delfile_fchar:
 	; esi = file name
@@ -5240,7 +5256,8 @@ loc_delfile_nofilename_retn:
 	retn
 
 loc_delfile_parse_path_name:
-	mov	edi, FindFile_Drv
+	; 21/07/2025
+	;mov	edi, FindFile_Drv
 	call	parse_path_name
 	;jc	loc_cmd_failed
 	; 28/07/2022
@@ -5249,7 +5266,9 @@ loc_delfile_failed:
 	jmp	loc_cmd_failed
 
 loc_delfile_check_filename_exists:
-	mov	esi, FindFile_Name
+	;mov	esi, FindFile_Name
+	; 21/07/2025
+	mov	esi, Path_FileName
 	cmp	byte [esi], 20h
 	;jna	loc_cmd_failed
 	; 28/07/2022
@@ -5257,9 +5276,19 @@ loc_delfile_check_filename_exists:
 	mov	[DelFile_FNPointer], esi
 
 loc_delfile_drv:
-	mov	dl, [FindFile_Drv]
+	;mov	dl, [FindFile_Drv]
+	; 21/07/2025
+	mov	dl, [Path_Drv]
 	mov	dh, [Current_Drv]
 	mov	[RUN_CDRV], dh
+	
+	;;;;
+	; 21/07/2025
+	;mov	[delfile_drv], dh
+	mov	ebx, [Current_Dir_FCluster]
+	mov	[delfile_dir_fcluster], ebx
+	;;;;
+
 	cmp	dl, dh
 	je	short loc_delfile_change_directory
 
@@ -5271,11 +5300,15 @@ loc_delfile_drv:
 	jc	short loc_delfile_chdrv_failed
 
 loc_delfile_change_directory:
-	cmp	byte [FindFile_Directory], 20h
+	;cmp	byte [FindFile_Directory], 20h
+	; 21/07/2025
+	cmp	byte [Path_Directory], 20h
 	jna	short loc_delfile_find
 
 	inc	byte [Restore_CDIR]
-	mov	esi, FindFile_Directory
+	;mov	esi, FindFile_Directory
+	; 21/07/2025
+	mov	esi, Path_Directory
 	xor	ah, ah ; CD_COMMAND sign -> 0
 	call	change_current_directory
 	;jc	loc_file_rw_cmd_failed
@@ -5291,7 +5324,9 @@ loc_delfile_chdir_ok: ; 28/07/2022
 	;call	change_prompt_dir_string
 
 loc_delfile_find:
-	;mov	esi, FindFile_Name
+	;;mov	esi, FindFile_Name
+	; 21/07/2025
+	;mov	esi, Path_FileName
 	mov	esi, [DelFile_FNPointer]
 	mov	ax, 1800h ; Except volume label and dirs
 	call	find_first_file
@@ -5361,10 +5396,18 @@ loc_yes_delete_file:
 
 loc_delete_file:
 	mov	bh, [FindFile_Drv]
+	; 21/07/2025
+	mov	bh, [Path_Drv]
 	;mov	bl, [DelFile_LNEL]
 	mov	bl, [FindFile_LongNameEntryLength]
-	;mov	cx, [DirBuff_EntryCounter]
-	mov	cx, [FindFile_DirEntryNumber]
+	;;mov	cx, [DirBuff_EntryCounter]
+	;mov	cx, [FindFile_DirEntryNumber]
+	;;;
+	; 21/07/2025
+	mov	ecx, [DirEntry_Counter] 
+		; from 'find_directory_entry'
+	;mov	[DelFile_EntryNumber], ecx
+	;;;
 	; (*) EDI = Directory buffer entry offset/address
 	call	remove_file ; (FILE.ASM, 'proc_delete_file')
 	;jnc	loc_print_deleted_message
@@ -5378,8 +5421,14 @@ loc_delete_file_err1:
 	;je	loc_permission_denied
 	; 28/07/2022
 	jne	short loc_delete_file_err2
+ loc_delete_file_openfile_err:	; 21/07/2025
 	jmp	loc_permission_denied
 loc_delete_file_err2:
+	;;;
+	; 21/07/2025
+	cmp	al, ERR_ACCESS_DENIED ; 5
+	je	short loc_delete_file_openfile_err
+	;;;
 	stc
 	jmp	loc_file_rw_cmd_failed
 
