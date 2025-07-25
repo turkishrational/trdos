@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - INITIALIZED DATA : trdosk9.s
 ; ----------------------------------------------------------------------------
-; Last Update: 22/07/2025 (Previous: 29/12/2024 - Kernel v2.0.9)
+; Last Update: 25/07/2025 (Previous: 29/12/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -34,7 +34,7 @@ Magic_Bytes:
 		db 1
 mainprog_Version:
 		db 7
-		db "[TRDOS] Main Program v2.1.0 (22/07/2025)"
+		db "[TRDOS] Main Program v2.1.0 (25/07/2025)"
 		db 0Dh, 0Ah
 		db "(c) Erdogan Tan 2005-2025"
 		db 0Dh, 0Ah, 0
@@ -413,7 +413,8 @@ Msg_DoYouWantRename:
                 db "Do you want to rename ", 0
 Rename_File:    db "file ", 0
 Rename_Directory: db "directory ", 0
-Rename_OldName: times 13 db 0
+; 25/07/2025
+;Rename_OldName: times 13 db 0
 Msg_File_rename_as: db " as "
 Rename_NewName: times 13 db 0
 

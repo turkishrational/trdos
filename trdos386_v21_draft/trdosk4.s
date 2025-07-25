@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 21/07/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 25/07/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -4884,6 +4884,7 @@ loc_del_short_name_sbd_skip:
 %endif
 
 rename_directory_entry:
+	; 25/07/2025
 	; 21/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 13/11/2017
@@ -4894,14 +4895,18 @@ rename_directory_entry:
 	; INPUT -> (Current Directory)
 	;      ECX = Directory Entry Number ; 21/07/2025
 	;      EAX = First Cluster number of file or directory
-	;      EBX = Longname Length (dir entry count) (< 256)
+	;;     EBX = Longname Length (dir entry count) (< 256)
 	;      ESI = New file (or directory) name (no path).
 	;           (ASCIIZ string)
+	;      ; 25/07/2025
+	;      EDX = Logical DOS Drive Parameters Table
+	;	BL = Longname Length (dir entry count)
+	;      EDI = First Cluster number of the directory	
 	; OUTPUT -> 
 	;      CF = 0 -> successfull
 	;      CF = 1 -> error code in EAX (AL)
 	;
-	; (EAX, EBX, ECX, EDX, ESI, EDI will be changed)
+	; (EAX, EBX, ECX, EDX, ESI, EDI, EBP will be changed)
 
 	cmp	byte [Current_FATType], 0
 	ja	short loc_rename_directory_entry
@@ -4918,9 +4923,23 @@ loc_rename_directory_entry:
 	mov	[DelFile_EntryNumber], ecx
 	mov	[DelFile_FCluster], eax
 
-	movzx	eax, cx
+; 25/07/2025
+%if 0
+	;movzx	eax, cx
+	; 25/07/2025
+	mov	eax, ecx 
 	call	locate_current_dir_entry
 	jnc	short loc_rename_direntry_check_fcluster
+%else
+	; 25/07/2025
+	mov	ebx, edi ; [SourceFile_DirFirstCluster]
+	mov	eax, ecx
+	push	esi
+	call	get_direntry_@
+	mov	ebx, esi
+	pop	esi
+	jnc	short loc_rename_direntry_check_fcluster
+%endif
 
 loc_rename_direntry_pop_retn:
 	retn
@@ -4939,35 +4958,76 @@ loc_rename_retn:
 	retn
 
 loc_rename_direntry_check_fcluster:
-	mov	dx, [edi+20] ; First Cluster HW
-	shl	edx, 16 ; 13/11/2017
-	mov	dx, [edi+26] ; First Cluster LW
-	cmp	edx, [DelFile_FCluster]
+	;mov	dx, [edi+20] ; First Cluster HW
+	;shl	edx, 16 ; 13/11/2017
+	;mov	dx, [edi+26] ; First Cluster LW
+	;cmp	edx, [DelFile_FCluster]
+	;jne	short loc_rename_direntry_pop_invd_retn
+	; 25/07/2025
+	mov	ax, [edi+20] ; First Cluster HW
+	shl	eax, 16 ; 13/11/2017
+	mov	ax, [edi+26] ; First Cluster LW
+	cmp	eax, [DelFile_FCluster]	
 	jne	short loc_rename_direntry_pop_invd_retn
+
+	; 25/07/2025
+	call	convert_current_date_time
+	mov	[edi+18], dx ; LastAccDate
+
 	; ESI = New file (or directory) name. (ASCIIZ string)
 	; 06/03/2016
 	; TRDOS v2 - NOTE: 'convert_file_name' procedure
 	; has been modified for eliminating following situation.
-	; 
+	;
 	; TRDOS v1 - NOTE: If file/dir name is more than 11 bytes
 	; without a dot, attributes (edi+11) byte will be overwritten !
 	; (Dot file name input must be proper for 11 byte dir entry
 	;  type file name output.)
 	call	convert_file_name
 
+; 25/07/2025
+%if 0
         mov     byte [DirBuff_ValidData], 2
 	call	save_directory_buffer
 	jc	short loc_rename_retn
+%else
+	; 25/07/2025
+	mov	esi, ebx ; [CurrentBuffer]
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+	jnz	short loc_rename_direntry_buf_write
+	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
+	;call	INC_DIRTY_COUNT
+	inc	dword [DirtyBufferCount]
+loc_rename_direntry_buf_write:
+	; esi = buffer header address
+	push	dword [esi+BUFFINFO.buf_ID] ; *
+	call	BUFWRITE
+	; BUFWRITE invalidates the buffer
+	; so, BUFFINFO.buf_ID must be restored here
+	; (but, this is not necessary) ; *
+	pop	ecx ; *
+	jc	short loc_rename_retn
+	and	ch, ~buf_dirty
+	mov	[esi+BUFFINFO.buf_ID], ecx ; *
+%endif
 
 loc_rename_direntry_del_ln:
-	movzx	edx, byte [DelFile_LNEL]
-	or	dl, dl
+	; 25/07/2025
+	; edx = LDRVT address
+	mov	ebx, [DelFile_FCluster]
+	
+	;movzx	edx, byte [DelFile_LNEL]
+	movzx	ecx, byte [DelFile_LNEL]
+	;or	dl, dl
+	or	cl, cl
 	jz	short loc_rename_direntry_update_parent_dir_lm_date
 
 	;movzx	eax, word [DelFile_EntryCounter]
 	; 21/07/2025
 	mov	eax, [DelFile_EntryNumber]
-	sub	eax, edx
+	;sub	eax, edx
+	; 25/07/2025
+	sub	eax, ecx
 	jc	short loc_rename_direntry_invd_retn
 
 loc_rename_direntry_del_ln_continue:
@@ -4975,6 +5035,9 @@ loc_rename_direntry_del_ln_continue:
 	call	delete_longname
 
 loc_rename_direntry_update_parent_dir_lm_date:
+	; 25/07/2025
+	;mov	[LMDT_Flag], 0
+	; (only last access date will be changed)
 	call	update_parent_dir_lmdt
 	xor	eax, eax
 	retn
@@ -8716,7 +8779,7 @@ get_direntry:
 	;  edx = LDRVT
 	;  17/07/2025
 	;  ecx = current (last) cluster
-	;      = [GDE_CCLUST]	
+	;      = [GDE_CCLUST]
 	;
 	;  if cf = 1 -> error code in eax
 	;

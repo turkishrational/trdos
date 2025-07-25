@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 21/07/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 25/07/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -4181,7 +4181,7 @@ check_invalid_filename_chars:
 	;	cf = 1 -> invalid
 	;	cf = 0 -> valid
 	;
-	;(EAX, ECX, EDI will be changed)
+	; (EAX, ECX, EDI will be changed)
 
 	push	esi
 
@@ -5089,11 +5089,11 @@ rmdir_get_buf:
 	sub	ebx, esi
 	push	ebx ; * ; save entry pointer
 	push	dword [esi+BUFFINFO.buf_sector] ; **
-	
+
 	; edx = LDRVT address
 	; eax = the 1st clust of the dir will be removed
-	call	FIGREC 	
-	
+	call	FIGREC
+
 	; eax = physical disk sector (LBA)
 	;  cl = physical drive number
 	call	GETBUFFER
@@ -5137,7 +5137,7 @@ NOTDIRPATHPOP2:
 
 	; 17/07/2025
 NOTDIRPATHPOP_err:
-	; 'permission denied !' error 
+	; 'permission denied !' error
 	mov	eax, ERR_PERM_DENIED
 	jmp	short del_sub_dir_err
 
@@ -5244,7 +5244,7 @@ delete_file:
 	;     if EAX = 2  ; ERR_NOT_FOUND
 	;	 file not found
 	;
-	; Modifed registers: 
+	; Modifed registers:
 	;	EAX, EBX, ECX, EDX, ESI, EDI, EBP
 
 get_delfile_fchar:
@@ -5281,7 +5281,7 @@ loc_delfile_drv:
 	mov	dl, [Path_Drv]
 	mov	dh, [Current_Drv]
 	mov	[RUN_CDRV], dh
-	
+
 	;;;;
 	; 21/07/2025
 	;mov	[delfile_drv], dh
@@ -5404,7 +5404,7 @@ loc_delete_file:
 	;mov	cx, [FindFile_DirEntryNumber]
 	;;;
 	; 21/07/2025
-	mov	ecx, [DirEntry_Counter] 
+	mov	ecx, [DirEntry_Counter]
 		; from 'find_directory_entry'
 	;mov	[DelFile_EntryNumber], ecx
 	;;;
@@ -5437,6 +5437,7 @@ loc_delfile_y_n_escape:
 	jmp	short loc_do_not_delete_file
 
 set_file_attributes:
+	; 23/07/2025 (TRDOS 386 v2.0.10)
 	; 26/09/2024 (TRDOS 386 v2.0.9)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 06/03/2016
@@ -5611,7 +5612,8 @@ loc_attr_file_check_fname_fchar:
 	jmp	pass_change_attr
 
 loc_attr_file_parse_path_name:
-	mov	edi, FindFile_Drv
+	; 23/07/2025
+	;mov	edi, FindFile_Drv
 	call	parse_path_name
 	;jc	loc_cmd_failed
 	; 28/07/2022
@@ -5620,7 +5622,9 @@ loc_sfa_3:
 	jmp	loc_cmd_failed
 
 loc_attr_file_check_filename_exists:
-	mov	esi, FindFile_Name
+	;mov	esi, FindFile_Name
+	; 23/07/2025
+	mov	esi, Path_FileName
 	cmp	byte [esi], 20h
 	;jna	loc_cmd_failed
 	; 28/07/2022
@@ -5631,7 +5635,9 @@ loc_attr_file_drv:
 	mov	dh, [Current_Drv]
 	mov	[RUN_CDRV], dh
 
-	mov	dl, [FindFile_Drv]
+	;mov	dl, [FindFile_Drv]
+	; 23/07/2025
+	mov	dl, [Path_Drv]
 	cmp	dl, dh
 	je	short loc_attr_file_change_directory
 
@@ -5641,12 +5647,16 @@ loc_attr_file_drv:
 	jc	short loc_sfa_4
 
 loc_attr_file_change_directory:
-        cmp     byte [FindFile_Directory], 20h
+        ;cmp     byte [FindFile_Directory], 20h
+	; 23/07/2025
+	cmp     byte [Path_Directory], 20h
 	jna	short loc_attr_file_find
 
 	inc	byte [Restore_CDIR]
 
-	mov	esi, FindFile_Directory
+	;mov	esi, FindFile_Directory
+	; 23/07/2025
+	mov	esi, Path_Directory
 	xor	ah, ah ; CD_COMMAND sign -> 0
 	call	change_current_directory
 	;jc	loc_file_rw_cmd_failed
@@ -5657,7 +5667,9 @@ loc_attr_file_change_directory:
 	;call	change_prompt_dir_string
 
 loc_attr_file_find:
-	;mov	esi, FindFile_Name
+	;;mov	esi, FindFile_Name
+	; 23/07/2025
+	;mov	esi, Path_FileName
 	mov	esi, [DelFile_FNPointer]
 	mov	ax, 0800h ; Except volume labels
 	call	find_first_file
@@ -5698,12 +5710,15 @@ loc_attr_file_change_attributes:
 	mov	al, [Attr_Chars+1]
 	or	bl, al
 
-	cmp	word [edi+DirEntry_NTRes], 01A1h ; Singlix FS
-	je	short loc_attr_file_fs_check
+	; 23/07/2025
+	;cmp	word [edi+DirEntry_NTRes], 01A1h ; Singlix FS
+	;je	short loc_attr_file_fs_check
 
 	mov	[Attributes], bl
-	mov	[edi+0Bh], bl    ; Attributes (New!)
+	mov	[edi+0Bh], bl	; Attributes (New!)
 
+; 23/07/2025 - TRDOS 386 v2.0.10
+%if 0
 	; 04/03/2016
 	; TRDOS v1 has a bug here! it does not set
 	; 'DirBuff_ValidData' to 2; as result of this bug,
@@ -5742,6 +5757,33 @@ loc_attr_file_change_fs_file_attributes:
 	jc	short loc_sfa_5
 
 	mov	[Attributes], bl
+%endif
+	; 23/07/2025
+	call	convert_current_date_time
+	mov	[edi+18], dx ; Last Access Date
+
+	; 23/07/2025
+	mov	esi, [CurrentBuffer]
+	or	byte [esi+BUFFINFO.buf_flags], buf_isDIR
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+	jnz	short loc_attr_write_buffer
+	;call	INC_DIRTY_COUNT
+	inc	dword [DirtyBufferCount]
+	;or	byte [esi+9], 40h
+	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
+loc_attr_write_buffer:
+	call	BUFWRITE
+	;jnc	short loc_print_attr_changed_message
+	; 23/07/2025
+	jnc	short loc_attr_update_parent_dir_at
+	jmp	loc_file_rw_cmd_failed
+
+	; 23/07/2025
+loc_attr_update_parent_dir_at:
+	; update only last access time of the parent dir
+	;mov	[LMDT_Flag], 0
+	call	update_parent_dir_lmdt
+	; ignore error (always cf = 0)
 
 loc_print_attr_changed_message:
 	mov	esi, Msg_New
@@ -5749,6 +5791,7 @@ loc_print_attr_changed_message:
 	jmp	loc_show_attributes_no_nextline
 
 rename_file:
+	; 23/07/2022 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 13/11/2017
 	; 06/11/2016
@@ -5757,7 +5800,7 @@ rename_file:
 	; 08/03/2016
 	; 06/03/2016 (TRDOS 386 = TRDOS v2.0)
 	; 20/11/2010 (TRDOS v1, CMD_INTR.ASM, 'cmp_cmd_rename')
-	; 16/11/2010 
+	; 16/11/2010
 
 get_rename_source_fchar:
 	; esi = file name
@@ -5808,14 +5851,17 @@ loc_rename_save_current_drive:
 
 loc_rename_sf_parse_path_name:
 	mov	esi, [SourceFilePath]
-	mov	edi, FindFile_Drv
+	; 23/07/2025
+	;mov	edi, FindFile_Drv
 	call	parse_path_name
 	;jc	loc_cmd_failed
 	; 28/07/2022
 	jc	short loc_rename_failed
 
 loc_rename_sf_check_filename_exists:
-	mov	esi, FindFile_Name
+	;mov	esi, FindFile_Name
+	; 23/07/2025
+	mov	esi, Path_FileName
 	cmp	byte [esi], 20h
 	;jna	loc_cmd_failed
 	; 28/07/2022
@@ -5827,7 +5873,9 @@ loc_rename_sf_drv:
 	;mov	dh, [Current_Drv]
 	;mov	[RUN_CDRV], dh
 
-	mov	dl, [FindFile_Drv]
+	;mov	dl, [FindFile_Drv]
+	; 23/07/2025
+	mov	dl, [Path_Drv]
 	cmp	dl, dh ; dh = [Current_Drv]
 	je	short rename_sf_change_directory
 
@@ -5837,11 +5885,15 @@ loc_rename_sf_drv:
 	jc	short loc_rename_fff_failed
 
 rename_sf_change_directory:
-	cmp	byte [FindFile_Directory], 20h
+	;cmp	byte [FindFile_Directory], 20h
+	; 23/07/2025
+	cmp	byte [Path_Directory], 20h
 	jna	short rename_sf_find
 
 	inc	byte [Restore_CDIR]
-	mov	esi, FindFile_Directory
+	;mov	esi, FindFile_Directory
+	; 23/07/2025
+	mov	esi, Path_Directory
 	xor	ah, ah ; CD_COMMAND sign -> 0
 	call	change_current_directory
  	;jc	loc_file_rw_cmd_failed
@@ -5852,8 +5904,10 @@ rename_sf_change_directory:
 	;call	change_prompt_dir_string
 
 rename_sf_find:
-	;mov	esi, [DelFile_FNPointer]
-	mov	esi, FindFile_Name
+	;;mov	esi, [DelFile_FNPointer]
+	;mov	esi, FindFile_Name
+	; 23/07/2025
+	mov	esi, Path_FileName
 
 	mov	ax, 0800h ; Except volume labels
 	call	find_first_file
@@ -5890,14 +5944,18 @@ loc_rename_sf_found:
 	jmp	loc_permission_denied
 
 loc_rename_attrb_ok:
+	; 25/07/2025
         mov     esi, FindFile_Drv
         mov     edi, SourceFile_Drv
-	mov	ecx, 32
+	;;mov	ecx, 32
+	;mov	ecx, 184/4
+	mov	ecx, (FindFile.size+3)/4
 	rep	movsd
 
 loc_rename_df_parse_path_name:
 	mov	esi, [DestinationFilePath]
-	mov	edi, FindFile_Drv
+	;mov	edi, FindFile_Drv
+	; 25/07/2025
 	call	parse_path_name
 	jc	short loc_rename_df_cmd_failed
 
@@ -5907,12 +5965,16 @@ loc_rename_df_parse_path_name:
 	; 'rename' command is valid only for same dos drive and same dir!
 	; ('move' command must be used if source file and destination file
 	; directories are not same!)
-	mov	dl, [FindFile_Drv]
+	;mov	dl, [FindFile_Drv]
+	; 25/07/2025
+	mov	dl, [Path_Drv]
 	cmp	dl, dh ; are source and destination drives different ?!
 	jne	short loc_rename_df_cmd_failed ; yes!
 
 rename_df_check_dirname_exists:
-	cmp	byte [FindFile_Directory], 0
+	;cmp	byte [FindFile_Directory], 0
+	; 25/07/2025
+	cmp	byte [Path_Directory], 0
 	jna	short rename_df_check_filename_exists
 
 	; different source file and destination file directories !
@@ -5922,7 +5984,9 @@ loc_rename_df_cmd_failed:
 	jmp	loc_file_rw_cmd_failed
 
 rename_df_check_filename_exists:
-	mov	esi, FindFile_Name
+	;mov	esi, FindFile_Name
+	; 25/07/2025
+	mov	esi, Path_FileName
 	call	check_filename
 	;jc	loc_mkdir_invalid_dir_name_chars
 	; 28/07/2022
@@ -5937,9 +6001,14 @@ loc_rename_file_name_ok:
 	;mov	dh, [Current_Drv] ; dh has not been changed
 
 rename_df_drv_check_writable:
-	movzx	esi, dh
-	;movzx	esi, byte [Current_Drv]
-	add	esi, Logical_DOSDisks
+	;movzx	esi, dh
+	;;movzx	esi, byte [Current_Drv]
+	;add	esi, Logical_DOSDisks
+	; 25/07/2025 (BugFix)
+	xor	eax, eax
+	mov	ah, dh
+	mov	esi, Logical_DOSDisks
+	add	esi, eax
 
 	mov	dl, dh ; dl = [Current_Drv]
 	mov	dh, [esi+LD_DiskType]
@@ -5953,14 +6022,18 @@ rename_df_drv_check_writable:
 	jmp	loc_file_rw_cmd_failed
 
 rename_df_compare_sf_df_name:
-	mov	esi, FindFile_Name
-	mov	edi, SourceFile_Name
+	;mov	esi, FindFile_Name
+	; 25/07/2025
+	mov	esi, Path_FileName
+	mov	edi, SourceFile_Name ; capitalized name
 	;mov	ecx, 12
 	; 28/07/2022
 	sub	ecx, ecx
 	mov	cl, 12
 rename_df_compare_sf_df_name_next:
 	lodsb
+	; 25/07/2025
+	call	simple_ucase
 	scasb
 	jne	short loc_rename_df_find
 	or	al, al
@@ -5968,8 +6041,10 @@ rename_df_compare_sf_df_name_next:
 	loop	rename_df_compare_sf_df_name_next
 
 loc_rename_df_find:
-	;mov	esi, [DelFile_FNPointer]
-	mov	esi, FindFile_Name
+	;;mov	esi, [DelFile_FNPointer]
+	;mov	esi, FindFile_Name
+	; 25/07/2025
+	mov	esi, Path_FileName
 
 	;xor	ax, ax ; Any
 	; 28/07/2022
@@ -5997,13 +6072,23 @@ loc_rename_df_check_error_code:
 	;jmp	loc_permission_denied  ; 06/11/2016
 
 rename_df_move_find_struct_to_dest:
-        mov     esi, FindFile_Drv
-        mov     edi, DestinationFile_Drv
-	;mov	ecx, 32
-	; 28/07/2022
-	sub	ecx, ecx
-	mov	cl, 32
-	rep	movsd
+	; 25/07/2025
+	;mov	esi, FindFile_Drv
+	;mov	edi, DestinationFile_Drv
+	;;mov	ecx, 32
+	;; 28/07/2022
+	;sub	ecx, ecx
+	;mov	cl, 32
+	;rep	movsd
+	; 25/07/2025
+	; FindFile_DirEntryName = new name
+	;	in dos directory entry format
+	mov	ecx, 12
+	mov	esi, FindFile_Name ; capitalized 
+; 25/07/2025
+%if 0
+	mov	edi, DestinationFile_Name
+	rep	movsb
 
 loc_rename_df_process_q_sf:
 	;mov	ecx, 12
@@ -6019,11 +6104,15 @@ rename_df_process_q_nml_1_sf:
 
 rename_df_process_q_nml_2_sf:
 	mov	byte [edi], 0
+%endif
 
 loc_rename_df_process_q_df:
-	;mov	ecx, 12
-	mov	cl, 12
-	mov	esi, DestinationFile_Name
+	;;mov	ecx, 12
+	;mov	cl, 12
+	;mov	esi, DestinationFile_Name
+	; 25/07/2025
+	;mov	esi, FindFile_Name 
+
 	mov	edi, Rename_NewName
 rename_df_process_q_nml_1_df:
 	lodsb
@@ -6053,7 +6142,9 @@ rename_confirmation_question_dir:
 	call	print_msg
 
 rename_confirmation_question_as:
-	mov	esi, Rename_OldName
+	;mov	esi, Rename_OldName
+	; 25/07/2025
+	mov	esi, SourceFile_Name
 	call	print_msg
 	mov	esi, Msg_File_rename_as
 	call	print_msg
@@ -6086,14 +6177,27 @@ loc_yes_rename_file:
 
 loc_rename_file_yes: ; 28/07/2022
 	mov	esi, Rename_NewName
-	mov	cx, [SourceFile_DirEntryNumber]
+	;mov	cx, [SourceFile_DirEntryNumber]
+	; 25/07/2025
+	;movzx	ecx, word [SourceFile_LastEntryNumber]
+	mov	cx, [SourceFile_LastEntryNumber]
+	; ecx = directory entry index number
+	mov	edi, [SourceFile_DirFirstCluster]
+
+	xor	edx, edx
+	mov	dh, [SourceFile_Drv]
+	add	edx, Logical_DOSDisks
+
 	mov	ax, [SourceFile_DirEntry+20] ; First Cluster, HW
 	shl	eax, 16 ; 13/11/2017
 	mov	ax, [SourceFile_DirEntry+26] ; First Cluster, LW
 
-  	movzx	ebx, byte [SourceFile_LongNameEntryLength]
+  	;movzx	ebx, byte [SourceFile_LongNameEntryLength]
+	; 25/07/2025
+	mov	bl, [SourceFile_LongNameEntryLength]
    	call	rename_directory_entry
 	jmp	loc_rename_file_ok
+
 ;loc_rename_file_ok:
 ;	jc	loc_run_cmd_failed
 ;	mov	esi, Msg_OK

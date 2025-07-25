@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 21/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 25/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -397,47 +397,65 @@ SourceFilePath:	     resd 1
 DestinationFilePath: resd 1
 
 ;alignb 4
+; 25/07/2025 - TRDOS 386 v2.0.10
 ; 06/03/2016
 ; FILE.ASM (09/10/2011)
 ;Source File Structure (same with 'Find File' Structure)
-SourceFile_Drv:			resb 1
-SourceFile_Directory:		resb 65
-SourceFile_Name:		resb 13
-SourceFile_LongNameEntryLength: 
-SourceFile_LongNameYes:		resb 1 ; Sign for longname procedures
-;Above 80 bytes
-;is TR-DOS Source File FullName Format/Structure
-SourceFile_AttributesMask:	resw 1
-SourceFile_DirEntry:		resb 32
-SourceFile_DirFirstCluster:	resd 1
-SourceFile_DirCluster:		resd 1
-SourceFile_DirEntryNumber:	resw 1
-SourceFile_MatchCounter:	resw 1
-; 16/03/2016
-SourceFile_SecPerClust:		resb 1
-SourceFile_Reserved:		resb 1
-; Above is 128 bytes
+SourceFile_Drv:		  resb 1
+SourceFile_Directory:	  resb 104 ; 7*13 + 12 + zero
+SourceFile_Name:	  resb 13
+SourceFile_AttributesMask: resw 1
+SourceFile_DirEntry:	  resb 32
+SourceFile_DirFirstCluster: resd 1
+SourceFile_DirCluster:	  resd 1
+SourceFile_DirSector:	  resd 1
+SourceFile_DirEntryNumber: resb 1
+SourceFile_DirSectorCount: resb 1
+SourceFile_MatchCounter:  resw 1
+;SourceFile_Reserved1:	  resw 1
+SourceFile_LastEntryNumber: resw 1
+SourceFile_LongNameEntryLength:
+SourceFile_LongNameYes:	  resb 1 ; Sign for longname procedures
+SourceFile_DirEntryName:  resb 13
+; 184 bytes
+;SourceFile_LongName:	  resb 129 ; ASCIIZ (max. 128+NUL)
+; 01/07/2025
+;SourceFile_Attributes:	  resb 1
+;SourceFile_Size:	  resd 1
+;SourceFile_FirstCluster: resd 1
+;;SourceFile_LmDateTime:  resd 1
+;SourceFile_FATType:	  resb 1
+
+; 25/07/2025 - TRDOS 386 v2.0.10
 ;Destination File Structure (same with 'Find File' Structure)
 DestinationFile_Drv:		resb 1
-DestinationFile_Directory: 	resb 65
+DestinationFile_Directory:	resb 104 ; 7*13 + 12 + zero
 DestinationFile_Name:		resb 13
-DestinationFile_LongNameEntryLength:
-DestinationFile_LongNameYes:	resb 1 ; Sign for longname procedures
-;Above 80 bytes
-;is TR-DOS Destination File FullName Format/Structure
-DestinationFile_AttributesMask: resw 1
+DestinationFile_AttributesMask:	resw 1
 DestinationFile_DirEntry:	resb 32
 DestinationFile_DirFirstCluster: resd 1
 DestinationFile_DirCluster:	resd 1
-DestinationFile_DirEntryNumber: resw 1
+DestinationFile_DirSector:	resd 1
+DestinationFile_DirEntryNumber:	resb 1
+DestinationFile_DirSectorCount:	resb 1
 DestinationFile_MatchCounter:	resw 1
-; 16/03/2016
-DestinationFile_SecPerClust:	resb 1
-DestinationFile_Reserved:	resb 1
-; Above is 128 bytes
+;DestinationFile_Reserved1:	resw 1
+DestinationFile_LastEntryNumber: resw 1
+DestinationFile_LongNameEntryLength:
+DestinationFile_LongNameYes:	resb 1 ; Sign for longname procedures
+DestinationFile_DirEntryName:	resb 13
+; 184 bytes
+;DestinationFile_LongName:	resb 129 ; ASCIIZ (max. 128+NUL)
+; 01/07/2025
+;DestinationFile_Attributes:	resb 1
+;DestinationFile_Size:		resd 1
+;DestinationFile_FirstCluster:	resd 1
+;;DestinationFile_LmDateTime:	resd 1
+;DestinationFile_FATType:	resb 1
 
-; 24/04/2016
-resw 1
+; 25/07/2025
+SourceFile_SecPerClust: resb 1
+DestinationFile_SecPerClust: resb 1 
 
 ; 10/03/2016
 ; FILE.ASM
