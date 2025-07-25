@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 17/07/2025  (Previous: 26/09/2024, TRDOS 386 v2.0.9)
+; Last Update: 25/07/2025  (Previous: 26/09/2024, TRDOS 386 v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -4773,6 +4773,7 @@ loc_print_attr_changed_message:
 	jmp	loc_show_attributes_no_nextline
 
 rename_file:
+	; 25/07/2025 (BugFix)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 13/11/2017
 	; 06/11/2016
@@ -4961,9 +4962,14 @@ loc_rename_file_name_ok:
 	;mov	dh, [Current_Drv] ; dh has not been changed
 
 rename_df_drv_check_writable:
-	movzx	esi, dh
-	;movzx	esi, byte [Current_Drv]
-	add	esi, Logical_DOSDisks
+	;movzx	esi, dh
+	;;movzx	esi, byte [Current_Drv]
+	;add	esi, Logical_DOSDisks
+	; 25/07/2025 (BugFix)
+	xor	eax, eax
+	mov	ah, dh
+	mov	esi, Logical_DOSDisks
+	add	esi, eax
 
 	mov	dl, dh ; dl = [Current_Drv]
 	mov	dh, [esi+LD_DiskType]
