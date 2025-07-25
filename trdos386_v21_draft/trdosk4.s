@@ -4922,6 +4922,8 @@ loc_rename_directory_entry:
 	; 21/07/2025
 	mov	[DelFile_EntryNumber], ecx
 	mov	[DelFile_FCluster], eax
+	; 25/07/2025
+	mov	[delfile_dir_fcluster], edi
 
 ; 25/07/2025
 %if 0
@@ -5014,7 +5016,7 @@ loc_rename_direntry_buf_write:
 loc_rename_direntry_del_ln:
 	; 25/07/2025
 	; edx = LDRVT address
-	mov	ebx, [DelFile_FCluster]
+	mov	ebx, [delfile_dir_fcluster]
 	
 	;movzx	edx, byte [DelFile_LNEL]
 	movzx	ecx, byte [DelFile_LNEL]
