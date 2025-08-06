@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 25/07/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 06/08/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -49,6 +49,8 @@ CommandBuffer: 	resb 80
 TextBuffer:	resb 256
 ; 02/07/2025 - TRDOS 386 v2.0.10
 RunPathBuffer:	resb 388
+; 26/07/2025
+MvPathBuffer equ RunPathBuffer
 
 MasterBootBuff:
 MasterBootCode: resb 1BEh
@@ -264,6 +266,8 @@ Path_Drv:		  resb 1
 Path_Directory:		  resb 256 ; ASCIIZ (max. 256+NUL)
 Path_FileName:		  resb 129
 Path_LongFlag:		  resb 1 ; Flag for using Long Path
+; 26/07/2025
+Path_Size equ $-Path_FileSystem
 
 First_Path_Pos: resd 1	; DIR.ASM ; 09/10/2011
 Last_Slash_Pos: resd 1	; DIR.ASM
@@ -321,10 +325,17 @@ mkdir_add_new_cluster:	resb 1
 mkdir_Name:		resb 13
 			resw 1 ; 01/03/2016
 ; 14/07/2025 - TRDOS 386 v2.0.10
+createfile_phydrv:	; 06/08/2025
 mkdir_phydrv:		resb 1
+createfile_dirsector:
 mkdir_dirsector:	resd 1
+createfile_datetime:
 mkdir_datetime:		resd 1
+createfile_entrypos:
 mkdir_entrypos:		resd 1
+; 06/08/2025
+createfile_pd_new_cluster:
+mkdir_pd_new_cluster:	resd 1
 
 ; 27/02/2016
 RmDir_MultiClusters:	resb 1
@@ -461,6 +472,7 @@ DestinationFile_SecPerClust: resb 1
 ; FILE.ASM
 move_cmd_phase:	   resb 1
 msftdf_sf_df_drv:  resb 1
+createfile_LDRVT: ; 05/08/2025		
 msftdf_drv_offset: resd 1
 
 ; 11/03/2016
@@ -515,18 +527,20 @@ csftdf_df_drv_dt:     resd 1
 ; FILE.ASM
 createfile_Name_Offset:  resd 1
 createfile_FreeSectors:  resd 1
-createfile_size:         resd 1
+; 06/08/2025
+;createfile_size:	 resd 1
 createfile_FFCluster:    resd 1 ; 11/03/2016
 createfile_LastDirCluster: resd 1
 createfile_Cluster:      resd 1
 createfile_PCluster:     resd 1
 createfile_attrib:	 resb 1
 createfile_SecPerClust:  resb 1
-createfile_DirIndex:     resw 1
-createfile_CCount:	 resd 1
+; 06/08/2025
+;createfile_DirIndex:	 resw 1
+;createfile_CCount:	 resd 1
 createfile_BytesPerSec:	 resw 1 ; 23/03/2016
-createfile_wfc:	         resb 1
-createfile_UpdatePDir:	 resb 1 ; 31/03/2016
+;createfile_wfc:	 resb 1
+;createfile_UpdatePDir:	 resb 1 ; 31/03/2016
 
 ;alignb 4
 

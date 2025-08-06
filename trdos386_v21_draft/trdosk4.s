@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 25/07/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 06/08/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2877,12 +2877,13 @@ loc_next_sum:
 	retn
 
 make_sub_directory:
+	; 06/08/2025
 	; 15/07/2025
 	; 14/07/2025
 	; 13/07/2025
 	; (Ref: 'DOS_MKDIR', Retro DOS v5.0 - ibmdos7.s)
 	; (('MakeNode','NEWENTRY','BUILDDIR','NEWDIR'))
-	; Note: Highly modified code, 
+	; Note: Highly modified code,
 	;	partially different than msdos/pcdos methods.
 	;	(mix of TRDOS 8086/386 and PCDOS 7.1 methods)
 	; 08/07/2025 (TRDOS 386 Kernel v2.0.10)
@@ -3429,7 +3430,7 @@ clear_directory_buffer:
 
 loc_mkdir_add_new_subdir_cluster:
 	; 14/07/2025
-	; the directory does'nt have a free (deleted) entry
+	; the directory doesn't have a free (deleted) entry
 	; (a new cluster will be added to it's last cluster)
 	mov	eax, [DirBuff_Cluster]
 		; Last cluster of the current directory
@@ -3439,6 +3440,9 @@ loc_mkdir_add_new_subdir_cluster:
 	call	ADD_NEW_CLUSTER
 	jc	short loc_mkdir_anc_error
 	; eax = First cluster allocated
+
+	; 06/08/2025
+	mov	[mkdir_pd_new_cluster],  eax
 
 	call	FIGREC
 
@@ -3451,7 +3455,7 @@ loc_mkdir_add_new_subdir_cluster:
 get_new_dir_sector:
 	; eax = physical disk sector
 	;  cl = physical drive number
-	; edx = LDRVT address 
+	; edx = LDRVT address
 
 	call	GETBUFFER_NPR ; no pre-read
 	jc	short loc_mkdir_anc_error
@@ -3498,7 +3502,9 @@ loc_mkdir_anc_1:
 	; FAT16 or FAT12 fs
 	lea	esi, [edx+LD_BPB+FAT_FirstFreeClust]
 loc_mkdir_anc_2:
-	mov	ecx, [mkdir_LastDirCluster]
+	;mov	ecx, [mkdir_LastDirCluster]
+	; 06/08/2025
+	mov	ecx, [mkdir_pd_new_cluster]
 	cmp	[esi], ecx
 	jne	short loc_mkdir_anc_3
 	; change first free cluster number
@@ -3511,14 +3517,13 @@ loc_mkdir_anc_2:
 	mov	dword [esi], 2
 loc_mkdir_anc_3:
 	; [mkdir_dirsector] = phys sector address
-	;	of the 1st sector of the new cluster	
+	;	of the 1st sector of the new cluster
 	; [mkdir_phydrv] = physical drive number
 	mov	dword [mkdir_entrypos], 0
 	; [mkdir_entrypos] = directory entry offset
 	; 14/07/2025
 	call	dirup_@ ; update FAT32 fs info sector
 			; and flush buffers
-	
 	;jnc	short NEWDIR_@
 	; eax = error code
 	;retn
@@ -3533,7 +3538,7 @@ NEWDIR_@:
 	; 13/07/2025 - TRDOS 386 v2.0.10
 NEWDIR:
 	; 16/07/2025
-	; 'mkdir' always changes LMDT 
+	; 'mkdir' always changes LMDT
 	;		of the parent directory
 	mov 	byte [LMDT_Flag], 1
 	; 13/07/2025
@@ -3793,8 +3798,9 @@ make_new_directory_entry:
 	; OUTPUT ->
 	;;;	EDI = Directory Entry Address
 	;	ESI = Dot File Name Location (Capitalized)
-	;	DX = Date, AX = Time in DOS Dir Entry format
-	;	
+	;;	DX = Date, AX = Time in DOS Dir Entry format
+	;	EDX = date (hw) & time (lw)
+	;
 	; Modified registers: EAX, ECX, EDX, EDI
 
 	call	convert_file_name
@@ -4884,6 +4890,7 @@ loc_del_short_name_sbd_skip:
 %endif
 
 rename_directory_entry:
+	; 26/07/2025
 	; 25/07/2025
 	; 21/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -4901,7 +4908,9 @@ rename_directory_entry:
 	;      ; 25/07/2025
 	;      EDX = Logical DOS Drive Parameters Table
 	;	BL = Longname Length (dir entry count)
-	;      EDI = First Cluster number of the directory	
+	;      EDI = First Cluster number of the directory
+	;      ; 26/07/2025
+	;	BH = Logical DOS Drive Number
 	; OUTPUT -> 
 	;      CF = 0 -> successfull
 	;      CF = 1 -> error code in EAX (AL)
@@ -4915,7 +4924,7 @@ rename_directory_entry:
 	;retn
 	; 29/07/2022
  	jmp	rename_fs_file_or_directory
-	
+
 loc_rename_directory_entry:
 	mov	[DelFile_LNEL], bl
 	;mov	[DelFile_EntryCounter], cx
@@ -4924,6 +4933,35 @@ loc_rename_directory_entry:
 	mov	[DelFile_FCluster], eax
 	; 25/07/2025
 	mov	[delfile_dir_fcluster], edi
+
+	; 26/07/2025
+	;;;;
+	; check if the file is open
+	; (do not rename open file)
+	mov	ecx, OPENFILES
+	mov	ebp, OF_MODE
+rde_cfo_1:
+	cmp	byte [ebp], 0
+	jz	short rde_cfo_4 ; not open
+rde_cfo_2:
+	push	ebp
+	sub	ebp, OF_MODE
+	cmp	[ebp+OF_DRIVE], bh
+	jne	short rde_cfo_3
+	shl	ebp, 2 ; dword
+	cmp	[ebp+OF_FCLUSTER], eax
+	jne	short rde_cfo_3
+	; set file open error
+	pop	ebp
+	mov	eax, ERR_ACCESS_DENIED ; 5
+	stc
+	retn
+rde_cfo_3:
+	pop	ebp
+rde_cfo_4:
+	inc	ebp
+	loop	rde_cfo_1
+	;;;;
 
 ; 25/07/2025
 %if 0
@@ -4935,7 +4973,9 @@ loc_rename_directory_entry:
 %else
 	; 25/07/2025
 	mov	ebx, edi ; [SourceFile_DirFirstCluster]
-	mov	eax, ecx
+	;mov	eax, ecx
+	; 26/07/2025
+	mov	eax, [DelFile_EntryNumber]
 	push	esi
 	call	get_direntry_@
 	mov	ebx, esi
@@ -5045,6 +5085,8 @@ loc_rename_direntry_update_parent_dir_lm_date:
 	retn
 
 move_source_file_to_destination_file:
+	; 27/07/2025
+	; 26/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 07/08/2022
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 15/10/2016
@@ -5095,15 +5137,27 @@ msftdf:
 
 msftdf_parse_sf_path:
 	; ESI = ASCIIZ pathname (Source)
-	push	edi 
-	mov	edi, SourceFile_Drv
+	push	edi
+	; 26/07/2025
+	;mov	edi, SourceFile_Drv
 	call	parse_path_name
-	pop	esi
+	;pop	esi
+	; 26/07/2025
+	pop	ebx
 	jc	short msftdf_psf_retn
+
+	; 26/07/2025 - TRDOS 386 v2.0.10
+	; save source path
+	mov	edi, MvPathBuffer
+	mov	esi, Path_FileSystem
+	mov	ecx, Path_Size ; 388
+	rep	movsb
+	mov	esi, ebx
 
 msftdf_parse_df_path:
 	; ESI = ASCIIZ pathname	(Destination)
-	mov	edi, DestinationFile_Drv
+	;mov	edi, DestinationFile_Drv
+	; 26/07/2025
 	call	parse_path_name
 	jnc	short msftdf_check_sf_drv
 
@@ -5116,10 +5170,14 @@ msftdf_psf_retn:
 	retn
 
 msftdf_check_sf_drv:
-	mov	al, [SourceFile_Drv]
+	;mov	al, [SourceFile_Drv]
+	; 26/07/2025
+	mov	al, [MvPathBuffer+1] ; Path_Drv
 
 msftdf_check_df_drv:
-	mov	dl, [DestinationFile_Drv]
+	;mov	dl, [DestinationFile_Drv]
+	; 26/07/2025
+	mov	dl, [Path_Drv]
 
 msftdf_compare_sf_df_drv:
 	sub	ebx, ebx
@@ -5141,7 +5199,7 @@ msftdf_not_same_drv:
 msftdf_check_sf_df_drv_ok:
 	mov	[msftdf_sf_df_drv], dl
 
-        sub	eax, eax
+	sub	eax, eax
 	mov	ah, dl
 	add	eax, Logical_DOSDisks
 	mov	[msftdf_drv_offset], eax
@@ -5155,7 +5213,9 @@ msftdf_change_drv:
 	  
 msftdf_check_destination_file:
 msftdf_df_check_directory:
-	mov	esi, DestinationFile_Directory
+	;mov	esi, DestinationFile_Directory
+	; 27/07/2025
+	mov	esi, Path_Directory
 	cmp	byte [esi], 20h
 	jna	short msftdf_df_find_1
 
@@ -5169,12 +5229,30 @@ msftdf_df_change_directory:
 ;	call 	change_prompt_dir_string
 
 msftdf_df_find_1:
-        mov     esi, DestinationFile_Name
+	;mov	esi, DestinationFile_Name
+	; 27/07/2025
+	mov	esi, Path_FileName
 	cmp	byte [esi], 20h
 	jna	short msftdf_df_copy_sf_name
 
+	; 27/07/2025
+msftdf_df_check_fname:
+	; 15/10/2016
+	;mov	esi, DestinationFile_Name ; *
+	; 27/07/2025
+	mov	esi, Path_FileName
+	call	check_filename
+	;jnc	short msftdf_convert_df_direntry_name
+	; 27/07/2025
+	jnc	short msftdf_df_find_2
+	; invalid file name chars !
+	mov	eax, ERR_INV_FILE_NAME  ; 26
+	jmp	short msftdf_df_stc_retn
+
 msftdf_df_find_2:
-	xor	ax, ax ; DestinationFile_AttributesMask -> any/zero
+	;xor	ax, ax ; DestinationFile_AttributesMask -> any/zero
+	; 27/07/2025
+	xor	eax, eax
 	call	find_first_file
 	;jnc	msftdf_permission_denied_retn
 	; 29/07/2022
@@ -5186,25 +5264,34 @@ msftdf_df_check_error_code:
 	cmp	al, 2
 	jne	short msftdf_df_stc_retn
 
+; 27/07/2025
+%if 0
 msftdf_df_check_fname:
 	; 15/10/2016
-	mov	esi, DestinationFile_Name ; *
+	;mov	esi, DestinationFile_Name ; *
+	; 27/07/2025
+	mov	esi, Path_FileName
 	call	check_filename
 	jnc	short msftdf_convert_df_direntry_name
 	; invalid file name chars !
 	mov	eax, ERR_INV_FILE_NAME  ; 26
 	jmp	short msftdf_df_stc_retn
+%endif
 
 msftdf_convert_df_direntry_name:
-	; mov	esi, DestinationFile_Name ; *
+	;mov	esi, DestinationFile_Name ; *
+	; 27/07/2025
+	mov	esi, Path_FileName
 	mov	edi, DestinationFile_DirEntry
 	call	convert_file_name
   	jmp	short msftdf_restore_current_dir_1
 
 msftdf_df_copy_sf_name:
-	mov	edi, esi
+	mov	edi, esi ; Path_FileName ; destination
 	push	edi
-        mov     esi, SourceFile_Name
+	;mov	esi, SourceFile_Name
+	; 27/07/2025
+	mov	esi, [MvPathBuffer+258] ; Path_FileName
 	;mov	ecx, 12
 	; 29/07/2022
 	sub	ecx, ecx
@@ -5217,7 +5304,9 @@ msftdf_df_copy_sf_name_loop:
         loop    msftdf_df_copy_sf_name_loop
 msftdf_df_copy_sf_name_ok:
 	pop	esi
-	jmp	short msftdf_df_find_2
+	;jmp	short msftdf_df_find_2
+	; 27/07/2025
+	jmp	short msftdf_df_check_fname
 
 msftdf_df_stc_retn:
 	stc
@@ -5233,7 +5322,9 @@ msftdf_restore_current_dir_1:
 	jc	short msftdf_restore_cdir_failed
 
 msftdf_sf_check_directory:
-	mov	esi, SourceFile_Directory
+	;mov	esi, SourceFile_Directory
+	; 27/07/2025
+	mov	esi, [MvPathBuffer+2] ; Path_Directory
 	cmp	byte [esi], 20h
 	jna	short msftdf_sf_find
 msftdf_sf_change_directory:
@@ -5246,7 +5337,9 @@ msftdf_sf_change_directory:
 ;	call	change_prompt_dir_string
 
 msftdf_sf_find:
-        mov     esi, SourceFile_Name  ; Offset 66
+	;mov	esi, SourceFile_Name  ; Offset 66
+	; 27/07/2025
+	mov	esi, [MvPathBuffer+258] ; Path_FileName
 	mov	ax, 1800h ; Only files
 	call	find_first_file
 	jc	short msftdf_return
@@ -5282,7 +5375,7 @@ msftdf_phase_1_return:
 	mov	[move_cmd_phase], al ; 0
 	inc	al ; mov al, 1
 	mov	ebx, msftdf_df2_check_directory
-	;mov	edx, 0FFFFFFFFh 
+	;mov	edx, 0FFFFFFFFh
 	retn
 
 msftdf_save_sf_structure:
@@ -5315,7 +5408,9 @@ msftdf_df2_check_move_cmd_phase:
 	je	short msftdf_phase_1_return
 
 msftdf_df2_check_directory:
-	mov	esi, DestinationFile_Directory
+	;mov	esi, DestinationFile_Directory
+	; 27/07/2025
+	mov	esi, Path_Directory ; destination
 	cmp	byte [esi], 20h
 	jna	short msftdf_make_dfde_locate_ffe_on_directory
 msftdf_df2_change_directory:
@@ -5334,14 +5429,18 @@ msftdf_make_dfde_locate_ffe_on_directory:
 	;
 	;xor	ax, ax
 	xor	eax, eax
-	mov	ecx, eax
-	dec	cx ; FFFFh
+	;mov	ecx, eax
+	;dec	cx ; FFFFh
+	; 27/07/2025
+	mov	ecx, 0FFFFh
 		; CX = FFFFh -> find first deleted or free entry
 		; ESI would be ASCIIZ filename address if the call
 		; would not be for first free or deleted dir entry
 	call	locate_current_dir_file
 	; 07/08/2022
 	jnc	short msftdf_make_dfde_set_ff_dir_entry
+
+; burada kaldým... 27/07/2025
 
 	;cmp	eax, 2
         cmp	al, 2
@@ -6965,6 +7064,8 @@ csftdf2_save_fs_file:
 	retn
 
 create_file:
+	; 06/08/2025 (TRDOS 386 Kernel v2.0.10)
+	;	(Major Modification)
 	; 31/08/2024
 	; 29/08/2024
 	; 27/08/2024
@@ -6979,52 +7080,33 @@ create_file:
 	; 09/08/2010
 	;
 	; INPUT ->
-	; 	EAX = File Size
 	; 	ESI = ASCIIZ File Name
-	; 	CL = File Attributes 
-	;	EBX = FFFFFFFFh -> create empty file
-	;			 (only for FAT fs)
+	; 	CL = File Attributes
 	; OUTPUT ->
-	;	EAX = New file's first cluster
-	;		 (0 for empty file) ; 29/08/2024
 	;	ESI = Logical Dos Drv Descr. Table Addr.
-	;	;EBX = CreateFile_Size address
-	;	;ECX = Sectors per cluster (<256)
-	;	;EDX = Directory Entry Index/Number (<65536)
-	;	; 29/08/2024
-	;	EBX = File Size (0 for a new, empty file)
-	;	ECX = Directory Entry Index/Number (<2048)
-	;	     (in directory cluster, not in directory)
-	;	EDX = Directory Cluster Number (of the file)
-	;	
+	;	FindFile_DirEntry = directory entry (copy)
+	;
 	;	cf = 1 -> error code in AL (EAX)
 	;
 	; (Modified registers: eax, ebx, ecx, edx, esi, edi)
 	;
 
-;	test	cl, 18h (directory or volume name)
-;	jnz	short loc_createfile_access_denied
+	;test	cl, 18h (directory or volume name)
+	;jnz	short loc_createfile_access_denied
 	and	cl, 07h ; S, H, R
         mov     [createfile_attrib], cl
 
-	mov	ecx, ebx
 	mov	ebx, esi ; ASCIIZ File Name address
 	sub	edx, edx
         mov     dh, [Current_Drv]
         mov     esi, Logical_DOSDisks
 	add	esi, edx
 
-	mov	[createfile_UpdatePDir], dl ; 0 ; 31/03/2016
-
 	; LD_DiskType = 0 for write protection (read only)
 	cmp	byte [esi+LD_DiskType], 1 ; 0 = Invalid
 	jnb	short loc_createfile_check_file_sytem
 	; 16/10/2016 (TRDOS Error code: 30, disk write protected)
 	;mov	eax, 30 ; 13h, MSDOS err : Disk write-protected
-	;mov	dx, 0
-	; 29/07/2022
-	xor	edx, edx ; 0
-	xor	eax, eax ; 0
 	mov	al, 30
 	stc
 	; err retn: EDX = 0, EBX = File name offset
@@ -7037,11 +7119,8 @@ create_file:
 ;	retn
 
 loc_createfile_check_file_sytem:
-	; 27/08/2024
-	mov	[createfile_size], eax
-	;
 	cmp	byte [esi+LD_FATType], 1
-	jnb	short loc_createfile_chk_empty_FAT_file_sign1
+	jnb	short loc_createfile_chk_empty_FAT_file_sign
 
 	; 27/08/2024
 	;mov	[createfile_size], eax
@@ -7049,29 +7128,18 @@ loc_createfile_check_file_sytem:
 	; EBX = ASCIIZ File Name address
 	jmp	create_fs_file
 
-loc_createfile_chk_empty_FAT_file_sign1:
-	; ECX = FFFFFFFFh -> create empty file if drive has FAT fs
-	inc	ecx
-	jnz	short loc_createfile_chk_empty_FAT_file_sign2
-
-	mov	[createfile_size], ecx ; 0  ; empty file
-
-loc_createfile_chk_empty_FAT_file_sign2:
+	; 06/08/2025
+loc_createfile_chk_empty_FAT_file_sign:
 	; 23/03/2016
-	mov	cx, [esi+LD_BPB+BytesPerSec]
-	mov	[createfile_BytesPerSec], cx
+	;mov	cx, [esi+LD_BPB+BytesPerSec]
+	;mov	[createfile_BytesPerSec], cx
+	; 06/08/2025
+	movzx	eax, word [esi+LD_BPB+BytesPerSec]
+	mov	[createfile_BytesPerSec], ax
 
 	; EBX = ASCIIZ File Name address
 	movzx	edx, byte [esi+LD_BPB+SecPerClust]
 	mov	[createfile_SecPerClust], dl
-	mov	ecx, [esi+LD_FreeSectors]
-	cmp	ecx, edx ; byte [createfile_SecPerClust]
-	jnb	short loc_create_fat_file
-
-loc_createfile_insufficient_disk_space:
-	mov	eax, 27h
-loc_createfile_gffc_retn:
-	retn
 
 loc_create_fat_file:
 	mov	[createfile_Name_Offset], ebx
@@ -7093,9 +7161,9 @@ loc_createfile_locate_ffe_on_directory:
 	push	esi ; *
 	xor	eax, eax
 
-	mov	[FAT_ClusterCounter], eax ; 0
+	;mov	[FAT_ClusterCounter], eax ; 0
 	; 21/03/2016
-	mov	[createfile_wfc], al ; 0
+	;mov	[createfile_wfc], al ; 0
 
  	mov	ecx, eax
 	dec	cx ; FFFFh
@@ -7103,23 +7171,37 @@ loc_createfile_locate_ffe_on_directory:
 	; ESI would be ASCIIZ filename address if the call
 	; would not be for first free or deleted dir entry
 	call	locate_current_dir_file
+	; 06/08/2025
+	pop	esi ; *
 	;jnc	loc_createfile_set_ff_dir_entry
 	; 29/07/2022
-	jc	short loc_createfile_locate_file_err
+	;jc	short loc_createfile_locate_file_err
 	; 26/08/2024
 	; cl = 0FFh, ch=0 or ch=0E5h
 	; 27/08/2024
 	;xor	ecx, ecx ; 26/08/2024
-	jmp	loc_createfile_set_ff_dir_entry
+	;jmp	loc_createfile_set_ff_dir_entry
+	; 06/08/2025
+	jnc	short loc_createfile_set_ff_dir_entry
 
 loc_createfile_locate_file_err: ; 29/07/2022
-	pop	esi ; *
 	; ESI = Logical DOS Drv. Description Table Address
 	cmp	eax, 2
 	je	short loc_createfile_add_new_cluster
 loc_createfile_locate_file_stc_retn:
 	stc
 	retn
+
+	; 06/08/2025
+loc_createfile_set_ff_dir_entry:
+	; EDI = Directory Entry Address
+	mov	al, [esi+LD_PhyDrvNo]
+	mov	[createfile_phydrv], al
+	lea	eax, [edi-BUFINSIZ]
+	mov	esi, [CurrentBuffer] ; from 'GETBUFFER'
+	sub	eax, esi
+	mov	[createfile_entrypos], eax ; offset in buffer
+	jmp	cf_new_dir_entry_@
 
 loc_createfile_add_new_cluster:
 	cmp	byte [Current_FATType], 2
@@ -7130,428 +7212,188 @@ loc_createfile_add_new_cluster:
 	jnb	short loc_createfile_add_new_cluster_check_fsc
 
 	;mov	eax, 12
-	mov	al, 12 ; No more files 
+	mov	al, 12 ; No more files
 
 loc_createfile_anc_retn:
+	retn
+
+loc_createfile_insufficient_disk_space:
+	mov	eax, 27h
+loc_createfile_gffc_retn:
 	retn
 
 loc_createfile_add_new_cluster_check_fsc:
 	mov	ecx, [createfile_FreeSectors]
 	movzx	eax, byte [createfile_SecPerClust]
-	;shl	ax, 1 ; AX = 2 * AX
-	; 29/07/2022
-	shl	eax, 1
+	; 06/08/2025
 	cmp	ecx, eax
         jb	short loc_createfile_insufficient_disk_space
 
 loc_createfile_add_new_subdir_cluster:
+; 06/08/2025
+%if 0 
 	mov	edx, [DirBuff_Cluster]
 	mov	[createfile_LastDirCluster], edx
-
 	; 27/08/2024
 	;;;
-	call	get_first_free_cluster
-	jc	short loc_createfile_anc_retn
-	mov	[createfile_FFCluster], eax
-	;;;
-	; 27/08/2024
-	;;;
-	;mov	eax, [createfile_FFCluster]
-	; eax = cluster address of the new directory sector
-	;;;
-
-	call	load_FAT_sub_directory
-	jc	short loc_createfile_anc_retn
-
-	; 27/08/2024
-	; [DirBuff_Cluster] = [createfile_FFCluster]
-
-pass_createfile_add_new_subdir_cluster:
-	; clear directory buffer (new dir sector) ; 27/08/2024
-	;movzx	eax, word [esi+LD_BPB+BytesPerSec]
-	movzx	eax, word [createfile_BytesPerSec] ; 23/03/2016
-	; ecx = directory buffer sector count 
-	;	(sectors per cluster)
-	mul	ecx
-	mov	ecx, eax 
-		; (bytes per cluster or directory buffer size)
-	shr	ecx, 2 ; dword count
-	sub	eax, eax ; 0
-	rep	stosd
-	;
-	mov	byte [DirBuff_ValidData], 2
-	call	save_directory_buffer
-	jc	short loc_createfile_anc_retn
-
-loc_createfile_save_added_subdir_cluster:
-	mov	eax, [createfile_LastDirCluster]
-	mov	ecx, [createfile_FFCluster]
-	call	update_cluster
-	jnc	short loc_createfile_save_fat_buffer_0
-	or	eax, eax ; EAX = 0 -> cluster value is 0 or eocc
-	jnz	short loc_createfile_save_fat_buffer_stc_retn
-
-loc_createfile_save_fat_buffer_0:
-	mov	eax, [createfile_FFCluster]
-	mov	[createfile_LastDirCluster], eax
-	;mov	ecx, 0FFFFFFFh ; 28 bit
-	; 29/08/2024
-	; (update_cluster will save 28 bit cluster value)
-	;mov	ecx, 0FFFFFFFFh
-	sub	ecx, ecx
-	dec	ecx ; 0FFFFFFFFh
-	call	update_cluster
-	jnc	short loc_createfile_save_fat_buffer_1
-	or	eax, eax ; Was it EOF ?
-	jz	short loc_createfile_save_fat_buffer_1 ; yes
-
-loc_createfile_save_fat_buffer_stc_retn:
-	stc
-loc_createfile_save_fat_buffer_retn:
-loc_createfile_gffc_2_stc_retn:
-	retn
-
-loc_createfile_save_fat_buffer_1:
-	; byte [FAT_BuffValidData] = 2
-	call	save_fat_buffer
-	jc	short loc_createfile_save_fat_buffer_retn
-
-	cmp	byte [FAT_ClusterCounter], 1
-	jb	short loc_createfile_save_fat_buffer_2
-
-	; ESI = Logical DOS Drive Description Table address
-	mov	eax, [FAT_ClusterCounter]
-
-	mov	byte [FAT_ClusterCounter], 0 ; 21/03/2016
-
-	mov	bx, 0FF01h ; add free clusters 
-	call	calculate_fat_freespace
-
-	;inc	eax ; 0FFFFFFFFh -> 0 ; recalculation is needed!
-	;jnz	short loc_createfile_save_fat_buffer_2
-
-	; ecx > 0 -> Recalculation is needed
-	or	ecx, ecx 
-	jz	short loc_createfile_save_fat_buffer_2
-
-	mov	bx, 0FF00h ; recalculate free space
-	call	calculate_fat_freespace
-
-loc_createfile_save_fat_buffer_2:
-	;call	update_parent_dir_lmdt
-
-	; 27/08/2024
-;loc_createfile_gffc_2:
 	;call	get_first_free_cluster
-	;jc	short loc_createfile_gffc_2_stc_retn
-	;
-	;mov	[createfile_FFCluster], eax
-	;
-
-	mov	eax, [createfile_LastDirCluster]
-
-	call	load_FAT_sub_directory
-	jc	short loc_createfile_gffc_2_stc_retn
-
-	mov	edi, Directory_Buffer
-
-	; 27/08/2024
-	;sub	bx, bx ; directory entry index/number = 0
-	sub	ebx, ebx
-	; 29/07/2022
-	;sub	ecx, ecx
-
-	push	esi ; * ; 23/03/2016
-
-loc_createfile_set_ff_dir_entry:
-	;;;
-	; 29/08/2024
-	mov	eax, [DirBuff_Cluster]
-	mov	[createfile_LastDirCluster], eax
-	;;;
-
-	; 27/08/2024
-	mov	[createfile_DirIndex], bx
-	; 29/07/2022
-	;mov	[createfile_DirIndex], cx ; 0
-
-	;;;
-	mov	eax, [createfile_size]
-	or	eax, eax 
-	jz	short loc_createfile_sffc
-	; 31/08/2024
-	mov	esi, [esp] ; * ; LDDDT address
-	call	get_first_free_cluster
-	jc	short loc_createfile_gffc_2_stc_retn
-loc_createfile_sffc:
+	; 06/08/2025
+	call	get_first_free_cluster_@
+	jc	short loc_createfile_anc_retn
 	mov	[createfile_FFCluster], eax
-	sub	ecx, ecx ; 0
-	;;;
+%else
+	; 06/08/2025
+	; the directory doesn't have a free (deleted) entry
+	; (a new cluster will be added to it's last cluster)
+	mov	eax, [DirBuff_Cluster]
+		; Last cluster of the current directory
+		; (from 'locate_current_dir_file')
+	mov	[createfile_LastDirCluster], eax
+	mov	edx, esi ; LDRVT address
+	call	ADD_NEW_CLUSTER
+	jc	short loc_createfile_anc_error
+	; eax = First cluster allocated
+	; 06/08/2025
+	; note: this is a new cluster for the new dir entry
+	;mov	[createfile_FFCluster], eax
+	mov	[createfile_pd_new_cluster], eax
 
-        ; EDI = Directory entry address
-	mov	esi, [createfile_Name_Offset]
-	;;;
-	; 27/08/2024
-	;mov	eax, [createfile_FFCluster]
-	;;;
-	mov	[createfile_Cluster], eax ; 24/03/2016
-	;mov	ch, 0FFh
-        ; 29/07/2022
-	; ecx = 0
-	dec	ch ; 0 -> 0FFh
-	mov	cl, [createfile_attrib] ; file attributes
-	; CH > 0 -> File size is in [EBX]
-	mov	ebx, createfile_size
+	call	FIGREC
 
-	call	make_directory_entry
+	mov	[createfile_phydrv], cl
+	mov	[createfile_dirsector], eax
+%endif
+	; 06/08/2025 - TRDOS 386 v2.0.10
+	;;;;
+cf_get_new_dir_sector:
+	; eax = physical disk sector
+	;  cl = physical drive number
+	; edx = LDRVT address
 
-	pop	esi ; * ; ESI = Logical Dos Drv Desc. Table address
+	call	GETBUFFER_NPR ; no pre-read
+	jc	short loc_createfile_anc_error
 
-	mov	byte [DirBuff_ValidData], 2
-	call	save_directory_buffer
-	jc	short loc_createfile_set_ff_dir_entry_retn
+	; clear buffer sector 
+	lea	edi, [esi+BUFINSIZ]
+	mov	ecx, 512/4
+	xor	eax, eax ; 0
+	rep	stosd
 
-	mov	byte [createfile_UpdatePDir], 1 ; 31/03/2016
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+	jnz	short cf_loop_clear_dir_sector
+	;call	INC_DIRTY_COUNT
+	inc	dword [DirtyBufferCount]
+	;or	byte [esi+9], 40h
+	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
+cf_loop_clear_dir_sector:
+	dec	ebx
+	jz	short loc_createfile_anc_@
+	mov	eax, [esi+BUFFINFO.buf_sector]
+	inc	eax
+	;mov	cl, [edx+LD_PhyDrvNo]
+	mov	cl, [createfile_phydrv]
+	jmp	short cf_get_new_dir_sector
 
-loc_createfile_get_set_write_file_cluster:
-	mov	eax, [createfile_size]
-	or	eax, eax ; 0 ?
-	jnz	short loc_createfile_get_set_wfc_cont ; no
-	inc	eax ; eax = 1
-
-	; 27/08/2024 (empty file)
-	;;;
-	; 23/03/2016
-	;movzx	ebx, byte [createfile_SecPerClust]
-	;;movzx	ecx, word [esi+LD_BPB+BytesPerSec] ; 512
-        ;movzx   ecx, word [createfile_BytesPerSec] ; 512
-	;;;
-	jmp	loc_createfile_set_cluster_count
-
-loc_createfile_set_ff_dir_entry_retn:
-	retn
-
-loc_createfile_write_fcluster_to_disk:
-	add	eax, [esi+LD_DATABegin] ; convert to physical address
-	mov	ebx, Cluster_Buffer
-	; ESI = Logical DOS Drv. Desc. Tbl. address
-	; EAX = Disk address
-	; EBX = Sector Buffer
-	; ECX = sectors per cluster
-	call	disk_write
-	jc	short loc_createfile_dsk_wr_err
-
-loc_createfile_update_fat_cluster:
-	; 21/03/2016
-	cmp	byte [createfile_wfc], 0
-	ja	short loc_createfile_update_fat_cluster_n1
-
-	inc	byte [createfile_wfc] ; 1
-	jmp	short loc_createfile_update_fat_cluster_n2
-
-loc_createfile_dsk_wr_err:
-	; 16/10/2016 (1Dh -> 18)
-	; 23/03/2016
-	;mov	eax, 18 ; Drive not ready or write error !
-	; 29/07/2022
-	sub	eax, eax
-	mov	al, 18
-loc_cf_stc_retn:
-	jmp	loc_createfile_stc_retn
-
-loc_createfile_update_fat_cluster_n1:
-	mov	eax, [createfile_PCluster]
-	mov	ecx, [createfile_Cluster]
-	call	update_cluster
-	jnc	short loc_createfile_update_fat_cluster_n2
-	or	eax, eax ; EAX = 0 -> cluster value is 0 or eocc
-	;jnz	loc_createfile_stc_retn
-	; 29/07/2022
-	jnz	short loc_cf_stc_retn
-
-loc_createfile_update_fat_cluster_n2:
-        mov	eax, [createfile_Cluster]
-	;mov	ecx, 0FFFFFFFh
-	; 29/08/2024
-	; (update_cluster will save 28 bit cluster value)
-	;mov	ecx, 0FFFFFFFFh
-	sub	ecx, ecx
-	dec	ecx
-	call	update_cluster
-	jnc	short loc_createfile_save_fat_buffer_3
-	or	eax, eax ; EAX = 0 -> cluster value is 0 or eocc
-	jz	short loc_createfile_save_fat_buffer_3
-
-loc_cf_upd_fat_fcluster_stc_retn:
-	jmp	loc_createfile_stc_retn
-
-loc_createfile_get_set_wfc_cont:
-	;movzx	ecx, word [esi+LD_BPB+BytesPerSec] ; 512
-	movzx	ecx, word [createfile_BytesPerSec] ; 512
-	add	eax, ecx
-	dec	eax  ; add eax, 511
-	sub	edx, edx
-	div	ecx
-	movzx	ebx, byte [createfile_SecPerClust]
-	add	eax, ebx
-	dec	eax  ; add eax, SecPerClust - 1
-	;xor	dx, dx
-	; 27/08/2024
-	xor	edx, edx
-	div	ebx
-
-loc_createfile_set_cluster_count:
-	mov 	[createfile_CCount], eax
-
-	; 31/08/2024
-	;;;
-	cmp	dword [createfile_size], 0 ; empty file ?
-	jz	short loc_createfile_save_fat_buffer_3
-	;;;
-
-	mov	edi, Cluster_Buffer
-	mov	eax, ecx ; Bytes per Sector
-	mul	ebx ; Sectors per Cluster
-	; EAX = Bytes per Cluster
-	mov	ecx, eax
-	shr	ecx, 2 ; dword count
-	xor	eax, eax
-	rep	stosd ; clear cluster buffer
-
-	mov	eax, [createfile_Cluster] ; 24/03/2016
-
-	mov	ecx, ebx
-
-loc_createfile_get_set_wf_fclust_cont:
-	;sub	eax, 2
-	; 30/07/2022
-	dec	eax
-	dec	eax
-	mul	ecx
-	; EAX = Logical DOS disk address (offset)
-        jmp     loc_createfile_write_fcluster_to_disk
-
-loc_createfile_save_fat_buffer_3:
-	; byte [FAT_BuffValidData] = 2
-	call	save_fat_buffer
-	;jc	loc_createfile_stc_retn
-	; 29/07/2022
-	jc	short loc_cf_upd_fat_fcluster_stc_retn
-
-	; 21/03/2016
-	;cmp	byte [FAT_ClusterCounter], 1
-	;jb	short loc_createfile_save_fat_buffer_4
-	; 31/08/2024
-	cmp	byte [FAT_ClusterCounter], 0
-	jna	short loc_createfile_save_fat_buffer_4 ; cf = 0
-
-	; ESI = Logical DOS Drive Description Table address
-	mov	eax, [FAT_ClusterCounter]
-	mov	bx, 0FF01h ; add free clusters
-	call	calculate_fat_freespace
-
-	;inc	eax ; 0FFFFFFFFh -> 0 ; recalculation is needed!
-	;jnz	short loc_createfile_save_fat_buffer_4
-
-	; ecx > 0 -> Recalculation is needed
-	or	ecx, ecx 
-	jz	short loc_createfile_save_fat_buffer_4
-
-	mov	bx, 0FF00h ; ; recalculate free space
-	call	calculate_fat_freespace
-
-loc_createfile_save_fat_buffer_4:
-	dec	dword [createfile_CCount]
-	;jz	short loc_createfile_upd_dir_modif_date_time
-	jz	short loc_createfile_stc_retn_cc ; 31/03/2016
-
-loc_createfile_get_set_write_next_cluster:
-	call	get_first_free_cluster
-	jc	short loc_createfile_stc_retn
-
-loc_createfile_get_set_write_next_cluster_1:
-	cmp	eax, 0FFFFFFFFh
-	jb	short loc_createfile_get_set_write_next_cluster_2
-
-;loc_createfile_wnc_insufficient_disk_space:
-	;mov	eax, 27h ; Insufficient disk space
-	; 29/07/2022
-	;xor	eax, eax
-	; 29/08/2024
-	; eax = FFFFFFFFh
-	inc	eax ; eax = 0
-	mov	al, 27h
-
-loc_createfile_stc_retn:
-	cmp	byte [createfile_wfc], 1
-	jnb	short loc_createfile_err_retn
-	retn
-
-loc_createfile_wnc_inv_format_retn:
-	;mov	eax, 28
-	mov	al, 28 ; Invalid format
-	jmp	short loc_createfile_stc_retn
-
-loc_createfile_get_set_write_next_cluster_2:
-	cmp	eax, 2
-	jb	short loc_createfile_wnc_inv_format_retn
-
-loc_createfile_get_set_write_next_cluster_3:
-	mov	ecx, [createfile_Cluster]
-	mov	[createfile_Cluster], eax
-	mov	[createfile_PCluster], ecx
-	movzx	ecx, byte [createfile_SecPerClust]
-	jmp	short loc_createfile_get_set_wf_fclust_cont
-
-loc_createfile_err_retn:
-	stc
-
-;loc_createfile_upd_dir_modif_date_time:
-loc_createfile_stc_retn_cc: ; 31/03/2016
-	pushf	; cpu is here for an error return or completion
-	push	eax ; error code if cf = 1
-
-	;call	update_parent_dir_lmdt
-
-;loc_createfile_stc_retn_cc:
-	mov	eax, [FAT_ClusterCounter]
-	or	eax, eax
-	jz	short loc_createfile_stc_retn_pop_eax
-	mov	bh, [Current_Drv]
-	mov	bl, 01h ; BL = 1 -> add clusters
-	; NOTE: EAX value will be added to Free Cluster Count
-	; (If EAX value is negative, Free Cluster Count will be decreased)
-  	call	calculate_fat_freespace
-        ; ESI = Logical DOS Drive Description Table Address
-        ;jc	short loc_createfile_stc_retn_pop_eax_cf
-	and	ecx, ecx ; cx = 0 -> valid free sector count
-	jz	short loc_createfile_stc_retn_pop_eax
-
-loc_createfile_stc_retn_recalc_FAT_freespace:
-	mov	bx, 0FF00h ; bh = 0FFh ->
-	; ESI = Logical DOS Drv DT Addr
-	; BL = 0 -> Recalculate 
-	call	calculate_fat_freespace
-
-loc_createfile_stc_retn_pop_eax:
+loc_createfile_anc_error:
+	push	eax ; error code
+	mov	eax, [createfile_LastDirCluster]
+	mov	ebx, -1 ; last cluster
+	call	RELBLKS
 	pop	eax
-	popf
-	jc	short loc_createfile_retn
+	mov	esi, edx
+	stc
+loc_createfile_dirup_err:
+	retn
+	;;;;
 
-loc_createfile_retn_fcluster:
-	mov	eax, [createfile_FFCluster]
-	;mov	ebx, createfile_size
-	;;movzx	ecx, byte [esi+LD_BPB+SecPerClust]
-	;movzx	ecx, byte [createfile_SecPerClust] ; 23/03/2016
-	;movzx	edx, word [createfile_DirIndex]
-	; 29/08/2024 - TRDOS 386 v2.0.9
-	mov	ebx, [createfile_size]
-	movzx	ecx, word [createfile_DirIndex] ; = directory entry index
-	mov	edx, [createfile_LastDirCluster] ; = [DirBuff_Cluster]
-	; esi = Logical DOS Drive Description Table address 
-	; byte [esi] = drive name ; 'A','B','C','D'
+	; 06/08/2025 - TRDOS 386 v2.0.10
+loc_createfile_anc_@:
+	cmp	byte [edx+LD_FATType], 2
+	jna	short loc_createfile_anc_1 ; not FAT32
+	; FAT32 fs
+	lea	esi, [edx+LD_BPB+FAT32_FirstFreeClust]
+	jmp	short loc_createfile_anc_2
+loc_createfile_anc_1:
+	; FAT16 or FAT12 fs
+	lea	esi, [edx+LD_BPB+FAT_FirstFreeClust]
+loc_createfile_anc_2:
+	;mov	ecx, [createfile_FFCluster]
+	mov	ecx, [createfile_pd_new_cluster]
+	cmp	[esi], ecx
+	jne	short loc_createfile_anc_3
+	; change first free cluster number
+	inc	ecx
+	mov	[esi], ecx
+	mov	ebx, [edx+LD_Clusters] ; Last Cluster - 1
+	inc	ebx  ; last cluster
+	cmp	ecx, ebx
+	jna	short loc_createfile_anc_3
+	mov	dword [esi], 2
+loc_createfile_anc_3:
+	; [createfile_dirsector] = phys sector address
+	;	of the 1st sector of the new cluster
+	; [createfile_phydrv] = physical drive number
+	mov	dword [createfile_entrypos], 0
+	; [createfile_entrypos] = directory entry offset
 
-loc_createfile_retn:
+	; 06/08/2025
+	; edx = LDRVT address
+	
+	mov	[createfile_LDRVT], edx
+	mov	esi, edx
+	call	update_fat32_fsinfo
+	mov	edx, esi
+
+cf_new_dir_entry:
+	mov	eax, [createfile_dirsector]
+	mov	cl, [createfile_phydrv]
+
+	call	GETBUFFER  ; Pre read
+	jc	short loc_createfile_error
+
+cf_new_dir_entry_@:
+	lea	edi, [esi+BUFINSIZ]
+	add	edi, [createfile_entrypos]
+	push	esi ; **
+	push	edi ; *
+	mov	esi, [createfile_Name_Offset]
+	mov	bl, [createfile_attrib]
+
+	; save Logical DOS Drive Description Table address
+	
+	call	make_new_directory_entry
+
+	; copy modified directory entry to FindFile_DirEntry field
+	pop	esi ; *
+	mov	edi, FindFile_DirEntry
+	mov	ecx, 32/4
+	rep	movsd
+	pop	esi ; **
+
+	; edx = date (hw) & time (lw)
+	;mov	[createfile_datetime], edx
+
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+	jnz	short cf_new_dir_entry_@@
+	;call	INC_DIRTY_COUNT
+	inc	dword [DirtyBufferCount]
+	;or	byte [esi+9], 40h
+	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
+cf_new_dir_entry_@@:
+	call	BUFWRITE
+	jc	short loc_createfile_error
+	;;;;
+
+	mov	[createfile_LDRVT], edx
+	mov	esi, edx ; LDRVT address
+
+	mov 	byte [LMDT_Flag], 1
+	;call	update_parent_dir_lmdt
+	;retn
+	jmp	update_parent_dir_lmdt
+
+	; 06/08/2025
+loc_createfile_error:
 	retn
 
 ; 28/05/2025 - TRDOS 386 v2.0.10

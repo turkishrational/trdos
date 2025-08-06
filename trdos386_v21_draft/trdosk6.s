@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 17/07/2025  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 06/08/2025  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1525,8 +1525,11 @@ sysfork_5: ; 2:
 		; br sysret1
 
 syscreat: ; < create file >
+	; 06/08/2025
+	; 05/08/2025 - TRDOS 386 v2.0.10
+	;	(Major Modification)
 	; 29/08/2024
-	; 25/08/2024 - TRDOS 386 v2.0.9	
+	; 25/08/2024 - TRDOS 386 v2.0.9
 	; 08/08/2022
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 13/11/2017
@@ -1634,7 +1637,7 @@ syscreat_0:
 syscreat_3:
 	; 16/10/2016
 	cmp	byte [SWP_inv_fname], 0
-	ja	short syscreat_inv_fname ; invalid file name !
+	ja	syscreat_inv_fname ; invalid file name !
 
 	; Here, we have a valid path and also a valid file name
 	; (Working dir has been changed if the path
@@ -1652,8 +1655,8 @@ syscreat_3:
 		;  BL = Attributes of The File/Directory
 		;  BH = Long Name Yes/No Status (>0 is YES)
 		;  DX > 0 : Ambiguous filename chars are used
-	jc	short syscreat_1 ; file not found (the good!)
-				 ; or another error (the bad!)
+	jc	syscreat_1	; file not found (the good!)
+				; or another error (the bad!)
 
 	; (& the uggly!) truncate file to zero length before open
 
@@ -1681,10 +1684,17 @@ syscreat_3:
 	;   (change attributes to normal, if you need truncate it)
 
 	test	bl, 00011111b  ; check attributes of existing file
-	jnz	short sysmkdir_err
+	jnz	sysmkdir_err
 
 	;; normal file, OK to continue...
 
+	; 05/08/2025
+	; cl = new attributes 
+	; (attr_volume_id and attr_directory flags will be ignored)
+	; ((attr_device flag is not used by TRDOS 386))
+
+; 05/08/2025 - TRDOS 386 v2.0.10
+%if 0
 	; ESI = FindFile_DirEntry
 	mov	ax, [esi+DirEntry_FstClusHI] ; 20
 	shl	eax, 16 ; 13/11/2017
@@ -1712,9 +1722,103 @@ syscreat_3:
 	; 03/09/2024
 	mov	word [edi+DirEntry_FstClusHI], 0
 	mov	word [edi+DirEntry_FstClusLO], 0
+%else
+	; 05/08/2025
+	; get first cluster and set first cluster
+	; and file size to zero
 
-	; 24/08/2024
+	; EDI = Directory Entry Address (in the buffer)
+	sub	eax, eax
+	mov	[edi+DirEntry_FileSize], eax ; 0
+	xchg	ax, [edi+DirEntry_FstClusHI] ; 20
+	shl	eax, 16 ; 13/11/2017
+	xchg	ax, [edi+DirEntry_FstClusLO] ; 26
+
+	mov	[FindFile_FirstCluster], eax ; old 1st cluster
+	;mov	[FindFile_Attributes], bl ; old attribs
+
+	; update file attributes
+	;and	cl, 100111h
+	and	cl, attr_archive+attr_system+attr_hidden+attr_read_only
+	mov	[edi+DirEntry_Attr], cl
+
+	; set archive bit
+	;or	byte [edi+DirEntry_Attr], attr_archive ; 20h
+
+	; set last access time
+	; and last modification date & time
+	call	convert_current_date_time
+	; OUTPUT -> DX = Date in dos dir entry format
+        ; 	    AX = Time in dos dir entry format
+	;mov	[edi+DirEntry_CrtTime], ax ; 14
+	;mov	[edi+DirEntry_CrtDate], dx ; 16
+	mov	[edi+DirEntry_LastAccDate], dx ; 18
+	mov	[edi+DirEntry_WrtTime], ax ; 22
+	mov	[edi+DirEntry_WrtDate], dx ; 24
+	
+	; copy modified directory entry to FindFile_DirEntry field
+	mov	esi, edi
+	mov	edi, FindFile_DirEntry
+	mov	ecx, 32/4
+	rep	movsd
+
+	;;;;
+	; set 'buffer is dirty' flag
+	mov	esi, [CurrentBuffer]
+	;or	byte [esi+BUFFINFO.buf_flags], buf_isDIR
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+	jnz	short truncate_file_sbd_skip
+	;call	INC_DIRTY_COUNT
+	inc	dword [DirtyBufferCount]
+	;or	byte [esi+9], 40h
+	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
+truncate_file_sbd_skip:
+	call	BUFWRITE
+	jc	short syscreate_truncate_err
+	;;;;
+
+	; check cluster value
+	;sub	edx, edx
+	;mov	dh, [FindFile_Drv]
+	;add	edx, Logical_DOSDisks
+
+	mov	[createfile_LDRVT], edx
+
+	mov	eax, [FindFile_FirstCluster]
+	; edx = LDRVT address
+	; eax = cluster number
+	cmp	eax, 2
+	jb	short skip_truncate
+	mov	ecx, [edx+LD_Clusters]
+	inc	ecx ; last cluster number
+	cmp	ecx, eax
+	jb	short skip_truncate
+	call	RELEASE
+	jc	short syscreate_truncate_err
+
+	cmp	byte [edx+LD_FATType], 2
+	jna	short truncate_file_1 ; not FAT32
+
+	; FAT32 fs
+	lea	ebx, [edx+LD_BPB+FAT32_FirstFreeClust]
+	jmp	short truncate_file_2
+
+truncate_file_1:
+	; FAT16 or FAT12 fs
+	lea	ebx, [edx+LD_BPB+FAT_FirstFreeClust]
+truncate_file_2:
+	mov	eax, [FindFile_FirstCluster]
+	cmp	eax, [ebx]
+	jnb	short skip_truncate
+	; replace first free cluster value
+	mov	[ebx], eax
+%endif
+
+	; 05/08/2025 - TRDOS 386 v2.0.10
 skip_truncate:
+; 05/08/2025
+%if 0
+	; 24/08/2024
 	; 26/10/2016
 	; EDI = Directory entry address in directory buffer
 	; Update directory entry
@@ -1724,13 +1828,32 @@ skip_truncate:
 	mov	[edi+DirEntry_WrtTime], ax
 	mov	[edi+DirEntry_WrtDate], dx
 	mov	[edi+DirEntry_LastAccDate], dx
-	xor	eax, eax ; file size = 0 
+	xor	eax, eax ; file size = 0
 	mov	[edi+DirEntry_FileSize], eax ; 0
-	mov	byte [DirBuff_ValidData], 2 ; data changed sign	
+	mov	byte [DirBuff_ValidData], 2 ; data changed sign
 	;mov	esi, FindFile_DirEntry
 	; 03/09/2024
 	mov	dl, 1 ; open file for writing
 	jmp	sysopen_2 ; 08/08/2022
+%endif
+	; 05/08/2025
+	; set last access date of the parent dir
+	;mov 	byte [LMDT_Flag], 0
+	call	update_parent_dir_lmdt
+	; ignore any errors (only last access date is updated)
+
+	mov	esi, [createfile_LDRVT] ; LDRVT address
+
+	; save FSINFO sector (for FAT32 file system only!)
+	call	update_fat32_fsinfo
+	; ignore any errors
+
+syscreat_4:
+	; now... open file for write
+	xor	eax, eax ; file size = 0
+	mov	edi, FindFile_DirEntry
+	mov	dl, 1 ; open file for writing
+	jmp	sysopen_2
 
 sysmkdir_err:
 	; 1 = write, 2 = read & write, >2 = invalid
@@ -1743,7 +1866,7 @@ syscreate_truncate_err:
 
 syscreat_inv_fname:  ; invalid file name chars
 	; 16/10/2016
-	mov	eax, ERR_INV_FILE_NAME  ; 26 ; invalid file name chars 
+	mov	eax, ERR_INV_FILE_NAME  ; 26 ; invalid file name chars
 	pop	ecx
 	jmp	short sysopen_err
 
@@ -1771,7 +1894,7 @@ syscreat_2:
 		; EAX = New file's first cluster
 		; ESI = Logical Dos Drv Descr. Table Addr.
 		; EBX = offset CreateFile_Size
-		; ECX = Sectors per cluster (<256) 
+		; ECX = Sectors per cluster (<256)
 		; EDX = Directory entry index/number (<65536)
 		; 29/08/2024
 		; EBX = File Size (0 for a new, empty file)
@@ -1779,6 +1902,12 @@ syscreat_2:
 		;      (in directory cluster, not in directory)
 		; EDX = Directory Cluster Number (of the file)
 
+	; 06/08/2025
+	; ESI = Logical Dos Drv Descr. Table Addr.
+	; FindFile_DirEntry = directory entry (copy)
+
+; 06/08/2025
+%if 0
 	; 26/10/2016
 	;mov	esi, Directory_Buffer
 	;shl	dx, 5 ; *32
@@ -1787,7 +1916,7 @@ syscreat_2:
 
 	; Here, directory entry has been created but last
 	; modification date & time of the parent dir has not
-	; been updated, yet! 
+	; been updated, yet!
 	; (Note: Directory and FAT buffers have been updated...)
 
 	call	update_parent_dir_lmdt ; now, it is OK too!
@@ -1811,8 +1940,13 @@ syscreat_2:
 	; ESI = Directory Entry (FindFile_DirEntry) Location
 	; EAX = File Size (= 0)
 	jmp	short sysopen_2
+%else
+	; 06/08/2025
+	jmp	short syscreat_4
+%endif
 
 sysopen: ;<open file>
+	; 05/08/2025
 	; 07/07/2025
 	; 29/06/2025 - TRDOS 386 v2.0.10
 	; 03/09/2024
@@ -1964,6 +2098,8 @@ sysopen_access_err:
 
 sysopen_2:
 	; esi = Directory Entry (FindFile_DirEntry) Location
+	; 05/08/2025
+	; edi = FindFile_DirEntry address
 	;mov	ebx, esi
         ; 03/09/2024
 	mov	ebx, edi ; Directory entry in directory buffer

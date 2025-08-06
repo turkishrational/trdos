@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 25/07/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 26/07/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -5791,6 +5791,7 @@ loc_print_attr_changed_message:
 	jmp	loc_show_attributes_no_nextline
 
 rename_file:
+	; 26/07/2025
 	; 23/07/2022 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 13/11/2017
@@ -6186,6 +6187,8 @@ loc_rename_file_yes: ; 28/07/2022
 
 	xor	edx, edx
 	mov	dh, [SourceFile_Drv]
+	; 26/07/2025
+	mov	bh, dh
 	add	edx, Logical_DOSDisks
 
 	mov	ax, [SourceFile_DirEntry+20] ; First Cluster, HW
@@ -6205,6 +6208,7 @@ loc_rename_file_yes: ; 28/07/2022
 ;	jmp	loc_file_rw_restore_retn
 
 move_file:
+	; 26/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 07/08/2022
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 11/03/2016
