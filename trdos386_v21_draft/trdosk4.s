@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 06/08/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 11/08/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -4778,7 +4778,7 @@ delete_directory_entry:
 	;	21/07/2025
 	;	ECX = Directory Buffer Entry Counter/Index
 	;	 BL = Longname Entry Length
-	;	 BH = Logical DOS Drive Number
+	;;;	 BH = Logical DOS Drive Number
 	;
 	;	[CurrentBuffer] = Directory Buffer header addr
 	;
@@ -5085,6 +5085,7 @@ loc_rename_direntry_update_parent_dir_lm_date:
 	retn
 
 move_source_file_to_destination_file:
+	; 11/08/2025
 	; 27/07/2025
 	; 26/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 07/08/2022
@@ -5180,8 +5181,9 @@ msftdf_check_df_drv:
 	mov	dl, [Path_Drv]
 
 msftdf_compare_sf_df_drv:
-	sub	ebx, ebx
-	mov	bh, [Current_Drv]
+	; 11/08/2025
+	;sub	ebx, ebx
+	;mov	bh, [Current_Drv]
 	cmp	dl, al
 	je	short msftdf_check_sf_df_drv_ok
 
@@ -5204,7 +5206,9 @@ msftdf_check_sf_df_drv_ok:
 	add	eax, Logical_DOSDisks
 	mov	[msftdf_drv_offset], eax
 
-	cmp	dl, bh ; byte [Current_Drv]
+	;cmp	dl, bh ; byte [Current_Drv]
+	; 11/08/2025
+	cmp	dl, [Current_Drv]
 	je	short msftdf_df_check_directory
 
 msftdf_change_drv:
@@ -5238,9 +5242,9 @@ msftdf_df_find_1:
 	; 27/07/2025
 msftdf_df_check_fname:
 	; 15/10/2016
-	;mov	esi, DestinationFile_Name ; *
+	;;mov	esi, DestinationFile_Name ; *
 	; 27/07/2025
-	mov	esi, Path_FileName
+	;mov	esi, Path_FileName
 	call	check_filename
 	;jnc	short msftdf_convert_df_direntry_name
 	; 27/07/2025
@@ -5291,7 +5295,7 @@ msftdf_df_copy_sf_name:
 	push	edi
 	;mov	esi, SourceFile_Name
 	; 27/07/2025
-	mov	esi, [MvPathBuffer+258] ; Path_FileName
+	mov	esi, MvPathBuffer+258 ; Path_FileName
 	;mov	ecx, 12
 	; 29/07/2022
 	sub	ecx, ecx
@@ -5324,7 +5328,7 @@ msftdf_restore_current_dir_1:
 msftdf_sf_check_directory:
 	;mov	esi, SourceFile_Directory
 	; 27/07/2025
-	mov	esi, [MvPathBuffer+2] ; Path_Directory
+	mov	esi, MvPathBuffer+2 ; Path_Directory
 	cmp	byte [esi], 20h
 	jna	short msftdf_sf_find
 msftdf_sf_change_directory:
@@ -5339,7 +5343,7 @@ msftdf_sf_change_directory:
 msftdf_sf_find:
 	;mov	esi, SourceFile_Name  ; Offset 66
 	; 27/07/2025
-	mov	esi, [MvPathBuffer+258] ; Path_FileName
+	mov	esi, MvPathBuffer+258 ; Path_FileName
 	mov	ax, 1800h ; Only files
 	call	find_first_file
 	jc	short msftdf_return
@@ -5388,10 +5392,13 @@ msftdf_save_sf_structure:
 	rep	movsd
 
 msftdf_df_copy_sf_parameters:
-	mov	esi, 11
-	mov	edi, esi
-	add	esi, SourceFile_DirEntry
-	add	edi, DestinationFile_DirEntry
+	;mov	esi, 11
+	;mov	edi, esi
+	;add	esi, SourceFile_DirEntry
+	;add	edi, DestinationFile_DirEntry
+	; 11/08/2025
+	mov	esi, SourceFile_DirEntry+11
+	mov	edi, DestinationFile_DirEntry+11
 	;mov	ecx, 21
 	mov	cl, 21
 	rep	movsb
@@ -5438,14 +5445,28 @@ msftdf_make_dfde_locate_ffe_on_directory:
 		; would not be for first free or deleted dir entry
 	call	locate_current_dir_file
 	; 07/08/2022
-	jnc	short msftdf_make_dfde_set_ff_dir_entry
-
-; burada kaldým... 27/07/2025
+	jnc	msftdf_make_dfde_set_ff_dir_entry
 
 	;cmp	eax, 2
         cmp	al, 2
 	jne	short msftdf_error_retn
 
+	; 11/08/2025
+msftdf_add_new_cluster:
+	;mov	esi, [msftdf_drv_offset]
+	cmp	byte [Current_FATType], al ; 2
+	;cmp	byte ptr [esi+LD_FATType], 2
+	ja	short msftdf_add_new_cluster_check_fsc
+	cmp	byte [Current_Dir_Level], 1
+	;cmp	byte [esi+LD_CDirLevel], 1
+	jnb	short msftdf_add_new_cluster_check_fsc
+
+	mov	al, 12 ; No more files
+msftdf_gffc_retn:
+	retn
+
+; 11/08/2025 - TRDOS 386 v2.0.10
+%if 0
 msftdf_add_new_dir_entry_check_fs:
 	mov	esi, [msftdf_drv_offset]
 	mov 	eax, [DirBuff_Cluster]
@@ -5464,8 +5485,25 @@ msftdf_add_new_fs_subdir_section:
 	;mov	ebx, Directory_Buffer
 	jnc	short msftdf_add_new_fs_subdir_section_ok
 	retn
+%endif
+
+msftdf_add_new_cluster_check_fsc:
+	mov	esi, [msftdf_drv_offset]
+        movzx   eax, byte [esi+LD_BPB+SecPerClust]
+	mov	ecx, [esi+LD_FreeSectors]
+	cmp	ecx, eax
+	jnb	short msftdf_add_new_subdir_cluster
+
+	; insufficient disk space
+	mov	eax, 27h
+msftdf_error_retn:
+	stc
+	retn
 
 msftdf_add_new_subdir_cluster:
+
+; 11/08/2025 - TRDOS 386 v2.0.10
+%if 0
 	call	add_new_cluster
 	jc	short msftdf_dsfde_error_retn
 
@@ -5490,6 +5528,117 @@ msftdf_dsfde_error_retn:
 msftdf_add_new_fs_subdir_section_ok:
 msftdf_add_new_subdir_cluster_ok:
 	mov	edi, ebx ; Directory buffer address
+%else
+	; 11/08/2025
+	; the directory doesn't have a free (deleted) entry
+	; (a new cluster will be added to it's last cluster)
+	mov	eax, [DirBuff_Cluster]
+		; Last cluster of the current directory
+		; (from 'locate_current_dir_file')
+	mov	[createfile_LastDirCluster], eax
+	mov	edx, esi ; LDRVT address
+	call	ADD_NEW_CLUSTER
+	jc	short msftdf_mkde_anc_error
+	; eax = First cluster allocated
+
+	mov	[createfile_pd_new_cluster], eax
+
+	call	FIGREC
+
+	mov	[createfile_phydrv], cl
+	mov	[createfile_dirsector], eax
+
+	movzx	ebx, byte [edx+LD_BPB+SecPerClust]
+
+msftdf_get_new_dir_sector:
+	; eax = physical disk sector
+	;  cl = physical drive number
+	; edx = LDRVT address
+
+	call	GETBUFFER_NPR ; no pre-read
+	jc	short msftdf_mkde_anc_error
+
+	; clear buffer sector 
+	lea	edi, [esi+BUFINSIZ]
+	mov	ecx, 512/4
+	xor	eax, eax ; 0
+	rep	stosd
+
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+	jnz	short msftdf_clear_dir_sector_next
+	;call	INC_DIRTY_COUNT
+	inc	dword [DirtyBufferCount]
+	;or	byte [esi+9], 40h
+	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
+msftdf_clear_dir_sector_next:
+	dec	ebx
+	jz	short msftdf_anc_@
+	mov	eax, [esi+BUFFINFO.buf_sector]
+	inc	eax
+	;mov	cl, [edx+LD_PhyDrvNo]
+	mov	cl, [createfile_phydrv]
+	jmp	short msftdf_get_new_dir_sector
+
+msftdf_mkde_anc_error:
+	push	eax ; error code
+	mov	eax, [createfile_LastDirCluster]
+	mov	ebx, -1 ; last cluster
+	call	RELBLKS
+	pop	eax
+	mov	esi, edx
+;msftdf_error_retn:
+	stc
+msftdf_mkde_dirup_err:
+;msftdf_dsfde_error_retn:
+;msftdf_dsfde_restore_cdir_failed:
+	retn
+
+msftdf_anc_@:
+	cmp	byte [edx+LD_FATType], 2
+	jna	short msftdf_anc_1 ; not FAT32
+	; FAT32 fs
+	lea	esi, [edx+LD_BPB+FAT32_FirstFreeClust]
+	jmp	short msftdf_anc_2
+msftdf_anc_1:
+	; FAT16 or FAT12 fs
+	lea	esi, [edx+LD_BPB+FAT_FirstFreeClust]
+msftdf_anc_2:
+	mov	ecx, [createfile_pd_new_cluster]
+	cmp	[esi], ecx
+	jne	short msftdf_anc_3
+	; change first free cluster number
+	inc	ecx
+	mov	[esi], ecx
+	mov	ebx, [edx+LD_Clusters] ; Last Cluster - 1
+	inc	ebx  ; last cluster
+	cmp	ecx, ebx
+	jna	short msftdf_anc_3
+	mov	dword [esi], 2
+msftdf_anc_3:
+	; [createfile_dirsector] = physical sector address
+	;	of the 1st sector of the new cluster
+	; [createfile_phydrv] = physical drive number
+	; 11/08/2025
+	;mov	dword [createfile_entrypos], 0
+	; [createfile_entrypos] = directory entry offset
+	call	dirup_@ ; update FAT32 fs info sector
+			; and flush buffers
+	; eax = error code
+	jc	short msftdf_mkde_dirup_err
+
+	mov	cl, [createfile_phydrv]
+	mov	eax, [createfile_dirsector]
+	mov	edx, esi ; LDRVT address
+
+	call	GETBUFFER ; Pre read
+	jc	short msftdf_mkde_dirup_err
+
+	;mov	esi, [CurrentBuffer]
+	or	byte [esi+BUFFINFO.buf_flags], buf_isDIR
+
+	lea	edi, [esi+BUFINSIZ]
+	;add	edi, [createfile_entrypos]
+%endif
 
 msftdf_make_dfde_set_ff_dir_entry:
 	mov	edx, [Current_Dir_FCluster]
@@ -5502,12 +5651,35 @@ msftdf_make_dfde_set_ff_dir_entry:
 	mov	cl, 8
 	rep	movsd
 
+; 11/08/2025 - TRDOS 286 v2.0.10
+%if 0
 	mov	byte [DirBuff_ValidData], 2
 	call	save_directory_buffer
 	jc	short msftdf_make_dfde_err_upd_pdir_lmdt
 
 msftdf_make_dfde_update_pdir_lmdt:
 	call	update_parent_dir_lmdt
+%endif
+	;;;;
+	; 11/08/2025
+	mov	esi, [CurrentBuffer]
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+	jnz	short msftdf_save_dfde
+	;call	INC_DIRTY_COUNT
+	inc	dword [DirtyBufferCount]
+	;or	byte [esi+9], 40h
+	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
+msftdf_save_dfde:
+	call	BUFWRITE
+	jc	short msftdf_dsfde_error_retn
+
+	;mov	[createfile_LDRVT], edx
+	;mov	[msftdf_drv_offset], edx
+	mov	esi, edx ; LDRVT address
+
+	mov 	byte [LMDT_Flag], 1
+	call	update_parent_dir_lmdt
+	;;;;
 
 msftdf_dsfde_restore_current_dir_1:
 	cmp	byte [Restore_CDIR], 0
@@ -5517,7 +5689,9 @@ msftdf_dsfde_restore_current_dir_1:
 	jc	short msftdf_dsfde_restore_cdir_failed
 
 msftdf_dsfde_check_directory:
-	mov	esi, SourceFile_Directory
+	;mov	esi, SourceFile_Directory
+	; 11/08/2025
+	mov	esi, MvPathBuffer+2 ; Path_Directory
 	cmp	byte [esi], 20h
 	jna	short msftdf_dsfde_find_file
 
@@ -5531,8 +5705,12 @@ msftdf_dsfde_change_directory:
 ;	call	change_prompt_dir_string
 
 msftdf_dsfde_find_file:
-	mov	esi, SourceFile_Name  ; Offset 66
-	mov	ax, [esi+14] ; 80 -> SourceFile_AttributesMask
+	;mov	esi, SourceFile_Name  ; Offset 66
+	; 11/08/2025
+	mov	esi, MvPathBuffer+258 ; Path_FileName
+	;mov	ax, [esi+14] ; 80 -> SourceFile_AttributesMask
+	; 11/08/2025
+	mov	ax, 1800h ; except directory and volume names
 	call	find_first_file
 	jc	short msftdf_dsfde_error_retn
 
@@ -5544,18 +5722,34 @@ msftdf_dsfde_delete_direntry:
 
 	xor	bl, bl
 	; BL = 0 -> File
-	; EDI -> Directory buffer entry offset/address 
+	; EDI -> Directory buffer entry offset/address
 	call	delete_fs_directory_entry
 	jnc	short msftdf_dsfde_restore_current_dir_2
+msftdf_dsfde_restore_cdir_failed:
+msftdf_dsfde_error_retn:
 	retn
 
 msftdf_delete_FAT_direntry:
 	mov	bl, [FindFile_LongNameEntryLength]
-	mov	cx, [FindFile_DirEntryNumber]
+	;mov	cx, [FindFile_DirEntryNumber]
+	; 11/08/2025
+	mov	ecx, [DirEntry_Counter]
 	; ESI = Logical DOS drive description table address
 	; EDI = Directory buffer entry offset/address
 	call	delete_directory_entry
 	jc	short msftdf_retn
+
+	; 11/08/2025
+	; delete long name (if there is)
+	; and update lmdt of the parent directory
+	; (and flush buffers)
+	mov	eax, [Current_Dir_FCluster]
+	mov	[delfile_dir_fcluster], eax
+	mov	edx, esi ; LDRVT address
+	call	remove_file_3
+	; ignore errors
+
+ 	; esi = LDRVT address
 
 msftdf_dsfde_restore_current_dir_2:
 	cmp	byte [Restore_CDIR], 0
