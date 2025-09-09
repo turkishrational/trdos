@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 26/07/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 09/09/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -6208,6 +6208,7 @@ loc_rename_file_yes: ; 28/07/2022
 ;	jmp	loc_file_rw_restore_retn
 
 move_file:
+	; 09/09/2025
 	; 26/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 07/08/2022
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -6263,7 +6264,7 @@ loc_move_scan_destination_OK:
 	mov	esi, [SourceFilePath]
 	mov	edi, [DestinationFilePath]
 
-	mov	al, 1  ; move procedure Phase 1
+	mov	al, 1 ; move procedure Phase 1
 	call	move_source_file_to_destination_file
 	jnc	short move_source_file_to_destination_question
 
@@ -6299,10 +6300,14 @@ loc_move_perm_denied:
 	jmp	loc_permission_denied
 
 move_source_file_to_destination_question:
-        mov     al, [SourceFile_Drv]
+        ;mov	al, [SourceFile_Drv]
+	; 09/09/2025
+	mov	al, [MvPathBuffer+1] ; Path_Drv
 	add	al, 'A'
 	mov	[msg_source_file_drv], al
-        mov     al, [DestinationFile_Drv]
+        ;mov	al, [DestinationFile_Drv]
+	; 09/09/2025
+	mov	al, [Path_Drv]
 	add	al, 'A'
 	mov	[msg_destination_file_drv], al
 
@@ -6310,21 +6315,29 @@ move_source_file_to_destination_question:
 
 	mov	esi, msg_source_file
 	call	print_msg
-	mov	esi, SourceFile_Directory
+	;mov	esi, SourceFile_Directory
+	; 09/09/2025
+	mov	esi, MvPathBuffer+2 ; Path_Directory
 	cmp	byte [esi], 20h
 	jna	short msftdfq_sfn
 	call	print_msg
 msftdfq_sfn:
-	mov	esi, SourceFile_Name
+	;mov	esi, SourceFile_Name
+	; 09/09/2025
+	mov	esi, MvPathBuffer+258 ; Path_FileName
 	call	print_msg
 	mov	esi, msg_destination_file
 	call	print_msg
-	mov	esi, DestinationFile_Directory
+	;mov	esi, DestinationFile_Directory
+	; 09/09/2025
+	mov	esi, Path_Directory
 	cmp	byte [esi], 20h
 	jna	short msftdfq_dfn
 	call	print_msg
 msftdfq_dfn:
-	mov	esi, DestinationFile_Name
+	;mov	esi, DestinationFile_Name
+	; 09/09/2025
+	mov	esi, Path_FileName
 	call	print_msg
 	mov	esi, msg_copy_nextline
 	call	print_msg
@@ -8422,13 +8435,13 @@ loc_run_auto_path_move_lfn_loop:
 	or	al, al
 	jz	short loc_run_auto_path_move_lfn_ok
 	stosb
-	jmp	short loc_run_auto_path_move_lfn_loop	
+	jmp	short loc_run_auto_path_move_lfn_loop
 
 loc_run_auto_path_move_lfn_ok:
 	mov	byte [edi], '"' ; the 2nd dbl quote
 	inc	edi
 	stosb	; al = 0
-	jmp	short loc_run_auto_path_ppn	
+	jmp	short loc_run_auto_path_ppn
 
 loc_run_auto_path_move_fn_loop:
 	lodsb
