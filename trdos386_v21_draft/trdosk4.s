@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 11/08/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 23/09/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -4773,7 +4773,7 @@ delete_directory_entry:
 	; 01/08/2011 (DIR.ASM, 'proc_delete_directory_entry')
 	; 10/04/2011
 	; INPUT ->
-	; 	ESI = Logical Dos Drive Descripton Table Address
+	; 	ESI = Logical Dos Drive Description Table Address
 	;	EDI = Directory Buffer Entry Address
 	;	21/07/2025
 	;	ECX = Directory Buffer Entry Counter/Index
@@ -4783,7 +4783,7 @@ delete_directory_entry:
 	;	[CurrentBuffer] = Directory Buffer header addr
 	;
 	; OUTPUT ->
-	; 	ESI = Logical dos drive descripton table address
+	; 	ESI = Logical dos drive description table address
 	;	EAX = First cluster to be truncated/unlinked
 	;;;     CF = 1 -> Error code in EAX (AL)
 	;;;     CF = 0 & BH <> 0 -> LMDT write error  (BH = 1)
@@ -5085,6 +5085,8 @@ loc_rename_direntry_update_parent_dir_lm_date:
 	retn
 
 move_source_file_to_destination_file:
+	; 22/09/2025
+	; 15/09/2025
 	; 11/08/2025
 	; 27/07/2025
 	; 26/07/2025 (TRDOS 386 Kernel v2.0.10)
@@ -5349,7 +5351,9 @@ msftdf_sf_find:
 	jc	short msftdf_return
 
 msftdf_sf_ambgfn_check:
-	or	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	;or	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	; 22/09/2025
+	or	dl, dl
 	jz	short msftdf_sf_found
 
 msftdf_ambiguous_file_name_error:
@@ -5383,7 +5387,9 @@ msftdf_phase_1_return:
 	retn
 
 msftdf_save_sf_structure:
-	mov	esi, FindFile_DirEntry
+	; 22/09/2025
+	;mov	esi, FindFile_DirEntry
+	; esi = FindFile_DirEntry
 	mov	edi, SourceFile_DirEntry
 	;mov	ecx, 8
 	; 29/07/2022
@@ -5761,12 +5767,17 @@ msftdf_dsfde_restore_current_dir_2:
 msftdf_new_dir_fcluster_retn:
 	xor	ecx, ecx 
 	mov	eax, [createfile_FFCluster]
-	mov	ebx, DestinationFile_Drv
+	;mov	ebx, DestinationFile_Drv
+	; 15/09/2025
+	mov	ebx, Path_Drv
 
 msftdf_retn:
 	retn
 
 copy_source_file_to_destination_file:
+	; 23/09/2025
+	; 22/09/2025
+	; 15/09/2025 (TRDOS 386 Kernel v2.0.10)
 	; 31/08/2024
 	; 30/08/2024
 	; 29/08/2024
@@ -5846,7 +5857,8 @@ csftdf_ph1:
 	push	edi ; *
 
 csftdf_parse_sf_path:
-	mov	edi, SourceFile_Drv
+	; 15/09/2025
+	;mov	edi, SourceFile_Drv
 	call	parse_path_name
 	jc	short csftdf_parse_sf_path_failed
 
@@ -5854,10 +5866,21 @@ csftdf_parse_df_path:
 	pop	esi ; * (pushed edi)
 
 csftdf_sf_check_filename_exists:
-	cmp	byte [SourceFile_Name], 21h
+	;cmp	byte [SourceFile_Name], 21h
+	; 15/09/2025
+	cmp	byte [Path_FileName], 21h
 	jb	short csftdf_sf_file_not_found_error
 
-	mov	edi, DestinationFile_Drv
+	; 15/09/2025 - TRDOS 386 v2.0.10
+	; save source path
+	mov	edi, MvPathBuffer
+	mov	esi, Path_FileSystem
+	mov	ecx, Path_Size ; 388
+	rep	movsb
+	mov	esi, ebx
+
+	;mov	edi, DestinationFile_Drv
+	; 15/09/2025
 	call	parse_path_name
 	jnc	short csftdf_check_sf_cdrv
 
@@ -5886,7 +5909,10 @@ csftdf_check_sf_cdrv:
 
 	mov	[csftdf_cdrv], bh ; 23/03/2016
 
-	mov	dl, [SourceFile_Drv]
+	;mov	dl, [SourceFile_Drv]
+	; 15/09/2025
+	mov	dl, [MvPathBuffer+1] ; Path_Drv
+
 	cmp	dl, bh ; byte [Current_Drv]
 	je	short csftdf_sf_check_directory
 
@@ -5894,7 +5920,9 @@ csftdf_check_sf_cdrv:
 	jc	short csftdf_sf_error_retn
 
 csftdf_sf_check_directory:
-	mov	esi, SourceFile_Directory
+	;mov	esi, SourceFile_Directory
+	; 15/09/2025
+	mov	esi, MvPathBuffer+2 ; Path_Directory
 	cmp	byte [esi], 20h
 	jna	short csftdf_find_sf
 
@@ -5908,13 +5936,17 @@ csftdf_sf_change_directory:
 ;	call	change_prompt_dir_string
 
 csftdf_find_sf:
-	mov	esi, SourceFile_Name
+	;mov	esi, SourceFile_Name
+	; 15/09/2025
+	mov	esi, MvPathBuffer+258 ; Path_FileName
 	mov	ax, 1800h ; Except volume label and dirs
 	call	find_first_file
 	jc	short csftdf_sf_error_retn
 
 csftdf_sf_ambgfn_check:
-	and	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	;and	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	; 22/09/2025
+	and	dl, dl
 	jz	short csftdf_sf_found
 
 csftdf_ambiguous_file_name_error:
@@ -5942,7 +5974,9 @@ csftdf_sf_found:
 	retn
 
 csftdf_set_source_file_direntry:
-	mov	esi, FindFile_DirEntry
+	; 22/09/2025
+	;mov	esi, FindFile_DirEntry
+	; esi = FindFile_DirEntry
 	mov	edi, SourceFile_DirEntry
 	;mov	ecx, 8
 	; 29/07/2022
@@ -5969,12 +6003,17 @@ csftdf_sf_restore_cdir:
 	jc	short csftdf_df_error_retn
 
 csftdf_df_check_filename_exists:
-	cmp	byte [DestinationFile_Name], 20h
+	;cmp	byte [DestinationFile_Name], 20h
+	; 15/09/2025
+	cmp	byte [Path_FileName], 20h
 	ja	short csftdf_check_df_cdrv
 
 csftdf_copy_sf_name:
-	mov	edi, DestinationFile_Name
-	mov	esi, SourceFile_Name
+	;mov	edi, DestinationFile_Name
+	; 15/09/2025
+	mov	edi, Path_FileName
+	;mov	esi, SourceFile_Name
+	mov	esi, MvPathBuffer+258 ; Path_FileName
 	mov	cl, 12
 
 csftdf_df_copy_sf_name_loop:
@@ -5986,7 +6025,10 @@ csftdf_df_copy_sf_name_loop:
 	jnz	csftdf_df_copy_sf_name_loop
 
 csftdf_check_df_cdrv:
-	mov	dl, [DestinationFile_Drv]
+	;mov	dl, [DestinationFile_Drv]
+	; 15/09/2025
+	mov	dl, [Path_Drv]
+
 	cmp	dl, [Current_Drv]
 	je	short csftdf_df_check_directory
 
@@ -5997,7 +6039,9 @@ csftdf_df_error_retn:
 	retn
 
 csftdf_df_check_directory:
-	mov	esi, DestinationFile_Directory
+	;mov	esi, DestinationFile_Directory
+	; 15/09/2025
+	mov	esi, Path_Directory
         cmp     byte [esi], 20h
 	jna	short csftdf_find_df
 
@@ -6013,11 +6057,20 @@ csftdf_df_change_directory:
 csftdf_find_df:
 	; 23/03/2016
 	sub	ebx, ebx
-	mov	bh, [DestinationFile_Drv]
+	;mov	bh, [DestinationFile_Drv]
+	; 15/09/2025
+	mov	bh, [Path_Drv]
 	add	ebx, Logical_DOSDisks
 	mov	[csftdf_df_drv_dt], ebx
 
-	mov	esi, DestinationFile_Name
+	; 15/09/2025
+	;mov	esi, DestinationFile_Name
+	mov	esi, Path_FileName
+
+	; 15/09/2025
+	call	check_filename
+	jc	short csftdf_df_error_inv_fname
+
 	;xor	ax, ax
 	; 25/08/2024
 	xor	eax, eax
@@ -6025,8 +6078,18 @@ csftdf_find_df:
 	call	find_first_file
 	jc	short csftdf_df_check_error_code
 
+		; ESI = Directory Entry (FindFile_DirEntry) Location
+		; EDI = Directory Buffer Directory Entry Location
+		; EAX = File Size
+		;  BL = Attributes of The File/Directory
+		;  BH = Long Name Yes/No Status (>0 is YES)
+		; 22/09/2025
+		;  DL > 0 : Ambiguous filename chars are used
+
 csftdf_df_ambgfn_check:
-	or	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	;or	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	; 22/09/2025
+	or 	dl, dl
 	jnz	short csftdf_df_error_inv_fname
 
 csftdf_df_found:
@@ -6044,6 +6107,12 @@ csftdf_df_error_stc_retn:
 	stc
 	retn
 
+	; 15/09/2025
+csftdf_df_error_inv_fname: ; 'invalid file name !'
+	mov 	eax, ERR_INV_FILE_NAME  ; 26
+	;cf = 1
+	retn
+
 csftdf_df_check_error_code:
 	;cmp	eax, 2
 	cmp	al, 2
@@ -6051,10 +6120,19 @@ csftdf_df_check_error_code:
 
 	mov	byte [DestinationFileFound], 0
 
+; 15/09/2025
+%if 0
 	; 15/10/2016
-	mov	esi, FindFile_Name ; *
+	;mov	esi, FindFile_Name ; *
+	; 15/09/2025
+	mov	esi, Path_FileName
 	call	check_filename
 	jnc	short csftdf_df_valid_fname
+;%else
+	; 15/09/2025
+	jmp	short csftdf_df_valid_fname
+;%endif
+
 csftdf_df_error_inv_fname: ; 'invalid file name !'
 	;mov 	eax, ERR_INV_FILE_NAME  ; 26
 	; 29/07/2022
@@ -6064,14 +6142,21 @@ csftdf_df_error_inv_fname: ; 'invalid file name !'
 	retn
 
 csftdf_df_valid_fname:
+; 15/09/2025
+;%if 0
 	; 21/03/2016
 	; (Capitalized file name)
 	;mov	esi, FindFile_Name ; * ; 15/10/2016
-	mov	edi, DestinationFile_Name
+	; 15/09/2025
+	;mov	edi, DestinationFile_Name
+	mov	edi, Path_FileName
 	movsd
 	movsd
 	movsd
 	;movsb
+%else
+csftdf_df_valid_fname:
+%endif
 
 csftdf_check_disk_free_size_0:
 	mov	eax, [SourceFile_DirEntry+DirEntry_FileSize]
@@ -6079,7 +6164,7 @@ csftdf_check_disk_free_size_0:
 csftdf_check_disk_free_size_1:
 	;sub	ebx, ebx
 	;mov 	esi, Logical_DOSDisks
-	;mov	bh,  [DestinationFile_Drv]
+	;mov	bh, [DestinationFile_Drv]
 	;add	esi, ebx
 
 	mov	esi, [csftdf_df_drv_dt] ; 23/03/2016
@@ -6123,16 +6208,37 @@ csftdf_df_save_first_cluster:
 	; EAX = Old destination file size
 	; 24/03/2016
 	; EDI = Directory entry address (within Dir Buffer boundaries)
+
+; 22/09/2025
+%if 0
 	sub	edi, Directory_Buffer  ; (<65536)
 	;shr	di, 5 ; Convert entry offset to entry index/number
 	; 29/07/2022
 	shr	edi, 5
 	mov	[DestinationFile_DirEntryNumber], di ; (<2048)
+%else
+	; 22/09/2025 - TRDOS 386 v2.0.10
+	; save directory entry location
+	mov	ebx, [CurrentBuffer]  ; from 'GETBUFFER'
+	mov	cl, [ebx+BUFFINFO.buf_ID]
+	;mov	[mkdir_phydrv], cl
+	mov	[csftdf_phydrv], cl
+	lea	ecx, [edi-BUFINSIZ] ; buffer address - header size
+	sub	ecx, ebx ; - buffer header address = dir entry offset
+	;mov	[mkdir_entrypos], ecx ; offset in buffer
+	mov	[csftdf_entrypos], ecx
+	mov	ecx, [ebx+BUFFINFO.buf_sector]
+	;mov	[mkdir_dirsector], ecx
+	mov	[csftdf_dirsector], ecx
+%endif
 
 csftdf_df_check_sf_df_fcluster:
 	mov	dx, [esi+DirEntry_FstClusHI]
+	; 22/09/2025
+	;mov	dx, [FindFile_DirEntry+DirEntry_FstClusHI]
 	shl	edx, 16
 	mov	dx, [esi+DirEntry_FstClusLO]
+	;mov	dx, [FindFile_DirEntry+DirEntry_FstClusLO]
 	mov	[csftdf_df_cluster], edx
 csftdf_df_check_sf_df_fcluster_1:
 	mov	dx, [SourceFile_DirEntry+DirEntry_FstClusHI]
@@ -6141,8 +6247,11 @@ csftdf_df_check_sf_df_fcluster_1:
 	cmp	edx, [csftdf_df_cluster]
 	jne	short csftdf_df_check_sf_df_fcluster_ok
 csftdf_df_check_sf_df_drv:
-	mov	dl, [SourceFile_Drv]
-	cmp	dl, [DestinationFile_Drv]
+	;mov	dl, [SourceFile_Drv]
+	;cmp	dl, [DestinationFile_Drv]
+	; 15/09/2025
+	mov	dl, [MvPathBuffer+1] ; Path_Drv
+	cmp	dl, [Path_Drv]
 	jne	short csftdf_df_check_sf_df_fcluster_ok
 
 	; source and destination files are same !
@@ -6154,7 +6263,7 @@ csftdf_df_check_sf_df_drv:
 
 csftdf_df_check_sf_df_fcluster_ok:
 csftdf_df_move_findfile_struct:
-	; mov	esi, FindFile_DirEntry
+	;mov	esi, FindFile_DirEntry
 	mov	edi, DestinationFile_DirEntry
 	;mov	ecx, 8
 	xor	ecx, ecx
@@ -6243,10 +6352,100 @@ csftdf2_check_cdrv:
 csftdf2_df_check_found_or_not:
 	; 21/03/2016
 	cmp	byte [DestinationFileFound], 0
-	ja	short csftdf2_set_sf_percentage
+	;ja	short csftdf2_set_sf_percentage
+	; 23/09/2025
+	jna	csftdf2_create_file
 
+	; 23/09/2025
+	; release destination file clusters before copy
+	;;;;
+	mov	cl, [csftdf_phydrv]
+	mov	eax, [csftdf_dirsector]
+	call	GETBUFFER  ; Pre read
+	;jc	short csftdf2_rw_error
+	jnc	short csftdf2_df_release_cc_1
+csftdf2_df_release_err:
+	jmp	csftdf2_rw_error
+csftdf2_df_release_cc_1:
+	; edx = LDRVT address
+	mov	eax, [csftdf_df_cluster]
+	push	esi
+	call	RELEASE
+	pop	esi
+	jc	short csftdf2_df_release_err
+
+	; free sectors already adjusted in RELEASE
+
+	cmp	byte [edx+LD_FATType], 2
+	jna	short csftdf2_df_release_cc_2 ; not FAT32
+
+	; FAT32 fs
+	lea	ebx, [edx+LD_BPB+FAT32_FirstFreeClust]
+	jmp	short csftdf2_df_release_cc_3
+
+csftdf2_df_release_cc_2:
+	; FAT16 or FAT12 fs
+	lea	ebx, [edx+LD_BPB+FAT_FirstFreeClust]
+csftdf2_df_release_cc_3:
+	mov	eax, [csftdf_df_cluster]
+	cmp	eax, [ebx]
+	jnb	short csftdf2_df_release_cc_4
+	; replace first free cluster value
+	mov	[ebx], eax
+
+	; Note: Only the cluster number in the directory entry
+	;       is considered for first free cluster calculation
+	;	(This is not always true, but usually
+	;	the first cluster number is smaller number
+	;	then others in the cluster chain.
+	;	Free cluster search is started from the First Free
+	;	Cluster number but loops back if it is required.)
+
+csftdf2_df_release_cc_4:
+	lea	edi, [esi+BUFINSIZ]
+	add	edi, [csftdf_entrypos]
+	xor	eax, eax
+	mov	[edi+28], eax ; 0 ; zero size
+	mov	[edi+20], ax ; 0 ; DirEntry_FstClusHI
+	mov	[edi+26], ax ; 0 ; DirEntry_FstClusLO
+
+	call	convert_current_date_time
+
+	mov	[edi+18], dx ; LastAccDate, 18
+	mov	[edi+22], ax ; WrtTime, 22
+	mov	[edi+24], dx ; WrtDate, 24
+
+	or	byte [esi+BUFFINFO.buf_flags], buf_isDIR
+
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+	jnz	short csftdf2_df_release_cc_5
+	;call	INC_DIRTY_COUNT
+	inc	dword [DirtyBufferCount]
+	;or	byte [esi+9], 40h
+	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
+csftdf2_df_release_cc_5:
+	push	esi
+	mov	esi, edx
+	call	update_fat32_fsinfo
+	; ignore error
+	pop	esi
+	push	dword [esi+BUFFINFO.buf_ID]
+	call	BUFWRITE
+	; ignore error
+	pop	eax
+	; buffer marked as free
+	and	ah, ~buf_dirty
+	; set buffer as valid and clean
+	mov	dword [esi+BUFFINFO.buf_ID], eax
+
+	; jump to file write (copy) code
+	jmp	short csftdf2_set_sf_percentage
+	;;;;
+	
 csftdf2_create_file:
-	mov	esi, DestinationFile_Name
+	;mov	esi, DestinationFile_Name
+	; 23/09/2025
+	mov	esi, Path_FileName
 	mov	eax, [csftdf_filesize]
 	xor	cl, cl ; 0
 
@@ -6283,7 +6482,22 @@ csftdf2_create_file:
 	jmp	csftdf2_rw_error
 
 csftdf2_create_file_OK:
-
+; 23/09/2025
+%if 1
+	; 23/09/2025 - TRDOS 386 v2.0.10
+	;;;
+	;mov	al, [createfile_phydrv]
+	;mov	[csftdf_phydrv], al
+	; [csftdf_phydrv] = [createfile_phydrv]
+	; [csftdf_df_drv_dt] = [createfile_LDRVT]
+	;mov	eax, [createfile_dirsector]
+	;mov	[csftdf_dirsector], eax
+	; [csftdf_dirsector] = [createfile_dirsector]
+	;mov	eax, [createfile_entrypos]
+	;mov	[csftdf_entrypos], eax
+	; [csftdf_entrypos] = [createfile_entrypos]
+	;;;
+%else
 	mov	[csftdf_df_cluster], eax
 	; 27/08/2024
 	; eax = 0
@@ -6313,8 +6527,21 @@ csftdf2_create_file_OK:
 
 	;mov	cl, [esi] ; L.D.D.D.T.
 	;mov	[DestinationFile_Drv], cl
+%endif
+	; 23/09/2025
+	;;;
+	mov	esi, FindFile_DirEntry
+	mov	edi, DestinationFile_DirEntry
+	sub	ecx, ecx
+	mov	cl,8
+	rep	movsd
+	;mov	[csftdf_df_cluster], 0
+	;;;
 
 csftdf2_set_sf_percentage:
+; 23/09/2025
+; burada kaldým...
+
 	; 17/03/2016
 	xor	eax, eax
 	mov 	[csftdf_percentage], al ; 0, reset
@@ -6322,7 +6549,10 @@ csftdf2_set_sf_percentage:
 	mov	[csftdf_sf_rbytes], eax ; 0, reset
 	mov	[csftdf_df_wbytes], eax ; 0, reset
 
-	mov	ah, [SourceFile_Drv]
+	;mov	ah, [SourceFile_Drv]
+	; 23/09/2025
+	mov	ah, [MvPathBuffer+1] ; Path_Drv
+
 	mov	esi, Logical_DOSDisks
 	add	esi, eax
 

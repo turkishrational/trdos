@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 06/08/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 23/09/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -325,12 +325,15 @@ mkdir_add_new_cluster:	resb 1
 mkdir_Name:		resb 13
 			resw 1 ; 01/03/2016
 ; 14/07/2025 - TRDOS 386 v2.0.10
+csftdf_phydrv:
 createfile_phydrv:	; 06/08/2025
 mkdir_phydrv:		resb 1
+csftdf_dirsector:	; 23/09/2025
 createfile_dirsector:
 mkdir_dirsector:	resd 1
 createfile_datetime:
 mkdir_datetime:		resd 1
+csftdf_entrypos:	; 23/09/2025
 createfile_entrypos:
 mkdir_entrypos:		resd 1
 ; 06/08/2025

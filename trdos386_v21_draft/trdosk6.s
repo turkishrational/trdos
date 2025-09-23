@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 06/08/2025  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 22/09/2025  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -17206,6 +17206,7 @@ sysfpstat_err:
 	jmp 	error
 
 sysdelete: ; Delete (Remove, Unlink) File
+	; 22/09/2025
 	; 29/12/2017 (TRDOS 386 = TRDOS v2.0)
 	;
         ; INPUT ->
@@ -17250,7 +17251,9 @@ sysdelete_2:
         mov	eax, ERR_FILE_ACCESS ; 11 = 'permission denied !'
         jmp	short sysdelete_err
 sysdelete_3:
-	and	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	;and	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	; 22/09/2025
+	and	dl, dl
 	jz	short sysdelete_4
 	mov	eax, ERR_INV_FILE_NAME ; 26 = 'invalid file name !'
         jmp	short sysdelete_err
@@ -17269,6 +17272,7 @@ sysrmdir_5:
 	jmp	sysret
 
 sysrmdir: ; Remove (Unlink) Directory
+	; 22/09/2025
 	; 17/07/2025 - TRDOS 386 v2.0.10
 	; 23/07/2022 - TRDOS 386 v2.0.5
 	; 19/01/2021
@@ -17350,7 +17354,9 @@ sysrmdir_2:
         mov	eax, ERR_DIR_ACCESS ; 11 = 'permission denied !'
         jmp	short sysrmdir_err
 sysrmdir_3:
-	and	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	;and	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	; 22/09/2025
+	and	dl, dl
 	jz	short sysrmdir_4
 	;mov	eax, ERR_NOT_DIR ; 'not a valid directory !'
 	mov	eax, ERR_INV_PATH_NAME ; 'bad path name !'
@@ -17458,6 +17464,7 @@ syschdir_ok:
 	jmp	sysret
 
 syschmod: ; Get & Change File (or Directory) Attributes
+	; 22/09/2025
 	; 26/09/2024 - TRDOS 386 v2.0.9
 	; 23/07/2022 - TRDOS 386 v2.0.5
 	; 19/01/2021
@@ -17564,7 +17571,9 @@ syschmod_1:
 	;jmp	short syschmod_err
 
 syschmod_2:
-	and	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	;and	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	; 22/09/2025
+	and	dl, dl
 	jz	short syschmod_3
 	mov	eax, ERR_INV_FILE_NAME ; 'invalid file name !'
         ;jmp	short syschmod_err
@@ -17996,6 +18005,7 @@ sysstime_7:
 	jmp	sysstime_3
 
 sysrename: ; Rename File (or Directory)
+	; 22/09/2025
 	; 08/08/2022
 	; 23/07/2022 - TRDOS 386 v2.0.5
 	; 19/01/2021
@@ -18073,7 +18083,9 @@ sysrename_2:
 	;  BH = Long Name Yes/No Status (>0 is YES)
 	;  DX > 0 : Ambiguous filename chars are used
 
-	and	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	;and	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	; 22/09/2025
+	and	dl, dl
 	jz	short sysrename_3
 	mov	eax, ERR_INV_FILE_NAME ; 'invalid file name !'
 	;jmp	short sysrename_err

@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 09/09/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 22/09/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -4467,6 +4467,7 @@ y_n_answer:
 	retn
 
 delete_directory:
+	; 22/09/2025
 	; 17/07/2025
 	; 16/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -4566,7 +4567,9 @@ loc_rmdir_chdrv_failed:
 	jmp	loc_file_rw_cmd_failed
 
 loc_rmdir_ambgfn_check:
-	and	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	;and	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	; 22/09/2025
+	and	dl, dl
 	jz	short loc_rmdir_directory_found
 
 loc_rmdir_directory_not_found:
@@ -5225,6 +5228,7 @@ rmdir_fde:
 %endif
 
 delete_file:
+	; 22/09/2025
 	; 21/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 29/02/2016
@@ -5335,7 +5339,9 @@ loc_delfile_find:
 	jc	short loc_delfile_fff_failed
 
 loc_delfile_ambgfn_check:
-	and	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	;and	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	; 22/09/2025
+	and	dl, dl
 	jz	short loc_delfile_found
 
 loc_file_not_found:
@@ -5437,6 +5443,7 @@ loc_delfile_y_n_escape:
 	jmp	short loc_do_not_delete_file
 
 set_file_attributes:
+	; 22/09/2025
 	; 23/07/2025 (TRDOS 386 v2.0.10)
 	; 26/09/2024 (TRDOS 386 v2.0.9)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -5680,7 +5687,9 @@ loc_sfa_4:
 	jmp	loc_file_rw_cmd_failed
 
 loc_attr_file_ambgfn_check:
-	or	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	;or	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	; 22/09/2025
+	or	dl, dl
 	;	(Note: It was BX in TRDOS v1)
 	;;jz	short loc_attr_file_found
 	;jnz	loc_file_not_found ; 06/03/2016
@@ -5791,6 +5800,7 @@ loc_print_attr_changed_message:
 	jmp	loc_show_attributes_no_nextline
 
 rename_file:
+	; 22/09/2025
 	; 26/07/2025
 	; 23/07/2022 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -5920,7 +5930,9 @@ loc_rename_fff_failed:
 	jmp	loc_file_rw_cmd_failed
 
 loc_rename_sf_ambgfn_check:
-	and	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	;and	dx, dx ; Ambiguous filename chars used sign (DX>0)
+	; 22/09/2025
+	and	dl, dl
 	;	(Note: It was BX in TRDOS v1)
 	;;jz	short loc_rename_sf_found
 	;jnz	loc_file_not_found
@@ -6408,6 +6420,7 @@ loc_move_y_n_escape:
 	jmp	short loc_do_not_move_file
 
 copy_file:
+	; 14/09/2025 - TRDOS 386 Kernel v2.0.10
 	; 31/08/2024 - TRDOS 386 v2.0.9
 	; 25/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 15/10/2016
@@ -6481,7 +6494,7 @@ loc_copy_cmd_failed_3:	; 25/07/2022
 	jmp	loc_run_cmd_failed
 
 loc_copy_cmd_failed_2:
-	cmp	al, 27h ; Insufficient disk space 
+	cmp	al, 27h ; Insufficient disk space
 	je	short loc_file_write_insuff_disk_space_msg
 
 	; 29/12/2017
@@ -6496,7 +6509,7 @@ loc_copy_cmd_failed_2:
 loc_file_write_insuff_disk_space_msg:
 	mov	esi, msg_insufficient_disk_space
 	call	print_msg
-        jmp     loc_file_rw_restore_retn 
+        jmp     loc_file_rw_restore_retn
 
 copy_source_file_to_destination_question:
 	push	edi ; *
@@ -6509,7 +6522,9 @@ copy_source_file_to_destination_question:
 loc_copy_ask_for_owr_yes_no:
 	mov	esi, Msg_DoYouWantOverWriteFile
 	call	print_msg
-	mov	esi, DestinationFile_Name
+	;mov	esi, DestinationFile_Name
+	; 14/09/2025
+	mov	esi, Path_FileName
 	call	print_msg
 	mov	esi, Msg_YesNo
 	call	print_msg
@@ -6544,30 +6559,42 @@ loc_copy_y_n_escape:
 	jmp	short loc_do_not_copy_file_j
 
 copy_source_file_to_destination_pass_owrq:
-	mov     al, [SourceFile_Drv]
+        ;mov	al, [SourceFile_Drv]
+	; 14/09/2025
+	mov	al, [MvPathBuffer+1] ; Path_Drv
 	add	al, 'A'
 	mov	[msg_source_file_drv], al
-        mov     al, [DestinationFile_Drv]
+        ;mov	al, [DestinationFile_Drv]
+	; 14/09/2025
+	mov	al, [Path_Drv]
 	add	al, 'A'
 	mov	[msg_destination_file_drv], al
 
 	mov	esi, msg_source_file
 	call	print_msg
-	mov	esi, SourceFile_Directory
+	;mov	esi, SourceFile_Directory
+	; 14/09/2025
+	mov	esi, MvPathBuffer+2 ; Path_Directory
 	cmp	byte [esi], 20h
 	jna	short csftdfq_sfn
 	call	print_msg
 csftdfq_sfn:
-	mov	esi, SourceFile_Name
+	;mov	esi, SourceFile_Name
+	; 14/09/2025
+	mov	esi, MvPathBuffer+258 ; Path_FileName
 	call	print_msg
 	mov	esi, msg_destination_file
 	call	print_msg
-	mov	esi, DestinationFile_Directory
+	;mov	esi, DestinationFile_Directory
+	; 14/09/2025
+	mov	esi, Path_Directory
 	cmp	byte [esi], 20h
 	jna	short csftdfq_dfn
 	call	print_msg
 csftdfq_dfn:
-	mov	esi, DestinationFile_Name
+	;mov	esi, DestinationFile_Name
+	; 14/09/2025
+	mov	esi, Path_FileName
 	call	print_msg
 	mov	esi, msg_copy_nextline
 	call	print_msg

@@ -308,7 +308,7 @@ struc BUFFINFO
 .buf_reserved:	resb 1		; make DWORD boundary for 386 (must be 0)
 .buf_sector:	resd 1		; Sector number of buffer (flags bit 7 = 0)
 ; The next two items are often refed as a word (flags bit 7 = 0)
-	; For FAT sectors, # times sector written out
+; For FAT sectors, # times sector written out
 .buf_wrtcntinc:	resd 1		; # sectors between each write
 .buf_DPB:	resd 1		; Pointer to drive parameters
 .size:	; 24 bytes
