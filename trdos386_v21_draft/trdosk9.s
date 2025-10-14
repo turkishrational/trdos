@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - INITIALIZED DATA : trdosk9.s
 ; ----------------------------------------------------------------------------
-; Last Update: 23/09/2025 (Previous: 29/12/2024 - Kernel v2.0.9)
+; Last Update: 14/10/2025 (Previous: 29/12/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -34,7 +34,7 @@ Magic_Bytes:
 		db 1
 mainprog_Version:
 		db 7
-		db "[TRDOS] Main Program v2.1.0 (23/09/2025)"
+		db "[TRDOS] Main Program v2.1.0 (14/10/2025)"
 		db 0Dh, 0Ah
 		db "(c) Erdogan Tan 2005-2025"
 		db 0Dh, 0Ah, 0
@@ -458,10 +458,13 @@ Msg_read_file_error_before_EOF:
 
 ; 18/03/2016
 ; TRDOS 386 (v2.0) mainprog copy procedure
-msg_reading:
-		db "Reading... ", 0
-msg_writing:
-		db "Writing... ", 0
+;msg_reading:
+;		db "Reading... ", 0
+;msg_writing:
+;		db "Writing... ", 0
+; 11/10/2025 - TRDOS 386 v2.0.10 (v2.1)
+msg_copying:	db "Copying... ", 0
+
 percentagestr:
 		db "   %", 0  ; "  0%" .. "100%"
 ; 11/04/2016

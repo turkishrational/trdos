@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 23/09/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 14/10/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -495,6 +495,13 @@ mem_max_aperture: resd 1 ; maximum value of contiguous free pages
 mem_pg_pos:	resd 1 ; mem. position (page #) of current aperture
 mem_max_pg_pos: resd 1 ; mem. position (page #) of max. aperture
 
+; 14/10/2025 - TRDOS 386 v2.0.10
+MainProgCfg_mem_addr:  resd 1
+MainProgCfg_mem_bsize: resd 1
+MainProgCfg_r_size:    resd 1
+MainProgCfg_rbytes:    resd 1		
+
+
 ; 15/03/2016
 ; FILE.ASM ('copy_source_file_to_destination_file')
 copy_cmd_phase:       resb 1
@@ -502,18 +509,24 @@ csftdf_rw_err:	      resb 1
 DestinationFileFound: resb 1
 csftdf_cdrv: 	      resb 1
 csftdf_filesize:      resd 1
+; 11/10/2025
 ; TRDOS386 (TRDOS v2.0)
-csftdf_sf_mem_addr:   resd 1
-csftdf_sf_mem_bsize:  resd 1
+;csftdf_sf_mem_addr:  resd 1
+;csftdf_sf_mem_bsize: resd 1
+; 11/10/2025 - TRDOS 3286 v2.0.10
+csftdf_sf_fcluster:   resd 1
+csftdf_df_fcluster:   resd 1
 ;
-
+MainProgCfg_cluster: ; 14/10/2025 (TRDOS 386 v2.0.10)	
 csftdf_sf_cluster:    resd 1 ; 16/03/2016
 csftdf_df_cluster:    resd 1
 ; 16/03/2016
-csftdf_r_size:        resd 1
-csftdf_w_size:        resd 1
-csftdf_sf_rbytes:     resd 1
-csftdf_df_wbytes:     resd 1
+;csftdf_r_size:       resd 1
+;csftdf_w_size:       resd 1
+;csftdf_sf_rbytes:    resd 1
+;csftdf_df_wbytes:    resd 1
+; 11/10/2025 - TRDOS 3286 v2.0.10
+csftdf_transfercount: resd 1	
 csftdf_percentage:    resb 1
 ; 17/03/2016
 csftdf_videopage:     resb 1
@@ -524,6 +537,11 @@ csftdf_df_drv_dt:     resd 1
 ; 29/08/2024
 ;csftdf_df_dclust:    resd 1
 ;csftdf_df_dindex:    resd 1
+; 11/10/2025
+csftdf_sf_spc:	      resb 1
+csftdf_sf_cs:	      resb 1
+csftdf_df_spc:	      resb 1
+csftdf_df_cs:	      resb 1
 
 ; 21/03/2016
 ; 20/03/2016

@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 22/09/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 14/10/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -7654,6 +7654,7 @@ set_env_change_variable_calc21:
         jmp     set_env_string_allocate_envb_retn ; OK !
 
 mainprog_startup_configuration:
+	; 14/10/2025 - TRDOS 386 Kernel v2.0.10
 	; 25/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 22/11/2017
 	; 06/05/2016
@@ -7678,7 +7679,9 @@ loc_start_mainprog_configuration:
 	mov	dx, [esi+DirEntry_FstClusHI]
 	shl	edx, 16
 	mov	dx, [esi+DirEntry_FstClusLO]
-	mov	[csftdf_sf_cluster], edx
+	;mov	[csftdf_sf_cluster], edx
+	; 14/10/2025
+	mov	[MainProgCfg_cluster], edx
 
 	mov	ecx, eax
 	sub	eax, eax
@@ -7692,22 +7695,30 @@ loc_start_mainprog_configuration:
 	call	allocate_memory_block
 	jc	short loc_load_mainprog_cfg_exit
 
-	mov	[csftdf_sf_mem_addr], eax ; loading address
-	mov	[csftdf_sf_mem_bsize], ecx ; block size
+	;mov	[csftdf_sf_mem_addr], eax ; loading address
+	;mov	[csftdf_sf_mem_bsize], ecx ; block size
+	; 14/10/2025 (TRDOS 386 v2.0.10)
+	mov	[MainProgCfg_mem_addr], eax ; loading address
+	mov	[MainProgCfg_mem_bsize], ecx ; block size
 
 	xor	ebx, ebx
-	;mov	[csftdf_sf_rbytes], ebx ; 0, reset
+	;;mov	[csftdf_sf_rbytes], ebx ; 0, reset
+	; 14/10/2025
+	;mov	[MainProgCfg_rbytes], ebx ; 0, reset
 
 	mov	bh, [Current_Drv] ; [FindFile_Drv]
 	mov	esi, Logical_DOSDisks
 	add	esi, ebx
 
-	mov	ebx, [csftdf_sf_mem_addr] ; memory block address
+	;mov	ebx, [csftdf_sf_mem_addr] ; memory block address
+	; 14/10/2025
 
 	cmp	byte [esi+LD_FATType], 0
         ja	short loc_mcfg_load_fat_file
 
-	mov	dword [csftdf_r_size], 65536
+	;mov	dword [csftdf_r_size], 65536
+	; 14/10/2025
+	mov	dword [MainProgCfg_r_size], 65536
         jmp     loc_mcfg_load_fs_file
 
 loc_load_mainprog_cfg_exit:
@@ -7717,7 +7728,9 @@ loc_mcfg_load_fat_file:
 	movzx	eax, word [esi+LD_BPB+BytesPerSec]
 	movzx	ecx, byte [esi+LD_BPB+SecPerClust]
 	mul	ecx
-	mov	[csftdf_r_size], eax
+	;mov	[csftdf_r_size], eax
+	; 14/10/2025
+	mov	[MainProgCfg_r_size], eax
 
 loc_mcfg_load_fat_file_next:
 	call	mcfg_read_fat_file_sectors
@@ -7730,7 +7743,9 @@ loc_mcfg_load_fat_file_ok:
 	; 06/05/2016
 	mov	dword [mainprog_return_addr], loc_mcfg_ci_return_addr
 	;
-	mov	esi, [csftdf_sf_mem_addr]
+	;mov	esi, [csftdf_sf_mem_addr]
+	; 14/10/2025
+	mov	esi, [MainProgCfg_mem_addr]
 	mov	[MainProgCfg_LineOffset], esi
 
 	mov	eax, [MainProgCfg_FileSize]
@@ -7782,8 +7797,12 @@ loc_move_mainprog_cfg_nl2:
 
 	; 25/07/2022
 mcfg_deallocate_mem:
-	mov	eax, [csftdf_sf_mem_addr] ; start address
-	mov	ecx, [csftdf_sf_mem_bsize] ; block size
+	;mov	eax, [csftdf_sf_mem_addr] ; start address
+	;mov	ecx, [csftdf_sf_mem_bsize] ; block size
+	; 14/10/2025
+	mov	eax, [MainProgCfg_mem_addr] ; start address
+	mov	ecx, [MainProgCfg_mem_bsize] ; block size	
+
 	;call	deallocate_memory_block
 	;retn
 	jmp	deallocate_memory_block
@@ -7864,7 +7883,9 @@ loc_mcfg_ci_return_addr:
 	mov	edx, eax
 	mov	esi, [MainProgCfg_LineOffset]
 	add	edx, esi
-	add	eax, [csftdf_sf_mem_addr]
+	;add	eax, [csftdf_sf_mem_addr]
+	; 14/10/2025
+	add	eax, [MainProgCfg_mem_addr]
 	sub	eax, esi
         ja      loc_mcfg_process_next_line_check
 
@@ -7893,20 +7914,29 @@ mcfg_read_fat_file_sectors:
 
 mcfg_read_fat_file_secs_0:
 	mov	edx, [MainProgCfg_FileSize]
-	sub	edx, [csftdf_sf_rbytes]
-	cmp	edx, [csftdf_r_size]
+	;sub	edx, [csftdf_sf_rbytes]
+	; 14/10/2025
+	sub	edx, [MainProgCfg_rbytes]
+	;cmp	edx, [csftdf_r_size]
+	cmp	edx, [MainProgCfg_r_size]
 	jnb	short mcfg_read_fat_file_secs_1
-	mov	[csftdf_r_size], edx
+	;mov	[csftdf_r_size], edx
+	; 14/10/2025
+	mov	[MainProgCfg_r_size], edx
 
 mcfg_read_fat_file_secs_1:
-	mov	eax, [csftdf_r_size]
+	;mov	eax, [csftdf_r_size]
+	; 14/10/2025
+	mov	eax, [MainProgCfg_r_size]
 	sub	edx, edx
 	movzx	ecx, word [esi+LD_BPB+BytesPerSec]
 	add	eax, ecx
 	dec	eax
 	div	ecx
 	mov	ecx, eax ; sector count
-	mov	eax, [csftdf_sf_cluster]
+	;mov	eax, [csftdf_sf_cluster]
+	; 14/10/2025
+	mov	eax, [MainProgCfg_cluster]
 
 	; EBX = memory block address (current)
 
@@ -7915,16 +7945,23 @@ mcfg_read_fat_file_secs_1:
 
 	; EBX = next memory address
 
-	mov	eax, [csftdf_sf_rbytes]
-	add	eax, [csftdf_r_size]
+	;mov	eax, [csftdf_sf_rbytes]
+	; 14/10/2025
+	mov	eax, [MainProgCfg_rbytes]
+	;add	eax, [csftdf_r_size]
+	add	eax, [MainProgCfg_r_size]
 	mov	edx, [MainProgCfg_FileSize]
 	cmp	eax, edx
 	jnb	short mcfg_read_fat_file_secs_3 ; edx > 0
-	mov	[csftdf_sf_rbytes], eax
+	;mov	[csftdf_sf_rbytes], eax
+	; 14/10/2025
+	mov	[MainProgCfg_rbytes], eax
 
 	push	ebx ; *
 	; get next cluster (csftdf_r_size! bytes)
-	mov	eax, [csftdf_sf_cluster]
+	;mov	eax, [csftdf_sf_cluster]
+	; 14/10/2025
+	mov	eax, [MainProgCfg_cluster]
 	call	get_next_cluster
 	pop	ebx ; *
 	jnc	short mcfg_read_fat_file_secs_2
@@ -7934,7 +7971,9 @@ mcfg_read_fat_file_secs_1:
 
 mcfg_read_fat_file_secs_2:
 	sub	edx, edx ; 0
-	mov	[csftdf_sf_cluster], eax ; next cluster
+	;mov	[csftdf_sf_cluster], eax ; next cluster
+	; 14/10/2025
+	mov	[MainProgCfg_cluster], eax
 
 ; 25/07/2022 - TRDOS 386 Kernel v2.0.5
 
