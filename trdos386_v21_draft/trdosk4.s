@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 14/10/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 17/10/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -5775,6 +5775,7 @@ msftdf_retn:
 	retn
 
 copy_source_file_to_destination_file:
+	; 17/10/2025
 	; 14/10/2025
 	; 13/10/2025
 	; 12/10/2025
@@ -6450,18 +6451,19 @@ csftdf2_create_file:
 	;mov	esi, DestinationFile_Name
 	; 23/09/2025
 	mov	esi, Path_FileName
-	mov	eax, [csftdf_filesize]
+	; 17/10/2025
+	;mov	eax, [csftdf_filesize]
 	xor	cl, cl ; 0
 
-	xor	ebx, ebx ; 0
-	dec	ebx ; 0FFFFFFFFh 
+	;xor	ebx, ebx ; 0
+	;dec	ebx ; 0FFFFFFFFh
 
 	; INPUT ->
-	; 	EAX -> File Size
+	;;; 	EAX -> File Size
 	; 	ESI = ASCIIZ File name
 	;	 CL = File attributes
-	;	EBX = FFFFFFFFh -> empty file sign for FAT fs
-	;	EBX <> FFFFFFFFh -> use file size for FAT fs 
+	;;;	EBX = FFFFFFFFh -> empty file sign for FAT fs
+	;;;	EBX <> FFFFFFFFh -> use file size for FAT fs
 	;
 	; OUTPUT ->
 	;	EAX = New file's first cluster
@@ -7748,12 +7750,78 @@ csftdf2_write_df_clust_@@:
 %else
 	; 14/10/2025 - TRDOS 386 v2.0.10
 csftdf2_save_file:
-	; burada kaldým...
-	; first free cluster deðiþikliði
-	; first cluster'ýn (ve clusterchain'in) dir entry'e iþlenmesi
-	; (dir entrry date&time update)
-	; update parent directory lmdt
-	retn
+	; 17/10/2025
+	mov	eax, [createfile_dirsector]
+	mov	cl, [createfile_phydrv]
+	call	GETBUFFER  ; Pre read
+	jc	short csftdf2_write_error
+
+	; set destination file (final) parameters
+
+	; ... file size and date&time (except last access date)
+	; will be set to same values of the source file ...
+
+
+	lea	edi, [esi+BUFINSIZ]
+	add	edi, [createfile_entrypos]
+
+	mov	ebx, SourceFile_DirEntry
+
+	mov	al, [ebx+DirEntry_Attr] ; dir_entry.dir_attr
+ 	or	al, attr_archive
+
+	push	esi
+
+	mov	esi, DestinationFile_DirEntry
+	mov	[esi+DirEntry_Attr], al	
+	mov	al, [ebx+DirEntry_CrtTimeTenth]
+	mov	[esi+DirEntry_CrtTimeTenth], al
+	mov	eax, [ebx+DirEntry_CrtTime]
+			; and DirEntry_CrtDate (hw)
+	mov	[esi+DirEntry_CrtTime], eax
+	mov	eax, [ebx+DirEntry_WrtTime]
+			; and DirEntry_WrtDate (hw)
+	mov	[esi+DirEntry_WrtTime], eax
+
+	mov	eax, [csftdf_df_fcluster]
+	mov	[esi+DirEntry_FstClusLO], ax
+	shr	eax, 16
+	mov	[esi+DirEntry_FstClusHI], ax
+	;mov	eax, [ebx+DirEntry_FileSize]
+	mov	eax, [csftdf_filesize]
+	mov	[esi+DirEntry_FileSize], eax
+
+	; copy/move directory entry to it's place
+	mov	ecx, 32/8 ; directory entry size
+	rep	movsd
+
+	pop	esi
+
+	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
+	jnz	short csftdf2_save_file_@
+	;call	INC_DIRTY_COUNT
+	inc	dword [DirtyBufferCount]
+	;or	byte [esi+9], 40h
+	or	byte [esi+BUFFINFO.buf_flags], buf_dirty
+csftdf2_save_file_@:
+	call	BUFWRITE
+	jc	short csftdf2_write_error
+	
+	mov	esi, edx ; LDRVT address
+
+	; update LMDT of the parent directory
+	mov 	byte [LMDT_Flag], 1
+	;call	update_parent_dir_lmdt
+	;retn
+	jmp	update_parent_dir_lmdt
+
+	; 17/10/2025
+csftdf2_write_error:
+	; 18/03/2016
+	;mov	al, 1Dh ; write error
+	; 31/08/2024
+	mov	al, ERR_DRV_WRITE ; 18 ; write error
+	jmp	csftdf2_rw_error	
 %endif
 
 
