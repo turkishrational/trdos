@@ -5869,13 +5869,18 @@ csftdf_parse_sf_path:
 	jc	short csftdf_parse_sf_path_failed
 
 csftdf_parse_df_path:
-	pop	esi ; * (pushed edi)
+	;pop	esi ; * (pushed edi)
+	; 18/10/2025
+	pop	ebx ; * (pushed edi) 
 
 csftdf_sf_check_filename_exists:
 	;cmp	byte [SourceFile_Name], 21h
 	; 15/09/2025
 	cmp	byte [Path_FileName], 21h
 	jb	short csftdf_sf_file_not_found_error
+
+	; 18/10/2025
+	;mov	ebx, esi
 
 	; 15/09/2025 - TRDOS 386 v2.0.10
 	; save source path
