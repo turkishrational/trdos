@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 14/10/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 18/10/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -340,12 +340,15 @@ mkdir_entrypos:		resd 1
 createfile_pd_new_cluster:
 mkdir_pd_new_cluster:	resd 1
 
-; 27/02/2016
-RmDir_MultiClusters:	resb 1
-RmDir_DirEntryOffset:	resd 1 ; 01/03/2016 (word -> dword)
-RmDir_ParentDirCluster: resd 1
-RmDir_DirLastCluster:   resd 1
-RmDir_PreviousCluster:  resd 1
+; 18/10/2025 (TRDOS 386 v2.0.10)
+;
+;; 27/02/2016
+;RmDir_MultiClusters:	resb 1
+;RmDir_DirEntryOffset:	resd 1 ; 01/03/2016 (word -> dword)
+;RmDir_ParentDirCluster: resd 1
+;RmDir_DirLastCluster:   resd 1
+;RmDir_PreviousCluster:  resd 1
+;
 
 delfile_dir_fcluster:	; 21/07/2025
 ; 17/07/2025
@@ -355,6 +358,7 @@ rmdir_drv:		resb 1
 
 ; 16/07/2025
 LMDT_Flag:	resb 1  ; Last Modification Date & Time update flag
+
 ; 22/02/2016
 UPDLMDT_CDirLevel:	resb 1
 UPDLMDT_CDirFCluster:	resd 1
@@ -363,13 +367,14 @@ alignb 4
 ; DRV_FAT.ASM ; 21/08/2011
 gffc_next_free_cluster:  resd 1
 ; 12/07/2025
-FCS_START:	
+FCS_START:
 gffc_first_free_cluster: resd 1
 FCS_END:
 gffc_last_free_cluster:  resd 1
 
-; 29/04/2016
-Cluster_Index: ; resd 1
+; 18/10/2025 (TRDOS 386 v2.0.10)
+;; 29/04/2016
+;Cluster_Index: ; resd 1
 ; 22/02/2016
 ClusterValue:	resd 1
 
@@ -391,17 +396,20 @@ glc_prevcluster: resd 1 ; DRV_FAT.ASM (21/08/2011)
 ; 22/10/2016
 glc_index:	 resd 1 ; Last Cluster Index (22/10/2016)
 
+; 18/10/2025 (TRDOS 386 v2.0.10)
+;
 ; DIR.ASM
-DLN_EntryNumber: resw 1
-DLN_40h:	 resb 1
+;DLN_EntryNumber: resw 1
+;DLN_40h:	 resb 1
 ; 28/02/2016
-TCC_FATErr:	 resb 1 ; DRV_FAT.ASM
+;TCC_FATErr:	 resb 1 ; DRV_FAT.ASM
 
 alignb 4
 ; DIR.ASM (09/10/2011)
 LCDE_EntryIndex: resw 1 ; LCDE_EntryOffset
 LCDE_ClusterSN:  resw 1
 LCDE_Cluster: 	 resd 1
+
 LCDE_ByteOffset: resd 1
 
 ;alignb4
@@ -416,21 +424,22 @@ DestinationFilePath: resd 1
 ; FILE.ASM (09/10/2011)
 ;Source File Structure (same with 'Find File' Structure)
 SourceFile_Drv:		  resb 1
-SourceFile_Directory:	  resb 104 ; 7*13 + 12 + zero
+; 18/10/2025
+;SourceFile_Directory:	  resb 104 ; 7*13 + 12 + zero
 SourceFile_Name:	  resb 13
-SourceFile_AttributesMask: resw 1
+;SourceFile_AttributesMask: resw 1
 SourceFile_DirEntry:	  resb 32
 SourceFile_DirFirstCluster: resd 1
-SourceFile_DirCluster:	  resd 1
-SourceFile_DirSector:	  resd 1
+;SourceFile_DirCluster:	  resd 1
+;SourceFile_DirSector:	  resd 1
 SourceFile_DirEntryNumber: resb 1
-SourceFile_DirSectorCount: resb 1
-SourceFile_MatchCounter:  resw 1
-;SourceFile_Reserved1:	  resw 1
+;SourceFile_DirSectorCount: resb 1
+;SourceFile_MatchCounter:  resw 1
+;;SourceFile_Reserved1:	  resw 1
 SourceFile_LastEntryNumber: resw 1
 SourceFile_LongNameEntryLength:
 SourceFile_LongNameYes:	  resb 1 ; Sign for longname procedures
-SourceFile_DirEntryName:  resb 13
+;SourceFile_DirEntryName:  resb 13
 ; 184 bytes
 ;SourceFile_LongName:	  resb 129 ; ASCIIZ (max. 128+NUL)
 ; 01/07/2025
@@ -445,19 +454,20 @@ SourceFile_DirEntryName:  resb 13
 DestinationFile_Drv:		resb 1
 DestinationFile_Directory:	resb 104 ; 7*13 + 12 + zero
 DestinationFile_Name:		resb 13
-DestinationFile_AttributesMask:	resw 1
+; 18/10/2025
+;DestinationFile_AttributesMask: resw 1
 DestinationFile_DirEntry:	resb 32
-DestinationFile_DirFirstCluster: resd 1
-DestinationFile_DirCluster:	resd 1
-DestinationFile_DirSector:	resd 1
-DestinationFile_DirEntryNumber:	resb 1
-DestinationFile_DirSectorCount:	resb 1
-DestinationFile_MatchCounter:	resw 1
-;DestinationFile_Reserved1:	resw 1
-DestinationFile_LastEntryNumber: resw 1
-DestinationFile_LongNameEntryLength:
-DestinationFile_LongNameYes:	resb 1 ; Sign for longname procedures
-DestinationFile_DirEntryName:	resb 13
+;DestinationFile_DirFirstCluster: resd 1
+;DestinationFile_DirCluster:	resd 1
+;DestinationFile_DirSector:	resd 1
+;DestinationFile_DirEntryNumber: resb 1
+;DestinationFile_DirSectorCount: resb 1
+;DestinationFile_MatchCounter:	resw 1
+;;DestinationFile_Reserved1:	resw 1
+;DestinationFile_LastEntryNumber: resw 1
+;DestinationFile_LongNameEntryLength:
+;DestinationFile_LongNameYes:	resb 1 ; Sign for longname procedures
+;DestinationFile_DirEntryName:	resb 13
 ; 184 bytes
 ;DestinationFile_LongName:	resb 129 ; ASCIIZ (max. 128+NUL)
 ; 01/07/2025
@@ -469,13 +479,13 @@ DestinationFile_DirEntryName:	resb 13
 
 ; 25/07/2025
 SourceFile_SecPerClust: resb 1
-DestinationFile_SecPerClust: resb 1 
+DestinationFile_SecPerClust: resb 1
 
 ; 10/03/2016
 ; FILE.ASM
 move_cmd_phase:	   resb 1
 msftdf_sf_df_drv:  resb 1
-createfile_LDRVT: ; 05/08/2025		
+createfile_LDRVT: ; 05/08/2025
 msftdf_drv_offset: resd 1
 
 ; 11/03/2016
@@ -499,7 +509,7 @@ mem_max_pg_pos: resd 1 ; mem. position (page #) of max. aperture
 MainProgCfg_mem_addr:  resd 1
 MainProgCfg_mem_bsize: resd 1
 MainProgCfg_r_size:    resd 1
-MainProgCfg_rbytes:    resd 1		
+MainProgCfg_rbytes:    resd 1
 
 
 ; 15/03/2016
@@ -543,6 +553,8 @@ csftdf_sf_cs:	      resb 1
 csftdf_df_spc:	      resb 1
 csftdf_df_cs:	      resb 1
 
+; 18/10/2025 - TRDOS 386 v2.0.10
+
 ; 21/03/2016
 ; 20/03/2016
 ; FILE.ASM
@@ -552,8 +564,9 @@ createfile_FreeSectors:  resd 1
 ;createfile_size:	 resd 1
 createfile_FFCluster:    resd 1 ; 11/03/2016
 createfile_LastDirCluster: resd 1
-createfile_Cluster:      resd 1
-createfile_PCluster:     resd 1
+; 18/10/2025
+;createfile_Cluster:     resd 1
+;createfile_PCluster:    resd 1
 createfile_attrib:	 resb 1
 createfile_SecPerClust:  resb 1
 ; 06/08/2025
