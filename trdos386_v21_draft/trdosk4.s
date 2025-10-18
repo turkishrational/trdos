@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 17/10/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 18/10/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -5775,6 +5775,7 @@ msftdf_retn:
 	retn
 
 copy_source_file_to_destination_file:
+	; 18/10/2025
 	; 17/10/2025
 	; 14/10/2025
 	; 13/10/2025
@@ -7806,14 +7807,14 @@ csftdf2_save_file:
 csftdf2_save_file_@:
 	call	BUFWRITE
 	jc	short csftdf2_write_error
-	
-	mov	esi, edx ; LDRVT address
 
-	; update LMDT of the parent directory
-	mov 	byte [LMDT_Flag], 1
-	;call	update_parent_dir_lmdt
-	;retn
-	jmp	update_parent_dir_lmdt
+	; 18/10/2025
+	;;;
+	cmp	byte [edx+LD_FATType], 2
+	jna	short csftdf2_save_file_cffc_1 ; not FAT32
+	; FAT32 fs
+	lea	esi, [edx+LD_BPB+FAT32_FirstFreeClust]
+	jmp	short csftdf2_save_file_cffc_2
 
 	; 17/10/2025
 csftdf2_write_error:
@@ -7821,9 +7822,51 @@ csftdf2_write_error:
 	;mov	al, 1Dh ; write error
 	; 31/08/2024
 	mov	al, ERR_DRV_WRITE ; 18 ; write error
-	jmp	csftdf2_rw_error	
-%endif
+	jmp	csftdf2_rw_error
 
+csftdf2_save_file_cffc_1:
+	; FAT16 or FAT12 fs
+	lea	esi, [edx+LD_BPB+FAT_FirstFreeClust]
+csftdf2_save_file_cffc_2:
+	mov	ecx, [csftdf_df_cluster]
+				; the last (written) cluster
+				; of the destination file
+	cmp	[esi], ecx
+	jne	short csftdf2_save_file_cffc_3
+	; change first free cluster number
+	inc	ecx
+	mov	[esi], ecx
+	mov	ebx, [edx+LD_Clusters] ; Last Cluster - 1
+	inc	ebx  ; last cluster
+	cmp	ecx, ebx
+	jna	short csftdf2_save_file_cffc_3
+	mov	dword [esi], 2
+
+csftdf2_save_file_cffc_3:
+	; 18/10/2025
+	;mov	esi, edx ; LDRVT address
+	;
+	;; update LMDT of the parent directory
+	;mov 	byte [LMDT_Flag], 1
+	;;call	update_parent_dir_lmdt
+	;;retn
+	;jmp	update_parent_dir_lmdt
+
+	; 18/10/2025
+	mov 	byte [LMDT_Flag], 1
+	;mov	esi, edx
+	call	dirup_@ ; update FAT32 fs info sector
+			; and flush buffers
+			; and update parent dir's LMDT
+	; eax = error code
+	or	eax, eax ; 0 ?
+	jnz	short csftdf2_write_error ; no, error
+
+	mov	eax, [csftdf_df_fcluster]
+	retn
+	;;;
+
+%endif
 
 csftdf2_save_fs_file:
 	; 16/10/2016 (1Dh -> 18)
