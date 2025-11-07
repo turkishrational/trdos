@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 18/10/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 07/11/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -5775,6 +5775,7 @@ msftdf_retn:
 	retn
 
 copy_source_file_to_destination_file:
+	; 07/11/2025
 	; 18/10/2025
 	; 17/10/2025
 	; 14/10/2025
@@ -6367,23 +6368,49 @@ csftdf2_df_check_found_or_not:
 	; 23/09/2025
 	jna	csftdf2_create_file
 
+mov ah, 4Eh
+mov al, 'X'
+mov [0B8010h], ax
+
+	; 07/11/2025
+	mov	edx, [csftdf_df_drv_dt]
+
 	; 23/09/2025
 	; release destination file clusters before copy
 	;;;;
 	mov	cl, [csftdf_phydrv]
+
 	mov	eax, [csftdf_dirsector]
 	call	GETBUFFER  ; Pre read
 	;jc	short csftdf2_rw_error
 	jnc	short csftdf2_df_release_cc_1
+
+mov ah, 4Eh
+mov al, '?'
+mov [0B800Eh], ax
+
 csftdf2_df_release_err:
 	jmp	csftdf2_rw_error
 csftdf2_df_release_cc_1:
 	; edx = LDRVT address
+
+;cmp dword [edx+LD_FATBegin], 1
+;je short skip1
+
+mov ah, 4Eh
+mov al, 'M'
+mov [0B800Eh], ax
+
+skip1: 
 	mov	eax, [csftdf_df_cluster]
 	push	esi
 	call	RELEASE
 	pop	esi
 	jc	short csftdf2_df_release_err
+
+mov ah, 4Eh
+mov al, '!'
+mov [0B8012h], ax
 
 	; free sectors already adjusted in RELEASE
 
@@ -7054,6 +7081,12 @@ csftdf2_read_fat_file_sector_2:
 	; eax = physical sector number
 	;  cl = physical drive/disk number
 	;       (needed for GETBUFFER procedure)
+
+push eax
+mov ah, 4Eh
+mov al, 'Y'
+mov [0B8010h], ax
+pop eax
 
 	call	GETBUFFER
 	jc	short csftdf2_read_fat_file_err
@@ -7756,6 +7789,11 @@ csftdf2_write_df_clust_@@:
 %else
 	; 14/10/2025 - TRDOS 386 v2.0.10
 csftdf2_save_file:
+
+mov ah, 4Eh
+mov al, 'B'
+mov [0B8010h], ax
+
 	; 17/10/2025
 	mov	eax, [createfile_dirsector]
 	mov	cl, [createfile_phydrv]

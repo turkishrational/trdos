@@ -1298,7 +1298,7 @@ floppy_drv_init:
 	inc	esi ; fd1_type ; 10/01/2016
 loc_drv_init_fd0_fd1:
 	mov	byte [edi+LD_MediaChanged], 0
-	cmp	byte [esi], 1 ; type (>0 if it is existing) 
+	cmp	byte [esi], 1 ; type (>0 if it is existing)
 		; 4 = 1.44 MB, 80 track, 3 1/2"
 	jb	short read_fd_boot_sector_retn
 	mov	[edi+LD_PhyDrvNo], dl
@@ -1555,7 +1555,7 @@ fd_init_calculate_free_clusters:
 	;     ESI = Logical DOS drive description table address
 	; OUTPUT ->
 	;    [ESI+LD_FreeSectors] will be set
-	
+
 	sub	eax, eax
 	mov	[esi+LD_FreeSectors], eax ; 0
 	mov	al, 2 ; eax = 2
@@ -1766,7 +1766,7 @@ gfvn_load_FAT32_root_dir_nc:
 	movzx	ebp, byte [esi+LD_BPB+SecPerClust]
 	; ebp = sectors per cluster
 	jmp	short check_root_volume_name_ns
-	
+
 loc_get_volume_name:
 
 ; 07/05/2025
@@ -1871,7 +1871,7 @@ load_next_root_dir_sector:
 	call    load_FAT_root_directory_ns
 	jnc	short check_root_volume_name_ns
 
-loc_get_volume_name_retn:	
+loc_get_volume_name_retn:
 	; eax = error code
 	retn
 	
@@ -1889,10 +1889,10 @@ check_fat32_nc_or_gvn_retn:
 	call	get_next_cluster
 	jc	short loc_get_volume_name_retn
 			; EndOfClusterChain (eax = 0)
-			; or Error (eax = error number)	
+			; or Error (eax = error number)
 
 	; eax = next cluster (this is not EOCC)
-	
+
 	;; FAT32
 	;; ecx = next cluster
 	;mov	eax, ecx
@@ -1900,7 +1900,7 @@ check_fat32_nc_or_gvn_retn:
 	;jnb	short loc_get_volume_name_stc_retn
 
 	mov	[CLUSNUM], eax
-	
+
 	jmp	gfvn_load_FAT32_root_dir_nc
 
 %endif

@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - SYS INIT : trdosk1.s
 ; ----------------------------------------------------------------------------
-; Last Update: 05/06/2025 (Previous: 26/09/2024, v2.0.9)
+; Last Update: 19/10/2025 (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -14,6 +14,7 @@
 ;
 
 sys_init:
+	; 19/10/2025
 	; 08/05/2025
 	; 17/04/2025 (TRDOS 386 v2.0.10)
 	; 26/09/2024 (TRDOS 386 v2.0.9)
@@ -58,9 +59,11 @@ sys_init:
 	; media changed sign is needed
 	; for proper drive initialization
 
-	mov 	esi, Logical_DOSDisks
+	;mov 	esi, Logical_DOSDisks
+	; 19/10/2025
+	mov	esi, Logical_DOSDisks+LD_MediaChanged 
 	mov 	al, 1 ; Initialization sign (invalid_fd_parameter)
-	add 	esi, LD_MediaChanged ; Media Change Status = 1 (init needed)
+	;add 	esi, LD_MediaChanged ; Media Change Status = 1 (init needed)
 	mov 	[esi], al ; A:
 	; Temporary - 26/09/2024
 	;;mov	dword [esi+LD_Clusters], -1 ; *

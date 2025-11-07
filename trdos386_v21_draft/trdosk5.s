@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 22/07/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 19/10/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2756,6 +2756,7 @@ ude_4:
 ; 21/04/2025 - TRDOS 386 v2.0.10
 
 GETFATBUFFER:
+	; 19/10/2025
 	; 22/07/2025
 	; 05/06/2025
 	; 28/04/2025
@@ -2766,6 +2767,7 @@ GETFATBUFFER:
 	jmp	short getb_x
 
 GETBUFFER_NPR:
+	; 19/10/2025
 	; 22/07/2025
 	; 05/06/2025
 	; 28/04/2025
@@ -2777,6 +2779,7 @@ GETBUFFER_NPR:
 	jmp	short getb_x
 
 GETBUFFER:
+	; 19/10/2025
 	; 22/07/2025
 	; 05/06/2025
 	; 28/04/2025
@@ -2815,6 +2818,12 @@ getb_x:
 	cmp	cl, [esi+BUFFINFO.buf_ID] ; is same (phy) disk number ?
 	jne	short getb_1	; no
 
+push eax
+mov ah, 4Eh
+mov al, 'Z'
+mov [0B800Eh], ax
+pop eax
+
 getb_0:
 	mov	[CurrentBuffer], esi
 	retn
@@ -2829,6 +2838,10 @@ getb_2:
 	cmp	cl, [esi+BUFFINFO.buf_ID]	; (phy) drive num
 	jne	short getb_7
 
+mov ah, 4Eh
+mov al, 'G'
+mov [0B800Eh], ax
+
 getb_3:
 	xor 	ebp, ebp ; 0
 
@@ -2837,17 +2850,20 @@ getb_3:
 	test	ch, al ; 1		; FAT sector ?
 	jz	short getb_6		; no
 
-	mov	bp, [edx+LD_BPB+BPB_FATSz16] ; FAT size in sectors
-
+	; 19/10/2025
 	cmp	byte [edx+LD_FATType], 2 ; FAT32 ?
-	jna	short getb_4		; no
+	ja	short getb_4		; yes
+
+	; FAT12 or FAT16
+	mov	bp, [edx+LD_BPB+BPB_FATSz16] ; FAT size in sectors
+	jmp	short getb_5
+getb_4:
+	mov	ebp, [edx+LD_BPB+BPB_FATSz32]
 
 	test	byte [edx+LD_BPB+BPB_ExtFlags], 80h
-	jnz	short getb_5	; bit 7 = 1 means only one FAT is active
-getb_4:
-	mov	al, [edx+LD_BPB+BPB_NumFATs]
+	jnz	short getb_6	; bit 7 = 1 means only one FAT is active
 getb_5:
-	mov	ebp, [edx+LD_BPB+BPB_FATSz32]
+	mov	al, [edx+LD_BPB+BPB_NumFATs]
 getb_6:
 	mov	[esi+BUFFINFO.buf_wrtcnt], al
 	mov	[esi+BUFFINFO.buf_wrtcntinc], ebp
@@ -2857,6 +2873,15 @@ getb_6:
 
 	; ref: Retro DOS v5 ibmdos7.s - PLACEBUF ; (MSDOS)
 	call	PLACEBUFFER
+
+cmp byte [edx+LD_BPB+BPB_NumFATs], 2
+je short skipbu1
+push eax
+mov ah, 4Eh
+mov al, 'V'
+mov [0B800Eh], ax
+pop eax
+skipbu1:
 
 	mov	[LastBuffer], esi
 	; 24/04/2025
@@ -2882,10 +2907,12 @@ getb_8:
 
 	cmp	ebp, -1		; 0FFFFFFFFh ; invalid (not free buf)
 	je	short getb_9
+
 	mov	esi, ebp ; restore free buffer (header offset) address
 	; 28/04/2025
 	mov	[esi+BUFFINFO.buf_DPB], edx ; current ldrvt address
 	jmp	short getb_10
+
 getb_9:
 	; The requested sector is not available in the buffers.
 	;
@@ -2899,6 +2926,12 @@ getb_9:
 	;jc	short getb_11
 	; 05/06/2025
 	jc	short getb_12
+
+mdc_1:
+mov ah, 4Eh
+mov al, 'W'
+mov [0B800Eh], ax
+
 	mov	eax, ebp	; restore sector number
 getb_10:
 	; 05/06/2025
@@ -2922,6 +2955,12 @@ getb_10:
 	and	ch, ch			; fat sector ?
 	jz	short getb_13		; no
 
+push eax
+mov ah, 4Eh
+mov al, '%'
+mov [0B8006h], ax
+pop eax
+
 	; input: eax = phy sector, ebx = buffer, esi = ldrv table
 	call	FATSECRD
 	; modified registers: (eax), ecx, edx
@@ -2930,6 +2969,12 @@ getb_10:
 	jmp	short getb_14
 
 getb_11:
+
+push eax
+mov ah, 4Eh
+mov al, '&'
+mov [0B8006h], ax
+pop eax
 	; 05/06/2025
 	pop	ebp ; **** ; disk sector number
 	; 28/04/2025
@@ -3188,12 +3233,42 @@ mapcl_3:
 	; eax = FAT sector (index) number
 	; ebx = cluster number offset in the FAT sector
 
+	mov	cl, [edx+LD_PhyDrvNo]
+
+cmp dword [edx+LD_FATBegin], 1
+jna short ok111
+
+cmp cl, 0
+ja short ok112 
+mov dword [edx+LD_FATBegin], 1
+ok112:
+push eax
+mov ah, 4Eh
+mov al, 'R'
+mov [0B800Ch], ax
+pop eax
+
+ok111:
+ 
 	add	eax, [edx+LD_FATBegin]
 	; eax = physical sector number of the FAT sector
-	
+
 	mov	[ClusSec], eax
 
-	mov	cl, [edx+LD_PhyDrvNo]
+cmp eax, 2880
+jna short deneme
+jmp short deneme1
+deneme:
+;cmp cl, 0
+;jna short deneme2
+jmp short deneme2
+deneme1:
+push eax
+mov ah, 4Eh
+mov al, 'P'
+mov [0B800Ah], ax
+pop eax
+deneme2:	
 
 	; edx = logical dos drive table address
 	; ebx = cluster number offset (in the buffer)
@@ -3201,6 +3276,12 @@ mapcl_3:
 
 	call	GETFATBUFFER
 	jc	short mapcl_5	; eax = error code
+
+push eax
+mov ah, 4Eh
+mov al, '+'
+mov [0B8004h], ax
+pop eax
 
 	;mov	esi, [CurrentBuffer]
 	lea	edi, [esi+BUFINSIZ]
@@ -3603,6 +3684,11 @@ fatsecrd_1:
 	pop	eax ; *
 	jnc	short fatsecrd_2
 
+mov ah, 4Eh
+mov al, 'T'
+mov [0B8008h], ax
+pop eax
+
 	loop	fatsecrd_3
 
 	; 28/04/2025
@@ -3611,7 +3697,7 @@ fatsecrd_1:
 	mov	eax, ERR_DRV_READ ; 'disk read error !'
 	stc
 fatsecrd_2:
-	retn 
+	retn
 
 fatsecrd_3:
 	cmp	byte [esi+LD_FATType], 2
@@ -3656,7 +3742,7 @@ BUFWRITE:
 	xchg	ecx, [esi+BUFFINFO.buf_ID]
 	cmp	cl, 0FFh
 	je	short bufwrt_4 ; Buffer is free, carry clear.
-	
+
 	test	ch, buf_dirty
 	jz	short bufwrt_4 ; Buffer is clean, carry clear.
 
@@ -5308,6 +5394,7 @@ RELEASE:
 RELEASE_nc:	; 21/07/2025
        	xor	ebx, ebx
 RELBLKS:
+	; 19/10/2025
 	; 17/07/2025
 	; 11/07/2025
 	; (MSDOS -> RELBLKS) - Ref: Retro DOS v5 - ibmdos7.s
@@ -5332,11 +5419,25 @@ RELBLKS:
 	push	ebx
 	push	eax
 	call	UNPACK
+
+push eax
+mov ah, 4Eh
+mov al, '?'
+mov [0B8000h], ax
+pop eax
+
 	pop	ecx
 	pop	ebx
         jbe	short rblks_4 ; jna short rblks_4
 
+push eax
+mov ah, 4Eh
+mov al, '!'
+mov [0B8002h], ax
+pop eax
+
 	mov	[NEXTCLUSTER], eax
+
 	mov	eax, ecx
 
 	; eax = Content of FAT
@@ -5362,6 +5463,10 @@ RELBLKS:
 rblks_1:
 	; FAT16 or FAT12 fs
 	lea	ebx, [edx+LD_BPB+FAT_FreeClusters]
+	
+	; 19/10/2025
+	; (clear carry flag is needed here for FAT12 fs)
+	clc
 rblks_2:
 	mov	eax, [ebx]
 	inc	eax ; -1 -> 0
