@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 19/10/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 09/11/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2756,6 +2756,7 @@ ude_4:
 ; 21/04/2025 - TRDOS 386 v2.0.10
 
 GETFATBUFFER:
+	; 09/11/2025
 	; 19/10/2025
 	; 22/07/2025
 	; 05/06/2025
@@ -2767,6 +2768,7 @@ GETFATBUFFER:
 	jmp	short getb_x
 
 GETBUFFER_NPR:
+	; 09/11/2025
 	; 19/10/2025
 	; 22/07/2025
 	; 05/06/2025
@@ -2779,6 +2781,7 @@ GETBUFFER_NPR:
 	jmp	short getb_x
 
 GETBUFFER:
+	; 09/11/2025
 	; 19/10/2025
 	; 22/07/2025
 	; 05/06/2025
@@ -2909,8 +2912,9 @@ getb_8:
 	je	short getb_9
 
 	mov	esi, ebp ; restore free buffer (header offset) address
+	; 09/11/2025
 	; 28/04/2025
-	mov	[esi+BUFFINFO.buf_DPB], edx ; current ldrvt address
+	;mov	[esi+BUFFINFO.buf_DPB], edx ; current ldrvt address
 	jmp	short getb_10
 
 getb_9:
@@ -3014,6 +3018,9 @@ getb_15:
 	mov	[esi+BUFFINFO.buf_ID], cx ; set ID and flags
 	mov	ch, [pre_read]	; bit 0 -> fat buffer flag
 				; bit 7 -> no pre-read flag
+	; 09/11/2025
+	mov	[esi+BUFFINFO.buf_DPB], edx ; current ldrvt address
+
 	jmp	getb_3
 
 ; --------------------------------------------------------------------

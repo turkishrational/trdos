@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 18/10/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 09/11/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -527,7 +527,7 @@ csftdf_filesize:      resd 1
 csftdf_sf_fcluster:   resd 1
 csftdf_df_fcluster:   resd 1
 ;
-MainProgCfg_cluster: ; 14/10/2025 (TRDOS 386 v2.0.10)	
+MainProgCfg_cluster: ; 14/10/2025 (TRDOS 386 v2.0.10)
 csftdf_sf_cluster:    resd 1 ; 16/03/2016
 csftdf_df_cluster:    resd 1
 ; 16/03/2016
@@ -535,8 +535,8 @@ csftdf_df_cluster:    resd 1
 ;csftdf_w_size:       resd 1
 ;csftdf_sf_rbytes:    resd 1
 ;csftdf_df_wbytes:    resd 1
-; 11/10/2025 - TRDOS 3286 v2.0.10
-csftdf_transfercount: resd 1	
+; 11/10/2025 - TRDOS 386 v2.0.10
+csftdf_transfercount: resd 1
 csftdf_percentage:    resb 1
 ; 17/03/2016
 csftdf_videopage:     resb 1
@@ -552,6 +552,8 @@ csftdf_sf_spc:	      resb 1
 csftdf_sf_cs:	      resb 1
 csftdf_df_spc:	      resb 1
 csftdf_df_cs:	      resb 1
+; 09/11/2025
+csftdf_sf_sector:     resd 1		
 
 ; 18/10/2025 - TRDOS 386 v2.0.10
 

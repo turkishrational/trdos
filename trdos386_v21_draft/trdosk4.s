@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 07/11/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 09/11/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -5775,6 +5775,7 @@ msftdf_retn:
 	retn
 
 copy_source_file_to_destination_file:
+	; 09/11/2025
 	; 07/11/2025
 	; 18/10/2025
 	; 17/10/2025
@@ -6672,7 +6673,6 @@ csftdf2_set_df_percent_wsize1:
 csftdf2_set_df_percent_wsize2:
 	mov	[csftdf_w_size], eax
 %endif
-
 	mov	eax, [csftdf_filesize]
 
 	cmp	eax, 65536 ; 64KB	; small file
@@ -6710,8 +6710,10 @@ csftdf2_load_file:
 	call	_int10h
 	mov	[csftdf_cursorpos], dx
 
-	sub	eax, eax
-	mov	[csftdf_rw_err], al ; 0
+	;sub	eax, eax
+	;mov	[csftdf_rw_err], al ; 0
+	; 09/11/2025
+	mov	byte [csftdf_rw_err], 0
 
 ; ///
 
@@ -6758,6 +6760,9 @@ loc_check_sf_save_loading_parms:
 %endif ; 11/10/2025
 
 csftdf2_1:
+
+; 09/11/2025
+%if 0
 	; 11/10/2025
 	; 18/03/2016
 	;mov	ebx, [csftdf_sf_mem_addr] ; memory block address
@@ -6769,6 +6774,7 @@ csftdf2_1:
 	; 29/07/2022
 	ja	short csftdf2_load_fat_file
 	jmp	csftdf2_load_fs_file
+%endif
 
 csftdf2_load_fat_file:
 	; 11/10/2025
@@ -6786,7 +6792,8 @@ csftdf2_load_fat_file_next:
 	call	csftdf2_print_percentage ; 19/03/2016
 
 csftdf2_load_fat_file_1:
-	mov	esi, [csftdf_sf_drv_dt]
+	; 09/11/2025
+	;mov	esi, [csftdf_sf_drv_dt]
 	; 11/10/2025
 	;pop	ebx ; *
 
@@ -6832,6 +6839,8 @@ csftdf2_write_fat_file_err2:
 	jmp	csftdf2_rw_error
 
 csftdf2_load_fat_file_3:
+call ceta
+
 	; 11/10/2025 - TRDOS 386 v2.0.10
 csftdf2_write_fat_file_1:
 	; esi = source/destination file buffer header
@@ -6851,8 +6860,8 @@ csftdf2_write_fat_file_1:
 	mov	[csftdf_transfercount], ecx
 	cmp	ecx, eax
 		; 1 sector = 512 bytes
-	jb	short csftdf2_write_fat_file_2
-	;je	short csftdf2_skip_set_to_filesize
+	; 09/11/2025
+	jb	short csftdf2_load_fat_file_2
 
 	; set to file size
 	mov	[csftdf_transfercount], eax
@@ -6861,11 +6870,13 @@ csftdf2_write_fat_file_1:
 	test	byte [csftdf_df_cs], 0FFh ; 0 ?
 	jz	short csftdf2_load_fat_file_ok
 
-	; clear buffer content (empty buffer)
-	lea	edi, [esi+BUFINSIZ]
-	xor	eax, eax
-	mov	ecx, 512/4
-	rep	stosd
+	; 09/11/2025
+	;; clear buffer content (empty buffer)
+	;lea	edi, [esi+BUFINSIZ]
+	;xor	eax, eax
+	;mov	ecx, 512/4
+	;rep	stosd
+	call	csftdf2_clear_default_buffer
 
 csftdf2_write_fat_file_2:
 	; esi = source/destination file buffer header
@@ -6875,11 +6886,26 @@ csftdf2_write_fat_file_2:
 	pop	esi
 	jc	short csftdf2_write_fat_file_err
 
+mov al, '0'
+mov ah, 4Eh
+mov [0B8022h], ax
+
 	; if [csftdf_df_cs] = 0 -> end of the cluster
 	; otherwise write the next empty sector of the clust
 	cmp	byte [csftdf_df_cs], 0
 	jna	short csftdf2_write_fat_file_2
 	jmp	short csftdf2_load_fat_file_ok
+
+ceta:
+push eax
+lea eax, [esi+BUFINSIZ]
+mov al, [eax]
+and al, 0Fh
+add al, '0'
+mov ah, 4Eh
+mov [0B8020h], ax
+pop eax
+retn
 
 csftdf2_write_fat_file_3:
 	; ***
@@ -6901,6 +6927,11 @@ csftdf2_load_fat_file_ok:
 	;jna	csftdf2_save_file ; 25/03/2016
 	; 29/07/2022
 	ja	short csftdf2_2
+
+mov al, 'U'
+mov ah, 4Eh
+mov [0B8022h], ax
+
 	jmp	csftdf2_save_file
 csftdf2_2:
 	; "Reading... 100%"
@@ -7039,6 +7070,7 @@ csftdf2_read_fat_file_secs_2:
 csftdf2_read_fat_file_secs_3:
 	retn
 %else
+	; 09/11/2025
 	; 11/10/2025
 csftdf2_read_file_sector:
 	mov	edx, [csftdf_sf_drv_dt]
@@ -7048,19 +7080,33 @@ csftdf2_read_file_sector:
 	jmp	csftdf2_read_fs_file_sector
 
 csftdf2_read_fat_file_sector:
-	movzx	eax, byte [csftdf_sf_cs]
-	cmp	al, [csftdf_sf_spc]
-	jb	short csftdf2_read_fat_file_sector_1
+	; 09/11/2025
+	mov	eax, [csftdf_sf_cluster]
+	and	eax, eax
+	jz	short csftdf2_read_fat_file_sector_x
+
+	mov	cl, [csftdf_sf_cs]
+	cmp	cl, [csftdf_sf_spc]
+	jb	short csftdf2_read_fat_file_sector_@
 	mov	byte [csftdf_sf_cs], 0
 			; 1st sector of the next clust
 	mov	esi, edx
-	mov	eax, [csftdf_sf_cluster]
 	call	get_next_cluster
-	jnc	short csftdf2_read_fat_file_sector_2
+	;jnc	short csftdf2_read_fat_file_sector_@
+	; 09/11/2025
+	jnc	short csftdf2_read_fat_file_sector_nc
 			; edx = esi = LDRVT address
 			; eax = next cluster number
 	and	eax, eax
 	jnz	short csftdf2_read_fat_file_err
+
+	; 09/11/2025
+	mov	[csftdf_sf_cluster], eax
+
+csftdf2_clear_default_buffer:
+csftdf2_read_fat_file_sector_x:
+	; 09/11/2025
+	mov	[csftdf_sf_sector], eax ; 0
 
 	; end of cluster chain
 	; prepare an empty buffer for writing
@@ -7072,15 +7118,25 @@ csftdf2_read_fat_file_sector:
 
 	retn
 
-csftdf2_read_fat_file_sector_1:
-	add	eax, [csftdf_sf_cluster]
-csftdf2_read_fat_file_sector_2:
+csftdf2_read_fat_file_sector_nc:
+	; 09/11/2025
+	mov	[csftdf_sf_cluster], eax
+
+csftdf2_read_fat_file_sector_@:
+	; 09/11/2025
+	movzx	esi, byte [csftdf_sf_cs]
+
 	inc	byte [csftdf_sf_cs]
 
 	call	FIGREC
 	; eax = physical sector number
 	;  cl = physical drive/disk number
 	;       (needed for GETBUFFER procedure)
+
+	add	eax, esi
+
+	; 09/11/2025
+	mov	[csftdf_sf_sector], eax
 
 push eax
 mov ah, 4Eh
@@ -7095,7 +7151,8 @@ pop eax
 	; edx = LDRVT address
 
 	; free the buffer (invalidate)
-	mov	dword [esi+BUFFINFO.buf_ID], 0FFh
+	; 09/11/2025
+	;mov	dword [esi+BUFFINFO.buf_ID], 0FFh
 
 csftdf2_read_fat_file_err:
 	; eax = error code (al)
@@ -7352,13 +7409,15 @@ csftdf2_write_fat_file_secs_5:
 	; 16/10/2016 (1Dh -> 18)
 	retn
 %else
+	; 09/11/2025
 	; 14/10/2025
 	; 13/10/2025
 	; 11/10/2025
 csftdf2_write_file_sector:
 	; esi = buffer header address
 	; edx = LDRVT address (source file)
-	lea 	ebx, [esi+BUFINSIZ]
+	; 09/11/2025
+	;lea 	ebx, [esi+BUFINSIZ]
 	; ebx = data buffer address
 	mov	edx, [csftdf_df_drv_dt]
 	cmp	byte [edx+LD_FATType], 0
@@ -7374,16 +7433,56 @@ csftdf2_write_fat_file_sector:
 	; edx = LDRVT address (destination file)
 	mov	eax, [csftdf_df_cluster]
 	cmp	byte [csftdf_df_cs], 0
-	ja	short csftdf2_write_fat_file_sector_@@@
+	;ja	short csftdf2_write_fat_file_sector_@@@
+	; 09/11/2025
+	ja	short csftdf2_write_fat_file_sector_@@
 csftdf2_write_fat_file_sector_@:
-	push	ebx
+	;push	ebx
 	call	ADD_NEW_CLUSTER
-	pop	ebx
+	;pop	ebx
 	jc	short csftdf2_write_fat_file_sector_err
 	mov	[csftdf_df_cluster], eax
-	call	FIGREC
-	xor 	ecx, ecx
+
+	; 09/11/2025
+	cmp	dword [csftdf_df_fcluster], 0
+	ja	short csftdf2_write_fat_file_sector_x
+	mov	[csftdf_df_fcluster], eax
+
+csftdf2_write_fat_file_sector_x:
+	; 09/11/2025
+	mov	eax, [csftdf_sf_sector]
+	and	eax, eax
+	jnz	short csftdf2_write_fat_file_sector_gb1
+	mov	esi, rw_buff_header ; default buffer
+	jmp	short csftdf2_write_fat_file_sector_gb2
+
+csftdf2_write_fat_file_sector_gb1:
+	push	edx ; destination drive's LDRVT
+	mov	edx, [csftdf_sf_drv_dt] ; source drv's LDRVT
+	mov	cl, [edx+LD_PhyDrvNo]
+	call	GETBUFFER
+	pop	edx
+	jc	short csftdf2_write_fat_file_sector_err
+
+	; esi = buffer header address
+
+	; free the buffer (invalidate)
+	mov	dword [esi+BUFFINFO.buf_ID], 0FFh
+
+csftdf2_write_fat_file_sector_gb2:
+	; 09/11/2025
+	mov	eax, [csftdf_df_cluster]
+
+	; 09/11/2025
+	;call	FIGREC
+	;xor 	ecx, ecx
 csftdf2_write_fat_file_sector_@@:
+	; 09/11/2025
+	lea 	ebx, [esi+BUFINSIZ]
+	; 09/11/2025
+	call	FIGREC
+	movzx	ecx, byte [csftdf_df_cs]
+	add	eax, ecx
 	mov	esi, edx
 	mov	cl, 1
 	; ebx = buffer data address
@@ -7392,25 +7491,25 @@ csftdf2_write_fat_file_sector_@@:
 	call	DWRITE
 	jc	short csftdf2_write_fat_file_sector_err
 	; 14/10/2025
-	mov	edx, esi ; LDRVT address 
+	mov	edx, esi ; LDRVT address
 	mov	cl, [csftdf_df_spc] ; sectors per cluster
 	inc	byte [csftdf_df_cs]
+	; 09/11/2025
 	cmp	cl, [csftdf_df_cs] ; current sector index
-	jna	short csftdf2_write_fat_file_sector_ok0
-csftdf2_write_fat_file_sector_ok:
-	clc
-	retn
+	ja	short csftdf2_write_fat_file_sector_ok
+	;clc
 csftdf2_write_fat_file_sector_ok0:
 	mov	byte [csftdf_df_cs], 0
+csftdf2_write_fat_file_sector_ok:
 	retn
 
-csftdf2_write_fat_file_sector_@@@:
-	call	FIGREC
-	movzx	ecx, byte [csftdf_df_cs]
-	add	eax, ecx
-	jmp	short csftdf2_write_fat_file_sector_@@
+	; 09/11/2025
+;csftdf2_write_fat_file_sector_@@@:
+	;call	FIGREC
+	;movzx	ecx, byte [csftdf_df_cs]
+	;add	eax, ecx
+	;jmp	short csftdf2_write_fat_file_sector_@@
 %endif
-
 
 ; 14/10/2025 - TRDOS 386 v2.0.10
 %if 0
@@ -7789,14 +7888,10 @@ csftdf2_write_df_clust_@@:
 %else
 	; 14/10/2025 - TRDOS 386 v2.0.10
 csftdf2_save_file:
-
-mov ah, 4Eh
-mov al, 'B'
-mov [0B8010h], ax
-
 	; 17/10/2025
-	mov	eax, [createfile_dirsector]
-	mov	cl, [createfile_phydrv]
+	mov	eax, [createfile_dirsector] ; [csftdf_dirsector]
+	mov	cl, [createfile_phydrv]	; [csftdf_phydrv]
+	; edx = LDRVT address ; 09/11/2025
 	call	GETBUFFER  ; Pre read
 	jc	short csftdf2_write_error
 
@@ -7807,7 +7902,7 @@ mov [0B8010h], ax
 
 
 	lea	edi, [esi+BUFINSIZ]
-	add	edi, [createfile_entrypos]
+	add	edi, [createfile_entrypos] ; [csftdf_entrypos]
 
 	mov	ebx, SourceFile_DirEntry
 
@@ -7817,7 +7912,7 @@ mov [0B8010h], ax
 	push	esi
 
 	mov	esi, DestinationFile_DirEntry
-	mov	[esi+DirEntry_Attr], al	
+	mov	[esi+DirEntry_Attr], al
 	mov	al, [ebx+DirEntry_CrtTimeTenth]
 	mov	[esi+DirEntry_CrtTimeTenth], al
 	mov	eax, [ebx+DirEntry_CrtTime]
@@ -7836,7 +7931,7 @@ mov [0B8010h], ax
 	mov	[esi+DirEntry_FileSize], eax
 
 	; copy/move directory entry to it's place
-	mov	ecx, 32/8 ; directory entry size
+	mov	ecx, 32/4 ; directory entry size
 	rep	movsd
 
 	pop	esi
