@@ -2821,12 +2821,6 @@ getb_x:
 	cmp	cl, [esi+BUFFINFO.buf_ID] ; is same (phy) disk number ?
 	jne	short getb_1	; no
 
-push eax
-mov ah, 4Eh
-mov al, 'Z'
-mov [0B800Eh], ax
-pop eax
-
 getb_0:
 	mov	[CurrentBuffer], esi
 	retn
@@ -2840,10 +2834,6 @@ getb_2:
 
 	cmp	cl, [esi+BUFFINFO.buf_ID]	; (phy) drive num
 	jne	short getb_7
-
-mov ah, 4Eh
-mov al, 'G'
-mov [0B800Eh], ax
 
 getb_3:
 	xor 	ebp, ebp ; 0
@@ -2876,15 +2866,6 @@ getb_6:
 
 	; ref: Retro DOS v5 ibmdos7.s - PLACEBUF ; (MSDOS)
 	call	PLACEBUFFER
-
-cmp byte [edx+LD_BPB+BPB_NumFATs], 2
-je short skipbu1
-push eax
-mov ah, 4Eh
-mov al, 'V'
-mov [0B800Eh], ax
-pop eax
-skipbu1:
 
 	mov	[LastBuffer], esi
 	; 24/04/2025
@@ -2931,11 +2912,6 @@ getb_9:
 	; 05/06/2025
 	jc	short getb_12
 
-mdc_1:
-mov ah, 4Eh
-mov al, 'W'
-mov [0B800Eh], ax
-
 	mov	eax, ebp	; restore sector number
 getb_10:
 	; 05/06/2025
@@ -2959,12 +2935,6 @@ getb_10:
 	and	ch, ch			; fat sector ?
 	jz	short getb_13		; no
 
-push eax
-mov ah, 4Eh
-mov al, '%'
-mov [0B8006h], ax
-pop eax
-
 	; input: eax = phy sector, ebx = buffer, esi = ldrv table
 	call	FATSECRD
 	; modified registers: (eax), ecx, edx
@@ -2973,12 +2943,6 @@ pop eax
 	jmp	short getb_14
 
 getb_11:
-
-push eax
-mov ah, 4Eh
-mov al, '&'
-mov [0B8006h], ax
-pop eax
 	; 05/06/2025
 	pop	ebp ; **** ; disk sector number
 	; 28/04/2025
@@ -3242,40 +3206,10 @@ mapcl_3:
 
 	mov	cl, [edx+LD_PhyDrvNo]
 
-cmp dword [edx+LD_FATBegin], 1
-jna short ok111
-
-cmp cl, 0
-ja short ok112 
-mov dword [edx+LD_FATBegin], 1
-ok112:
-push eax
-mov ah, 4Eh
-mov al, 'R'
-mov [0B800Ch], ax
-pop eax
-
-ok111:
- 
 	add	eax, [edx+LD_FATBegin]
 	; eax = physical sector number of the FAT sector
 
 	mov	[ClusSec], eax
-
-cmp eax, 2880
-jna short deneme
-jmp short deneme1
-deneme:
-;cmp cl, 0
-;jna short deneme2
-jmp short deneme2
-deneme1:
-push eax
-mov ah, 4Eh
-mov al, 'P'
-mov [0B800Ah], ax
-pop eax
-deneme2:	
 
 	; edx = logical dos drive table address
 	; ebx = cluster number offset (in the buffer)
@@ -3283,12 +3217,6 @@ deneme2:
 
 	call	GETFATBUFFER
 	jc	short mapcl_5	; eax = error code
-
-push eax
-mov ah, 4Eh
-mov al, '+'
-mov [0B8004h], ax
-pop eax
 
 	;mov	esi, [CurrentBuffer]
 	lea	edi, [esi+BUFINSIZ]
@@ -3690,12 +3618,6 @@ fatsecrd_1:
 	pop	ebx ; **
 	pop	eax ; *
 	jnc	short fatsecrd_2
-
-mov ah, 4Eh
-mov al, 'T'
-mov [0B8008h], ax
-pop eax
-
 	loop	fatsecrd_3
 
 	; 28/04/2025
@@ -5427,21 +5349,9 @@ RELBLKS:
 	push	eax
 	call	UNPACK
 
-push eax
-mov ah, 4Eh
-mov al, '?'
-mov [0B8000h], ax
-pop eax
-
 	pop	ecx
 	pop	ebx
         jbe	short rblks_4 ; jna short rblks_4
-
-push eax
-mov ah, 4Eh
-mov al, '!'
-mov [0B8002h], ax
-pop eax
 
 	mov	[NEXTCLUSTER], eax
 

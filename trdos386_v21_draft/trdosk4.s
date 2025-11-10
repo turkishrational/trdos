@@ -6369,10 +6369,6 @@ csftdf2_df_check_found_or_not:
 	; 23/09/2025
 	jna	csftdf2_create_file
 
-mov ah, 4Eh
-mov al, 'X'
-mov [0B8010h], ax
-
 	; 07/11/2025
 	mov	edx, [csftdf_df_drv_dt]
 
@@ -6386,32 +6382,15 @@ mov [0B8010h], ax
 	;jc	short csftdf2_rw_error
 	jnc	short csftdf2_df_release_cc_1
 
-mov ah, 4Eh
-mov al, '?'
-mov [0B800Eh], ax
-
 csftdf2_df_release_err:
 	jmp	csftdf2_rw_error
 csftdf2_df_release_cc_1:
 	; edx = LDRVT address
-
-;cmp dword [edx+LD_FATBegin], 1
-;je short skip1
-
-mov ah, 4Eh
-mov al, 'M'
-mov [0B800Eh], ax
-
-skip1: 
 	mov	eax, [csftdf_df_cluster]
 	push	esi
 	call	RELEASE
 	pop	esi
 	jc	short csftdf2_df_release_err
-
-mov ah, 4Eh
-mov al, '!'
-mov [0B8012h], ax
 
 	; free sectors already adjusted in RELEASE
 
@@ -6839,8 +6818,6 @@ csftdf2_write_fat_file_err2:
 	jmp	csftdf2_rw_error
 
 csftdf2_load_fat_file_3:
-call ceta
-
 	; 11/10/2025 - TRDOS 386 v2.0.10
 csftdf2_write_fat_file_1:
 	; esi = source/destination file buffer header
@@ -6886,26 +6863,11 @@ csftdf2_write_fat_file_2:
 	pop	esi
 	jc	short csftdf2_write_fat_file_err
 
-mov al, '0'
-mov ah, 4Eh
-mov [0B8022h], ax
-
 	; if [csftdf_df_cs] = 0 -> end of the cluster
 	; otherwise write the next empty sector of the clust
 	cmp	byte [csftdf_df_cs], 0
 	jna	short csftdf2_write_fat_file_2
 	jmp	short csftdf2_load_fat_file_ok
-
-ceta:
-push eax
-lea eax, [esi+BUFINSIZ]
-mov al, [eax]
-and al, 0Fh
-add al, '0'
-mov ah, 4Eh
-mov [0B8020h], ax
-pop eax
-retn
 
 csftdf2_write_fat_file_3:
 	; ***
@@ -6927,11 +6889,6 @@ csftdf2_load_fat_file_ok:
 	;jna	csftdf2_save_file ; 25/03/2016
 	; 29/07/2022
 	ja	short csftdf2_2
-
-mov al, 'U'
-mov ah, 4Eh
-mov [0B8022h], ax
-
 	jmp	csftdf2_save_file
 csftdf2_2:
 	; "Reading... 100%"
@@ -7137,12 +7094,6 @@ csftdf2_read_fat_file_sector_@:
 
 	; 09/11/2025
 	mov	[csftdf_sf_sector], eax
-
-push eax
-mov ah, 4Eh
-mov al, 'Y'
-mov [0B8010h], ax
-pop eax
 
 	call	GETBUFFER
 	jc	short csftdf2_read_fat_file_err
