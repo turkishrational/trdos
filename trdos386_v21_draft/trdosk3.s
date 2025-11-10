@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 14/10/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 19/10/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -8200,6 +8200,17 @@ loc_run_find_executable_file_next:
 
 	mov	eax, [edi+dir_entry.dir_file_size]
 loc_load_and_run_file_@:
+	;;;
+	; 19/10/2025 (TRDOS 386 v2.0.10)
+	and	eax, eax ;zero file size check?
+	jnz	short loc_load_and_run_file_@@
+	mov	eax, ERR_FILE_SIZE
+		; 20, 'file size error !'
+	;mov	eax, ERR_ZERO_LENGTH 
+		; 20, 'zero length !' error
+	jmp	loc_run_cmd_failed
+loc_load_and_run_file_@@:
+	;;;
 	mov	[FindFile_Size], eax
 	;mov	bl, [edi+dir_entry.dir_attr]
 	;mov	[FindFile_Attributes], bl
@@ -8285,7 +8296,7 @@ loc_run_find_program_file_next:
 	; 07/07/2025
 	mov	esi, Path_FileName
 	; 01/07/2025
-	jmp	short loc_load_and_run_file_@
+	jmp	loc_load_and_run_file_@
 
 loc_run_program_file_not_found:
 	cmp	al, 2 ; file not found
