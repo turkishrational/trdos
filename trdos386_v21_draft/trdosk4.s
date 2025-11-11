@@ -5775,8 +5775,8 @@ msftdf_retn:
 	retn
 
 copy_source_file_to_destination_file:
-	; 10/11/2025
-	; 09/11/2025
+	; 11/11/2025
+	; 09/11/2025, 10/11/2025
 	; 07/11/2025
 	; 18/10/2025
 	; 14/10/2025, 17/10/2025
@@ -6836,8 +6836,23 @@ csftdf2_write_fat_file_1:
 	cmp	ecx, eax
 		; 1 sector = 512 bytes
 	; 09/11/2025
-	jb	short csftdf2_load_fat_file_2
+	;jb	short csftdf2_load_fat_file_2
+	; 11/11/2025
+	jnb	short csftdf2_write_fat_file_3
 
+	; 11/11/2025
+	cmp	byte [csftdf_percentage], 0
+	jna	short csftdf2_load_fat_file_2
+
+	; Set cursor position
+	; AH= 02h, BH= Page Number, DH= Row, DL= Column
+	mov	bh, [csftdf_videopage]
+	mov	dx, [csftdf_cursorpos]
+	mov	ah, 2
+	call	_int10h
+	jmp	csftdf2_load_fat_file_next
+
+csftdf2_write_fat_file_3: ; 11/11/2025	
 	; set to file size
 	mov	[csftdf_transfercount], eax
 
@@ -6859,7 +6874,7 @@ csftdf2_write_fat_file_2:
 	push	esi
 	call	csftdf2_write_file_sector
 	pop	esi
-	jc	short csftdf2_write_fat_file_err
+	jc	csftdf2_write_fat_file_err
 
 	; if [csftdf_df_cs] = 0 -> end of the cluster
 	; otherwise write the next empty sector of the clust
@@ -6867,21 +6882,21 @@ csftdf2_write_fat_file_2:
 	jna	short csftdf2_write_fat_file_2
 	jmp	short csftdf2_load_fat_file_ok
 
-csftdf2_write_fat_file_3:
-	; ***
-	cmp	byte [csftdf_percentage], 0
-	jna	csftdf2_load_fat_file_2
-
-	; 10/11/2025
-	;push	ebx ; *
-
-	; Set cursor position
-	; AH= 02h, BH= Page Number, DH= Row, DL= Column
-	mov	bh, [csftdf_videopage]
-	mov	dx, [csftdf_cursorpos]
-	mov	ah, 2
-	call	_int10h
-	jmp	csftdf2_load_fat_file_next
+;csftdf2_write_fat_file_3:
+;	; ***
+;	cmp	byte [csftdf_percentage], 0
+;	jna	csftdf2_load_fat_file_2
+;
+;	; 10/11/2025
+;	;push	ebx ; *
+;
+;	; Set cursor position
+;	; AH= 02h, BH= Page Number, DH= Row, DL= Column
+;	mov	bh, [csftdf_videopage]
+;	mov	dx, [csftdf_cursorpos]
+;	mov	ah, 2
+;	call	_int10h
+;	jmp	csftdf2_load_fat_file_next
 
 csftdf2_load_fat_file_ok:
 	cmp	byte [csftdf_percentage], 0
@@ -7841,6 +7856,8 @@ csftdf2_save_file:
 	; 17/10/2025
 	mov	eax, [createfile_dirsector] ; [csftdf_dirsector]
 	mov	cl, [createfile_phydrv]	; [csftdf_phydrv]
+	; 11/11/2025
+	mov	edx, [csftdf_df_drv_dt]
 	; edx = LDRVT address ; 09/11/2025
 	call	GETBUFFER  ; Pre read
 	jc	short csftdf2_write_error
