@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 10/11/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 11/11/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -7967,6 +7967,7 @@ csftdf2_save_fs_file:
 	retn
 
 create_file:
+	; 11/11/2025
 	; 06/08/2025 (TRDOS 386 Kernel v2.0.10)
 	;	(Major Modification)
 	; 31/08/2024
@@ -8044,6 +8045,16 @@ loc_createfile_chk_empty_FAT_file_sign:
 	movzx	edx, byte [esi+LD_BPB+SecPerClust]
 	mov	[createfile_SecPerClust], dl
 
+	; 11/11/2025
+	mov	ecx, [esi+LD_FreeSectors]
+;	cmp	ecx, edx ; byte [createfile_SecPerClust]
+;	jnb	short loc_create_fat_file
+
+;loc_createfile_insufficient_disk_space:
+;	mov	eax, 27h
+;loc_createfile_gffc_retn:
+;	retn
+
 loc_create_fat_file:
 	mov	[createfile_Name_Offset], ebx
 	mov	[createfile_FreeSectors], ecx
@@ -8104,6 +8115,9 @@ loc_createfile_set_ff_dir_entry:
 	mov	esi, [CurrentBuffer] ; from 'GETBUFFER'
 	sub	eax, esi
 	mov	[createfile_entrypos], eax ; offset in buffer
+	; 11/11/2025
+	mov	eax, [DIRSEC]
+	mov	[createfile_dirsector], eax
 	jmp	cf_new_dir_entry_@
 
 loc_createfile_add_new_cluster:
@@ -8127,9 +8141,12 @@ loc_createfile_gffc_retn:
 
 loc_createfile_add_new_cluster_check_fsc:
 	mov	ecx, [createfile_FreeSectors]
-	movzx	eax, byte [createfile_SecPerClust]
+	; 11/11/2025
+	;movzx	eax, byte [createfile_SecPerClust]
+	movzx	ebx, byte [createfile_SecPerClust]
 	; 06/08/2025
-	cmp	ecx, eax
+	;cmp	ecx, eax
+	cmp	ecx, ebx
         jb	short loc_createfile_insufficient_disk_space
 
 loc_createfile_add_new_subdir_cluster:
@@ -8153,7 +8170,11 @@ loc_createfile_add_new_subdir_cluster:
 		; (from 'locate_current_dir_file')
 	mov	[createfile_LastDirCluster], eax
 	mov	edx, esi ; LDRVT address
+	; 11/11/2025
+	mov	ecx, 1
+	push	ebx
 	call	ADD_NEW_CLUSTER
+	pop	ebx
 	jc	short loc_createfile_anc_error
 	; eax = First cluster allocated
 	; 06/08/2025
@@ -8181,6 +8202,9 @@ cf_get_new_dir_sector:
 	mov	ecx, 512/4
 	xor	eax, eax ; 0
 	rep	stosd
+
+	; 11/11/2025
+	; ebx = sectors per cluster
 
 	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
 	jnz	short cf_loop_clear_dir_sector
@@ -8241,7 +8265,7 @@ loc_createfile_anc_3:
 
 	; 06/08/2025
 	; edx = LDRVT address
-	
+
 	mov	[createfile_LDRVT], edx
 	mov	esi, edx
 	call	update_fat32_fsinfo
@@ -8263,7 +8287,7 @@ cf_new_dir_entry_@:
 	mov	bl, [createfile_attrib]
 
 	; save Logical DOS Drive Description Table address
-	
+
 	call	make_new_directory_entry
 
 	; copy modified directory entry to FindFile_DirEntry field
