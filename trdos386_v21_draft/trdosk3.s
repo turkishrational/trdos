@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 19/10/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 13/11/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -5427,7 +5427,7 @@ loc_delete_file_err1:
 	;je	loc_permission_denied
 	; 28/07/2022
 	jne	short loc_delete_file_err2
- loc_delete_file_openfile_err:	; 21/07/2025
+loc_delete_file_openfile_err:	; 21/07/2025
 	jmp	loc_permission_denied
 loc_delete_file_err2:
 	;;;
@@ -6420,6 +6420,7 @@ loc_move_y_n_escape:
 	jmp	short loc_do_not_move_file
 
 copy_file:
+	; 13/11/2025
 	; 14/09/2025 - TRDOS 386 Kernel v2.0.10
 	; 31/08/2024 - TRDOS 386 v2.0.9
 	; 25/07/2022 - TRDOS 386 Kernel v2.0.5
@@ -6502,14 +6503,25 @@ loc_copy_cmd_failed_2:
 	cmp	al, ERR_PERM_DENIED
 	;jne	loc_run_cmd_failed
 	; 25/07/2022
-	jne	short loc_copy_cmd_failed_3
+	;jne	short loc_copy_cmd_failed_3
+	; 13/11/2025
+	jne	short loc_copy_cmd_failed_4
 
 	jmp	loc_permission_denied
 
 loc_file_write_insuff_disk_space_msg:
 	mov	esi, msg_insufficient_disk_space
+loc_copy_cmd_failed_5:
 	call	print_msg
         jmp     loc_file_rw_restore_retn
+
+	; 13/11/2025 (TRDOS 386 v2.0.10)
+loc_copy_cmd_failed_4:
+	cmp	al, ERR_INV_FILE_NAME ; 26 ; 1Ah
+	jne	short loc_copy_cmd_failed_3
+	
+	mov	esi, msg_invalid_file_name
+	jmp	short loc_copy_cmd_failed_5
 
 copy_source_file_to_destination_question:
 	push	edi ; *

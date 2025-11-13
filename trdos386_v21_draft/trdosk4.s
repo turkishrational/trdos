@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 11/11/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 13/11/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -5085,6 +5085,7 @@ loc_rename_direntry_update_parent_dir_lm_date:
 	retn
 
 move_source_file_to_destination_file:
+	; 13/11/2025
 	; 22/09/2025
 	; 15/09/2025
 	; 11/08/2025
@@ -5372,7 +5373,9 @@ msftdf_permission_denied_retn:
 	;mov	eax, 05h ; Access (Permission) denied !
 	; 29/07/2022
 	sub	eax, eax
-	mov	al, 5
+	;mov	al, 5
+	; 13/11/2025
+	mov	al, ERR_PERM_DENIED
 	stc
 msftdf_rest_cdir_err_retn:
 msftdf_return:
@@ -5775,6 +5778,7 @@ msftdf_retn:
 	retn
 
 copy_source_file_to_destination_file:
+	; 13/11/2025
 	; 11/11/2025
 	; 09/11/2025, 10/11/2025
 	; 07/11/2025
@@ -6113,7 +6117,9 @@ csftdf_df_permission_denied_retn:
 	;mov	eax, 05h ; Access/Permission denied.
 	; 29/07/2022
 	sub	eax, eax
-	mov	al, 5
+	;mov	al, 5
+	; 13/11/2025
+	mov	al, ERR_PERM_DENIED
 csftdf_df_error_stc_retn:
 	stc
 	retn

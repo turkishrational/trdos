@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - SYSTEM DEFINITIONS : sysdefs.s
 ; ----------------------------------------------------------------------------
-; Last Update: 05/06/2025  (Previous: 23/07/2022, v2.0.5)
+; Last Update: 13/11/2025  (Previous: 23/07/2022, v2.0.5)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -164,9 +164,10 @@ SYSCALL_INT_NUM   equ '40' ; '40h'
 
 ; 13/05/2015 - ERROR CODES
 ERR_FILE_NOT_OPEN  equ 10 ; 'file not open !' error
-ERR_FILE_ACCESS    equ 11 ; 'permission denied !' error
+; 13/11/2025
+;ERR_FILE_ACCESS   equ 11 ; 'permission denied !' error
 ; 14/05/2015
-ERR_DIR_ACCESS     equ 11 ; 'permission denied !' error
+;ERR_DIR_ACCESS    equ 11 ; 'permission denied !' error
 ERR_FILE_NOT_FOUND equ 12 ; 'file not found !' error
 ERR_TOO_MANY_FILES equ 13 ; 'too many open files !' error
 ERR_DIR_EXISTS     equ 14 ; 'directory already exists !' error
@@ -214,7 +215,11 @@ ERR_DISK_SPACE	   equ 39 ; 'out of volume !' TRDOS 8086
 ERR_DISK_WRITE	   equ 30 ; 'disk write protected !' ; 16/10/2016
 ERR_ACCESS_DENIED  equ  5 ; 'access denied !' ; TRDOS 8086
 ; 28/02/2017
-ERR_PERM_DENIED	   equ 11 ; 'permission denied !' error
+;ERR_PERM_DENIED   equ 11 ; 'permission denied !' error
+; 13/11/2025 - TRDOS 386 v2.0.10
+ERR_PERM_DENIED	   equ 5  ; 'permission denied !' error
+ERR_FILE_ACCESS	   equ 5  ; 'permission denied !' error
+ERR_DIR_ACCESS	   equ 5  ; 'permission denied !' error
 ; 18/05/2016
 ERR_MISC	   equ 27 ; miscellaneous/other errors
 ; 15/10/2016

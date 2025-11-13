@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - INITIALIZED DATA : trdosk9.s
 ; ----------------------------------------------------------------------------
-; Last Update: 11/11/2025 (Previous: 29/12/2024 - Kernel v2.0.9)
+; Last Update: 13/11/2025 (Previous: 29/12/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -34,7 +34,7 @@ Magic_Bytes:
 		db 1
 mainprog_Version:
 		db 7
-		db "[TRDOS] Main Program v2.1.0 (11/11/2025)"
+		db "[TRDOS] Main Program v2.1.0 (13/11/2025)"
 		db 0Dh, 0Ah
 		db "(c) Erdogan Tan 2005-2025"
 		db 0Dh, 0Ah, 0
@@ -315,6 +315,11 @@ Msg_Insufficient_Memory:
 	; 04/06/2025 - TRDOS 386 v2.0.10
 Msg_Invalid_LongName:
                 db "Invalid long name!"
+                db 0Dh, 0Ah, 0
+
+	; 13/11/2025
+msg_invalid_file_name:
+                db "Invalid file name!"
                 db 0Dh, 0Ah, 0
 
 Msg_Error_Code:
