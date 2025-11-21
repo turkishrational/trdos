@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 09/11/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 19/11/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -1030,11 +1030,13 @@ LNE_COUNT:	resb 1	; (PCDOS 7.1 -> ? -LFN entry count-)
 FATBYT:		resd 1
 ;FCS_START:	resd 1
 ;FCS_END:	resd 1	; 12/07/2025
+NEXTCLUSTER:	; 19/11/2025
 LASTCLUSTER:	resd 1
 FREECLUSTER:	resd 1
-NEXTCLUSTER:	resd 1
-CLUSTERS:	resd 1
-CLUSTCOUNT:	resd 1
+; 19/11/2025
+;NEXTCLUSTER:	resd 1
+;CLUSTERS:	resd 1
+;CLUSTCOUNT:	resd 1
 
 ; 02/06/2025 - TRDOS 386 v2.0.10
 ; get_direntry parameters

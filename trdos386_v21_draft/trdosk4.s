@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 13/11/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 19/11/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -3442,7 +3442,7 @@ loc_mkdir_add_new_subdir_cluster:
 	; eax = First cluster allocated
 
 	; 06/08/2025
-	mov	[mkdir_pd_new_cluster],  eax
+	mov	[mkdir_pd_new_cluster], eax
 
 	call	FIGREC
 
@@ -7990,6 +7990,7 @@ csftdf2_save_fs_file:
 	retn
 
 create_file:
+	; 19/11/2025
 	; 11/11/2025
 	; 06/08/2025 (TRDOS 386 Kernel v2.0.10)
 	;	(Major Modification)
@@ -8193,8 +8194,8 @@ loc_createfile_add_new_subdir_cluster:
 		; (from 'locate_current_dir_file')
 	mov	[createfile_LastDirCluster], eax
 	mov	edx, esi ; LDRVT address
+	; 19/11/2025
 	; 11/11/2025
-	mov	ecx, 1
 	push	ebx
 	call	ADD_NEW_CLUSTER
 	pop	ebx

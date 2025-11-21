@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 09/11/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 21/11/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -5049,8 +5049,10 @@ pack_9:
 ; 11/07/2025 - TRDOS 386 v2.0.10
 
 ADD_NEW_CLUSTER:
-	mov	ecx, 1
-ADD_NEW_CLUSTERS:
+	; 21/11/2025
+	; 19/11/2025
+	;mov	ecx, 1
+;ADD_NEW_CLUSTERS:
 	; 17/07/2025
 	; 14/07/2025
 	; 12/07/2025
@@ -5065,7 +5067,8 @@ ADD_NEW_CLUSTERS:
 	; INPUT:
 	;     edx = Logical DOS Drive Description Table address
 	;     eax = Last cluster of file (0 if null file)
-	;     ecx = Number of clusters to allocate
+	;     19/11/2025
+	;;;   ecx = Number of clusters to allocate
 	;     [current_file] = file (SFT) number
 	;
 	; OUTPUT:
@@ -5086,17 +5089,19 @@ ADD_NEW_CLUSTERS:
 ;ALLOCATE:
 	; edx = Logical DOS Drive Description Table address
 	; eax = Last cluster of file (0 if null file)
-	; ecx = Number of clusters to allocate
-	mov 	[NEXTCLUSTER], eax
+	;; ecx = Number of clusters to allocate
+	; 19/11/2025	
+	;mov 	[NEXTCLUSTER], eax
 	mov	[LASTCLUSTER], eax
-	mov	[CLUSTERS], ecx
-	mov	[CLUSTCOUNT], ecx
+	;mov	[CLUSTERS], ecx
+	;mov	[CLUSTCOUNT], ecx
 
-	xor	eax, eax ; 0
-	call	UNPACK
-	; eax = [CL0FATENTRY]
-	mov	[FATBYT], eax	; save correct cluster 0 value
-	;jc	short figrec_retn ; abort if error
+	; 19/11/2025
+	;xor	eax, eax ; 0
+	;call	UNPACK
+	;; eax = [CL0FATENTRY]
+	;mov	[FATBYT], eax	; save correct cluster 0 value
+	;;jc	short figrec_retn ; abort if error
 
 	cmp	byte [edx+LD_FATType], 2
 	jna	short adc_1 ; FAT fs
@@ -5116,8 +5121,11 @@ adc_2:
 	mov	[FCS_END], ecx ; Last Cluster (search end)
 	;;;
 
-	and	eax, eax
-	jz	short adc_4
+	;and	eax, eax
+	;jz	short adc_4
+	; 19/11/2025
+	cmp	eax, 2
+	jb	short adc_4
 
 	mov	[FCS_START], eax
 
@@ -5178,14 +5186,15 @@ adc_9:
 adc_10:
 	retn
 adc_11:
-	; free cluster (eax = 0)
-	;mov	eax, [FREECLUSTER] ; 14/07/2025
-	; eax = cluster number
-	;mov	ebx, 1
-	sub	ebx, ebx
-	inc	ebx 	; 1 ; mark this free guy as "1"
-	call	PACK	; set special "temporary" mark
-	jc	short adc_10
+	; 21/11/2025
+	;; free cluster (eax = 0)
+	;;mov	eax, [FREECLUSTER] ; 14/07/2025
+	;; eax = cluster number
+	;;mov	ebx, 1
+	;sub	ebx, ebx
+	;inc	ebx 	; 1 ; mark this free guy as "1"
+	;call	PACK	; set special "temporary" mark
+	;jc	short adc_10
 
 	cmp	byte [edx+LD_FATType], 2
 	jna	short adc_12 ; not FAT32
@@ -5198,6 +5207,8 @@ adc_12:
 	; FAT16 or FAT12 fs
 	lea	ebx, [edx+LD_BPB+FAT_FreeClusters]
 adc_13:
+; 21/11/2025
+%if 0	
 	mov	eax, [ebx]
 	inc	eax
 	;jz	short NO_ALLOC ; Free count not valid
@@ -5210,37 +5221,71 @@ adc_13:
 	movzx	eax, byte [edx+LD_BPB+SecPerClust]
 	; 17/07/2025
 	sub	[edx+LD_FreeSectors], eax
+%else
+	; 21/11/2025
+	mov	ecx, [ebx]
+	inc	ecx
+	jz	short adc_14 ; Free count not valid
+	dec	ecx
+
+	dec	ecx
+	; Reduce free count by 1
+	mov	[ebx], ecx
+	movzx	ecx, byte [edx+LD_BPB+SecPerClust]
+	sub	[edx+LD_FreeSectors], ecx
+%endif
 
 adc_14: ; (MSDOS -> NO_ALLOC)
-	mov	ebx, [FREECLUSTER]
-	mov	eax, [NEXTCLUSTER]
-	call	PACK
-	jc	short adc_10
+	; 19/11/2025
+	;mov	ebx, [FREECLUSTER]
+	;mov	eax, [NEXTCLUSTER]
+	;call	PACK
+	;jc	short adc_10
 
-	dec	dword [CLUSTCOUNT]
-	jz	short adc_15
-
-	mov	eax, [FREECLUSTER]
-	mov	[NEXTCLUSTER], eax
-	jmp	short adc_8
+	;dec	dword [CLUSTCOUNT]
+	;jz	short adc_15
+	;
+	;mov	eax, [FREECLUSTER]
+	;mov	[NEXTCLUSTER], eax
+	;jmp	short adc_8
 
 ; We've successfully extended the file. Clean up and exit
 
 adc_15:
-	mov	eax, [FREECLUSTER] ; (new) last cluster
+	;mov	eax, [FREECLUSTER] ; (new) last cluster
+	; 21/11/2025
+	; eax = [FREECLUSTER]
 	mov	ebx, -1 ; 0FFFFFFFFh
 	call	PACK	; mark last cluster EOF
 	jc	short adc_10
 
-	mov	eax, [LASTCLUSTER]
-	call	UNPACK		; Get first cluster allocated for return
-	jc	short adc_10
-	mov	[NEXTCLUSTER], eax
-	call    RESTFATBYT      ; Restore correct cluster 0 value
-	jc	short adc_10
-	
+	; 19/11/2025
+	;mov	eax, [LASTCLUSTER]
+	;call	UNPACK		; Get first cluster allocated for return
+	;jc	short adc_10
+	;mov	[NEXTCLUSTER], eax
+	;call	RESTFATBYT      ; Restore correct cluster 0 value
+	;jc	short adc_10
+
+	; 21/11/2025
+	mov	eax, [LASTCLUSTER] ; cluster number
+	and	eax, eax
+	jz	short adc_18
+	mov	ebx, [FREECLUSTER] ; content (next cluster)
+	call	PACK
+	jnc	short adc_18
+	mov	eax, [FREECLUSTER]
+	sub	ebx, ebx ; 0
+	call	PACK	; mark cluster free
+	; FAT write error !
+	mov	eax, ERR_MISC ; 27 ; miscellaneous/other errors	
+	stc
+	retn
+adc_18:
 	mov	ebx, [LASTCLUSTER]
-	mov	eax, [NEXTCLUSTER]
+	;mov	eax, [NEXTCLUSTER]
+	; 19/11/2025
+	mov	eax, [FREECLUSTER]
 		; EAX = first cluster allocated
 ; 14/07/2025
 %if 0
@@ -5267,13 +5312,14 @@ adc_16:
 ; cluster we were able to allocate, so it doesn't become orphaned.
 
 adc_17:
-	mov	eax, [LASTCLUSTER] ; EAX = last cluster of file
-	mov	ebx, -1 ; 0FFFFFFFFh ; cluster content (data)
-				; last cluster sign
-	call	RELBLKS         ; give back any clusters just alloced
-	call	RESTFATBYT	; Alloc failed.
-	mov	ecx, [CLUSTERS] ; Number of clusters to allocate
-	sub	ecx, [CLUSTCOUNT]
+	; 19/11/2025
+	;mov	eax, [LASTCLUSTER] ; EAX = last cluster of file
+	;mov	ebx, -1 ; 0FFFFFFFFh ; cluster content (data)
+	;			; last cluster sign
+	;call	RELBLKS         ; give back any clusters just alloced
+	;call	RESTFATBYT	; Alloc failed.
+	;mov	ecx, [CLUSTERS] ; Number of clusters to allocate
+	;sub	ecx, [CLUSTCOUNT]
 		; ECX = max. no. of clusters that could be added to file
 Disk_Full_Return:
         ; MSDOS 6.0
@@ -5287,6 +5333,8 @@ Disk_Full_Return:
 
 ; 11/07/2025 - TRDOS 386 v2.0.10
 
+; 19/11/2025
+%if 0
 RESTFATBYT:
 	; 11/07/2025
 	; (MSDOS -> RESTFATBYT) - Ref: Retro DOS v5 - ibmdos7.s
@@ -5313,6 +5361,7 @@ RESTFATBYT:
 	mov	eax, [FATBYT]
 	mov	[CL0FATENTRY], eax
 	retn
+%endif
 
 ; --------------------------------------------------------------------
 
