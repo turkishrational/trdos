@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 21/11/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 26/11/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -3148,6 +3148,7 @@ up_1:
 ; 27/04/2025 - TRDOS 386 v2.0.10
 
 MAPCLUSTER:
+	; 25/11/2025
 	; 22/07/2025
 	; 10/07/2025
 	; 27/04/2025
@@ -3221,14 +3222,16 @@ mapcl_3:
 	;mov	esi, [CurrentBuffer]
 	lea	edi, [esi+BUFINSIZ]
 	add	edi, ebx
+
 	cmp	ebx, 511
 	jne	short mapcl_4
 
 	; FAT12, cluster split
-	
-	mov	al, [edi]	
-	inc	byte [ClusSplit]
+
+	mov	al, [edi]
 	mov	[ClusSave], al
+
+	inc	byte [ClusSplit]
 
 	;mov	eax, [esi+BUFFINFO.buf_sector]
 	;mov	[ClusSec], eax
@@ -3241,12 +3244,30 @@ mapcl_3:
 	call	GETFATBUFFER
 	jc	short mapcl_5	; eax = error code
 
-	mov	al, [ClusSave]
+	;mov	al, [ClusSave]
 	; 10/07/2025
 	;mov	ah, [esi+BUFINSIZ]
 	lea	edi, [esi+BUFINSIZ]
-	mov	ah, [edi]
-	jmp	short mapcl_7
+	;mov	ah, [edi]
+	; 25/11/2025
+	mov	eax, [edi]
+	shl	eax, 8
+	mov	al, [ClusSave]
+	mov	[ClusSave], eax
+	; 25/11/2025
+	;jmp	short mapcl_7
+
+mapcl_7:
+	test	byte [CLUSNUM], 1 ; odd ?
+	jz	short mapcl_8 ; no, even
+
+	; FAT12, high 12 bit
+	shr	eax, 4
+mapcl_8:
+	; FAT12
+	; low 12 bit
+	and	eax, 0FFFh
+	retn
 
 mapcl_4:
 	mov	eax, [edi]
@@ -3263,18 +3284,6 @@ mapcl_5:
 mapcl_6:
 	; FAT32
 	and	eax, 0FFFFFFFh ; 28bit
-	retn
-
-mapcl_7:
-	test	byte [CLUSNUM], 1 ; odd ?
-	jz	short mapcl_8 ; no, even
-
-	; FAT12, high 12 bit
-	shr	eax, 4
-mapcl_8:
-	; FAT12
-	; low 12 bit
-	and	eax, 0FFFh
 	retn
 
 ; --------------------------------------------------------------------
@@ -4915,6 +4924,8 @@ NEXTENTRY:
 ; 10/07/2025 - TRDOS 386 v2.0.10
 
 PACK:
+	; 26/11/2025
+	; 25/11/2025
 	; 22/07/2025
 	; 10/07/2025
 	; (MSDOS -> PACK) - Ref: Retro DOS v5 - ibmdos7.s
@@ -4960,7 +4971,11 @@ pack_1:
 	; Note: EAX contains 12 bit next cluster number
 	;       but we need all of the 16 bit cluster data
 	;	(it is in [ClusSave])
-	mov	ax, [ClusSave]
+	;mov	ax, [ClusSave]
+	; 25/11/2025
+	mov	eax, [ClusSave]
+	; 26/11/2025
+	and	ebx, 0FFFh
 
 	; FAT12
 	test	byte [CLUSNUM], 1 ; odd ?
