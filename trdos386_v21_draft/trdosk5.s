@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 26/11/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 28/11/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -4010,6 +4010,7 @@ u_fat32_fsi_1:
 ; 04/05/2025 - TRDOS 386 v2.0.10
 
 read_fat32_fsinfo:
+	; 28/11/2025
 	; 04/05/2025
 	;
 	; Read FAT32 fs info sector
@@ -4029,7 +4030,7 @@ read_fat32_fsinfo:
 	push	esi
 	call	GETCURRENTHEAD	; (MSDOS -> GETCURHEAD)
 	call	BUFWRITE
-	jnc	short u_fat32_fsi_1
+	jnc	short r_fat32_fsi_1
 	pop	esi
 	retn
 
@@ -4044,19 +4045,19 @@ r_fat32_fsi_1:
 	push	ebx
 	call	DREAD	; read fs info sector
 	pop	ebx
-	jc	short u_fat32_fsi_3
+	jc	short r_fat32_fsi_3
 
 	;cmp	dword [ebx+FSINFO.LeadSig], 41615252h
 	cmp	dword [ebx], 41615252h ; 'RRaA' ; (NASM syntax)
-	jne	short u_fat32_fsi_2
+	jne	short r_fat32_fsi_2
 
 	;cmp	dword [ebx+484], 61417272h
 	cmp	dword [ebx+FSINFO.StrucSig], 61417272h ; 'rrAa'
-	jne	short u_fat32_fsi_2
+	jne	short r_fat32_fsi_2
 
 	;cmp	dword [ebx+508], 0AA550000h
 	cmp	dword [ebx+FSINFO.TrailSig], 0AA550000h
-	je	short u_fat32_fsi_3
+	je	short r_fat32_fsi_3
 
 r_fat32_fsi_2:
 	mov	eax, -1 ; invalid data/sector
