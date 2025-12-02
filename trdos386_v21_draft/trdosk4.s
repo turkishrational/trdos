@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 19/11/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 01/12/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2877,6 +2877,7 @@ loc_next_sum:
 	retn
 
 make_sub_directory:
+	; 01/12/2025
 	; 06/08/2025
 	; 15/07/2025
 	; 14/07/2025
@@ -3605,6 +3606,9 @@ zerodir_ok:
 	call	PACK	; mark last cluster EOF
 	jc	short zerodir_error
 
+	; 01/12/2025
+	xor	edi, edi ; 0
+
 	cmp	byte [edx+LD_FATType], 2
 	jna	short loc_mkdir_dec_fat_fc ; not FAT32
 
@@ -3615,6 +3619,8 @@ zerodir_ok:
 	jne	short loc_mkdir_dec_fat32_fc
 	inc	ecx
 	mov	[edx+LD_BPB+FAT32_FirstFreeClust], ecx
+	; 01/12/2025
+	inc	edi
 	mov	eax, [edx+LD_Clusters] ; Last Cluster - 1
 	inc	eax  ; last cluster
 	cmp	ecx, eax
@@ -3650,7 +3656,20 @@ loc_mkdir_dec_fat32_fc:
 	movzx	eax, byte [mkdir_SecPerClust]
 	sub	[edx+LD_FreeSectors], eax
 
+	; 01/12/2025
+	cmp	byte [edx+LD_FATType], 2
+	jna	short loc_mkdir_skip_dec_fc_@ ; not FAT32
+	inc	edi
+	jmp	short loc_mkdir_set_fsinfo_mf
 loc_mkdir_skip_dec_fc:
+	; 01/12/2025
+	and	edi, edi
+	jz	short loc_mkdir_skip_dec_fc_@
+loc_mkdir_set_fsinfo_mf:
+	; (set FSINFO modified flag)
+	mov	byte [edx+LD_BPB+BS_FAT32_Reserved1], -1
+
+loc_mkdir_skip_dec_fc_@:
 	; 14/07/2025
 	; update first cluster field of the directory entry
 	; (of the parent directory)
@@ -5778,6 +5797,7 @@ msftdf_retn:
 	retn
 
 copy_source_file_to_destination_file:
+	; 01/12/2025
 	; 13/11/2025
 	; 11/11/2025
 	; 09/11/2025, 10/11/2025
@@ -6414,6 +6434,12 @@ csftdf2_df_release_cc_3:
 	jnb	short csftdf2_df_release_cc_4
 	; replace first free cluster value
 	mov	[ebx], eax
+	
+	; 01/12/2025
+	cmp	byte [edx+LD_FATType], 2
+	jna	short csftdf2_df_release_cc_4
+	; (set FSINFO modified flag)
+	mov	byte [edx+LD_BPB+BS_FAT32_Reserved1], -1
 
 	; Note: Only the cluster number in the directory entry
 	;       is considered for first free cluster calculation
@@ -6545,7 +6571,7 @@ csftdf2_create_file_OK:
 	;mov	cl, 8 ; 32 bytes
 	; 29/08/2024
 	sub	ecx, ecx ; 0
-	mov	cl,8
+	mov	cl, 8
 	rep	movsd
 
 	;mov	cl, [esi] ; L.D.D.D.T.
@@ -6556,7 +6582,7 @@ csftdf2_create_file_OK:
 	mov	esi, FindFile_DirEntry
 	mov	edi, DestinationFile_DirEntry
 	sub	ecx, ecx
-	mov	cl,8
+	mov	cl, 8
 	rep	movsd
 	;mov	[csftdf_df_cluster], 0
 	;;;
@@ -7990,6 +8016,7 @@ csftdf2_save_fs_file:
 	retn
 
 create_file:
+	; 01/12/2025
 	; 19/11/2025
 	; 11/11/2025
 	; 06/08/2025 (TRDOS 386 Kernel v2.0.10)
@@ -8275,6 +8302,12 @@ loc_createfile_anc_2:
 	; change first free cluster number
 	inc	ecx
 	mov	[esi], ecx
+	; 01/12/2025
+	cmp	byte [edx+LD_FATType], 2
+	jna	short loc_createfile_anc_4 ; not FAT32
+	; 01/12/2025 (Set FSINFO modified flag)
+	mov	byte [edx+LD_BPB+BS_FAT32_Reserved1],-1
+loc_createfile_anc_4:
 	mov	ebx, [edx+LD_Clusters] ; Last Cluster - 1
 	inc	ebx  ; last cluster
 	cmp	ecx, ebx

@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 28/11/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 01/12/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -3880,6 +3880,7 @@ chk_flush_2:
 ; 03/05/2025 - TRDOS 386 v2.0.10
 
 update_fat32_fsinfo:
+	; 01/12/2025
 	; 04/05/2025
 	; 03/05/2025
 	; Ref: Retro DOS v5 - ibmdos7.s
@@ -3911,12 +3912,13 @@ update_fat32_fsinfo:
 	cmp	byte [esi+LD_FATType], 3 ; FAT32 fs ?
 	jne	short u_fat32_fsi_2 ; no, nothing to do
 
-	; 04/05/2025
+	; 01/12/2025
 	; check modification status of FSINFO sector data
-	mov	eax, [esi+LD_BPB+FAT32_fsinfo_sector]
-	and	eax, eax
-	jnz	short u_fat32_fsi_3 ; FSINFO data is valid
-			  ; and free count or ffc is not changed
+	cmp	byte [esi+LD_BPB+BS_FAT32_Reserved1], 0
+	jna	short u_fat32_fsi_2 ; FSINFO data is valid
+			; and free count or ffc is not changed
+	; reset FSINFO sector modification flag
+	mov	byte [esi+LD_BPB+BS_FAT32_Reserved1], 0 ; reset
 
 ; 04/05/2025
 %if 0
@@ -4001,7 +4003,8 @@ u_fat32_fsi_1:
 	; flag/set the FSINFO sector data is valid and not-modified yet
 	; (modification procedure will reset it to zero again)
 
-	mov	[esi+LD_BPB+FAT32_fsinfo_sector], eax
+	; 01/12/2025
+	;mov	[esi+LD_BPB+FAT32_fsinfo_sector], eax
 
 	retn
 
@@ -5388,6 +5391,7 @@ RELEASE:
 RELEASE_nc:	; 21/07/2025
        	xor	ebx, ebx
 RELBLKS:
+	; 01/12/2025
 	; 19/10/2025
 	; 17/07/2025
 	; 11/07/2025
@@ -5461,6 +5465,12 @@ rblks_2:
 	movzx	eax, byte [edx+LD_BPB+SecPerClust]
 	; 17/07/2025
 	add	[edx+LD_FreeSectors], eax
+
+	; 01/12/2025
+	cmp	byte [edx+LD_FATType], 2
+	jna	short rblks_3 ; not FAT32
+	; 01/12/2025 (Set FSINFO modified flag)
+	mov	byte [edx+LD_BPB+BS_FAT32_Reserved1],-1
 
 rblks_3: ; (MSDOS -> NO_DEALLOC)
 	mov	eax, [NEXTCLUSTER]

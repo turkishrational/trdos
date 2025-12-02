@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - DRV INIT : trdosk2.s
 ; ----------------------------------------------------------------------------
-; Last Update: 13/05/2025 (Previous: 22/05/2024, v2.0.8)
+; Last Update: 01/12/2025 (Previous: 22/05/2024, v2.0.8)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -1074,6 +1074,7 @@ load_masterboot_ok:
 	retn
 
 get_free_FAT_sectors:
+	; 01/12/2025
 	; 04/05/2025 (TRDOS 386 v2.0.10)
 	; 29/08/2023
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -1093,7 +1094,7 @@ get_free_FAT_sectors:
 	;mov	[esi+LD_FreeSectors], eax ; Reset
 
 	; 04/05/2025
-	mov	 [FreeClusterCount], eax ; 0
+	mov	[FreeClusterCount], eax ; 0
 	dec	eax  ; mov eax, -1
 
         cmp     byte [esi+LD_FATType], 2
@@ -1115,9 +1116,10 @@ gffs_1:
 	mov	[esi+LD_BPB+FAT32_FreeClusters], eax ; -1
 	;mov	[esi+LD_BPB+BPB_Reserved+4], eax ; First Free Cluster (reset)
 	mov	[esi+LD_BPB+FAT32_FirstFreeClust], eax ; -1
+	; 01/12/2025
 	; 04/05/2025
-	;mov	[esi+LD_BPB+BPB_Reserved+8], eax
-	mov	[esi+LD_BPB+FAT32_fsinfo_sector], eax ; -1
+	;;mov	[esi+LD_BPB+BPB_Reserved+8], eax
+	;mov	[esi+LD_BPB+FAT32_fsinfo_sector], eax ; -1
 
 ; 04/05/2025
 %if 0
@@ -1149,7 +1151,7 @@ loc_gfc_check_fsinfo_signs:
 	;mov	eax, [ebx]
 %else
 	; 04/05/2025 - TRDOS 386 v2.0.10
-	
+
 	call	read_fat32_fsinfo
 	jc	short gffc_err
 %endif
