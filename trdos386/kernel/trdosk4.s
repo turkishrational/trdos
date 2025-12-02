@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 11/08/2025  (Previous: 03/09/2024, v2.0.9)
+; Last Update: 02/12/2025  (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1324,6 +1324,7 @@ loc_pslnsc_retn:
     	retn
 
 parse_path_name:
+	; 02/12/2025 (TRDOS 386 v2.0.10, BugFix)
 	; 03/09/2024 (TRDOS 386 v2.0.9)
 	; 09/08/2022
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -1424,7 +1425,10 @@ loc_scan_next_slash_pos:
 
 	mov	ecx, [Last_Slash_Pos]
 	; 03/09/2024
-	jcxz	pass_ppn_cdir
+	;jcxz	pass_ppn_cdir
+	; 02/12/2025
+	jecxz	pass_ppn_cdir
+
 	mov	esi, [First_Path_Pos]
 	sub	ecx, esi
 	inc	ecx
