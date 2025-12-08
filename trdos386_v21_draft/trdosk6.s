@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 08/12/2025  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 09/12/2025  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -13731,6 +13731,7 @@ cnpm_2:
 ;	retn ; * 'sysret' ; byte [sysflg] -> 0FFh
 
 readi:
+	; 09/12/2025
 	; 08/12/2025 - TRDOS 386 v2.0.10 (v2.1)
 	; 09/08/2022
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
@@ -13795,9 +13796,11 @@ dskr_1:
 	call	mget_r
 	; NOTE: in 'mget_r', relevant sector will be read in buffer
 	; if it is not already in buffer !
-	;mov	ebx, readi_buffer
 	; 08/12/2025
-	lea	ebx, [esi+BUFINSIZ]
+	;mov	ebx, readi_buffer
+	; 09/12/2025
+	;lea	ebx, [esi+BUFINSIZ]
+	; ebx = buffer (data) address
 	cmp	byte [u.kcall], 0 ; the caller is 'namei' sign (=1)
 	ja	short dskr_3	  ; zf=0 -> the caller is 'namei'
 	cmp	word [u.pcount], 0
@@ -13826,6 +13829,7 @@ dskr_5:		; 23/07/2022
 	retn
 
 mget_r:
+	; 09/12/2025
 	; 08/12/2025
 	; 01/07/2025 - TRDOS 386 Kernel v2.0.10
 	; 29/08/2023
@@ -14048,8 +14052,11 @@ mget_r_9:
 	mov	edx, esi
 	call	GETBUFFER
 	jc	short mget_r_err ; eax = error code
-	; ebx = buffer (data) address
+	; esi = buffer header address
 	; edx = LDRVT address
+	; 09/12/2025
+	lea	ebx, [esi+BUFINSIZ]
+	; ebx = buffer (data) address
 %endif
 
 mget_r_10:
