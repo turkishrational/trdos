@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 19/11/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 08/12/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -590,15 +590,20 @@ readi.valid:	resb 1 ; valid data (>0 = valid for readi)
 readi.drv:	resb 1 ; drive number (0, 1,2,3,4..)
 readi.spc:	resb 1 ; sectors per cluster for 'readi' drive
 readi.s_index:  resb 1 ; sector index in current cluster (buffer)
-readi.sector:	resd 1 ; current disk sector
-readi.bpc:	resw 1 ; bytes per cluster - 1
-readi.offset:	resw 1 ; byte offset in cluster buffer
+; 08/12/2025
+;readi.sector:	resd 1 ; current disk sector
+;readi.bpc:	resw 1 ; bytes per cluster - 1
+;readi.offset:	resw 1 ; byte offset in cluster buffer
+; 08/12/2025
+readi.bpc:	resd 1 ; bytes per cluster
+readi.offset:	resd 1 ; byte offset in cluster buffer
 readi.cluster:  resd 1 ; current cluster number
 readi.c_index:	resd 1 ; cluster index of the current cluster (0,1,2,3..)
 readi.fclust:	resd 1 ; first cluster of the current cluster
 ; 01/07/2025
 ;readi.fs_index: resd 1 ; sector index in disk/file section (for Singlix FS)
-;readi.buffer:	resd 1 ; readi sector buffer address
+; 08/12/2025
+readi.buffer:	resd 1 ; readi sector buffer address
 
 ;alignb 4
 
@@ -607,8 +612,11 @@ writei.drv:	resb 1 ; drive number (0, 1,2,3,4..)
 writei.spc:	resb 1 ; sectors per cluster for 'writei' drive
 writei.s_index: resb 1 ; sector index in current cluster (buffer)
 writei.sector:	resd 1 ; current disk sector
-writei.bpc:	resw 1 ; bytes per cluster - 1
-writei.offset:	resw 1 ; byte offset in cluster buffer
+;writei.bpc:	resw 1 ; bytes per cluster - 1
+;writei.offset:	resw 1 ; byte offset in cluster buffer
+; 08/12/2025
+writei.bpc:	resd 1 ; bytes per cluster
+writei.offset:	resd 1 ; byte offset in cluster buffer
 writei.cluster: resd 1 ; current cluster number
 writei.c_index:	resd 1 ; cluster index of the current cluster (0,1,2,3..)
 writei.fclust:  resd 1 ; first cluster of the current cluster

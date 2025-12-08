@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.10 (v2.1.0 pre-work)
 ; ----------------------------------------------------------------------------
-; Last Update: 03/12/2025 (Previous: 28/01/2025)
+; Last Update: 07/12/2025 (Previous: 28/01/2025)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -3775,7 +3775,7 @@ starting_msg:
 	;;;db "Turkish Rational DOS v2.0 [29/12/2024] ...", 0
 	;;db "Turkish Rational DOS v2.0 [28/01/2025] ...", 0
 	;db "Turkish Rational DOS v2.0 [24/04/2025] ...", 0
-	db "Turkish Rational DOS v2.1 [03/12/2025] ...", 0
+	db "Turkish Rational DOS v2.1 [08/12/2025] ...", 0
 
 NextLine:
 	db 0Dh, 0Ah, 0
@@ -3840,7 +3840,7 @@ kernel_version_msg: ; 17/04/2021
 ;;;db	"TRDOS (386) Kernel v2.0.8 by Erdogan Tan" ; 16/05/2024
 ;;db	"TRDOS (386) Kernel v2.0.9 by Erdogan Tan" ; 20/08/2024
 ;db	"TRDOS (386) Kernel v2.0.10 by Erdogan Tan" ; 11/01/2025
-db	"TRDOS (386) Kernel v2.1.0 by Erdogan Tan" ; 03/12/2025
+db	"TRDOS (386) Kernel v2.1.0 by Erdogan Tan" ; 08/12/2025
 db	0
 
 ; 20/02/2017
@@ -4057,10 +4057,12 @@ PF_Count:	resd 1	; total page fault count
 
 ; 29/04/2016 (TRDOS 386 = TRDOS v2.0)
 ; 22/08/2015 (Retro UNIX 386 v1)
-buffer: 
-	resb	8
-readi_buffer:
-	resb 	512
+; 08/12/2025 - TRDOS 386 v2.0.10 (v2.1)
+;buffer: 
+;	resb	8
+;readi_buffer:
+;	resb 	512
+
 	resb	8
 writei_buffer:
 	resb	512

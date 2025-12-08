@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 22/09/2025  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 08/12/2025  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2563,6 +2563,7 @@ sysclose_err:
 	jmp	error
 
 sysread: ; < read from file >
+	; 08/12/2025 - TRDOS 386 v2.0.10 (v2.1)
 	; 27/09/2024
 	; 18/09/2024
 	; 03/09/2024 (TRDOS v2.0.9)
@@ -2629,6 +2630,12 @@ sysread: ; < read from file >
 	jc	short device_read ; read data from device
 
 	; EAX = First cluster of the file
+	; EBX = File number (Open file number)
+
+	; 08/12/2025 - TRDOS 386 v2.0.10 (v2.1)
+	; ref: RetroDOS v5.0, kernel.s, DOS_READ (PCDOS 7.1)
+	test	byte [ebx+OF_MODE], open_for_read ; 1
+	jz	short file_access_error
 
 	call	rw1	; 03/09/2024 (major modification)
 	jnc	short sysread_0
@@ -2640,9 +2647,12 @@ device_rw_error: ; 03/05/2025
 
 sysread_0:
 	call	readi
+	; 08/12/2025
+	jc	short sysrw_err ; eax = error code
 	jmp	short rw0
 
 syswrite: ; < write to file >
+	; 08/12/2025 - TRDOS 386 v2.0.10 (v2.1)
 	; 27/09/2024
 	; 18/09/2024
 	; 03/09/2024
@@ -2710,6 +2720,11 @@ syswrite: ; < write to file >
 	; EAX = First cluster of the file
 	; EBX = File number (Open file number) ; 23/10/2016
 
+	; 08/12/2025 - TRDOS 386 v2.0.10 (v2.1)
+	; ref: RetroDOS v5.0, kernel.s, DOS_READ (PCDOS 7.1)
+	test	byte [ebx+OF_MODE], open_for_write ; 2
+	jz	short file_access_error
+
 	call	rw1	; 03/09/2024 (major modification)
 	; 03/09/2024
 	jc	short sysrw_err
@@ -2729,6 +2744,14 @@ rw0: ; 1:
         mov	eax, [u.nread]
 	mov	[u.r0], eax
 	jmp	sysret
+
+	; 08/12/2025 - TRDOS 386 v2.0.10 (v2.1)
+file_access_error:
+	mov	eax, ERR_FILE_ACCESS ; permission denied !
+	stc
+rw4:
+	mov	[u.error], eax
+	retn
 
 	; 17/04/2021 (temporary)
 device_write:
@@ -2751,6 +2774,7 @@ device_read:
 	;;jmp	error
 	;; 26/09/2024
 	;jmp	short sysrw_err
+
 	; 03/05/2025 - Temporary !
 	mov	eax, ERR_DEV_ACCESS ; 11
 			; 'permission denied !' error
@@ -2860,13 +2884,15 @@ rw2:
 	;jmp	short rw4
 
 	; 03/09/2024
-rw3:
+;rw3:
+;	; 08/12/2025 - TRDOS 386 v2.0.10 (v2.1)
+;file_access_error:
 ;	mov	eax, ERR_FILE_ACCESS ; permission denied !
 ;	stc
-
-rw4:	; 17/04/2021
-	mov	dword [u.error], eax
-	retn
+;
+;rw4:	; 17/04/2021
+;	mov	dword [u.error], eax
+;	retn
 
 systimer:
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
@@ -13812,6 +13838,7 @@ cnpm_2:
 ;	retn ; * 'sysret' ; byte [sysflg] -> 0FFh
 
 readi:
+	; 08/12/2025 - TRDOS 386 v2.0.10 (v2.1)
 	; 09/08/2022
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 01/05/2016
@@ -13831,6 +13858,8 @@ readi:
 	; OUTPUTS ->
 	;    u.count - cleared
 	;    u.nread - accumulates total bytes passed back
+	;; 08/12/2025
+	;    if CF = 1 -> EAX = error code
 	;
 	; ((EAX)) input/output
 	; (Retro UNIX Prototype : 14/12/2012 - 01/03/2013, UNIXCOPY.ASM)
@@ -13846,6 +13875,7 @@ readi:
 	jna	short dskr_5 ; retn
 ;readi_1:
 dskr:
+	; 08/12/2025 - TRDOS 386 v2.0.10
 	; 01/05/2016
 	; 25/04/2016 - TRDOS 386 (TRDOS v2.0)
 	; 24/05/2015 - 12/10/2015 (Retro UNIX 386 v1)
@@ -13854,8 +13884,14 @@ dskr_0:
         mov	edx, [i.size]
 	mov	ebx, [u.fofp]
 	sub	edx, [ebx]
-	jna	short dskr_4
-	;
+	; 08/12/2025
+	;jna	short dskr_4
+	ja	short dskr_@
+	jz	short dskr_4
+	mov	eax, ERR_FILE_EOF ; end of file
+	; cf = 1
+	retn
+dskr_@:
 	push	eax ; 01/05/2016
 	cmp     edx, [u.count]
 	jnb	short dskr_1
@@ -13866,7 +13902,9 @@ dskr_1:
 	call	mget_r
 	; NOTE: in 'mget_r', relevant sector will be read in buffer
 	; if it is not already in buffer !
-	mov	ebx, readi_buffer
+	;mov	ebx, readi_buffer
+	; 08/12/2025
+	lea	ebx, [esi+BUFINSIZ]
 	cmp	byte [u.kcall], 0 ; the caller is 'namei' sign (=1)
 	ja	short dskr_3	  ; zf=0 -> the caller is 'namei'
 	cmp	word [u.pcount], 0
@@ -13895,7 +13933,8 @@ dskr_5:		; 23/07/2022
 	retn
 
 mget_r:
-	; 01/07/2025 - TRDOS 386 Kernel v2.0.10 
+	; 08/12/2025
+	; 01/07/2025 - TRDOS 386 Kernel v2.0.10
 	; 29/08/2023
 	; 30/07/2022
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
@@ -13907,7 +13946,8 @@ mget_r:
 	; 03/06/2015 (Retro UNIX 386 v1, 'mget', u.5s)
 	; 22/03/2013 - 31/07/2013 (Retro UNIX 8086 v1)
 	;
-	; Get existing or (allocate) a new disk block for file
+	; Get existing disk block for file ; 08/12/2025
+	;;Get existing or (allocate) a new disk block for file
 	;
 	; INPUTS ->
 	;    [u.fofp] = file offset pointer
@@ -13915,10 +13955,14 @@ mget_r:
 	;    [cdev] = Logical dos drive number
 	;    ([u.off] = file offset)
 	; OUTPUTS ->
-	;    EAX = logical sector number
-	;    ESI = Logical Dos Drive Description Table address
+	;;   EAX = logical sector number
+	;;   ESI = Logical Dos Drive Description Table address
+	;  08/12/2025
+	;    EBX = buffer (data) address
+	;    EDX = LDRVT address
 	;
-	; Modified registers: EDX, EBX, ECX, ESI, EDI
+	; Modified registers:
+	;    EAX, EDX, EBX, ECX, ESI, EDI, EBP (08/12/2025)
 
 	mov     esi, [u.fofp]
 	mov	ebx, [esi] ; (u.off)
@@ -13939,8 +13983,10 @@ mget_r:
 	jne	short mget_r_3
 
 	mov	eax, ebx ; file offset
-	mov	cx, [readi.bpc]
-	inc	ecx ; <= 65536
+	;mov	cx, [readi.bpc]
+	;inc	ecx ; <= 65536
+	; 08/12/2025
+	mov	ecx, [readi.bpc]
 	sub	edx, edx
 	div	ecx
 
@@ -13950,7 +13996,9 @@ mget_r:
         jne     short mget_r_4  ; (*)
 
 	; edx = byte offset in cluster (<= 65535)
-	mov	[readi.offset], dx
+	;mov	[readi.offset], dx
+	; 08/12/2025
+	mov	[readi.offset], edx
 	; 23/07/2022
 	;shr	dx, 9 ; / 512
 	shr	edx, 9
@@ -13963,6 +14011,8 @@ mget_r:
 
 mget_r_0:
 	mov	[readi.drv], ch ; physical drive number
+	; 08/12/2025
+	xor	ch, ch ; 0
 	cmp	byte [esi+LD_FATType], 0
 	ja	short mget_r_1
 	mov	cl, [esi+LD_FS_BytesPerSec+1]
@@ -13976,42 +14026,55 @@ mget_r_2:
 	; 23/07/2022
 	;xor	ch, ch
 	; 29/08/2023
-	shl	ecx, 9 
+	shl	ecx, 9
 	;shl	cx, 9 ; * 512
 	;dec	cx ; bytes per cluster - 1
 	; 23/07/2022
-	dec	ecx
-	mov	[readi.bpc], cx
+	;dec	ecx
+	;mov	[readi.bpc], cx
+	; 08/12/2025
+	mov	[readi.bpc], ecx
 	;sub	cx, cx
 	; 23/07/2022
 	sub	ecx, ecx
 mget_r_3:
 	mov	[readi.fclust], eax ; first cluster (or FDT address)
-	mov	[readi.valid], cl ; 0
-	;mov	[readi.s_index], cl ; 0
-	;mov	[readi.offset], cx ; 0
-	mov	[readi.c_index], ecx ; 0
-	mov	[readi.cluster], ecx ; 0
-	mov	[readi.sector], ecx ; 0
+	; 08/12/2025
+	sub	edx, edx ; 0
+	mov	[readi.valid], dl ; 0
+	;mov	[readi.s_index], dl ; 0
+	;mov	[readi.offset], dx ; 0
+	mov	[readi.c_index], edx ; 0
+	mov	[readi.cluster], edx ; 0
+	;mov	[readi.sector], edx ; 0
 
 	mov	eax, ebx ; file offset
-	mov	cx, [readi.bpc]
-	inc	ecx ; <= 65536
-	sub	edx, edx
-	div	ecx
+	;mov	cx, [readi.bpc]
+	;inc	ecx ; <= 65536
+	; 08/12/2025
+	;mov	ecx, [readi.bpc]
+ 	;sub	edx, edx ; 0
+	;div	ecx
+	div	dword [readi.bpc]
 	;mov	edi, [readi.c_index] ; previous cluster index
 	sub	edi, edi
 mget_r_4:
 	mov	[readi.c_index], eax ; cluster index
 	; edx = byte offset in cluster (<= 65535)
-	mov	[readi.offset], dx
+	;mov	[readi.offset], dx
+	; 08/12/2025
+	mov	[readi.offset], edx
 	; 23/07/2022
 	;shr	dx, 9 ; / 512
 	shr	edx, 9
 	mov	[readi.s_index], dl ; sector index in cluster (0 to spc -1)
 
-	mov	ecx, eax ; current cluster index
-	mov	eax, [readi.fclust]
+	;mov	ecx, eax ; current cluster index
+	;mov	eax, [readi.fclust]
+	; 08/12/2025
+	mov	ecx, [readi.fclust]
+	xchg	ecx, eax
+	; eax = first cluster
 	or	ecx, ecx ; cluster index
 	jz	short mget_r_6
 
@@ -14024,6 +14087,9 @@ mget_r_4:
 	mov	eax, edx
 	sub	ecx, edi
 	jz	short mget_r_7
+	; 08/12/2025
+	; (note: even if ecx contains a relative value here
+	;       "ecx < [esi+LD_Clusters]" condition will be valid)
 mget_r_5:
 	; EAX = Beginning cluster
 	; EDX = Sector index in disk/file section
@@ -14035,7 +14101,7 @@ mget_r_5:
 	; EAX = Cluster number
 mget_r_6:
 	; 01/07/2025
-	; eax = sector address (not physical) for Singlix FS 
+	; eax = sector address (not physical) for Singlix FS
 	mov	[readi.cluster], eax ; FDT number for Singlix File System
 mget_r_7:
 	cmp	byte [esi+LD_FATType], 0
@@ -14052,6 +14118,8 @@ mget_r_7:
 	mov	dl, [readi.s_index]
 	add	eax, edx
 mget_r_8:
+; 08/12/2025
+%if 0
 	; eax = logical sector number
 	cmp	byte [readi.valid], 0
 	jna	short mget_r_9
@@ -14059,6 +14127,10 @@ mget_r_8:
 	je	short mget_r_11 ; sector is already in 'readi' buffer
 mget_r_9:
 	mov	[readi.sector], eax
+%endif
+
+; 08/12/2025 - TRDOS 386 v2.0.10 (v2.1)
+%if 0
 	mov	ebx, readi_buffer ; buffer address
 	;mov	ecx, 1
 	; 30/07/2022
@@ -14077,19 +14149,32 @@ mget_r_9:
 
 	call	disk_read
 	jnc	short mget_r_10
+%else
+	; 08/12/2025
+	mov	cl, [readi.drv]
+	mov	edx, esi
+	call	GETBUFFER
+	jc	short mget_r_err ; eax = error code
+	; ebx = buffer (data) address
+	; edx = LDRVT address
+%endif
 
+mget_r_10:
+	mov	byte [readi.valid], 1 ; 24/10/2016
+	; 08/12/2025
+	;mov	eax, [readi.sector]
+mget_r_11:
+	retn
+
+	; 08/12/2025
 	; 22/10/2016 (15h -> 17)
-	mov	eax, 17 ; Drive not ready or read error !
+	;mov	eax, 17 ; Drive not ready or read error !
 mget_r_err:
 	mov	[u.error], eax
 	; 12/10/2016
 	mov	[u.r0], eax
 	jmp	error
-mget_r_10:
-	mov	byte [readi.valid], 1 ; 24/10/2016
-	mov	eax, [readi.sector]
-mget_r_11:
-	retn
+
 mget_r_12:
 	;; EAX = FDT number
 	;; EDX = Sector index from FDT sector (0,1,2,3,4...)
@@ -15884,6 +15969,7 @@ find_next_fs_file:
 	retn
 
 writei:
+	; 08/12/2025 - TRDOS 386 v2.0.10 (v2.1)
 	; 02/09/2024
 	; 27/08/2024 - TRDOS 386 v2.0.9 
 	; 08/08/2022

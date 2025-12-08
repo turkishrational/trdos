@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - SYSTEM DEFINITIONS : sysdefs.s
 ; ----------------------------------------------------------------------------
-; Last Update: 13/11/2025  (Previous: 23/07/2022, v2.0.5)
+; Last Update: 08/12/2025  (Previous: 23/07/2022, v2.0.5)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -269,3 +269,8 @@ MAX_MSG_LEN	   equ 255 ; max. msg length for 'sysmsg'
 OPENFILES	   equ 32  ; max. number of open files (system)
 ; 07/10/2016
 ;NUMOFDEVICES	   equ 20  ; max. num of available devices (sys)
+
+; 08/12/2025
+open_for_read	equ 1
+open_for_write	equ 2
+open_for_rw	equ 3
