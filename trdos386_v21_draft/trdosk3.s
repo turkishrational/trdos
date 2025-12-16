@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 13/11/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 16/12/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -4593,7 +4593,7 @@ loc_rmdir_save_lnel: ; 28/02/2016
 	mov	[rmdir_LNEL], bh
 	;;;
 	; 18/07/2025
-	mov	eax, [DirEntry_Counter] 
+	mov	eax, [DirEntry_Counter]
 		; from 'find_directory_entry'
 	mov	[rmdir_EntryNumber], eax
 	;;;
@@ -4730,6 +4730,7 @@ loc_rmdir_directory_not_empty:
 %endif
 
 delete_sub_directory:
+	; 05/12/2025
 	; 17/07/2025
 	; (Ref: 'DOS_RMDIR', Retro DOS v5.0 - ibmdos7.s)
 	; 16/07/2025 (TRDOS 386 Kernel v2.0.10)
@@ -4775,8 +4776,9 @@ del_sub_dir_2:
 	;mov	[DelFile_EntryCounter], bx
 
     	sub	ebx, ebx
+	; 05/12/2025 - TRDOS 386 v2.0.10 (v2.1)
 	; 29/12/2017
-	mov	[FAT_ClusterCounter], ebx ; 0 ; Reset
+	;mov	[FAT_ClusterCounter], ebx ; 0 ; Reset
 
 	;mov	bh, [FindFile_Drv]
 	; 17/07/2025
@@ -4914,12 +4916,12 @@ loc_rmdir_dot_entry_check:
 loc_rmdir_dotdot_entry_check:
 	cmp	word [edi+1], '. '
 pass_rmdir_dot_entry_check:
-	jne	short loc_rmdir_directory_not_empty_1 
+	jne	short loc_rmdir_directory_not_empty_1
 	inc	bl
-	jmp	short loc_rmdir_find_last_dir_entry_next 
+	jmp	short loc_rmdir_find_last_dir_entry_next
 
 loc_rmdir_directory_not_empty_1:
-	pop	eax ; pushed esi 
+	pop	eax ; pushed esi
 	xor	eax, eax ; 0
 loc_rmdir_directory_not_empty_2:
 loc_delete_sub_dir_stc_retn:
@@ -4944,7 +4946,7 @@ loc_rmdir_set_prev_cluster_dir_last_cluster:
 	;cmc
 	;jc	short loc_rmdir_cmd_failed
 	;jmp	short loc_rmdir_save_fat_buffer
-	; 29/12/2017 
+	; 29/12/2017
 	and	eax, eax
 	jnz	short loc_delete_sub_dir_stc_retn
 	jmp	short loc_rmdir_save_fat_buffer
@@ -5228,6 +5230,7 @@ rmdir_fde:
 %endif
 
 delete_file:
+	; 16/12/2025
 	; 22/09/2025
 	; 21/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -5401,7 +5404,8 @@ loc_yes_delete_file:
 	jmp	loc_file_rw_restore_retn
 
 loc_delete_file:
-	mov	bh, [FindFile_Drv]
+	; 16/12/2025
+	;mov	bh, [FindFile_Drv]
 	; 21/07/2025
 	mov	bh, [Path_Drv]
 	;mov	bl, [DelFile_LNEL]
@@ -7666,6 +7670,7 @@ set_env_change_variable_calc21:
         jmp     set_env_string_allocate_envb_retn ; OK !
 
 mainprog_startup_configuration:
+	; 05/12/2025
 	; 14/10/2025 - TRDOS 386 Kernel v2.0.10
 	; 25/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 22/11/2017
@@ -7723,7 +7728,8 @@ loc_start_mainprog_configuration:
 	add	esi, ebx
 
 	;mov	ebx, [csftdf_sf_mem_addr] ; memory block address
-	; 14/10/2025
+	; 05/12/2025
+	mov	ebx, [MainProgCfg_mem_addr]
 
 	cmp	byte [esi+LD_FATType], 0
         ja	short loc_mcfg_load_fat_file
@@ -7913,10 +7919,11 @@ loc_mcfg_ci_return_addr:
 	call	print_msg
 	jmp	dos_prompt
 
-mcfg_read_file_sectors:
+	; 05/12/2025
+;mcfg_read_file_sectors:
 	; 14/04/2016
-	cmp	byte [esi+LD_FATType], 0
-        jna	short mcfg_read_fs_file_sectors
+	;cmp	byte [esi+LD_FATType], 0
+        ;jna	short mcfg_read_fs_file_sectors
 
 mcfg_read_fat_file_sectors:
 	; return:

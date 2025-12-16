@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/12/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 16/12/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -617,6 +617,9 @@ load_FS_root_directory:
 load_FS_sub_directory:
 	retn
 
+; 07/12/2025 - TRDOS 3865 v2.0.10 (v2.1)
+%if 0
+
 read_cluster:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 15/10/2016
@@ -647,9 +650,31 @@ read_file_sectors: ; 16/03/2016
 	cmp	[esi+LD_FATType], ch ; 0
 	jna	short read_fs_cluster
 
+%endif
+
+	; 07/12/2025 - TRDOS 386 Kernel v2.0.10
+	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
+	; 15/10/2016
+	; 18/03/2016
+	; 16/03/2016
+	; 17/02/2016
+	; 15/02/2016 (TRDOS 386 = TRDOS v2.0)
+	;
+	; INPUT ->
+	;	EAX = Cluster Number (Sector index for SINGLIX FS)
+	;	ESI = Logical DOS Drive Description Table address
+	;	EBX = Cluster (File R/W) Buffer address (max. 64KB)
+	;	ECX = Sector count (<= sectors per cluster)
+	; OUTPUT ->
+	;	cf = 1 -> Cluster can not be loaded at the buffer
+	;	    EAX > 0 -> Error number
+	;	cf = 0 -> Cluster has been loaded at the buffer
+	;
+	; (Modified registers: EAX, ECX, EBX, EDX)
+
 read_fat_file_sectors: ; 18/03/2016
 	sub	eax, 2 ; Beginning cluster number is always 2
-	movzx	edx, byte [esi+LD_BPB+BPB_SecPerClust] ; 18/03/2016 
+	movzx	edx, byte [esi+LD_BPB+BPB_SecPerClust] ; 18/03/2016
 	mul	edx
 	add	eax, [esi+LD_DATABegin] ; absolute address of the cluster
 
@@ -669,6 +694,9 @@ read_fat_file_sectors: ; 18/03/2016
 rclust_retn:
 	sub	eax, eax ; 0
 	retn
+
+; 07/12/2025 - TRDOS 3865 v2.0.10 (v2.1)
+%if 0
 
 read_fs_cluster:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -695,6 +723,8 @@ read_fs_sectors:
 	; 15/02/2016 (TRDOS 386 = TRDOS v2.0)
 	stc
 	retn
+
+%endif
 
 	;;;;
 	; 08/07/2025 - TRDOS 386 v2.0.10
@@ -939,6 +969,9 @@ gffc_7:
 
 %endif
 
+; 07/12/2025 - TRDOS 3865 v2.0.10 (v2.1)
+%if 0
+
 set_first_free_cluster:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 15/10/2016
@@ -1031,6 +1064,11 @@ loc_sffc_read_fsinfo_sector:
 	jne	short loc_sffc_write_fsinfo_sector
 
 	retn
+
+%endif
+
+; 07/12/2025 - TRDOS 3865 v2.0.10 (v2.1)
+%if 1
 
 update_cluster:
 	; 31/08/2024
@@ -1548,6 +1586,11 @@ pass_uc_fat32_c_zero_check_2:
 	
 	jmp     loc_fat_buffer_updated
 
+%endif
+
+; 07/12/2025 - TRDOS 3865 v2.0.10 (v2.1)
+%if 1
+
 save_fat_buffer:
 	; 31/08/2024 (TRDOS 386 v2.0.9)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -1667,7 +1710,10 @@ loc_save_FAT_buff_write_err:
 	mov	eax, 18 ; Drive not ready or write error
 	retn
 
-; burada kaldým... 
+%endif
+
+; 07/12/2025 - TRDOS 3865 v2.0.10 (v2.1)
+%if 1
 
 calculate_fat_freespace:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -1945,6 +1991,11 @@ loc_set_FAT32_free_sectors_ok:
         jmp     short loc_cfs_retn_params
 	;
 
+%endif
+
+; 07/12/2025 - TRDOS 3865 v2.0.10 (v2.1)
+%if 1
+
 get_last_cluster:
 	; 22/10/2016
 	; 27/02/2016 (TRDOS 386 = TRDOS v2.0)
@@ -1959,13 +2010,13 @@ get_last_cluster:
 	;	EAX = Last Cluster Number
 	;       ECX = Previous Cluster -just before the last cluster-
 	;       ; 22/10/2016
-	;	[glc_index] = cluster index number of the last cluster	
+	;	[glc_index] = cluster index number of the last cluster
 	;
 	; (Modified registers: EAX, ECX, EBX, EDX)
 
 	mov	ecx, eax
 
-	mov	dword [glc_index], 0FFFFFFFFh ; 22/10/2016	
+	mov	dword [glc_index], 0FFFFFFFFh ; 22/10/2016
 
 loc_glc_get_next_cluster_1:
 	mov	[glc_prevcluster], ecx
@@ -1974,7 +2025,7 @@ loc_glc_get_next_cluster_1:
 
 loc_glc_get_next_cluster_2:
 	call	get_next_cluster
-	; ecx = current/previous cluster 
+	; ecx = current/previous cluster
 	; eax = next/last cluster
 	jnc	short loc_glc_get_next_cluster_1
 
@@ -1988,7 +2039,7 @@ loc_glc_get_next_cluster_2:
 	; previous of previous cluster becomes previous cluster (ecx)
 
 loc_glc_prev_cluster_retn:
-	mov	ecx, [glc_prevcluster] 
+	mov	ecx, [glc_prevcluster]
 	retn
 
 loc_glc_stc_retn:
@@ -2093,6 +2144,10 @@ truncate_cluster_chain:
 	stc
 	retn
 %endif
+%endif ; 07/12/2025
+
+; 07/12/2025 - TRDOS 3865 v2.0.10 (v2.1)
+%if 1
 
 set_fat32_fsinfo_sector_parms:
 	; 15/10/2016
@@ -2201,6 +2256,11 @@ loc_read_FAT32_fsinfo_sec_stc_retn:
 	sub	ebx, ebx ; 0
 	stc
 	retn
+
+%endif
+
+; 07/12/2025 - TRDOS 3865 v2.0.10 (v2.1)
+%if 1
 
 add_new_cluster:
 	; 30/08/2024
@@ -2413,6 +2473,11 @@ loc_add_new_cluster_return_cluster_number:
 	xor	edx, edx ; 0
         retn
 
+%endif ; 07/12/2025
+
+; 07/12/2025 - TRDOS 3865 v2.0.10 (v2.1)
+%if 0
+
 write_cluster:
 	; 31/08/2024 - TRDOS 386 v2.0.9
 	; 15/10/2016
@@ -2489,6 +2554,8 @@ write_fs_sectors:
 	stc
 	retn
 
+%endif ; 07/12/2025
+
 get_cluster_by_index:
 	; 01/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -2507,7 +2574,7 @@ get_cluster_by_index:
 	;(Modified registers: EAX, ECX, EBX, EDX)
 	;	
 	cmp	byte [esi+LD_FATType], 1
-        ;jb      short get_fs_section_by_index
+        ;jb	short get_fs_section_by_index
 	; 01/07/2025
 	jb      short get_fs_sector_by_index
 
@@ -5393,6 +5460,8 @@ RELEASE:
 RELEASE_nc:	; 21/07/2025
        	xor	ebx, ebx
 RELBLKS:
+	; 16/12/2025
+	; 13/12/2025
 	; 01/12/2025
 	; 19/10/2025
 	; 17/07/2025
@@ -5426,12 +5495,12 @@ RELBLKS:
 
 	mov	[NEXTCLUSTER], eax
 
-	mov	eax, ecx
-
 	; eax = Content of FAT
 	;	for given cluster (next cluster)
 	; ebx = -1 -> put eof mark
 	;     = 0 -> release (set as free cluster)
+
+	mov	eax, ecx
 
 	push	ebx
 	call	PACK
@@ -5451,7 +5520,7 @@ RELBLKS:
 rblks_1:
 	; FAT16 or FAT12 fs
 	lea	ebx, [edx+LD_BPB+FAT_FreeClusters]
-	
+
 	; 19/10/2025
 	; (clear carry flag is needed here for FAT12 fs)
 	clc
@@ -5476,12 +5545,15 @@ rblks_2:
 
 rblks_3: ; (MSDOS -> NO_DEALLOC)
 	mov	eax, [NEXTCLUSTER]
+; 16/12/2025
+; 13/12/2025
+%if 0
 	; check for 1
 	; is last cluster of incomplete chain
 	dec	eax
 	jz	short rblks_4
-
 	inc	eax
+%endif
 	call	IsEOF
         ;jb	short RELEASE
 	; 21/07/2025

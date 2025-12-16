@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 01/12/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 16/12/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1583,7 +1583,7 @@ loc_find_dir_next_entry_1:
 	;jnb	short loc_ffde_stc_retn_255
 	; 19/07/2025 (*)
 	and	bl, 15
-	jz	short loc_ffde_stc_retn_255        
+	jz	short loc_ffde_stc_retn_255
 
 	; 28/07/2022
 	;jmp	short check_find_dir_entry
@@ -3461,7 +3461,7 @@ get_new_dir_sector:
 	call	GETBUFFER_NPR ; no pre-read
 	jc	short loc_mkdir_anc_error
 
-	; clear buffer sector 
+	; clear buffer sector
 	lea	edi, [esi+BUFINSIZ]
 	mov	ecx, 512/4
 	xor	eax, eax ; 0
@@ -3977,6 +3977,9 @@ convert_current_date_time:
 
 	retn
 
+; 07/12/2025 - TRDOS 386 v2.0.10 (v2.1)
+%if 1
+
 save_directory_buffer:
 	; 30/07/2022
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -4080,6 +4083,8 @@ loc_save_dir_buff_validate_retn:
 	xor	eax, eax
 	; 26/02/2016
 	jmp	short loc_save_dir_buff_retn
+
+%endif
 
 update_parent_dir_lmdt:
 	; 16/07/2025
@@ -4435,6 +4440,9 @@ dln_ok:
 	retn
 %endif
 
+; 07/12/2025 - TRDOS 386 v2.0.10 (v2.1)
+%if 0
+
 locate_current_dir_entry:
 	; 30/07/2022
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -4669,6 +4677,8 @@ loc_lcde_load_dir_cluster_1:
 	mov	eax, 17 ; Drive not ready or read error !
 	jmp	short loc_lcde_retn
 
+%endif
+
 remove_file:
 	; 21/07/2025 (TRDOS 386 Kernel v2.0.10)
 	;  (Ref: DOS_DELETE, Retro DOS v5.0 - ibmdos7.s)
@@ -4786,6 +4796,7 @@ loc_del_file_err_retn:
 %endif
 
 delete_directory_entry:
+	; 16/12/2025
 	; 21/07/2025 (TRDOS 386 Kernel v2.0.10)
 	; 15/10/2016
 	; 28/02/2016 (TRDOS 386 = TRDOS v2.0)
@@ -4797,7 +4808,7 @@ delete_directory_entry:
 	;	21/07/2025
 	;	ECX = Directory Buffer Entry Counter/Index
 	;	 BL = Longname Entry Length
-	;;;	 BH = Logical DOS Drive Number
+	;	 BH = Logical DOS Drive Number
 	;
 	;	[CurrentBuffer] = Directory Buffer header addr
 	;
@@ -5104,6 +5115,7 @@ loc_rename_direntry_update_parent_dir_lm_date:
 	retn
 
 move_source_file_to_destination_file:
+	; 16/12/2025
 	; 13/11/2025
 	; 22/09/2025
 	; 15/09/2025
@@ -5758,6 +5770,8 @@ msftdf_dsfde_error_retn:
 	retn
 
 msftdf_delete_FAT_direntry:
+	; 16/12/2025
+	mov	bh, [FindFile_Drv]
 	mov	bl, [FindFile_LongNameEntryLength]
 	;mov	cx, [FindFile_DirEntryNumber]
 	; 11/08/2025
@@ -5797,6 +5811,7 @@ msftdf_retn:
 	retn
 
 copy_source_file_to_destination_file:
+	; 15/12/2025	
 	; 01/12/2025
 	; 13/11/2025
 	; 11/11/2025
@@ -6819,10 +6834,12 @@ csftdf2_write_fat_file_err:
 	; 11/10/2025
 	; ***
  	mov	edx, [csftdf_df_drv_dt]
-	mov	eax, [csftdf_df_fcluster]
+	; 15/12/2025
+	mov	ebx, [csftdf_df_fcluster]
 	; is it already allocated ?
-	or	eax, eax
+	or	ebx, ebx
 	jz	short csftdf2_write_fat_file_err2 ; no
+	mov	eax, ebx
 
 	call	RELEASE
 
@@ -6864,13 +6881,17 @@ csftdf2_write_fat_file_1:
 	mov	eax, [csftdf_filesize]
 	mov	ecx, [csftdf_transfercount]
 	add	ecx, 512
-	mov	[csftdf_transfercount], ecx
+	; 15/12/2025
+	;mov	[csftdf_transfercount], ecx
 	cmp	ecx, eax
 		; 1 sector = 512 bytes
 	; 09/11/2025
 	;jb	short csftdf2_load_fat_file_2
 	; 11/11/2025
 	jnb	short csftdf2_write_fat_file_3
+
+	; 15/12/2025
+	mov	[csftdf_transfercount], ecx
 
 	; 11/11/2025
 	cmp	byte [csftdf_percentage], 0
@@ -6895,7 +6916,8 @@ csftdf2_write_fat_file_3: ; 11/11/2025
 	; 09/11/2025
 	;; clear buffer content (empty buffer)
 	;lea	edi, [esi+BUFINSIZ]
-	;xor	eax, eax
+	; 15/12/2025
+	xor	eax, eax ; 0
 	;mov	ecx, 512/4
 	;rep	stosd
 	call	csftdf2_clear_default_buffer
@@ -6912,7 +6934,8 @@ csftdf2_write_fat_file_2:
 	; otherwise write the next empty sector of the clust
 	cmp	byte [csftdf_df_cs], 0
 	jna	short csftdf2_write_fat_file_2
-	jmp	short csftdf2_load_fat_file_ok
+	; 15/12/2025
+	;jmp	short csftdf2_load_fat_file_ok
 
 ;csftdf2_write_fat_file_3:
 ;	; ***
@@ -7142,7 +7165,8 @@ csftdf2_read_fat_file_sector_@:
 	mov	[csftdf_sf_sector], eax
 
 	call	GETBUFFER
-	jc	short csftdf2_read_fat_file_err
+	; 15/12/2025
+	;jc	short csftdf2_read_fat_file_err
 
 	; esi = buffer header address
 	; edx = LDRVT address
