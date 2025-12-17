@@ -2877,6 +2877,7 @@ loc_next_sum:
 	retn
 
 make_sub_directory:
+	; 17/12/2025
 	; 01/12/2025
 	; 06/08/2025
 	; 15/07/2025
@@ -3453,6 +3454,13 @@ loc_mkdir_add_new_subdir_cluster:
 	;movzx	ebx, byte [edx+LD_BPB+SecPerClust]
 	movzx	ebx, byte [mkdir_SecPerClust]
 
+	; 17/12/2025
+	cmp	byte [esi+LD_FATType], 3 ; FAT32 ?
+	jb	short get_new_dir_sector ; no
+
+	; (set FSINFO modified flag)
+	mov	byte [edx+LD_BPB+BS_FAT32_Reserved1], -1
+
 get_new_dir_sector:
 	; eax = physical disk sector
 	;  cl = physical drive number
@@ -3487,8 +3495,10 @@ loc_mkdir_anc_error:
 	mov	eax, [mkdir_LastDirCluster]
 	mov	ebx, -1 ; last cluster
 	call	RELBLKS
-	pop	eax
+	; 17/12/2025
 	mov	esi, edx
+	;call	update_fat32_fsinfo
+	pop	eax
 	stc
 loc_mkdir_dirup_err:	; 14/07/2025
 	retn
@@ -3606,11 +3616,17 @@ zerodir_ok:
 	call	PACK	; mark last cluster EOF
 	jc	short zerodir_error
 
+; 17/12/2025
+%if 0
 	; 01/12/2025
 	xor	edi, edi ; 0
-
+%endif
 	cmp	byte [edx+LD_FATType], 2
 	jna	short loc_mkdir_dec_fat_fc ; not FAT32
+
+	; 17/12/2025
+	; (set FSINFO modified flag)
+	mov	byte [edx+LD_BPB+BS_FAT32_Reserved1], -1
 
 	; FAT32 fs
 	lea	ebx, [edx+LD_BPB+FAT32_FreeClusters]
@@ -3619,8 +3635,12 @@ zerodir_ok:
 	jne	short loc_mkdir_dec_fat32_fc
 	inc	ecx
 	mov	[edx+LD_BPB+FAT32_FirstFreeClust], ecx
+
+; 17/12/2025
+%if 0
 	; 01/12/2025
 	inc	edi
+%endif
 	mov	eax, [edx+LD_Clusters] ; Last Cluster - 1
 	inc	eax  ; last cluster
 	cmp	ecx, eax
@@ -3656,12 +3676,18 @@ loc_mkdir_dec_fat32_fc:
 	movzx	eax, byte [mkdir_SecPerClust]
 	sub	[edx+LD_FreeSectors], eax
 
+; 17/12/2025
+%if 0
 	; 01/12/2025
 	cmp	byte [edx+LD_FATType], 2
 	jna	short loc_mkdir_skip_dec_fc_@ ; not FAT32
 	inc	edi
 	jmp	short loc_mkdir_set_fsinfo_mf
+%endif
+
 loc_mkdir_skip_dec_fc:
+; 17/12/2025
+%if 0
 	; 01/12/2025
 	and	edi, edi
 	jz	short loc_mkdir_skip_dec_fc_@
@@ -3670,6 +3696,7 @@ loc_mkdir_set_fsinfo_mf:
 	mov	byte [edx+LD_BPB+BS_FAT32_Reserved1], -1
 
 loc_mkdir_skip_dec_fc_@:
+%endif
 	; 14/07/2025
 	; update first cluster field of the directory entry
 	; (of the parent directory)
@@ -3712,7 +3739,7 @@ dirup_@:
 	movzx	eax, byte [FAILERR]
 	retn
 
-loc_mkdir_error:	 ; error code in EAX
+loc_mkdir_error:	; error code in EAX
 	;;;
 	; 14/07/2025
 	; free/release the cluster again
@@ -5590,6 +5617,13 @@ msftdf_add_new_subdir_cluster_ok:
 
 	movzx	ebx, byte [edx+LD_BPB+SecPerClust]
 
+	; 17/12/2025
+	cmp	byte [esi+LD_FATType], 3 ; FAT32 ?
+	jb	short msftdf_get_new_dir_sector ; no
+
+	; (set FSINFO modified flag)
+	mov	byte [edx+LD_BPB+BS_FAT32_Reserved1], -1
+
 msftdf_get_new_dir_sector:
 	; eax = physical disk sector
 	;  cl = physical drive number
@@ -5624,8 +5658,10 @@ msftdf_mkde_anc_error:
 	mov	eax, [createfile_LastDirCluster]
 	mov	ebx, -1 ; last cluster
 	call	RELBLKS
-	pop	eax
+	; 17/12/2025
 	mov	esi, edx
+	;call	update_fat32_fsinfo
+	pop	eax
 ;msftdf_error_retn:
 	stc
 msftdf_mkde_dirup_err:
@@ -6451,12 +6487,14 @@ csftdf2_df_release_cc_3:
 	; replace first free cluster value
 	mov	[ebx], eax
 	
+; 17/12/2025
+%if 0
 	; 01/12/2025
 	cmp	byte [edx+LD_FATType], 2
 	jna	short csftdf2_df_release_cc_4
 	; (set FSINFO modified flag)
 	mov	byte [edx+LD_BPB+BS_FAT32_Reserved1], -1
-
+%endif
 	; Note: Only the cluster number in the directory entry
 	;       is considered for first free cluster calculation
 	;	(This is not always true, but usually
@@ -8022,7 +8060,7 @@ csftdf2_save_file_@:
 	; FAT32 fs
 	lea	esi, [edx+LD_BPB+FAT32_FirstFreeClust]
 	; 17/12/2025 (Set FSINFO modified flag)
-	mov	byte [edx+LD_BPB+BS_FAT32_Reserved1],-1
+	mov	byte [edx+LD_BPB+BS_FAT32_Reserved1], -1
 	jmp	short csftdf2_save_file_cffc_2
 
 	; 17/10/2025
@@ -8349,8 +8387,10 @@ loc_createfile_anc_error:
 	mov	eax, [createfile_LastDirCluster]
 	mov	ebx, -1 ; last cluster
 	call	RELBLKS
-	pop	eax
+	; 17/12/2025
 	mov	esi, edx
+	;call	update_fat32_fsinfo
+	pop	eax
 	stc
 loc_createfile_dirup_err:
 	retn
@@ -8378,7 +8418,7 @@ loc_createfile_anc_2:
 	cmp	byte [edx+LD_FATType], 2
 	jna	short loc_createfile_anc_4 ; not FAT32
 	; 01/12/2025 (Set FSINFO modified flag)
-	mov	byte [edx+LD_BPB+BS_FAT32_Reserved1],-1
+	mov	byte [edx+LD_BPB+BS_FAT32_Reserved1], -1
 loc_createfile_anc_4:
 	mov	ebx, [edx+LD_Clusters] ; Last Cluster - 1
 	inc	ebx  ; last cluster

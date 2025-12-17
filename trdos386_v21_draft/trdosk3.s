@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 16/12/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 17/12/2025  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -4730,6 +4730,7 @@ loc_rmdir_directory_not_empty:
 %endif
 
 delete_sub_directory:
+	; 17/12/2025
 	; 05/12/2025
 	; 17/07/2025
 	; (Ref: 'DOS_RMDIR', Retro DOS v5.0 - ibmdos7.s)
@@ -5077,7 +5078,7 @@ loc_rmdir_update_parent_dir_lmdt:
 
 loc_delete_sub_directory_ok:
 	; 29/12/2017
-	xor	eax, eax ;  0 ;  cf = 0
+	xor	eax, eax ; 0 ; cf = 0
 	retn
 %else
 	; 17/07/2025 - TRDOS 386 v2.0.10
@@ -5178,6 +5179,11 @@ del_sub_dir_8:
 
 	; FAT32 fs
 	lea	ebx, [edx+LD_BPB+FAT32_FirstFreeClust]
+
+	; 17/12/2025
+	; (set FSINFO modified flag)
+	;mov	byte [edx+LD_BPB+BS_FAT32_Reserved1], -1
+
 	jmp	short del_sub_dir_10
 
 del_sub_dir_9:
