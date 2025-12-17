@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 16/12/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 17/12/2025 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -6722,18 +6722,31 @@ csftdf2_enable_percentage_display:
 
 	; 11/10/2025 - TRDOS 386 v2.0.10
 csftdf2_load_file:
+	; 17/12/2025
 	; 13/05/2016
 	; 19/03/2016
 	; 18/03/2016
 	; 17/03/2016
+
+	; 17/12/2025
+	mov	esi, msg_copying
+	call	print_msg
+
+	cmp	byte [csftdf_percentage], 1
+	jb	short csftdf2_skip_get_cursor_pos
+
 	mov	ah, 0Fh
 	call	_int10h
 	; 13/05/2016
 	mov	[csftdf_videopage], bh ; active video page
+
 	mov	ah, 03h
 	call	_int10h
 	mov	[csftdf_cursorpos], dx
 
+	;mov	dword [csftdf_percent], -1
+
+csftdf2_skip_get_cursor_pos:
 	;sub	eax, eax
 	;mov	[csftdf_rw_err], al ; 0
 	; 09/11/2025
@@ -6805,10 +6818,10 @@ csftdf2_load_fat_file:
 	;push	ebx ; *
 
 csftdf2_load_fat_file_next:
-	;mov	esi, msg_reading
+	;;mov	esi, msg_reading
 	; 11/10/2025
-	mov	esi, msg_copying
-	call	print_msg
+	;mov	esi, msg_copying
+	;call	print_msg
 
 	cmp	byte [csftdf_percentage], 0
 	jna	short csftdf2_load_fat_file_1
@@ -6897,12 +6910,14 @@ csftdf2_write_fat_file_1:
 	cmp	byte [csftdf_percentage], 0
 	jna	short csftdf2_load_fat_file_2
 
+	; 17/12/2025
 	; Set cursor position
 	; AH= 02h, BH= Page Number, DH= Row, DL= Column
-	mov	bh, [csftdf_videopage]
-	mov	dx, [csftdf_cursorpos]
-	mov	ah, 2
-	call	_int10h
+	;mov	bh, [csftdf_videopage]
+	;mov	dx, [csftdf_cursorpos]
+	;mov	ah, 2
+	;call	_int10h
+	
 	jmp	csftdf2_load_fat_file_next
 
 csftdf2_write_fat_file_3: ; 11/11/2025	
@@ -6975,10 +6990,11 @@ csftdf2_2:
 	mov	ah, 2
 	call	_int10h
 
-	;mov	esi, msg_reading
+	; 17/12/2025
+	;;mov	esi, msg_reading
 	; 11/10/2025
-	mov	esi, msg_copying
-	call	print_msg
+	;mov	esi, msg_copying
+	;call	print_msg
 
 	mov	esi, percentagestr
 	call	print_msg
@@ -6986,25 +7002,43 @@ csftdf2_2:
         jmp	csftdf2_save_file ; 25/03/2016
 
 csftdf2_print_percentage:
+	; 17/12/2025
 	; 11/10/2025 - TRDOS 386 v2.0.10
 	; 09/12/2017
 	; 19/03/2016
 	; 18/03/2016
+
+	; 17/12/2025
+	mov	eax, [csftdf_transfercount]
+	sub	edx, edx
+	mov	dl, 100
+	mul	edx
+	mov	ecx, [csftdf_filesize]
+	div	ecx
+	cmp	eax, [csftdf_percent]
+	je	short csftdf2_skip_print_percent
+	mov	[csftdf_percent], eax
+
 	mov	al, 20h
 	mov	edi, percentagestr
 	stosb
 	stosb
 	;mov	eax, [csftdf_sf_rbytes]
 	; 11/10/2025
-	mov	eax, [csftdf_transfercount]
+	;mov	eax, [csftdf_transfercount]
+	; 17/12/2025
+	mov	al, [csftdf_percent]
 
-	;mov	edx, 100
+	;;mov	edx, 100
 	; 29/07/2022
 	sub	edx, edx
-	mov	dl, 100
-	mul	edx
-	mov	ecx, [csftdf_filesize]
-	div	ecx
+	;mov	dl, 100
+	;mul	edx
+	;mov	ecx, [csftdf_filesize]
+	;div	ecx
+
+	; eax = 0 to 100
+
 	mov	cl, 10
 	div	cl
 	add	ah, '0'
@@ -7023,10 +7057,20 @@ csftdf2_print_percentage:
 	;mov	[edi], '1' ; 100%
 
 csftdf2_print_percent_1:
+	; 17/12/2025
+	mov	bh, [csftdf_videopage]
+	mov	dx, [csftdf_cursorpos]
+	mov	ah, 2
+	call	_int10h
+
 	mov	esi, percentagestr
 	;call	print_msg
 	;retn
 	jmp	print_msg
+
+csftdf2_skip_print_percent:
+	; 17/12/2025
+	retn
 
 ; 11/10/2025 - TRDOS 386 v2.0.10
 %if 0
