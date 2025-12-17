@@ -8021,6 +8021,8 @@ csftdf2_save_file_@:
 	jna	short csftdf2_save_file_cffc_1 ; not FAT32
 	; FAT32 fs
 	lea	esi, [edx+LD_BPB+FAT32_FirstFreeClust]
+	; 17/12/2025 (Set FSINFO modified flag)
+	mov	byte [edx+LD_BPB+BS_FAT32_Reserved1],-1
 	jmp	short csftdf2_save_file_cffc_2
 
 	; 17/10/2025

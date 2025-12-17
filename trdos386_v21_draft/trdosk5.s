@@ -4052,7 +4052,7 @@ u_fat32_fsi_1:
 	mov	[ebx+FSINFO.Free_Count], eax ; BPB_Reserved ; 52
 	mov	eax, [esi+LD_BPB+FAT32_FirstFreeClust]
 			; note: this reserved field is used to store
- 			;	the first free cluster number 
+ 			;	the first free cluster number
 			;	but this field must be zero on the disk
 			;		 (FAT32 volume boot sector)
 	; set first free cluster number to search
