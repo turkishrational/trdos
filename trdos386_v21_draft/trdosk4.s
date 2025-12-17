@@ -5811,6 +5811,7 @@ msftdf_retn:
 	retn
 
 copy_source_file_to_destination_file:
+	; 17/12/2025
 	; 15/12/2025	
 	; 01/12/2025
 	; 13/11/2025
@@ -6917,10 +6918,10 @@ csftdf2_write_fat_file_1:
 	;mov	dx, [csftdf_cursorpos]
 	;mov	ah, 2
 	;call	_int10h
-	
+
 	jmp	csftdf2_load_fat_file_next
 
-csftdf2_write_fat_file_3: ; 11/11/2025	
+csftdf2_write_fat_file_3: ; 11/11/2025
 	; set to file size
 	mov	[csftdf_transfercount], eax
 
@@ -6948,7 +6949,8 @@ csftdf2_write_fat_file_2:
 	; if [csftdf_df_cs] = 0 -> end of the cluster
 	; otherwise write the next empty sector of the clust
 	cmp	byte [csftdf_df_cs], 0
-	jna	short csftdf2_write_fat_file_2
+	; 17/12/2025
+	ja	short csftdf2_write_fat_file_2
 	; 15/12/2025
 	;jmp	short csftdf2_load_fat_file_ok
 
