@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - INITIALIZED DATA : trdosk9.s
 ; ----------------------------------------------------------------------------
-; Last Update: 09/12/2025 (Previous: 29/12/2024 - Kernel v2.0.9)
+; Last Update: 19/12/2025 (Previous: 29/12/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -31,7 +31,7 @@ Magic_Bytes:
 		db 1
 mainprog_Version:
 		db 7
-		db "[TRDOS] Main Program v2.0.10 (09/12/2025)"
+		db "[TRDOS] Main Program v2.0.10 (19/12/2025)"
 		db 0Dh, 0Ah
 		db "(c) Erdogan Tan 2005-2025"
 		db 0Dh, 0Ah, 0
@@ -226,9 +226,10 @@ Msg_Insufficient_Memory:
 Msg_Error_Code:
                 db 'Command failed! Error code : '
 error_code_hex: db '00h'
-                db 0Ah, 0Ah, 0
+                db 0Dh, 0Ah, 0
 
-align 2
+; 19/12/2025
+;align 2
 
 ; 10/02/2016
 ; DIR.ASM - 09/10/2011

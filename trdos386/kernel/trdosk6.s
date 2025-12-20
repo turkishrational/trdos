@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 09/12/2025  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 19/12/2025  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1813,6 +1813,7 @@ syscreat_2:
 	jmp	short sysopen_2
 
 sysopen: ;<open file>
+	; 19/12/2025 - TRDOS 386 v2.0.10
 	; 03/09/2024
 	; 19/08/2024 - TRDOS 386 v2.0.9
 	; 23/07/2022 - TRDOS 386 v2.0.5
@@ -1869,14 +1870,14 @@ sysopen: ;<open file>
 	;	* 2nd argument, mode is in CX register
 	;
 	;	AX register (will be restored via 'u.r0') will return
-	;	to the user with the file descriptor/number 
+	;	to the user with the file descriptor/number
 	;	(index to u.fp list).
 	;
 	;call	arg2
 	; * name - 'u.namep' points to address of file/path name
 	;          in the user's program segment ('u.segmnt')
 	;          with offset in BX register (as sysopen argument 1).
-	; * mode - sysopen argument 2 is in CX register 
+	; * mode - sysopen argument 2 is in CX register
 	;          which is on top of stack.
 	;
 	; jsr r0,arg2 / get sys args into u.namep and on stack
@@ -1923,7 +1924,7 @@ sysopen_0:
 	;mov	ax, 1
 	;mov	[FFF_Valid], ah ; 0 ; reset ; 17/10/2016
 	;call	set_working_path
-	call	set_working_path_x ; 17/10/2016	
+	call	set_working_path_x ; 17/10/2016
 	jnc	short sysopen_1
 
 syscreat_err: ; ecx = file attributes (for 'syscreat')
@@ -1940,45 +1941,45 @@ sysopen_err:
 
 sysopen_1:
 	;mov	esi, FindFile_Name
-        mov	ax, 1800h ; Only files
+	mov	ax, 1800h ; Only files
 	call	find_first_file
 	pop	edx
 	jc	short sysopen_err ; eax = 2 (File not found !)
 
 	; check_open_file_attr_access_code
 
-        test	bl, 7  ; system, hidden, readonly
-        jz	short sysopen_2
+	test	bl, 7  ; system, hidden, readonly
+	jz	short sysopen_2
 
 	and	dl, dl ; 0 = read mode
 	jz	short sysopen_2
 
 sysopen_access_err:
 	; 1 = write, 2 = read & write, >2 = invalid
-        mov	eax, ERR_FILE_ACCESS ; 11 = 'permission denied !'
-        jmp	short sysopen_err
+	mov	eax, ERR_FILE_ACCESS ; 11 = 'permission denied !'
+	jmp	short sysopen_err
 
 sysopen_2:
 	; esi = Directory Entry (FindFile_DirEntry) Location
 	;mov	ebx, esi
-        ; 03/09/2024
+	; 03/09/2024
 	mov	ebx, edi ; Directory entry in directory buffer
 	xor     esi, esi ; 0
-        xor     edi, edi ; 0
+	xor     edi, edi ; 0
 sysopen_3: ; scan the list of entries in fsp table
-        cmp     byte [esi+u.fp], 0
-        jna     short sysopen_4 ; empty slot
-        ;inc	si
+	cmp     byte [esi+u.fp], 0
+	jna     short sysopen_4 ; empty slot
+	;inc	si
 	; 19/08/2024
 	inc	esi
-        cmp     si, 10
+	cmp     si, 10
 	jb	short sysopen_3
 toomanyf:
 	mov	eax, ERR_TOO_MANY_FILES ; too many open files !
 	jmp	short sysopen_err
 
-sysopen_4: 
-        cmp     byte [edi+OF_MODE], 0 ; Scan open files table
+sysopen_4:
+	cmp     byte [edi+OF_MODE], 0 ; Scan open files table
 	jna     short sysopen_5
 
 	;inc	di
@@ -1992,7 +1993,7 @@ sysopen_5:
 	; 19/08/2024
 	;;;
 	push	eax ; size
-        mov 	ax, [ebx+DirEntry_FstClusHI]
+	mov 	ax, [ebx+DirEntry_FstClusHI]
 	shl	eax, 16
 	mov 	ax, [ebx+DirEntry_FstClusLO]
 	pop	ebx ; size
@@ -2025,9 +2026,9 @@ sysopen_5_@@@:
 	mov	dl, 1 ; open for write
 sysopen_8:
 	inc	dl
-        mov     [edi+OF_MODE], dl
+	mov     [edi+OF_MODE], dl
 	mov	dl, [FindFile_Drv]
-        mov     [edi+OF_DRIVE], dl ; Logical DOS drive number
+	mov     [edi+OF_DRIVE], dl ; Logical DOS drive number
 	;shl	di, 2 ; *4 (dword offset)
 	; 23/07/2022
 	shl	edi, 2
@@ -2038,16 +2039,16 @@ sysopen_8:
 
 	; 19/08/2024
 	; eax = Fist Cluster
-        ;mov 	ax, [ebx+DirEntry_FstClusHI]
+	;mov 	ax, [ebx+DirEntry_FstClusHI]
 	;shl	eax, 16
 	;mov 	ax, [ebx+DirEntry_FstClusLO]
 
 	mov     [edi+OF_FCLUSTER], eax ; First cluster
 	mov     [edi+OF_CCLUSTER], eax ; Current cluster
 
-        xor	ebx, ebx
-        mov     [edi+OF_POINTER], ebx ; offset pointer (0)
-        mov     [edi+OF_CCINDEX], ebx ; cluster index (0)
+	xor	ebx, ebx
+	mov     [edi+OF_POINTER], ebx ; offset pointer (0)
+	mov     [edi+OF_CCINDEX], ebx ; cluster index (0)
 
 	mov	eax, [FindFile_DirFirstCluster]
 	mov	[edi+OF_DIRFCLUSTER], eax
@@ -2059,22 +2060,32 @@ sysopen_8:
 	; Important for files of removable drives
 	; (In order to check the drive has same volume/disk)
 	mov	bh, dl
-        add	ebx, Logical_DOSDisks
-        mov	al, [ebx+LD_FATType]
-        cmp	al, 1
-        jb	short sysopen_6_fs
-        cmp	al, 2
-        ja	short sysopen_6_fat32
+	add	ebx, Logical_DOSDisks
+
+	mov	al, [ebx+LD_FATType]
+
+; 19/12/2025
+%if 0
+	cmp	al, 1
+	jb	short sysopen_6_fs
+%endif
+	cmp	al, 2
+	ja	short sysopen_6_fat32
 sysopen_6_fat:
-        mov	eax, [ebx+LD_BPB+VolumeID]
-        jmp	short sysopen_7
+	mov	eax, [ebx+LD_BPB+VolumeID]
+	jmp	short sysopen_7
+
+; 19/12/2025
+%if 0
 sysopen_6_fs:
-        mov	eax, [ebx+LD_FS_VolumeSerial]
-        jmp	short sysopen_7
+	mov	eax, [ebx+LD_FS_VolumeSerial]
+	jmp	short sysopen_7
+%endif
+
 sysopen_6_fat32:
-        mov	eax, [ebx+LD_BPB+FAT32_VolID]
+	mov	eax, [ebx+LD_BPB+FAT32_VolID]
 sysopen_7:
-        mov	[Current_VolSerial], eax
+	mov	[Current_VolSerial], eax
 
 	mov	[edi+OF_VOLUMEID], eax
 
@@ -2096,7 +2107,7 @@ sysopen_7:
 	mov	ebx, edi
 	inc	bl
 
-        mov     [esi+u.fp], bl ; Open File Entry Number
+	mov     [esi+u.fp], bl ; Open File Entry Number
 	mov     [u.r0], esi ; move index to u.fp list
 			    ; into eax on stack
 
@@ -13615,6 +13626,7 @@ dskr_5:		; 23/07/2022
 	retn
 
 mget_r:
+	; 19/12/2025 - TRDOS 386 Kernel v2.0.10
 	; 29/08/2023
 	; 30/07/2022
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
@@ -13627,7 +13639,7 @@ mget_r:
 	; 22/03/2013 - 31/07/2013 (Retro UNIX 8086 v1)
 	;
 	; Get existing or (allocate) a new disk block for file
-	; 
+	;
 	; INPUTS ->
 	;    [u.fofp] = file offset pointer
 	;    EAX = First Cluster
@@ -13676,16 +13688,22 @@ mget_r:
 	mov	[readi.s_index], dl ; sector index in cluster (0 to spc -1)
 
 	mov	eax, [readi.cluster]  ; > 0 if [readi.valid] = 1
-	mov	edx, [readi.fs_index]
+	; 19/12/2025
+	;mov	edx, [readi.fs_index]
         jmp     mget_r_7
 
 mget_r_0:
 	mov	[readi.drv], ch ; physical drive number
+; 19/12/2025
+%if 0
 	cmp	byte [esi+LD_FATType], 0
 	ja	short mget_r_1
-	mov	cl, [esi+LD_FS_BytesPerSec+1]
-	shr	cl, 1 ;  ; 1 for 512 bytes, 4 for 2048 bytes
+	;mov	cl, [esi+LD_FS_BytesPerSec+1]
+	;shr	cl, 1	; 1 for 512 bytes, 4 for 2048 bytes
+	; 19/12/2025
+	mov	cl, 1
 	jmp	short mget_r_2	
+%endif
 mget_r_1:
 	mov	cl, [esi+LD_BPB+BPB_SecPerClust]
 mget_r_2:
@@ -13754,9 +13772,11 @@ mget_r_5:
 mget_r_6:
 	mov	[readi.cluster], eax ; FDT number for Singlix File System
 mget_r_7:
+; 19/12/2025
+%if 0
 	cmp	byte [esi+LD_FATType], 0
 	jna	short mget_r_12
-
+%endif
 	;sub	eax, 2
 	; 30/07/2022
 	dec	eax
@@ -13806,6 +13826,9 @@ mget_r_10:
 	mov	eax, [readi.sector]
 mget_r_11:
 	retn
+
+; 19/12/2025
+%if 0
 mget_r_12:
 	; EAX = FDT number
 	; EDX = Sector index from FDT sector (0,1,2,3,4...)
@@ -13813,6 +13836,7 @@ mget_r_12:
 	mov	[readi.fs_index], edx
 	add	eax, edx
 	jmp	short mget_r_8
+%endif
 
 trans_addr_r:
 	; 12/10/2016
@@ -14955,6 +14979,7 @@ sysfnf_11:
 	jmp	short sysfff_6
 
 sysfnf: ; <Find Next File>
+	; 19/12/2025 (TRDOS 386 v2.0.10)
 	; 25/08/2024 (TRDOS 386 Kernel v2.0.9)
 	; 29/08/2023 (TRDOS 386 Kernel v2.0.6)
 	; 08/08/2022
@@ -15094,8 +15119,12 @@ sysfnf_3:
         
 	cmp	byte [Current_FATType], 2
 	ja	short sysfnf_err_0 ; invalid, we neeed to stop !?
+
+; 19/12/2025
+%if 0
 	cmp	byte [Current_FATType], 1
 	jb	short sysfnf_err_0 ; invalid, we neeed to stop !?
+%endif
 
 	cmp	byte [DirBuff_ValidData], al ; 0
 	jna	short sysfnf_4 
@@ -15143,11 +15172,18 @@ sysfnf_6:
 	jmp	sysfnf_9
 sysfnf_7:
 	inc	byte [SWP_DRV_chg]
+
+; 19/12/2025
+%if 0
 	cmp	byte [Current_FATType], 1
 	;jnb	short sysfnf_8
 	; 08/08/2022
 	jb	short sysfnf_13
+%endif
 	jmp	sysfnf_8
+
+; 19/12/2025
+%if 0
 sysfnf_13:
 	; Singlix (TRFS) File System 
 	; (access via compatibility buffer)
@@ -15157,6 +15193,7 @@ sysfnf_13:
 	; 08/08/2022
 	jc	short sysfnf_err_1
 	jmp	sysfnf_9
+%endif
 
 writei:
 	; 02/09/2024
@@ -15342,6 +15379,7 @@ dskw_6:
 	jmp	dskw_0 ; / yes, branch
 
 mget_w:
+	; 19/12/2025 - TRDOS 386 v2.0.10
 	; 03/09/2024
 	; 02/09/2024
 	; 25/08/2024 - TRDOS 386 v2.0.9
@@ -15384,14 +15422,19 @@ mget_w:
 	; 31/10/2016
 	mov	ebx, eax ; First Cluster or FDT address
 
+; 19/12/2025
+%if 0
 	cmp	byte [esi+LD_FATType], 0
 	;jna	mget_w_14 ; Singlix FS
 	; 23/07/2022
 	ja	short mget_w_20
-	jmp	mget_w_14  ; Singlix FS
+	jmp	mget_w_14 ; Singlix FS
+%endif
 
 mget_w_20:
-	movzx	eax, word [esi+LD_BPB+BytesPerSec]
+	;movzx	eax, word [esi+LD_BPB+BytesPerSec]
+	; 19/12/2025
+	mov	eax, 512
 	movzx	edx, byte [esi+LD_BPB+SecPerClust]
 	mov	[writei.spc], dl  ; sectors per cluster
 	mul	edx
@@ -15431,7 +15474,7 @@ mget_w_21:
 	cmp	byte [writei.valid], dl ; 0
 	jna	short mget_w_0
 
-	mov 	byte [writei.valid], dl ; 0 ; reset ('writei' will set it) 
+	mov 	byte [writei.valid], dl ; 0 ; reset ('writei' will set it)
 
 	cmp	eax, [writei.fclust]
 	jne	short mget_w_0
@@ -15538,6 +15581,7 @@ mget_w_3:
 	jne	short mget_w_5
 
 	mov	[writei.fs_index], eax ; cluster index (for next check)
+	
 	mov	eax, [writei.lclust] ; last cluster
 	jmp	short mget_w_10
 
@@ -15560,13 +15604,14 @@ mget_w_4: ; 02/11/2016
 	mov	[writei.s_index], dl ; sector index in cluster (0 to spc -1)
 
 	; 02/09/2024
-	mov	 [writei.fclust], ebx
+	mov	[writei.fclust], ebx
 
 mget_w_5:
 	and	eax, eax ; 0 = First Cluster's index number
 	jnz	short mget_w_6
 
 	mov	[writei.fs_index], eax ; cluster index (for next check)
+	
 	mov	eax, [writei.fclust] ; first cluster
 	jmp	short mget_w_10
 
@@ -15603,8 +15648,11 @@ mget_w_9:
 mget_w_10:
 	mov	[writei.cluster], eax ; FDT number for Singlix File System
 
+; 19/12/2025
+%if 0
 	cmp	byte [esi+LD_FATType], 0
 	jna	short mget_w_13
+%endif
 	; 01/11/2016
 	mov	edx, [writei.c_index]
 	mov	[writei.fs_index], edx
@@ -15625,6 +15673,9 @@ mget_w_12:
 	;;mov	byte [writei.valid], 1
 	retn
 
+; 19/12/2025
+%if 0
+
 mget_w_13:
 	; EAX = FDT number (Current Section)
 	; EDX = Sector index from the first section (0,1,2,3,4...)
@@ -15636,9 +15687,11 @@ mget_w_13:
 	jmp	short mget_w_12
 
 mget_w_14:
-	mov	cl, [esi+LD_FS_BytesPerSec+1]
-	shr	cl, 1 ;  ; 1 for 512 bytes, 4 for 2048 bytes
-	mov	[writei.spc], cl  ; sectors per cluster
+	;mov	cl, [esi+LD_FS_BytesPerSec+1]
+	;shr	cl, 1 ;  ; 1 for 512 bytes, 4 for 2048 bytes
+	;mov	[writei.spc], cl  ; sectors per cluster
+	; 19/12/2025
+	mov	byte [writei.spc], 1
 	; NOTE: writei bytes per sector value is always 512 !
 	mov	word [writei.bpc], 512
 
@@ -15767,7 +15820,10 @@ mget_w_19:
 	;mov	byte [writei.s_index], 0 ; sector index in cluster
 	jmp	mget_w_3
 
+%endif
+
 update_file_lmdt: ; & update file size
+	; 19/12/2025 - TRDOS 386 v2.0.10
 	; 03/09/2024
 	; 27/08/2024 - TRDOS 386 v2.0.9
 	; 30/07/2022
@@ -15906,8 +15962,11 @@ uflmdt_4:
 uflmdt_5:
 	mov	ebx, rw_buffer ; Common r/w sector buffer addr
 
+; 19/12/2025
+%if 0
 	and	al, al ; 0 = Singlix FS
 	jz	short uflmdt_11
+%endif
 
 ;uflmdt_12:
 	and	edx, edx
@@ -15942,6 +16001,8 @@ uflmdt_2:
 	stc	; update failed
 	retn
 
+; 19/12/2025
+%if 0
 uflmdt_11:
 	; 24/10/2016
 	; Update last modification date & time of a file
@@ -15960,6 +16021,7 @@ uflmdt_11:
 	xor	eax, eax
 	stc
 	retn
+%endif
 
 uflmdt_8:
 	mov	edx, [esi+LD_BPB+FAT32_RootFClust]
@@ -16867,9 +16929,11 @@ syschmod_3:
 	cmp	byte [u.uid], 0  ; root (super user) ?
 	ja	short syschmod_perm_err
 syschmod_4:
+; 19/12/2025
+%if 0
 	cmp	word [edi+DirEntry_NTRes], 01A1h ; Singlix FS
 	je	short syschmod_7
-
+%endif
 	mov	[edi+0Bh], bh    ; Attributes (New!)
 
 	mov	byte [DirBuff_ValidData], 2 ; modified sign
@@ -16885,6 +16949,8 @@ syschmod_6:
 	;mov	dword [u.error], 0
 	jmp	sysret
 
+; 19/12/2025
+%if 0
 syschmod_7:
 	sub	eax, eax
         mov     ah, [DirBuff_DRV]
@@ -16906,8 +16972,8 @@ syschmod_8:
 	;jmp	short syschmod_5
 	; 23/07/2022
 	jnc	short syschmod_5
-	jmp	syschmod_err ; 26/09/2024 
-
+	jmp	syschmod_err ; 26/09/2024
+%endif
 
 sysdrive: ; Get/Set Current (Working) Drive (for user)
 	; 30/12/2017 (TRDOS 386 = TRDOS v2.0) 
@@ -17087,7 +17153,7 @@ systime_1:
 				; accepted as [TIMER_LH]/18.2
 				; seconds since the midnight.)
 	jna	short systime_0
-	mov	[u.r0], eax	
+	mov	[u.r0], eax
 	jmp	error ; cf = 1 & [u.r0] = eax = timer ticks
 
 systime_2:
@@ -17262,6 +17328,7 @@ sysstime_7:
 	jmp	sysstime_3
 
 sysrename: ; Rename File (or Directory)
+	; 19/12/2025 - TRDOS 386 v2.0.10
 	; 08/08/2022
 	; 23/07/2022 - TRDOS 386 v2.0.5
 	; 19/01/2021
@@ -17362,8 +17429,9 @@ sysrename_3:
 	test	bl, 7 ; system, hidden, readonly
         jnz	short sysrename_perm_err
 sysrename_4:
-	cmp	word [edi+DirEntry_NTRes], 01A1h ; Singlix FS
-	je	short sysrename_perm_err ; -temporary!-
+	; 19/12/2025
+	;cmp	word [edi+DirEntry_NTRes], 01A1h ; Singlix FS
+	;je	short sysrename_perm_err ; -temporary!-
 
 	; save old file name & file info (FFF structure)
 	mov	esi, FindFile_Drv
@@ -17445,7 +17513,7 @@ sysmem: ; Get Total&Free Memory amount
 	;	      = 4GB - CORE (4MB)
 	;	ECX = Free memory count (in bytes)
 	;	EDX = Calculated free memory count (in bytes)
-	
+
 	mov	eax, [memory_size] ; in pages
 	shl	eax, 12		   ; in bytes
 	mov	[u.r0], eax
@@ -17466,7 +17534,7 @@ sysmem: ; Get Total&Free Memory amount
 sysprompt:
 	; Set TRDOS 386 Command Interpreter (MainProg) prompt
 	; 30/07/2022 (TRDOS 386 Kernel v2.0.5)
-	; 31/12/2017 (TRDOS 386 = TRDOS v2.0) 
+	; 31/12/2017 (TRDOS 386 = TRDOS v2.0)
 	;
         ; INPUT -> 
 	;	EBX = 0 -> use default prompt
@@ -17547,7 +17615,7 @@ syspath:
 	;adc	cx, 1 ; 255 -> 256, 0 -> 1
 	; 30/07/2022
 	dec	cl ; 0 -> 255, 1 -> 0
-	inc	ecx ; 255 -> 256, 0 -> 1 
+	inc	ecx ; 255 -> 256, 0 -> 1
 	; EDI = Output buffer
 	; CX = Buffer length
 	; AL = 0 -> use ASCIIZ word in [ESI]
@@ -17560,7 +17628,7 @@ syspath:
 	; ECX = transfer (byte) count
 	call	transfer_to_user_buffer
 	jc	short syspath_err
-	mov	[u.r0], ecx 
+	mov	[u.r0], ecx
 	jmp	sysret
 
 syspath_0:
@@ -17710,6 +17778,11 @@ isintr:
 	test	byte [u.intr], 0FFh
 	; zf = 1 -> terminate interrupt disabled
 	; zf = 0 -> terminate interrupt enabled
+
+; 19/12/2025
+iget:
+sndc:
+sleep:
 	retn
 
 ; 23/07/2022 - TRDOS 386 v2.0.5
@@ -17717,15 +17790,16 @@ isintr:
 ; 22/01/2021
 ; temporary - 24/01/2016
 
-iget:
-	;retn
-;iopen:
+; 19/12/2025
+;iget:
 ;	;retn
-;iclose:
+;;iopen:
+;;	;retn
+;;iclose:
+;;	;retn
+;sndc:
 ;	;retn
-sndc:
-	;retn
-access:
-	;retn
-sleep:
-	retn
+;access:
+;	;retn
+;sleep:
+;	retn

@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - File System Procedures : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 31/08/2024 (Previous: 07/08/2022)
+; Last Update: 19/12/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -150,11 +150,11 @@ load_FAT_sectors1:
 	; edx = 0
 	mov	[FAT_BuffSector], eax
 	mov	ebx, eax
-        add     eax, [esi+LD_FATBegin]
+        add	eax, [esi+LD_FATBegin]
 	mov	dl, 2
 	;cmp	byte [esi+LD_FATType], 2
         cmp	[esi+LD_FATType], dl ; 2
-	ja      short load_FAT_sectors3
+	ja	short load_FAT_sectors3
 	movzx	ecx, word [esi+LD_BPB+BPB_FATSz16]
 	jmp	short load_FAT_sectors4
 
@@ -259,7 +259,7 @@ load_FAT_root_dir0: ; 23/10/2016
 
 	;or	dx, dx ; 0 for FAT32 file systems
 	;jz	short load_FAT32_root_dir0 ; FAT32 root dir
-	
+
 	; 25/07/2022
 	mov	eax, edx
 	cmp	dx, 512 ; Number of Root Dir Entries
@@ -267,7 +267,7 @@ load_FAT_root_dir0: ; 23/10/2016
 	;mov	eax, edx ; 25/07/2022
 	; 23/10/2016
 	mov	ecx, eax
-	add	cx, 15 ; round up 
+	add	cx, 15 ; round up
 	;shr	cx, 4  ; 16 entries per sector (512/32)
 	; 25/07/2022
 	shr	ecx, 4
@@ -286,7 +286,7 @@ lrd_mov_ecx_32:
 	sub	ecx, ecx
 	mov	cl, 32
 	;dec	dx ; 511
-	;mov	ax, 32*512 
+	;mov	ax, 32*512
 
 lrd_check_dir_buffer:
 	; 25/07/2022
@@ -354,6 +354,7 @@ load_FAT32_root_dir0:
 	jmp	short load_FAT_sub_dir0
 	
 load_FAT_sub_directory:
+	; 19/12/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 01/02/2016 (TRDOS 386 = TRDOS v2.0)
 	; 05/07/2011
@@ -386,9 +387,13 @@ load_FAT_sub_dir0:
 	mov	[DirBuff_ValidData], ch ; 0
 	mov	[DirBuff_Cluster], eax
 
-	movzx	eax, word [esi+LD_BPB+BytesPerSec]
-	mul	ecx
-	shr	eax, 5 ; directory entry count (dir size / 32)
+	;movzx	eax, word [esi+LD_BPB+BytesPerSec] ; 512
+	;mul	ecx
+	;shr	eax, 5 ; directory entry count (dir size / 32)
+	; 19/12/2025
+	mov	eax, ecx
+	shl	eax, 4 ; 512/32 (16 entries per sector)
+
 	;dec	ax ; last entry
 	; 25/07/2022
 	dec	eax
@@ -405,14 +410,16 @@ load_FAT_sub_dir0:
 
 ; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 
-load_current_FS_directory:
-	;retn
-load_FS_root_directory:
-	;retn
-load_FS_sub_directory:
-	retn
+; 19/12/2025
+;load_current_FS_directory:
+;	;retn
+;load_FS_root_directory:
+;	;retn
+;load_FS_sub_directory:
+;	retn
 
 read_cluster:
+	; 19/12/2025 (TRDOS 386 v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 15/10/2016
 	; 18/03/2016
@@ -437,14 +444,18 @@ read_cluster:
 	; CL = 1 = [esi+LD_FS_Reserved2] ; SectPerClust for Singlix FS
 
 read_file_sectors: ; 16/03/2016
+
+; 19/12/2025
+%if 0
 	;cmp	byte [esi+LD_FATType], 0
 	; 25/07/2022
 	cmp	[esi+LD_FATType], ch ; 0
 	jna	short read_fs_cluster
+%endif
 
 read_fat_file_sectors: ; 18/03/2016
 	sub	eax, 2 ; Beginning cluster number is always 2
-	movzx	edx, byte [esi+LD_BPB+BPB_SecPerClust] ; 18/03/2016 
+	movzx	edx, byte [esi+LD_BPB+BPB_SecPerClust] ; 18/03/2016
 	mul	edx
 	add	eax, [esi+LD_DATABegin] ; absolute address of the cluster
 
@@ -465,19 +476,22 @@ rclust_retn:
 	sub	eax, eax ; 0
 	retn
 
+; 19/12/2025
+%if 0
+
 read_fs_cluster:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 15/02/2016 (TRDOS 386 = TRDOS v2.0)
 	; Singlix FS
 
 	; EAX = Cluster number is sector index number of the file (eax)
-	
+
 	; EDX = File number is the first File Descriptor Table address
 	;	of the file. (Absolute address of the FDT).
 
 	; eax = sector index (0 for the first sector)
 	; edx = FDT0 address
-		; 64 KB buffer = 128 sectors (limit) 
+		; 64 KB buffer = 128 sectors (limit)
 	;mov	ecx, 128 ; maximum count of sectors (before eof)
 	; 25/07/2022
 	sub	ecx, ecx
@@ -491,6 +505,8 @@ read_fs_sectors:
 	stc
 	retn
 
+%endif
+
 get_first_free_cluster:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 02/03/2016
@@ -501,7 +517,7 @@ get_first_free_cluster:
 	;	ESI = Logical DOS Drive Description Table address
 	; OUTPUT ->
 	;	cf = 1 -> Error code in AL (EAX)
-	;	cf = 0 -> 
+	;	cf = 0 ->
 	;	  EAX = Cluster number
 	;	  If EAX = FFFFFFFFh -> no free space
 	;	If the drive has FAT32 fs:
@@ -1232,6 +1248,7 @@ pass_uc_fat32_c_zero_check_2:
 	jmp     loc_fat_buffer_updated
 
 save_fat_buffer:
+	; 19/12/2025 (TRDOS 386 v2.0.10)
 	; 31/08/2024 (TRDOS 386 v2.0.9)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 15/10/2016
@@ -1267,9 +1284,11 @@ loc_save_fat_buff:
 	add	esi, edx
 
 	mov	dl, [esi+LD_FATType]
+; 19/12/2025
+%if 0
 	and	dl, dl
 	jz	short loc_save_fat_buffer_inv_data_pop_retn
-
+%endif
 	mov	eax, [FAT_BuffSector]
 	cmp	dl, 2
 	ja	short loc_save_fat32_buff
@@ -1770,7 +1789,7 @@ set_fat32_fsinfo_sector_parms:
 	; INPUT ->
 	;	ESI = Logical dos drive description table address
 	;	[esi+LD_BPB+BPB_Reserved] = Free Cluster Count
-	;	[esi+LD_BPB+BPB_Reserved+4] = First Free Cluster 
+	;	[esi+LD_BPB+BPB_Reserved+4] = First Free Cluster
 	; OUTPUT ->
 	;	ESI = Logical dos drive description table address
 	; 	CF = 0 -> OK..
@@ -1782,11 +1801,11 @@ set_fat32_fsinfo_sector_parms:
 	jc	short update_fat32_fsinfo_sector_retn
 
 	mov	eax, [esi+LD_BPB+BPB_Reserved] ; Free Cluster Count
-	mov	edx, [esi+LD_BPB+BPB_Reserved+4] ; First free Cluster	
+	mov	edx, [esi+LD_BPB+BPB_Reserved+4] ; First free Cluster
 
         ;mov	ebx, DOSBootSectorBuff
 	mov	[ebx+488], eax
-	mov	[ebx+492], edx	
+	mov	[ebx+492], edx
 
 	mov	eax, [CFS_FAT32FSINFOSEC]
 	mov	ecx, 1
@@ -1810,14 +1829,14 @@ get_fat32_fsinfo_sector_parms:
 	;	ESI = Logical dos drive description table address
 	; OUTPUT ->
 	;	ESI = Logical dos drive description table address
-	;	EBX = FSINFO sector buffer address (DOSBootSectorBuff)	
+	;	EBX = FSINFO sector buffer address (DOSBootSectorBuff)
 	;	CF = 0 -> OK..
 	;	   EAX = FsInfo sector address
 	;	   ECX = Free cluster count
-	;	   EDX = First free cluster 	
+	;	   EDX = First free cluster
 	;	CF = 1 -> Error code in AL (EAX)
 	;	   EBX = 0
-	;	
+	;
 	;	[CFS_FAT32FSINFOSEC] = FAT32 FSINFO sector address
         ;
 	; (Modified registers: EAX, EBX, ECX, EDX)
@@ -1845,7 +1864,7 @@ get_fat32_fsinfo_sector_parms:
 
 	mov	eax, [CFS_FAT32FSINFOSEC]
 	mov	ecx, [ebx+488] ; free cluster count
-	mov	edx, [ebx+492] ; first (next) free cluster	
+	mov	edx, [ebx+492] ; first (next) free cluster
 
 	retn
 
@@ -1896,7 +1915,7 @@ add_new_cluster:
 	;	EDX = 0 (if cf = 0)
 	; NOTE:
 	; This procedure does not update lm date&time !
-	;    ; 30/08/2024	
+	;    ; 30/08/2024
 	; and doesn't update 1st clust and file size fields !
 	;
 	; (Modified registers: EAX, EBX, ECX, EDX, EDI)
@@ -1954,7 +1973,7 @@ loc_add_new_cluster_save_fcc:
 	;;;
 	; 27/08/2024
 	dec	eax ; (*)
-	;;;  
+	;;;
 	mov	[FAT_anc_FFCluster], eax
 
 ; 27/08/2024 (TRDOS 386 v2.0.9)
@@ -1991,12 +2010,12 @@ loc_add_new_cluster_write_nc_to_disk:
 	mov	eax, edx
         add     eax, [esi+LD_DATABegin]
 	jc	short loc_add_new_cluster_invalid_format_retn
-		
+
 	mov	ecx, ebx ; ECX = sectors per cluster (<256)
 	mov	ebx, Cluster_Buffer
 	call	disk_write
 	jnc	short loc_add_new_cluster_update_fat_nlc
-	
+
 	; 15/10/2016 (1Dh -> 18)
 	;mov	eax, 18 ; Write Error
 	; 25/07/2022
@@ -2083,6 +2102,7 @@ loc_add_new_cluster_return_cluster_number:
         retn
 
 write_cluster:
+	; 19/12/2025 - TRDOS 386 v2.0.10
 	; 31/08/2024 - TRDOS 386 v2.0.9
 	; 15/10/2016
 	; 21/03/2016 (TRDOS 386 = TRDOS v2.0)
@@ -2092,26 +2112,30 @@ write_cluster:
 	;	ESI = Logical DOS Drive Description Table address
 	;	EBX = Cluster (File R/W) Buffer address (max. 64KB)
 	;	Only for SINGLIX FS:
-	;	EDX = File Number (The 1st FDT address) 
+	;	EDX = File Number (The 1st FDT address)
 	; OUTPUT ->
 	;	cf = 1 -> Cluster can not be written onto disk
 	;	    EAX > 0 -> Error number
 	;	cf = 0 -> Cluster has been written successfully
 	;
 	; (Modified registers: EAX, ECX, EBX, EDX)
-	
-	movzx	ecx, byte [esi+LD_BPB+BPB_SecPerClust] 
+
+	movzx	ecx, byte [esi+LD_BPB+BPB_SecPerClust]
 	; CL = 1 = [esi+LD_FS_Reserved2] ; SectPerClust for Singlix FS
 
 write_file_sectors: ; 16/03/2016
+
+; 19/12/2025
+%if 0
 	cmp	byte [esi+LD_FATType], 0
 	jna	short write_fs_cluster
+%endif
 
 write_fat_file_sectors:
 	; 31/08/2024
 	; ecx = sector count (may be different than sectors per cluster)
 	sub	eax, 2 ; Beginning cluster number is always 2
-	movzx	edx, byte [esi+LD_BPB+BPB_SecPerClust] ; 18/03/2016 
+	movzx	edx, byte [esi+LD_BPB+BPB_SecPerClust] ; 18/03/2016
 	mul	edx
 	add	eax, [esi+LD_DATABegin] ; absolute address of the cluster
 
@@ -2119,11 +2143,11 @@ write_fat_file_sectors:
 	; ECX = Sector count
 	; EBX = Buffer address
 	; (EDX = 0)
-	; ESI = Logical DOS drive description table address	
+	; ESI = Logical DOS drive description table address
 
 	call	disk_write
 	jnc	short wclust_retn
-	
+
 	; 15/10/2016 (1Dh -> 18)
 	mov	eax, 18 ; Drive not ready or write error !
 	retn
@@ -2132,20 +2156,23 @@ wclust_retn:
 	sub	eax, eax ; 0
 	retn
 
+; 19/12/2025
+%if 0
+
 write_fs_cluster:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 21/03/2016 (TRDOS 386 = TRDOS v2.0)
 	; Singlix FS
-	
+
 	; EAX = Cluster number is sector index number of the file (eax)
-	
-	; EDX = File number is the first File Descriptor Table address 
+
+	; EDX = File number is the first File Descriptor Table address
 	;	of the file. (Absolute address of the FDT).
-	
+
 	; eax = sector index (0 for the first sector)
 	; edx = FDT0 address
-		; 64 KB buffer = 128 sectors (limit) 
-	;mov	ecx, 128 ; maximum count of sectors (before eof) 
+		; 64 KB buffer = 128 sectors (limit)
+	;mov	ecx, 128 ; maximum count of sectors (before eof)
 	; 25/07/2022
 	sub	ecx, ecx
 	mov	cl, 128
@@ -2158,7 +2185,10 @@ write_fs_sectors:
 	stc
 	retn
 
+%endif
+
 get_cluster_by_index:
+	; 19/12/2025 (TRDOS 386 v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 29/04/2016 (TRDOS 386 = TRDOS v2.0)
 	; INPUT ->
@@ -2168,19 +2198,21 @@ get_cluster_by_index:
 	; 	ECX = Cluster sequence number after the beginning cluster
 	; 	ESI = Logical DOS Drive Description Table address
 	; OUTPUT ->
-	;	EAX = Cluster number 
+	;	EAX = Cluster number
 	;	cf = 1 -> Error code in AL (EAX)
 	;
 	;(Modified registers: EAX, ECX, EBX, EDX)
-	;	
-	cmp	byte [esi+LD_FATType], 1
-        jb      short get_fs_section_by_index 
 
+; 19/12/2025
+%if 0
+	cmp	byte [esi+LD_FATType], 1
+        jb      short get_fs_section_by_index
+%endif
 	cmp	ecx, [esi+LD_Clusters]
 	jb	short gcbi_1
 gcbi_0:
 	;stc
-	;mov	eax, 23h ; Cluster not available ! 
+	;mov	eax, 23h ; Cluster not available !
 			 ; MSDOS error code: FCB unavailable
 	; 25/07/2022
 	sub	eax, eax
@@ -2204,6 +2236,9 @@ gcbi_3:
 	cmc 	; stc
 	retn
 
+; 19/12/2025
+%if 0
+
 get_fs_section_by_index:
 	; 29/04/2016 (TRDOS 386 = TRDOS v2.0)
 	; INPUT ->
@@ -2222,7 +2257,7 @@ get_fs_section_by_index:
 	retn
 
 get_last_section:
-	; 22/10/2016 (TRDOS 386 = TRDOS v2.0)	
+	; 22/10/2016 (TRDOS 386 = TRDOS v2.0)
 	; INPUT ->
 	; 	EAX = (The 1st) FDT number/address
 	; 	ESI = Logical DOS Drive Description Table address
@@ -2230,8 +2265,8 @@ get_last_section:
 	; 	EAX = FDT number/address of the last section
 	; 	EDX = Last sector of the section (0,1,2,3,4...)
 	;	[glc_index] = sector index number of the last sector
-	;		      (for file, not for the last section)  	
-	;		   	
+	;		      (for file, not for the last section)
+	;
 	;	cf = 1 -> Error code in AL (EAX)
 	;
 	;(Modified registers: EAX, ECX, EBX, EDX)
@@ -2239,3 +2274,5 @@ get_last_section:
 	mov	eax, 0
 	mov	edx, 0
 	retn
+
+%endif

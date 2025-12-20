@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.10
 ; ----------------------------------------------------------------------------
-; Last Update: 09/12/2025 (Previous: 11/08/2025)
+; Last Update: 19/12/2025 (Previous: 11/08/2025)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -21,7 +21,7 @@
 ; nasm trdos386.s -l trdos386.txt -o TRDOS386.SYS
 
 KLOAD	equ 10000h ; Kernel loading address
-	; NOTE: Retro UNIX 8086 v1 boot code loads kernel at 1000h:0000h 
+	; NOTE: Retro UNIX 8086 v1 boot code loads kernel at 1000h:0000h
 KCODE	equ 08h	; Code segment descriptor (ring 0)
 KDATA	equ 10h	; Data segment descriptor (ring 0)
 ; 19/03/2015
@@ -30,7 +30,7 @@ UDATA	equ 23h ; 20h + 3h  (ring 3)
 ; 24/03/2015
 TSS	equ 28h	; Task state segment descriptor (ring 0)
 ; 19/03/2015
-CORE	equ 400000h  ; Start of USER's virtual/linear address space 
+CORE	equ 400000h  ; Start of USER's virtual/linear address space
 		     ; (at the end of the 1st 4MB)
 ECORE	equ 0FFC00000h ; End of USER's virtual address space (4GB - 4MB)
 		     ; ULIMIT = (ECORE/4096) - 1 = 0FFBFFh (in GDT)
@@ -44,11 +44,11 @@ KEND    equ KERNELFSIZE + KLOAD
 CMOS_SECONDS	EQU	00H		; SECONDS (BCD)
 CMOS_SEC_ALARM	EQU	01H		; SECONDS ALARM (BCD)
 CMOS_MINUTES	EQU	02H		; MINUTES (BCD)
-CMOS_MIN_ALARM	EQU	03H		; MINUTES ALARM (BCD) 	
+CMOS_MIN_ALARM	EQU	03H		; MINUTES ALARM (BCD)
 CMOS_HOURS	EQU	04H		; HOURS (BCD
 CMOS_HR_ALARM	EQU	05H		; HOURS ALARM   (BCD)
 CMOS_DAY_WEEK	EQU	06H		; DAY OF THE WEEK  (BCD)
-CMOS_DAY_MONTH	EQU	07H		; DAY OF THE MONTH (BCD) 
+CMOS_DAY_MONTH	EQU	07H		; DAY OF THE MONTH (BCD)
 CMOS_MONTH	EQU	08H		; MONTH (BCD)
 CMOS_YEAR	EQU	09H		; YEAR (TWO DIGITS) (BCD)
 CMOS_CENTURY	EQU	32H		; DATE CENTURY BYTE (BCD)
@@ -75,9 +75,9 @@ MEM_ALLOC_TBL	equ	100000h		; Memory Allocation Table at the end of
 					;  changed later.)
 					; ((lower 17 bits of 32 bit M.A.T.
 					;   address must be ZERO)).
-					; ((((Reason: 32 bit allocation 
+					; ((((Reason: 32 bit allocation
 					;     instructions, dword steps)))
-					; (((byte >> 12 --> page >> 5)))  
+					; (((byte >> 12 --> page >> 5)))
 ;04/11/2014	
 PDE_A_PRESENT	equ	1		; Present flag for PDE
 PDE_A_WRITE	equ 	2		; Writable (write permission) flag
@@ -100,13 +100,13 @@ HD3_DPT	 equ 96	    ; Disk parameter table address for hd3
 ; 15/11/2020
 VBE3INFOSEG equ 97E0h ; 512 bytes before Video_Pg_Backup
 ; 15/12/2020
-VBE3MODEINFOSEG equ 97C0h ; 512 bytes before VBE3INFOBLOCK 
+VBE3MODEINFOSEG equ 97C0h ; 512 bytes before VBE3INFOBLOCK
 
 ; 29/11/2020
 VBE3INFOBLOCK equ 97E00h ; linear address (512 bytes)
 VBE3MODEINFOBLOCK equ 97C00h ; linear address (256 bytes)
 VBE3SAVERESTOREBLOCK equ 97600h ; linear address (2048 bytes)
-VBE3CRTCINFOBLOCK equ 97D80h ; linear address (64 bytes) ; 17/01/2021 
+VBE3CRTCINFOBLOCK equ 97D80h ; linear address (64 bytes) ; 17/01/2021
 VBE3BIOSDATABLOCK equ 97000h ; linear address (1536 bytes)
 VBE3STACKADDR equ 96000h ; linear address (1024 bytes)
 ; VBE3 32 bit Protected Mode Interface (16 bit) Selectors (in GDT)
@@ -123,10 +123,10 @@ KCODE16 equ 70h ; _16bit_CS:
 ; 06/12/2020
 VBE3VIDEOSTATE equ 95800h ; 2048 bytes
 ; 05/01/2021
-VGAFONT16USER equ 94000h ; 8x16 pixels user font (256 chars)	
-			 ; (reserved/allocated font space: 4096 bytes) 
+VGAFONT16USER equ 94000h ; 8x16 pixels user font (256 chars)
+			 ; (reserved/allocated font space: 4096 bytes)
 
-VGAFONT8USER equ 95000h	; 8x8 pixels user font (256 chars)	
+VGAFONT8USER equ 95000h	; 8x8 pixels user font (256 chars)
 			; (reserved/allocated font space: 2048 bytes)
 ; 17/01/2021
 ; temporary (initial) location for EDID information
@@ -138,7 +138,7 @@ VBE3EDIDINFOBLOCK equ 97D00h ; linear address (128 bytes)
 FDPT_CYLS	equ 0 ; 1 word, number of cylinders
 FDPT_HDS	equ 2 ; 1 byte, number of heads
 FDPT_TT		equ 3 ; 1 byte, A0h = translated FDPT with logical values
-		      ; otherwise it is standard FDPT with physical values 	
+		      ; otherwise it is standard FDPT with physical values
 FDPT_PCMP	equ 5 ; 1 word, starting write precompensation cylinder
 		      ; (obsolete for IDE/ATA drives)
 FDPT_CB		equ 8 ; 1 byte, drive control byte
@@ -217,7 +217,7 @@ endstruc
 	jnc	short chk_ms
 	mov	ah, 88h    ; Get extended memory size 
 	int	15h
-	;	   
+	;
 	;mov	al, 17h	; Extended memory (1K blocks) low byte
 	;out	70h, al ; select CMOS register
 	;in	al, 71h ; read data (1 byte)
@@ -226,7 +226,7 @@ endstruc
 	;out	70h, al ; select CMOS register
 	;in	al, 71h ; read data (1 byte)
 	;mov	ch, al
- 	;      
+ 	;
 	mov	cx, ax
 	xor	dx, dx
 chk_ms:
@@ -241,8 +241,8 @@ chk_ms:
         cmp     cx, 1024
 	;jnb	short L0
 	jnb	short V0 ; 14/11/2020
-		 ; insufficient memory_error	
-		 ; Minimum 2 MB memory is needed... 
+		 ; insufficient memory_error
+		 ; Minimum 2 MB memory is needed...
 	; 05/11/2014
 	; (real mode error printing)
 	sti
@@ -270,7 +270,7 @@ _int13h_48h_buffer: ; 07/07/2016
  	db	0Dh, 0Ah, 0
 V0:
 	; 18/10/2023 - TRDOS 386 v2.0.7
-	; set video mode to 03h again 
+	; set video mode to 03h again
 	; (to reset video bios data in ROMBIOS DATA AREA)
 	mov	ax, 3
 	int	10h
@@ -284,12 +284,12 @@ V0:
 	rep	movsw
 	push	cs
 	pop	ds
-	
+
 	; 24/11/2023
 	; 15/12/2020
 	;mov	si, [mem_16m_64k]
 	;mov	[real_mem_16m_64k], si
-	
+
 	; 15/11/2020
 	; 14/11/2020 (TRDOS 386 v2.0.3)
 	; check VESA (VBE) VIDEO BIOS version
@@ -297,7 +297,7 @@ V0:
 	mov	ax, 4F03h  ; Return current VBE mode
 	int	10h
 	cmp	ax, 004Fh  ; successful (vbe) function call
-	;jne	short L0   ; not a VESA VBE compatible bios	
+	;jne	short L0   ; not a VESA VBE compatible bios
 	; 18/10/2023
 	jne	short V1   ; restore es
 
@@ -306,10 +306,10 @@ V0:
 	;jmp	short V1
 
 	;mov	ah, 3
-	;;jmp	short V1	
-	
+	;;jmp	short V1
+
 	; 15/11/2020
-	mov	bx, VBE3INFOSEG  ; 97E0h for current version 
+	mov	bx, VBE3INFOSEG  ; 97E0h for current version
 	mov	es, bx
 	xor	di, di
 	mov	dword [es:di], 'VBE2' ; request VESA VBE3 info
@@ -317,7 +317,7 @@ V0:
 	;mov	ax, 4F00h ; Return VBE controller information
 	xchg	al, ah
 	int	10h
-	
+
 	; dx = cs
 	; es = VBE3INFOSEG (97E0h)
 	; di = 0
@@ -330,16 +330,16 @@ V0:
 	; 15/11/2020
 	cmp	dword [es:di], 'VESA'
 	jne	short V1
-	
+
 	;mov	ax, [es:di+4]
 	;	; ax = vbe version in BCD format (0200h or 0300h)
-	;mov	[vbe3], ah ; version number (major) 	
+	;mov	[vbe3], ah ; version number (major)
 
 	; 15/11/2020
 	mov	al, [es:di+5]
 		; al = high byte of VBE version number (02h or 03h)
 
-	mov	[vbe3], al ; version number (major) 	
+	mov	[vbe3], al ; version number (major)
 			   ; 02h or 03h is expected
 	; 17/01/2021
 	; Read EDID
@@ -350,7 +350,7 @@ V0:
 	mov	ax, VBE3MODEINFOSEG  ; 97C0h for current version
 	mov	es, ax
 	mov	di, VBE3EDIDINFOBLOCK - VBE3MODEINFOBLOCK
-	; es:di = temporary address of 128 bytes EDID information 
+	; es:di = temporary address of 128 bytes EDID information
 	mov	ax, 4F15h ; VBE/DDC Services 
 	int	10h
 	;cmp	ax, 4Fh
@@ -376,7 +376,7 @@ V0:
 	mov	si, [es:di+MODEINFO.PhysBasePtr] ; hw of LFB addr
 	mov	[def_LFB_addr], si ; k_LFB_size = 3145728 bytes
 	sub	si, 256
-	
+
 	; 15/12/2020
 	; check memory and decrease it to 3.5 GB if it is 4GB
 	; (reserve upper memory for LFB)
@@ -392,15 +392,15 @@ V0:
 	; VESA VBE3 video hardware 
 	; (example: NVIDIA GEFORCE FX550, 256 MB)
 	; uses upper memory from 0D0000000h to 0DFFFFFFFh
-	
+
 	;;cmp	di, 0CF00h ; 3328 MB - 16MB
 	;jna	short V1  ; <= 3328 MB memory, it is not required
 			  ; decrease
-	;cmp	al, 3 
-	;jb	short V2 
+	;cmp	al, 3
+	;jb	short V2
 	; VESA VBE 3
 	;mov	word [mem_16m_64k], 0CF00h ; 3328 MB - 16MB
-	;jmp	short V1 	
+	;jmp	short V1
 ;V2:
 	; VESA VBE 2
 	; Check Bochs/Qemu/VirtualBox Emulator
@@ -415,10 +415,10 @@ V0:
 	;jne	short V1
 	;
 	; BOCHS/QEMU/VIRTUALBOX
-	;mov	word [mem_16m_64k], 0DF00h ; 3584 MB - 16MB	
+	;mov	word [mem_16m_64k], 0DF00h ; 3584 MB - 16MB
 V1:
 	push	ds
-	pop	es ; restore extra data segment	
+	pop	es ; restore extra data segment
 L0:
 
 %include 'diskinit.s' ; 07/03/2015
@@ -460,7 +460,7 @@ L0:
 	retf
 L17:
 	mov	cx, 1000h
-	mov	es, cx  ; 1000h 
+	mov	es, cx  ; 1000h
 	add	cx, cx
 	mov	ds, cx  ; 2000h
 	;sub	si, si
@@ -470,7 +470,7 @@ L17:
 	; 02/12/2023
 	; si = di = 0
 	mov	cx, 32768
-	rep	movsw	
+	rep	movsw
 
 	; Turn off the floppy drive motor
         mov     dx, 3F2h
@@ -504,7 +504,7 @@ L19:
 	mov     cr0, eax
 
 	; Jump to 32 bit code
-	
+
 	db 66h 			; Prefix for 32-bit
 	db 0EAh 		; Opcode for far jump
 	dd StartPM 		; Offset to start, 32-bit
@@ -515,7 +515,7 @@ L19:
 ; 20/02/2017
 
 
-[BITS 32] 
+[BITS 32]
 
 StartPM:
 	; Kernel Base Address = 0 ; 30/12/2013
@@ -535,8 +535,8 @@ clear_bss: ; Clear uninitialized data area
 	xor	eax, eax ; 0
 	mov	ecx, (bss_end - bss_start)/4
 	;shr	ecx, 2 ; bss section is already aligned for double words
-	mov	edi, bss_start	
-	rep	stosd  		
+	mov	edi, bss_start
+	rep	stosd
 
 memory_init:
 	; Initialize memory allocation table and page tables
@@ -552,12 +552,12 @@ memory_init:
 	; 06/11/2014
 	; 05/11/2014
 	; 04/11/2014
-	; 31/10/2014 (Retro UNIX 386 v1 - Beginning) 
+	; 31/10/2014 (Retro UNIX 386 v1 - Beginning)
 	;
 ;	xor	eax, eax
 ;	xor 	ecx, ecx
 	mov	cl, 8
-	mov	edi, MEM_ALLOC_TBL	
+	mov	edi, MEM_ALLOC_TBL
 	rep	stosd		   ; clear Memory Allocation Table
 				   ; for the first 1 MB memory
 	;
@@ -568,14 +568,14 @@ memory_init:
 	shr	ecx, 2
 	mov	[free_pages], ecx
 	mov	dx, [mem_16m_64k]  ; Number of contiguous 64 KB blocks
-				   ; between 16 MB and 4 GB.	
+				   ; between 16 MB and 4 GB.
 	or	dx, dx
 	jz	short mi_0
 
 ; 04/12/2023
 %if 1
 	; 02/12/2023 - temporary (2816MB limit)
-	;cmp	dx, 44800 ; 0AF00h	
+	;cmp	dx, 44800 ; 0AF00h
 	cmp	dx, 40704	; (2560MB limit)
 	jna	short mi_x
 	;mov	dx, 44800
@@ -598,16 +598,16 @@ mi_0:
 	mov	eax, ecx
 	add	ax, 256		   ; add 256 pages for the first 1 MB
 	;add	eax, 256
-mi_1:			 
+mi_1:
 	mov	[memory_size], eax ; Total available memory in pages
 				   ; 1 alloc. tbl. bit = 1 memory page
-				   ; 32 allocation bits = 32 mem. pages   
+				   ; 32 allocation bits = 32 mem. pages
 	;
-	add	eax, 32767	   ; 32768 memory pages per 1 M.A.T. page 	
+	add	eax, 32767	   ; 32768 memory pages per 1 M.A.T. page
 	shr	eax, 15		   ; ((32768 * x) + y) pages (y < 32768)
 				   ;  --> x + 1 M.A.T. pages, if y > 0
 				   ;  --> x M.A.T. pages, if y = 0
-	mov	[mat_size], ax	   ; Memory Alloc. Table Size in pages		
+	mov	[mat_size], ax	   ; Memory Alloc. Table Size in pages
 	shl	eax, 12		   ; 1 M.A.T. page = 4096 bytes
 	;			   ; Max. 32 M.A.T. pages (4 GB memory)
 	mov	ebx, eax	   ; M.A.T. size in bytes
@@ -618,28 +618,28 @@ mi_1:
 	;
 	sub	eax, 4		   ; convert M.A.T. size to offset value
 	mov	[last_page], eax   ; last page offset in the M.A.T.
-	;			   ; (allocation status search must be 
-				   ; stopped after here)	
+	;			   ; (allocation status search must be
+				   ; stopped after here)
 	xor	eax, eax
-	dec	eax		   ; FFFFFFFFh (set all bits to 1)	
+	dec	eax		   ; FFFFFFFFh (set all bits to 1)
 	;push	cx
 	; 18/04/2021
 	push	ecx
 	; ecx = 3840 ; 27/11/2023
 	; (Note: ecx < 3840 if the total memory is less than 16 MB)
-	shr	ecx, 5		   ; convert 1 - 16 MB page count to 
+	shr	ecx, 5		   ; convert 1 - 16 MB page count to
 				   ; count of 32 allocation bits
 	; ecx = 120 ; 27/11/2023
 	rep	stosd
 	;pop	cx
 	; 18/04/2021
 	pop	ecx
-	inc	eax		   ; 0	
+	inc	eax		   ; 0
 	and	cl, 31		   ; remain bits
 	jz	short mi_4
-	mov	[edi], eax	   ; reset	
+	mov	[edi], eax	   ; reset
 mi_2:
-	bts	[edi], eax	   ; 06/11/2014		
+	bts	[edi], eax	   ; 06/11/2014
 	dec	cl
 	jz	short mi_3
 	inc	al
@@ -648,14 +648,14 @@ mi_3:
 	sub	al, al	   	   ; 0
 	add	edi, 4		   ; 15/11/2014
 mi_4:
-	or	dx, dx		  ; check 16 MB to 4 GB memory space	
+	or	dx, dx		  ; check 16 MB to 4 GB memory space
 	jz	short mi_6	  ; max. 16 MB memory, no more...
-	;	
+	;
 	mov	ecx, MEM_ALLOC_TBL + 512 ; End of first 16 MB memory
-	;	
+	;
 	sub	ecx, edi	  ; displacement (to end of 16 MB)
 	jz	short mi_5	  ; jump if EDI points to 
-				  ;         end of first 16 MB	
+				  ;         end of first 16 MB
 	shr	ecx, 1		  ; convert to dword count
 	shr	ecx, 1		  ; (shift 2 bits right) 
 	rep 	stosd		  ; reset all bits for reserved pages
@@ -671,21 +671,21 @@ mi_5:
 	jnc	short mi_6
 	dec	ax		  ; eax = 0000FFFFh
 	stosd
-	inc	ax		  ; 0		
+	inc	ax		  ; 0
 mi_6:
-	cmp	edi, ebx	  ; check if EDI points to 	
+	cmp	edi, ebx	  ; check if EDI points to
 	jnb	short mi_7	  ; end of memory allocation table
 	;			  ; (>= MEM_ALLOC_TBL + 4906) 
 	mov	ecx, ebx	  ; end of memory allocation table
 	sub	ecx, edi	  ; convert displacement/offset
-	shr	ecx, 1		  ; to dword count 	 		
-	shr	ecx, 1		  ; (shift 2 bits right) 
+	shr	ecx, 1		  ; to dword count
+	shr	ecx, 1		  ; (shift 2 bits right)
 	rep 	stosd		  ; reset all remain M.A.T. bits
 mi_7:
 	; Reset M.A.T. bits in M.A.T. (allocate M.A.T. pages)
 	mov	edx, MEM_ALLOC_TBL
 	;sub	ebx, edx	  ; Mem. Alloc. Tbl. size in bytes
-	;shr	ebx, 12		  ; Mem. Alloc. Tbl. size in pages	
+	;shr	ebx, 12		  ; Mem. Alloc. Tbl. size in pages
 	mov	cx, [mat_size]	  ; Mem. Alloc. Tbl. size in pages
 	mov	edi, edx
 	shr	edi, 15		  ; convert M.A.T. address to
@@ -712,8 +712,8 @@ mi_9:
 
 	; edx = MEM_ALLOC_TBL
 	mov	ecx, [memory_size] ; memory size in pages (PTEs)
-	add	ecx, 1023	 ; round up (1024 PTEs per table)	 	
-	shr	ecx, 10		 ; convert memory page count to 
+	add	ecx, 1023	 ; round up (1024 PTEs per table)
+	shr	ecx, 10		 ; convert memory page count to
 				 ; page table count (PDE count)
 	;
 	push	ecx		 ; (**) PDE count (<= 1024)
@@ -750,7 +750,7 @@ mi_10:
 	mov	eax, edi
 	or	al, PDE_A_PRESENT + PDE_A_WRITE
 				; supervisor + read&write + present
-	mov	edx, ecx 	; (**) PDE count (= pg. tbl. count)	
+	mov	edx, ecx 	; (**) PDE count (= pg. tbl. count)
 mi_11:
 	add	eax, 4096	; Add page size (PGSZ)
 			        ; EAX points to next page table
@@ -773,23 +773,23 @@ mi_12:
 	mov	ecx, [memory_size] ; memory size in pages
 	mov	edx, ecx	; (***)
 	mov	al, PTE_A_PRESENT + PTE_A_WRITE
-			     ; supervisor + read&write + present 	
+			     ; supervisor + read&write + present
 mi_13:
 	stosd
-	add	eax, 4096	
+	add	eax, 4096
 	loop	mi_13	
 	;and	dx, 1023	; (***)
 	; 30/08/2023
 	and	edx, 1023
 	jz	short mi_14
-	;mov	cx, 1024	
+	;mov	cx, 1024
 	; 30/08/2023
 	mov	ch, 4 ; 4*256 = 1024
 	;sub	cx, dx		; from dx (<= 1023) to 1024
 	; 24/07/2022
 	sub	ecx, edx
 	xor	eax, eax
-	rep	stosd		; clear remain (empty) PTEs 
+	rep	stosd		; clear remain (empty) PTEs
 				; of the last page table
 mi_14:
 	;  Initialization of Kernel's Page Tables is OK, here.
@@ -799,11 +799,11 @@ mi_14:
 
 	shr	eax, 15		; convert to M.A.T. byte offset
 	and	al, 0FCh	; clear bit 0 and bit 1 for
-				; aligning on dword boundary	
+				; aligning on dword boundary
 	mov	[first_page], eax
 	mov	[next_page], eax ; The first free page pointer
 				 ; for user programs
-				 ; (Offset in Mem. Alloc. Tbl.)	
+				 ; (Offset in Mem. Alloc. Tbl.)
 	;
 	; Linear/FLAT (1 to 1) memory paging for the kernel is OK, here.
 	;
@@ -833,7 +833,7 @@ StartPMP:
 	;xor	eax, eax	; black background, black fore color
 	mov	eax, 07000700h  ; black background, light gray fore color
 	rep	stosd
-	
+
 	; 19/08/2014
 	; Kernel Base Address = 0
 	; It is mapped to (physically) 0 in the page table.
@@ -844,7 +844,7 @@ StartPMP:
 	;; 14/08/2015 (kernel version message will appear
 	;;	       when protected mode and paging is enabled)
 	mov	edi, 0B8000h ; 27/08/2014
-	
+
 	; 30/11/2020
 	; 14/11/2020 (TRDOS 386 v2.0.3)
 	;cmp	byte [vbe3], 3 ; 03h
@@ -883,7 +883,7 @@ StartPMP:
 	out	0A1h, al		;
 					;; ICW4
 	mov	al, 01h	 		;
-	out	21h, al			; 	8086 mode, normal EOI	
+	out	21h, al			; 	8086 mode, normal EOI
 	; jmp 	$+2
 	out	0A1h, al		;	for both chips.
 
@@ -894,7 +894,7 @@ StartPMP:
 
 	; 02/04/2015
 	; 26/03/2015 System call (INT 30h) modification
-	;  DPL = 3 (Interrupt service routine can be called from user mode)			
+	;  DPL = 3 (Interrupt service routine can be called from user mode)
 	;
 	;; Linux (v0.12) source code by Linus Torvalds (1991)
 	;  setup_idt:
@@ -922,7 +922,7 @@ rp_sidt1:
 	; 15/04/2016
 	; TRDOS 386 (TRDOS v2.0) /// 32 sofware interrupts ///
 	;mov	cl, 16        ; 16 software interrupts (INT 30h to INT 3Fh)
-	mov	cl, 32	      ; 32 software interrupts (INT 30h to INT 4Fh)	
+	mov	cl, 32	      ; 32 software interrupts (INT 30h to INT 4Fh)
 rp_sidt2:
 	lodsd
 	and	eax, eax
@@ -930,7 +930,7 @@ rp_sidt2:
 	mov	edx, eax
 	mov	dx, 0EE00h	; P=1b/DPL=11b/01110b
 	mov	bx, ax
-	mov	eax, ebx	; selector & offset bits 0-15 	
+	mov	eax, ebx	; selector & offset bits 0-15
 	stosd
 	mov	eax, edx
 	stosd
@@ -941,14 +941,14 @@ rp_sidt3:
 	mov	edx, eax
 	mov	dx, 0EE00h	; P=1b/DPL=11b/01110b
 	mov	bx, ax
-	mov	eax, ebx	; selector & offset bits 0-15 	
+	mov	eax, ebx	; selector & offset bits 0-15
 rp_sidt4:
 	stosd
 	xchg	eax, edx
 	stosd
 	xchg	edx, eax
 	loop	rp_sidt4
-sidt_OK: 
+sidt_OK:
 	lidt 	[idtd]
 	;
 	; TSS descriptor setup ; 24/03/2015
@@ -958,19 +958,19 @@ sidt_OK:
 	mov	[gdt_tss1], al
 	mov	[gdt_tss2], ah
 	mov	word [tss.IOPB], tss_end - task_state_segment
-		; 
+		;
 		; IO Map Base address (When this address points
-		; to end of the TSS, CPU does not use IO port 
-		; permission bit map for RING 3 IO permissions, 
+		; to end of the TSS, CPU does not use IO port
+		; permission bit map for RING 3 IO permissions,
 		; access to any IO ports in ring 3 will be forbidden.)
  		;
 	;mov	[tss.esp0], esp ; TSS offset 4
 	;mov	word [tss.ss0], KDATA ; TSS offset 8 (SS)
    	mov	ax, TSS  ; It is needed when an interrupt 
 			 ; occurs (or a system call -software INT- is requested)
-			 ; while cpu running in ring 3 (in user mode).				
+			 ; while cpu running in ring 3 (in user mode).
 			 ; (Kernel stack pointer and segment will be loaded
-			 ; from offset 4 and 8 of the TSS, by the CPU.)	 
+			 ; from offset 4 and 8 of the TSS, by the CPU.)
 	ltr	ax  ; Load task register
 	;
 esp0_set0:
@@ -990,7 +990,7 @@ esp0_set0:
 ; Note:
 ; 1 or 2 additional kernel page table(s) may be needed for Linear Frame Buffer
 ; .. but, it/they will not have to be contiguous with other kernel page tables.
-; ------------------------ 	 
+; ------------------------
 
 ; 27/11/2023 - TRDOS 386 v2.0.7
 %if 0
@@ -1011,7 +1011,7 @@ esp0_set1:
 %endif
 
 esp0_set_ok:
-	; 30/07/2015 (**tss.esp0**) 
+	; 30/07/2015 (**tss.esp0**)
 	mov	[tss.esp0], esp	; 90000h ; 29/11/2023
 				; <-- 97000h ; 04/12/2023 (max. 3072 bytes)
         mov     word [tss.ss0], KDATA
@@ -1024,7 +1024,7 @@ esp0_set_ok:
 	xor	al, al		; Enable all hardware interrupts!
 	out	21h, al		; (IBM PC-AT compatibility)
 	jmp 	$+2		; (All conventional PC-AT hardware
-	out	0A1h, al	;  interrupts will be in use.)	
+	out	0A1h, al	;  interrupts will be in use.)
 				; (Even if related hardware component
 				;  does not exist!)
 	; Enable NMI 
@@ -1058,12 +1058,12 @@ esp0_set_ok:
 	jb	short jmp_display_mem_info ; 24/07/2022
 	jmp	check_boch_plex86_vbe
 
-vbe3_pmid_chk:	
+vbe3_pmid_chk:
 	mov	ecx, 32768 - (20+2) ; 32766 - PMInfoBlockSize
 	mov	esi, 0C0002h ; 1st word of the video bios rom is 0AA55h
 	
 chk_pmi_sign:
-	;mov	eax, [esi] 
+	;mov	eax, [esi]
 	;cmp	eax, 'PMID'
 	; 30/11/2020
 	;cmp	al, 'P'
@@ -1095,7 +1095,7 @@ verify_pmib_chksum:
 	; 18/10/2023
 	; 15/11/2020
 	;xor	eax, eax
-	;;mov	ecx, eax 
+	;;mov	ecx, eax
 	;mov	cl, 20
 	mov	cx, 20 ; 30/11/2020
 	push	esi
@@ -1117,7 +1117,7 @@ pmib_sum_bytes:
 	; (This setting may be changed via 'sysvideo' bx=0908h)
 
 skip_verify_pmib_chksum: ; 18/10/2023
-		
+
 	mov	byte [truecolor], 32 ; (RGB: 00RRGGBBh)
 
 display_vbios_product_name: ; 14/11/2020
@@ -1145,7 +1145,7 @@ display_vbios_product_name: ; 14/11/2020
 			; TRDOS 386 v2.0.3 VESA VBE3 protected mode
 			; interface development reference is ...
 			; NVIDIA GeForce FX5500 VGA BIOS -C000h:029Ch-
-			; Version 4.34.20.54.00 -C000h:02EDh- 	  
+			; Version 4.34.20.54.00 -C000h:02EDh-
 			; ((OemString is 'NVIDIA'))
 			; ((OemVendorName is 'NVIDIA Corporation'))
 			; ((OemProductName is 'NV34 Board - p162-1nz))
@@ -1210,7 +1210,7 @@ vbe3pminit:
 	; 30/11/2020
 	sub	edi, esi ; izolate offset
 	add	edi, eax ; new address
-	mov	[pmid_addr], edi ; new 'PMID' location	
+	mov	[pmid_addr], edi ; new 'PMID' location
 
 	; Move VIDEO BIOS from 0C0000h to EAX
 	mov	ecx, 65536/4
@@ -1257,10 +1257,10 @@ vbe3pminit:
 	mov	eax, VBE3SAVERESTOREBLOCK
 	stosw	; edi = _vbe3_ES+4
 	shr	eax, 16
-	mov	[edi], al ; base address, bits 16..23 	
+	mov	[edi], al ; base address, bits 16..23
 
 	;Note: low word of _VBE3_ES base address will be
-	;      set -again- by VBE3 PMI caller routine 
+	;      set -again- by VBE3 PMI caller routine
 
 	; 09/12/2020
 	;; set pmi32 (as VBE3 PMI is ready)
@@ -1271,7 +1271,7 @@ vbe3pminit:
 	mov	eax, pminit_return_addr16
 	stosw	; edi = _16bit_CS+4
 	shr	eax, 16
-	mov	[edi], al ; base address, bits 16..23 
+	mov	[edi], al ; base address, bits 16..23
 
 	; 30/11/2020
 	; clear mem from VBE3 BIOS data area emu block
@@ -1281,7 +1281,7 @@ vbe3pminit:
 	; (VBE3BIOSDATABLOCK contains a copy of the 1st
 	; 1536 bytes of the memory, IVT, ROMBIOS DATA etc.)
 	; ((it must not be cleared here))
-%if 0	
+%if 0
 	; 01/12/2020
 	mov	edi, VBE3BIOSDATABLOCK ; 97000h
 	;mov	cx, (VBE3INFOBLOCK-VBE3BIOSDATABLOCK)/4
@@ -1302,14 +1302,14 @@ vbe3pminit:
 		 ; ecx = 1536/4 = 384 double words
 	;xor	eax, eax
 	xor	al, al
-	rep	stosd	
+	rep	stosd
 
 	; Filling PMInfoBlock selector fields
 	mov	edi, [pmid_addr]
 	mov	word [edi+PMInfo.BIOSDataSel], VBE3BDS
 	mov	word [edi+PMInfo.A0000Sel], VBE3A000
 	mov	word [edi+PMInfo.B0000Sel], VBE3B000
-	mov	word [edi+PMInfo.B8000Sel], VBE3B800	
+	mov	word [edi+PMInfo.B8000Sel], VBE3B800
 	mov	word [edi+PMInfo.CodeSegSel], VBE3DS
 	mov	byte [edi+PMInfo.InProtectMode], 1
 
@@ -1318,7 +1318,7 @@ vbe3pminit:
 	mov	cl, PMInfo.size - 1
 	;xor	ah, ah
 pmid_chksum:
-	lodsb	
+	lodsb
 	add	ah, al
 	loop	pmid_chksum
 	neg	ah ; 1 -> 255, 255 -> 1
@@ -1343,7 +1343,7 @@ _VBE3PMI_fcall:
 	push	ebp ; **
 
 	mov	ebp, esp ; save 32 bit stack pointer
-	
+
 	mov	esi, eax
 
 	cli
@@ -1358,7 +1358,7 @@ _VBE3PMI_fcall:
 	; 02/12/2020
 	mov	ax, VBE3SS
 	mov	ss, ax
-	
+
 	mov	esp, 1020 ; 30/11/2020
 
 	; 01/12/2020
@@ -1369,7 +1369,7 @@ _VBE3PMI_fcall:
 	; 30/11/2020 - 16 bit pm selector test (OK)
 	; (32 bit stack push/pop & retf with 32 bit code segment)
 	; (16 bit stack push/pop with 16 bit code segment)
-	
+
 	; return
 	;push	KCODE16
 	;push	0 ; 30/11/2020 (pminit_return_addr16)
@@ -1394,13 +1394,13 @@ _VBE3PMI_fcall:
 
 	; 02/12/2020
 	xor	esi, esi ; (not necessary, it is not used)
-	
+
 	retf 	; far return (to 16 bit code segment)
 
 	; 01/12/2020
 	;db	0EAh  ; far jump to 16 bit code segment
 ;jumpfar16:
-	;dd	0		
+	;dd	0
 	;dw	VBE3CS
 
 ;stack16:
@@ -1441,11 +1441,11 @@ pminit_return_addr32:
 	xor	al, al	   ; Enable all hardware interrupts!
 	out	21h, al	   ; (IBM PC-AT compatibility)
 	jmp 	$+2	   ; (All conventional PC-AT hardware
-	out	0A1h, al   ;  interrupts will be in use.)	
+	out	0A1h, al   ;  interrupts will be in use.)
 			   ; (Even if related hardware component
 			   ;  does not exist!)
 	pop	eax
-	
+
 	sti
 
 	; top of stack = return address 
@@ -1490,7 +1490,7 @@ vbe3h_chcl:
 	;shl	ax, 6  ; * 64
 	;mov	[vbestatebufsize+30], ax
 	;
-	;; 06/12/2020	
+	;; 06/12/2020
 	;; check 'vbe3stbufsize' (it must be <= 32)
 	;
 	;cmp	bx, 32
@@ -1501,7 +1501,7 @@ vbe3h_chcl:
 
 	; 30/11/2020
 	; Change VESA VBE3 BIOS text color in order to give
-	; "VBE3 PMI initialization has been successed" meaning 	
+	; "VBE3 PMI initialization has been successed" meaning
 
 	mov	esi, 0B8000h + 160*2 ; row 2
 	mov	edi, esi
@@ -1520,7 +1520,7 @@ di5:
 	;
 	inc	byte [vbe3]  ; [vbe3] = 2 -> 3
 			; will be decreased to 2 again if 'PMID'
-			; signature will not be found. 	
+			; signature will not be found.
 	jmp	vbe3_pmid_chk ; check for ATI Video BIOS
 
 di0:
@@ -1569,7 +1569,7 @@ psem:
 	jz	short di3
 	push	esi
 	; 13/05/2016
-	mov	ebx, 7	; Black background, 
+	mov	ebx, 7	; Black background,
 			; light gray forecolor
 			; Video page 0 (BH=0)
 	call	_write_tty
@@ -1633,9 +1633,9 @@ check_boch_plex86_vbe:
 	mov	esi, vbe2_bochs_vbios ; BOCH/QEMU vbios msg
 	mov	ah, 0Eh  ; Yellow font
 	call	print_kmsg
-	
+
 	; this is not necessary ! (20/11/2020)
-	cmp	byte [vbe2bios], 0C4h 
+	cmp	byte [vbe2bios], 0C4h
 	;jb	display_mem_info	; (QEMU)
 	; 02/12/2023
 	jb	short not_boch_qemu_vbe
@@ -1702,11 +1702,11 @@ di3:
 ;	call	int1Ah
 ;	cmp	edx, ecx ; ; 18.2 * seconds
 ;	jna	short md_info_msg_wait3
-;	xchg 	edx, ecx	
+;	xchg 	edx, ecx
 ;md_info_msg_wait3:
 ;	sub	ecx, edx
 ;	cmp	ecx, 127 ; 7 seconds (18.2 * 7)
-;	jb	short md_info_msg_wait1		
+;	jb	short md_info_msg_wait1
 ;md_info_msg_ok:
 
 	; 15/12/2020
@@ -1743,8 +1743,8 @@ di3:
 	;shr	ebx, 12	; convert byte address to page address
 	mov	ecx, [memory_size]
 	;cmp	ebx, ecx
-	;jnb	short di4 ; LFB addr >= main memory size	
-	
+	;jnb	short di4 ; LFB addr >= main memory size
+
 	; (set the overlapped pages as allocated for kernel)
 	;;;
 	; 28/11/2023
@@ -1765,7 +1765,7 @@ sysinit:
 	call	sys_init
 	;
 	;jmp 	cpu_reset ; 22/02/2015
-hang:  
+hang:
 	; 23/02/2015
 	;sti			; Enable interrupts
 	hlt
@@ -1802,7 +1802,7 @@ nxtl:
 	;push	bx
 	; 18/04/2021
 	push	ebx
-	mov	bx, 0Eh 	; Yellow character 
+	mov	bx, 0Eh 	; Yellow character
 				; on black background
 				; bh = 0 (video page 0)
 				; Retro UNIX 386 v1 - Video Mode 0
@@ -1821,7 +1821,7 @@ nxtl:
 	jne	short hang
 	mov	al, 0Ah		; next line
 	jmp	short nxtl
-	
+
 ;_c8:
 ;	; 25/08/2014
 ;	cli			; Disable interrupts
@@ -1855,7 +1855,7 @@ video_mode_13h_parms:
 	; standard VGA mode)
 
 	cmp	byte [edid], 4Fh
-	jne	short CRT_monitor	
+	jne	short CRT_monitor
 
 	mov	esi, edid_info
 	add	esi, 26h ; EDID Standard Timing Identification
@@ -1897,7 +1897,7 @@ LCD_monitor:
 	inc	edi
 	inc	edi
 	movsb		; Vertical Blanking Start Register
-	movsb		; Vertical Blanking End Register		
+	movsb		; Vertical Blanking End Register
 CRT_monitor:
 	retn
 ; *************************************
@@ -1906,13 +1906,13 @@ CRT_monitor:
 vbe3:	db 0  ; VESA VBE version (must be 03h)
 	      ; for using video bios calls in protected mode
 vbe2bios:
-	db 0B0h ; 
-;pmid_addr: 		
+	db 0B0h ;
+;pmid_addr:
 	;dw 0  ; > 0 if 'PMID' sign is found 
 	;     ;	('pmid' offset addr in VGA bios seg, 0C000h)
 	;; 02/12/2020
 	;dw 0	; 32 bit address in pmid_addr
-		
+
 ; 28/02/2017
 ; 22/01/2017
 ; 15/01/2017
@@ -1928,7 +1928,7 @@ vbe2bios:
 ; 14/05/2015 (multi tasking -time sharing- 'clock', x_timer)
 ; 17/02/2015
 ; 06/02/2015 (unix386.s)
-; 11/12/2014 - 22/12/2014 (dsectrm2.s) 
+; 11/12/2014 - 22/12/2014 (dsectrm2.s)
 ;
 ; IBM PC-XT Model 286 Source Code - BIOS2.ASM (06/10/85)
 ;
@@ -1993,7 +1993,7 @@ T4:					; TEST_DAY
 	;MOV	[TIMER_LOW],AX
 	sub	eax, eax
 	mov	[TIMER_LH], eax
-	;	
+	;
 	MOV	byte [TIMER_OFL],1
 
 ;-----	TEST FOR DISKETTE TIME OUT
@@ -2014,12 +2014,12 @@ T5:
 	;AND	[CS:MOTOR_STATUS],al 	; TURN OFF MOTOR RUNNING BITS
 	and	[MOTOR_STATUS], al
 	;and	[ORG_MOTOR_STATUS], al
-	MOV	AL,0CH			; bit 3 = enable IRQ & DMA, 
+	MOV	AL,0CH			; bit 3 = enable IRQ & DMA,
 					; bit 2 = enable controller
 					;	1 = normal operation
 					;	0 = reset	
 					; bit 0, 1 = drive select
-					; bit 4-7 = motor running bits 
+					; bit 4-7 = motor running bits
 	MOV	DX,03F2H		; FDC CTL PORT
 	OUT	DX,AL			; TURN OFF THE MOTOR
 T6:	
@@ -2035,7 +2035,7 @@ T7:
 	; 14/10/2015
 	MOV	AL,EOI			; GET END OF INTERRUPT MASK
 	CLI				; DISABLE INTERRUPTS TILL STACK CLEARED
-	OUT	INTA00,AL		; END OF INTERRUPT TO 8259 - 1	
+	OUT	INTA00,AL		; END OF INTERRUPT TO 8259 - 1
 	;
 	;;;
 	; 21/08/2024
@@ -2052,7 +2052,7 @@ rtc_int_2:
 	; We need to exit if the user's IRQ callback service is in progress!
 	; (To prevent a conflict!)
 	cmp	byte [u.r_lock], 0	; R_LOCK, IRQ callback service lock !
-	ja	short timer_int_return  ; Timer Lock : 'sysrele' is needed !	
+	ja	short timer_int_return  ; Timer Lock : 'sysrele' is needed !
 	; 15/01/2017
 	cmp	byte [priority], 2
 	jnb	short T8  ; current process has a timer event (15/01/2017)
@@ -2061,7 +2061,7 @@ rtc_int_2:
 	jna	short timer_int_return ; 23/05/2016
 
 	; 15/01/2017
-	; present process must be changed with high priority process	
+	; present process must be changed with high priority process
 T9:		; 21/08/2024
 	;xor	al, al
 	xor	eax, eax ; 26/12/2016
@@ -2072,7 +2072,7 @@ T9:		; 21/08/2024
 	je	short rtc_int_3     ; user space ([sysflg]= 0FFh)
 
 	; system space, wait for 'sysret'
-	; to change running process 	
+	; to change running process
 	; with high priority (event) process
 
 	mov	[u.quant], al ; 0
@@ -2093,7 +2093,7 @@ timer_int_return: ; 23/05/2016 - jump from 'rtc_int' ('rtc_int_2')
 rtc_int_3:
 	inc	byte [sysflg] 	; now, we are in system space
 	;
-        jmp     sysrelease ; change running process immediatelly 
+        jmp     sysrelease ; change running process immediatelly
 
 T8:
 	; 13/01/2017 (eax -> ebx)
@@ -2111,7 +2111,7 @@ T8:
 	; 13/01/2017 - Timer Lock (T_LOCK)
 	inc	byte [u.t_lock]
 	mov	cl, [sysflg]
-	mov	[u.t_mode], cl 
+	mov	[u.t_mode], cl
 
 	mov	ebp, [tss.esp0] ; kernel stack address (for ring 0)
 	sub	ebp, 20		; eip, cs, eflags, esp, ss
@@ -2145,7 +2145,7 @@ T8:
 	mov	[u.usp], edi
 	mov	ecx, ((ESPACE/4) - 4) ; except DS, ES, FS, GS
 	rep	movsd
-	mov	cl, 4	
+	mov	cl, 4
 	rep	stosd
 	mov	[u.sp], edi
 	mov	esi, ebp
@@ -2160,11 +2160,11 @@ T8:
 
 	; 09/01/2017
 	; !!! CALLBACK ROUTINE MUST BE ENDED/RETURNED WITH 'sysrele'
-	;     system call !!!	
+	;     system call !!!
 	; 25/12/2016
 	; Callback Note: (19/12/2016)
 	; !!! CALLBACK ROUTINE MUST BE ENDED/RETURNED WITH 'RETN' !!!
-	;	pushf ; save flags	
+	;	pushf ; save flags
 	; 	<callback service code>
 	; 	popf  ; restore flags
 	; 	retn ; return to normal running address
@@ -2184,25 +2184,25 @@ set_callback_addr:
 	; to start of user's interrupt
 	; service (callback) address
 	;; and sets callback 'retn' address to normal
-	;; return address of user's running code! 
+	;; return address of user's running code!
 	;
 	; INPUT:
 	;	EBX = callback routine/service address
-	;	      (virtual, not physical address!)	
+	;	      (virtual, not physical address!)
 	;	[u.sp] = kernel stack, points to
 	;		 user's EIP,CS,EFLAGS,ESP,SS
 	;		 registers.
 	; OUTPUT:
 	;	EIP (user) = callback (service) address
 	;	CS (user) = UCODE
-	;	EFLAGS (user) = flags before callback 	 
-	;       ESP (user) = ESP-4 (user, before callback) 
+	;	EFLAGS (user) = flags before callback
+	;       ESP (user) = ESP-4 (user, before callback)
 	;	[ESP](user) = EIP (user) before callback
 	;
 	; Note: If CPU was in user mode while entering 
 	;	the timer interrupt service routine,
 	;	'IRET' will get return to callback routine
-	;	immediately. If CPU was in system/kernel mode  
+	;	immediately. If CPU was in system/kernel mode
 	;	'iret' will get return to system call and
 	;	then, callback routine will be return address
 	;	from system call. (User's callback/service code
@@ -2219,10 +2219,10 @@ set_callback_addr:
   	;	    inc	dword [time_counter]
 	;	    ...
 	;	    mov eax, 39 ; 'sysrele'
-	;	    int 40h ; TRDOS 386 system call (interrupt)		
+	;	    int 40h ; TRDOS 386 system call (interrupt)
 	;
 	;
-	;; Note(*): User's callback service code must preserve cpu 
+	;; Note(*): User's callback service code must preserve cpu
 	;;	flags if it has any instructions which changes
 	;;	flags in the service code. (25/12/2016)
 	;;
@@ -2234,8 +2234,8 @@ set_callback_addr:
   	;;	    inc	dword [time_counter]
 	;;	    popf ; restore flags
 	;;	    retn ; return to normal user code
-	;;		  (which is interrupted by the 
-	;;		   timer interput) 	
+	;;		  (which is interrupted by the
+	;;		   timer interput)
 	;;
 
 	; 15/01/2017
@@ -2302,7 +2302,7 @@ rtc_int_1:
  	;	
 	; 25/08/2014
 	call	rtc_p  ; 19/05/2016 - major modification 
-	
+
 	; 23/05/2016
 	sub	ah, ah ; 0
 	; 22/05/2016 - TRDOS 386 timer event modifications
@@ -2323,7 +2323,7 @@ rtc_int_return: ; 19/05/2016
 	; 23/05/2016
 	MOV	AL,EOI		; GET END OF INTERRUPT MASK
 	CLI			; DISABLE INTERRUPTS TILL STACK CLEARED
-	OUT	INTA00,AL	; END OF INTERRUPT TO 8259 - 1	
+	OUT	INTA00,AL	; END OF INTERRUPT TO 8259 - 1
 	;
 	; 23/05/2016
 	and	ah, ah
@@ -2417,7 +2417,7 @@ which_irq:
         ; 27/08/2014
         add     dword [scr_row], 0A0h
 	;
-	mov	ah, 17h	; blue (1) background, 
+	mov	ah, 17h	; blue (1) background,
 			; light gray (7) forecolor
         mov     edi, [scr_row]
 	mov	al, 'I'
@@ -2445,7 +2445,7 @@ ii1:
 	mov	al, ' '
 	stosw
 	; 23/02/2015
-	cmp	bl, 7 ; check for IRQ 8 to IRQ 15 
+	cmp	bl, 7 ; check for IRQ 8 to IRQ 15
 	jna	ii2
 	; 22/01/2017
 	mov	al, 20h  ; END OF INTERRUPT COMMAND TO
@@ -2599,7 +2599,7 @@ cpu_except:	; CPU Exceptions
 	cld
 	xchg	eax, [esp] 
 		; eax = Exception number
-		; [esp] = eax (before exception)	
+		; [esp] = eax (before exception)
 	push	ebx
 	push	esi
 	push	edi
@@ -2617,7 +2617,7 @@ cpu_except:	; CPU Exceptions
 	mov	ebx, [k_page_dir]
 	mov	cr3, ebx
 	; 28/08/2015
-	cmp	eax, 0Eh ; 14, PAGE FAULT	
+	cmp	eax, 0Eh ; 14, PAGE FAULT
 	jne	short cpu_except_nfp
 	call	page_fault_handler
 	and 	eax, eax
@@ -2655,8 +2655,8 @@ h1ok:
 	cmp	ah, 9
 	jna	short h2ok
 	add	ah, 'A'-':'
-h2ok:	
-	xchg 	ah, al	
+h2ok:
+	xchg 	ah, al
 	add	ax, '00'
 	mov	[excnstr], ax
 	;
@@ -2668,7 +2668,7 @@ h2ok:
 	; 28/08/2015
 	mov	ecx, 16	  ; divisor value to convert binary number
 			  ; to hexadecimal string
-	;mov	ecx, 10	    ; divisor to convert	
+	;mov	ecx, 10	    ; divisor to convert
 			    ; binary number to decimal string
 b2d1:
 	xor	edx, edx
@@ -2679,13 +2679,13 @@ b2d1:
 	cmp	eax, ecx
 	jnb	short b2d1
 	mov	edi, EIPstr ; EIP value
-			    ; points to instruction which faults	
+			    ; points to instruction which faults
 	; 28/08/2015
 	mov	edx, eax
 b2d2:
 	;add	al, '0'
 	mov	al, [edx+hexchrs]
-	stosb		    ; write hexadecimal digit to its place	
+	stosb		    ; write hexadecimal digit to its place
 	cmp	ebx, esp
 	jna	short b2d3
 	;pop	ax
@@ -2698,13 +2698,13 @@ b2d3:
 	stosb
 	mov	al, 20h	    ; space
 	stosb
-	xor	al, al	    ; to do it an ASCIIZ string	
+	xor	al, al	    ; to do it an ASCIIZ string
 	stosb
 	;
 	pop	edx
 	pop	ecx
 	;
-	mov	ah, 4Fh	; red (4) background, 
+	mov	ah, 4Fh	; red (4) background,
 			; white (F) forecolor
 	mov	esi, exc_msg ; message offset
 	;
@@ -2712,7 +2712,7 @@ b2d3:
 	;
         add	dword [scr_row], 0A0h
         mov	edi, [scr_row]
-	;	
+	;
 	mov	byte [sysflg], 0  ; system mode
         sti
 	;
@@ -2728,9 +2728,9 @@ b2d3:
 	; 30/11/2023
 	xor	eax, eax
 	inc	eax
-	; eax = 1	
+	; eax = 1
 	jmp	sysexit ; terminate process !!!
-	
+
 	; 22/01/2017
 	; 18/04/2016
 	; 28/08/2015
@@ -2751,7 +2751,7 @@ ignore_int:
 	mov	eax, cr3
 	push	eax ; (*) page directory
 	;
-	mov	ah, 67h	; brown (6) background, 
+	mov	ah, 67h	; brown (6) background,
 			; light gray (7) forecolor
 	mov	esi, int_msg ; message offset
 piemsg:
@@ -2792,14 +2792,14 @@ time_of_day:
         jc      short time_of_day_retn ; 23/05/2016
 	mov	al, CMOS_SECONDS
 	call	CMOS_READ
-	mov	[time_seconds], al 
+	mov	[time_seconds], al
 	mov	al, CMOS_MINUTES
 	call	CMOS_READ
-	mov	[time_minutes], al 
+	mov	[time_minutes], al
 	mov	al, CMOS_HOURS
 	call	CMOS_READ
         mov     [time_hours], al
-	mov	al, CMOS_DAY_WEEK 
+	mov	al, CMOS_DAY_WEEK
 	call	CMOS_READ
 	mov	[date_wday], al
  	mov	al, CMOS_DAY_MONTH
@@ -2831,7 +2831,7 @@ time_of_day_retn:
 rtc_p:
 	mov	cl, 1 ; 15/01/2017
 	jmp	short rtc_p0
-u_timer: 
+u_timer:
 	; Timer Events with 18.2 Hz Timer Ticks
 	; (and also timer events with RTC seconds)
 	sub	cl, cl ; mov cl, 0 ; 15/01/2017
@@ -2842,7 +2842,7 @@ rtc_p0:
 	; 25/08/2014 - 07/09/2014
 	; Retro UNIX 386 v1:
  	; Print Real Time Clock content
-	
+
 	; 15/01/2017
 	mov	byte [priority], cl ; 0 or 1 (not 2)
 	mov	ch, [timer_events]
@@ -2852,7 +2852,7 @@ rtc_p0:
 	mov	esi, timer_set  ; beginning address of
 				; timer events space
 rtc_p1:
-	mov	eax, [esi]	
+	mov	eax, [esi]
 	and	al, al ; 0 = free, >0 = process no.
 	jz	short rtc_p4
 	;
@@ -2860,7 +2860,7 @@ rtc_p1:
 	; ah = response value, al = interrupt type
 	; 15/01/2017
 	; cl = interrupt source
-	;       1 = RTC, 0 = PIT  	 	
+	;       1 = RTC, 0 = PIT
 	cmp	al, cl 
 	jne	short rtc_p2 ; not as requested or undefined !
 	cmp	al, 1 ; 1 ; RTC interrupt ?
@@ -2871,27 +2871,27 @@ rtc_p1:
 rtc_p2:
 	; 15/01/2017 (cl -> ch)
 	; 07/06/2016
-	dec	ch    ; remain count of timer events	
+	dec	ch    ; remain count of timer events
 	jnz	short rtc_p4
-rtc_p3:	 
+rtc_p3:
 	retn
-rtc_p4:	
+rtc_p4:
 	;cmp	esi, timer_set + 240 ; 15*16 (last event)
 	;jnb	short rtc_p3 ; end of timer event space
 	add	esi, 16 ; next timer event
 	jmp	short rtc_p1
-rtc_p5:	 
+rtc_p5:
 	; current timer count ; 06/06/2016 (182)
 	sub	dword [esi+8], 182 ; 1 second (10*18.2)
 	ja	short rtc_p2  ; check for the next 
-rtc_p6:	
+rtc_p6:
 	; it is the time of response! 
 	mov	ebx, [esi+4] ; set (count limit) value
 	mov	[esi+8], ebx ; reset count down value
 			     ; to count limit
 	; 19/12/2016
 	; 10/12/2016 - timer callback modification
-	mov	edi, [esi+12] ; response (or callback) address	
+	mov	edi, [esi+12] ; response (or callback) address
 	cmp	byte [esi+1], 0 ; >0 = callback
 	jna	short rtc_p8
 
@@ -2924,7 +2924,7 @@ rtc_p8:
 	je	short rtc_p7
 rtc_p9:
 	; al = process number  ; 10/06/2016
-	mov	dl, 2 ; priority, 2 = event (high)	
+	mov	dl, 2 ; priority, 2 = event (high)
 	call	set_run_sequence ; 19/05/2016
 	jmp	short rtc_p2 ; 10/06/2016
 
@@ -2940,15 +2940,15 @@ default_irq7:
 	jmp short $+2
 	in	al, 20h
 	and 	al, 80h ; bit 7 (is it real IRQ 7 or fake?)
-        jz      short irq7_iret ; Fake (spurious) IRQ, do not send EOI 
+        jz      short irq7_iret ; Fake (spurious) IRQ, do not send EOI
         mov     al, 20h ; EOI
-	out	20h, al 
+	out	20h, al
 irq7_iret:
 	;pop	ax
 	; 18/04/2021
 	pop	eax
 	iretd
-	
+
 bcd_to_ascii:
 	; 25/08/2014
 	; INPUT ->
@@ -2963,8 +2963,8 @@ bcd_to_ascii:
 				; AL = AL MOD 10h
 	or	ax, '00'	; Make it ASCII based
 
-        xchg	ah, al 
-	
+        xchg	ah, al
+
 	retn
 
 ; 15/12/2020
@@ -2979,9 +2979,9 @@ real_mem_16m_64k:
 			; at the end of system memory.)
 			; Upper memory space from LFB base address
 			; to 4GB will not be included by M.A.T.
-def_LFB_addr:	
-	dw	0 	; HW of default LFB addr (for mode 118h)	
-	
+def_LFB_addr:
+	dw	0 	; HW of default LFB addr (for mode 118h)
+
 
 %include 'keyboard.s' ; 07/03/2015
 
@@ -3001,11 +3001,11 @@ setup_rtc_int:
 	in	al, 71h ; get initial value of register A
 	mov 	ah, al
 	and	ah, 0F0h
-	mov	al, 8Ah 
+	mov	al, 8Ah
 	out	70h, al ; reset index to register A
 	mov	al, ah
 	or	al, 0Fh	; new rate (0Fh -> 15)
-	out	71h, al ; write only our rate to A. Note, rate is the bottom 4 bits. 
+	out	71h, al ; write only our rate to A. Note, rate is the bottom 4 bits.
 	; enable RTC interrupt
 	mov	al, 8Bh ;
 	out	70h, al ; select register B and disable NMI
@@ -3013,7 +3013,7 @@ setup_rtc_int:
 	in	al, 71h ; read the current value of register B
 	mov	ah, al  ;
 	mov 	al, 8Bh ;
-	out	70h, al ; set the index again (a read will reset the index to register B)	
+	out	70h, al ; set the index again (a read will reset the index to register B)
 	mov	al, ah  ;
 	or	al, 40h ;
 	out	71h, al ; write the previous value ORed with 0x40. This turns on bit 6 of register B
@@ -3023,19 +3023,19 @@ setup_rtc_int:
 ; Write memory information
 ; 29/01/2016
 ; 06/11/2014
-; 14/08/2015 
-memory_info:	
+; 14/08/2015
+memory_info:
 	mov	eax, [memory_size] ; in pages
 	push	eax
 	shl	eax, 12		   ; in bytes
 	mov	ebx, 10
 	mov	ecx, ebx	   ; 10
-	mov	esi, mem_total_b_str	
+	mov	esi, mem_total_b_str
 	call	bintdstr
 	pop	eax
 	mov	cl, 7
 	mov	esi, mem_total_p_str
-	call	bintdstr	
+	call	bintdstr
 	; 14/08/2015
 	call	calc_free_mem
 	; edx = calculated free pages
@@ -3044,7 +3044,7 @@ memory_info:
 	cmp	eax, edx ; calculated free mem value 
 		; and initial free mem value are same or not?
 	jne 	short pmim ; print mem info with '?' if not
-	push 	edx ; free memory in pages	
+	push 	edx ; free memory in pages
 	;mov 	eax, edx
 	shl	eax, 12 ; convert page count
 			; to byte count
@@ -3080,7 +3080,7 @@ pkmsg_ok:
 ; temporary
 ; Write default liner frame buffer address
 ;
-default_lfb_info:	
+default_lfb_info:
 	mov	ax, [def_LFB_addr] ; high word
 	; 24/11/2023 - temporary
 	or	ax, ax
@@ -3088,14 +3088,14 @@ default_lfb_info:
 	call	wordtohex
 	mov	dword [lfb_addr_str], eax
 	mov	esi, msg_lfb_addr
-	mov	ah, 0Fh ; Black background, 
+	mov	ah, 0Fh ; Black background,
 			; white forecolor
 	jmp	short print_kmsg
 
 ; Convert binary number to hexadecimal string
 ; 10/05/2015  
 ; dsectpm.s (28/02/2015)
-; Retro UNIX 386 v1 - Kernel v0.2.0.6  
+; Retro UNIX 386 v1 - Kernel v0.2.0.6
 ; 01/12/2014
 ; 25/11/2014
 ;
@@ -3109,11 +3109,11 @@ bytetohex:
 	xor	ebx, ebx
 	mov	bl, al
 	shr	bl, 4
-	mov	bl, [ebx+hexchrs] 	 	
+	mov	bl, [ebx+hexchrs]
 	xchg	bl, al
 	and	bl, 0Fh
-	mov	ah, [ebx+hexchrs] 
-	pop	ebx	
+	mov	ah, [ebx+hexchrs]
+	pop	ebx
 	retn
 
 wordtohex:
@@ -3133,16 +3133,16 @@ wordtohex:
 	and	bl, 0Fh
 	mov	ah, [ebx+hexchrs]
 	shl	eax, 16 ; ax -> hw of eax
-	pop	ax ; * restore ax 
+	pop	ax ; * restore ax
 	pop	ebx
 	jmp	short bytetohex
 	;mov	bl, al
 	;shr	bl, 4
 	;mov	bl, [ebx+hexchrs]
-	;xchg	bl, al	 	
+	;xchg	bl, al
 	;and	bl, 0Fh
-	;mov	ah, [ebx+hexchrs] 
-	;pop	ebx	
+	;mov	ah, [ebx+hexchrs]
+	;pop	ebx
 	;retn
 
 dwordtohex:
@@ -3239,32 +3239,32 @@ gdt:	; Global Descriptor Table
 	dw 0, 0, 0, 0		; NULL descriptor
 gdt_kcode:
 	; 18/08/2014
-			; 8h kernel code segment, base = 00000000h		
-	;dw 0FFFFh, 0, 9E00h, 00CFh	; KCODE  ; 30/12/2016	 
+			; 8h kernel code segment, base = 00000000h
+	;dw 0FFFFh, 0, 9E00h, 00CFh	; KCODE  ; 30/12/2016
 	dw 0FFFFh, 0, 9A00h, 00CFh	; KCODE
 gdt_kdata:
-			; 10h kernel data segment, base = 00000000h	
+			; 10h kernel data segment, base = 00000000h
 	dw 0FFFFh, 0, 9200h, 00CFh	; KDATA
 gdt_ucode:
 			; 1Bh user code segment, base address = 400000h ; CORE
-	;dw 0FBFFh, 0, 0FE40h, 00CFh	; UCODE  ; 30/12/2016	
+	;dw 0FBFFh, 0, 0FE40h, 00CFh	; UCODE  ; 30/12/2016
 	dw 0FBFFh, 0, 0FA40h, 00CFh	; UCODE
-gdt_udata: 
+gdt_udata:
 			; 23h user data segment, base address = 400000h ; CORE
 	dw 0FBFFh, 0, 0F240h, 00CFh	; UDATA
 gdt_tss:
 			; Task State Segment
-	dw 0067h ; Limit = 103 ; (104-1, tss size = 104 byte, 
+	dw 0067h ; Limit = 103 ; (104-1, tss size = 104 byte,
 			       ;  no IO permission in ring 3)
 gdt_tss0:
-	dw 0  ; TSS base address, bits 0-15 
+	dw 0  ; TSS base address, bits 0-15
 gdt_tss1:
-	db 0  ; TSS base address, bits 16-23 
+	db 0  ; TSS base address, bits 16-23
 	      		; 49h	
 	db 11101001b ; 0E9h => P=1/DPL=11/0/1/0/B/1 --> B = Task is busy (1)
 	db 0 ; G/0/0/AVL/LIMIT=0000 ; (Limit bits 16-19 = 0000) (G=0, 1 byte)
 gdt_tss2:
-	db 0  ; TSS base address, bits 24-31 
+	db 0  ; TSS base address, bits 24-31
 
 	; 04/12/2023 - TRDOS v2.0.7
 	; 30/11/2020
@@ -3279,70 +3279,70 @@ _vbe3_CS:  ; vesa vbe3 bios uses this as code seg (same addr with _vbe3_DS)
 			; 38h ; VBE3BDS
 _vbe3_BDS: ; vesa vbe3 bios uses this as equivalent of rombios data segment
 	; limit = 1536, base addr = 0, P/DPL/1/Type/E/W/A = 92h, 16 bit
-	dw 05FFh, 0, 9200h, 0 ; Note: base addr will be initialized	
+	dw 05FFh, 0, 9200h, 0 ; Note: base addr will be initialized
 			; 40h ; VBE3A000 
 _A0000Sel: ; VGA default video memory address
 	; limit = 65536, base addr = 0A0000h, 16 bit
 	dw 0FFFFh, 0, 920Ah, 0
-			; 48h ; VBE3B000 
+			; 48h ; VBE3B000
 _B0000Sel: ; MDA (monochrome) video memory address
 	; limit = 65536, base addr = 0B0000h, 16 bit
 	dw 0FFFFh, 0, 920Bh, 0
-			; 50h ; VBE3B800 
+			; 50h ; VBE3B800
 _B8000Sel: ; CGA video memory address
 	; limit = 32768, base addr = 0B8000h, 16 bit
 	dw 07FFFh, 8000h, 920Bh, 0
-			; 58h ; VBE3DS 
+			; 58h ; VBE3DS
 _vbe3_DS: ; vesa vbe3 bios uses this as data seg (CodeSegSel in PMInfoBlock)
 	; limit = 65536, base addr = 0, P/DPL/1/Type/E/W/A = 92h, 16 bit
 	;dw 0FFFFh, 0, 9200h, 0 ; Note: base addr will be initialized
 	; 04/12/2023 - TRDOS 386 v2.0.7	; (+!*!+)
 	dw 0FFFFh, 0, 9206h, 0	; VBE3BIOSCODE_ADDR = 60000h
-			; 60h ; VBE3SS   
+			; 60h ; VBE3SS
 _vbe3_SS: ; kernel's stack segment but 16 bit version (same stack addr)
 	; limit = 1024, base addr = 0, P/DPL/1/Type/E/W/A = 92h, 16 bit
 	dw 03FFh, 0, 9200h, 0 ; Note: base addr will be initialized
-			; 68h ; VBE3ES 	
+			; 68h ; VBE3ES
 _vbe3_ES: ; extra 16 bit segment points to buffers in kernel's mem space
 	; limit = 2048, base addr = 0, P/DPL/1/Type/E/W/A = 92h, 16 bit
 	dw 07FFh, 0, 9200h,0 ; Note: base addr will be initialized
-			; 70h ; KODE16	
+			; 70h ; KODE16
 _16bit_CS: ; 16 bit code segment points to kernel's far return addr
 	; limit = 16M, base addr = 0, P/DPL/1/Type/E/W/A = 92h, 16 bit
 	dw 0FFFFh, 0, 9A00h, 00FFh ; Note: base addr will be initialized
 
 gdt_end:
-	;; 9Eh = 1001 1110b (GDT byte 5) P=1/DPL=00/1/TYPE=1110, 
+	;; 9Eh = 1001 1110b (GDT byte 5) P=1/DPL=00/1/TYPE=1110,
 					;; Type= 1 (code)/C=1/R=1/A=0
 		; P= Present, DPL=0=ring 0,  1= user (0= system)
 		; 1= Code C= Conforming, R= Readable, A= Accessed
 
-	;; 9Ah = 1001 1010b (GDT byte 5) P=1/DPL=00/1/TYPE=1010, 
+	;; 9Ah = 1001 1010b (GDT byte 5) P=1/DPL=00/1/TYPE=1010,
 					;; Type= 1 (code)/C=0/R=1/A=0
 		; P= Present, DPL=0=ring 0,  1= user (0= system)
 		; 1= Code C= non-Conforming, R= Readable, A= Accessed
 
-	;; 92h = 1001 0010b (GDT byte 5) P=1/DPL=00/1/TYPE=1010, 
+	;; 92h = 1001 0010b (GDT byte 5) P=1/DPL=00/1/TYPE=1010,
 					;; Type= 0 (data)/E=0/W=1/A=0
 		; P= Present, DPL=0=ring 0,  1= user (0= system)
 		; 0= Data E= Expansion direction (1= down, 0= up)
 		; W= Writeable, A= Accessed
 
-	;; FEh = 1111 1110b (GDT byte 5) P=1/DPL=11/1/TYPE=1110, 
+	;; FEh = 1111 1110b (GDT byte 5) P=1/DPL=11/1/TYPE=1110,
 					;; Type= 1 (code)/C=1/R=1/A=0
 		; P= Present, DPL=3=ring 3,  1= user (0= system)
 		; 1= Code C= Conforming, R= Readable, A= Accessed
-	
-	;; FAh = 1111 1010b (GDT byte 5) P=1/DPL=11/1/TYPE=1010, 
+
+	;; FAh = 1111 1010b (GDT byte 5) P=1/DPL=11/1/TYPE=1010,
 					;; Type= 1 (code)/C=0/R=1/A=0
 		; P= Present, DPL=3=ring 3,  1= user (0= system)
 		; 1= Code C= non-Conforming, R= Readable, A= Accessed
 
-	;; F2h = 1111 0010b (GDT byte 5) P=1/DPL=11/1/TYPE=0010, 
+	;; F2h = 1111 0010b (GDT byte 5) P=1/DPL=11/1/TYPE=0010,
 					;; Type= 0 (data)/E=0/W=1/A=0
 		; P= Present, DPL=3=ring 3,  1= user (0= system)
 		; 0= Data E= Expansion direction (1= down, 0= up)
-	
+
 	;; CFh = 1100 1111b (GDT byte 6) G=1/B=1/0/AVL=0, Limit=1111b (3)
 
 		;; Limit = FFFFFh (=> FFFFFh+1= 100000h) // bits 0-15, 48-51 //
@@ -3388,7 +3388,7 @@ fd1_type:    db 0  ; 4 = 1.44 Mb, 80 track, 3.5" (18 spt)
 		     ; 6 = 2.88 Mb, 80 track, 3.5" (36 spt)
 		     ; 3 = 720 Kb, 80 track, 3.5" (9 spt)
 		     ; 2 = 1.2 Mb, 80 track, 5.25" (15 spt)
-		     ; 1 = 360 Kb, 40 track, 5.25" (9 spt)		
+		     ; 1 = 360 Kb, 40 track, 5.25" (9 spt)
 hd0_type:    db 0  ; EDD status for hd0 (bit 7 = present flag)
 hd1_type:    db 0  ; EDD status for hd1 (bit 7 = present flag)
 hd2_type:    db 0  ; EDD status for hd2 (bit 7 = present flag)
@@ -3426,8 +3426,8 @@ Align 2
 Align 2
 
 %include 'sysdefs.s' ; 24/01/2015
-%include 'trdosk0.s' ; 04/01/2016 
-%include 'trdosk1.s' ; 04/01/2016 
+%include 'trdosk0.s' ; 04/01/2016
+%include 'trdosk1.s' ; 04/01/2016
 %include 'trdosk2.s' ; 04/01/2016
 %include 'trdosk3.s' ; 06/01/2016
 %include 'trdosk4.s' ; 24/01/2016
@@ -3452,18 +3452,18 @@ ilist:
 	;times 	32 dd cpu_except ; INT 0 to INT 1Fh
 	;
 	; Exception list
-	; 25/08/2014	
+	; 25/08/2014
 	dd	exc0	; 0h,  Divide-by-zero Error
-	dd	exc1	
-	dd 	exc2	
-	dd	exc3	
-	dd	exc4	
-	dd	exc5	
+	dd	exc1
+	dd 	exc2
+	dd	exc3
+	dd	exc4
+	dd	exc5
 	dd 	exc6	; 06h,  Invalid Opcode
-	dd	exc7	
-	dd	exc8	
-	dd	exc9	
-	dd 	exc10	
+	dd	exc7
+	dd	exc8
+	dd	exc9
+	dd 	exc10
 	dd	exc11
 	dd	exc12
 	dd	exc13	; 0Dh, General Protection Fault
@@ -3488,7 +3488,7 @@ ilist:
 IRQ_list: ; 28/02/2017 ('syscalbac')
 	; Interrupt list
 	dd	timer_int	; INT 20h
-		;dd	irq0	
+		;dd	irq0
 	dd	kb_int		; 24/01/2016
 		;dd	irq1
 	dd	irq2
@@ -3498,7 +3498,7 @@ IRQ_list: ; 28/02/2017 ('syscalbac')
 	dd	irq4
 	dd	irq5
 ;DISKETTE_INT: ;06/02/2015
-	dd	fdc_int		; 16/02/2015, IRQ 6 handler	
+	dd	fdc_int		; 16/02/2015, IRQ 6 handler
 		;dd	irq6
 ; Default IRQ 7 handler against spurious IRQs (from master PIC)
 ; 25/02/2015 (source: http://wiki.osdev.org/8259_PIC)
@@ -3512,11 +3512,11 @@ IRQ_list: ; 28/02/2017 ('syscalbac')
 	dd	irq11
 	dd	irq12
 	dd	irq13
-;HDISK_INT1:  ;06/02/2015 	
-	dd	hdc1_int 	; 21/02/2015, IRQ 14 handler		
+;HDISK_INT1:  ;06/02/2015
+	dd	hdc1_int 	; 21/02/2015, IRQ 14 handler
 		;dd	irq14
 ;HDISK_INT2:  ;06/02/2015
-	dd	hdc2_int 	; 21/02/2015, IRQ 15 handler		
+	dd	hdc2_int 	; 21/02/2015, IRQ 15 handler
 		;dd	irq15	; INT 2Fh
 		; 14/08/2015
 	;dd	sysent		; INT 30h (system calls)
@@ -3532,14 +3532,14 @@ IRQ_list: ; 28/02/2017 ('syscalbac')
 	dd	int33h		; DISK I/O (IBM PC/AT, Int 13h)
 	dd	int34h		; #IOCTL# (I/O port access support for ring 3)
 	dd	int35h		; Time/Date Functions (IBM PC/AT, Int 1Ah)
-	dd	ignore_int	; INT 36h : Timer Functions	
-	dd	ignore_int	; INT 37h	
+	dd	ignore_int	; INT 36h : Timer Functions
+	dd	ignore_int	; INT 37h
 	dd	ignore_int	; INT 38h
 	dd	ignore_int	; INT 39h
-	dd	ignore_int	; INT 3Ah	
+	dd	ignore_int	; INT 3Ah
 	dd	ignore_int	; INT 3Bh
 	dd	ignore_int	; INT 3Ch
-	dd	ignore_int	; INT 3Dh	
+	dd	ignore_int	; INT 3Dh
 	dd	ignore_int	; INT 3Eh
 	dd	ignore_int	; INT 3Fh
 	dd	sysent		; INT 40h : !!! TRDOS 386 System Calls !!!
@@ -3591,7 +3591,7 @@ trdos_isc_routine:
 	mov	eax, ecx
 	call	dwordtohex
 	mov	[eax_str], edx
-	mov	[eax_str+4], eax 	
+	mov	[eax_str+4], eax
 
 	inc	ebx
 	mov	al, [ebx] ; Interrupt number
@@ -3775,7 +3775,7 @@ starting_msg:
 	;;;db "Turkish Rational DOS v2.0 [23/06/2024] ...", 0
 	;;db "Turkish Rational DOS v2.0 [29/12/2024] ...", 0
 	;db "Turkish Rational DOS v2.0 [28/01/2025] ...", 0
-	db "Turkish Rational DOS v2.0 [09/12/2025] ...", 0
+	db "Turkish Rational DOS v2.0 [19/12/2025] ...", 0
 
 NextLine:
 	db 0Dh, 0Ah, 0
@@ -3853,7 +3853,7 @@ alignb 8 ; 25/12/2016
 
 	; 15/04/2016
 	; TRDOS 386 (TRDOS v2.0)
-	; 	80 interrupts 	
+	; 	80 interrupts
 	; 11/03/2015
 	; Interrupt Descriptor Table (20/08/2014)
 idt:
@@ -3869,13 +3869,13 @@ task_state_segment:
 	; 24/03/2015
 tss.link:   resw 1
 	    resw 1
-; tss offset 4	
+; tss offset 4
 tss.esp0:   resd 1
 tss.ss0:    resw 1
-	    resw 1	
+	    resw 1
 tss.esp1:   resd 1
 tss.ss1:    resw 1
-	    resw 1 	
+	    resw 1
 tss.esp2:   resd 1
 tss.ss2:    resw 1
 	    resw 1
@@ -3884,7 +3884,7 @@ tss.CR3:    resd 1
 tss.eip:    resd 1
 tss.eflags: resd 1
 ; tss offset 40
-tss.eax:    resd 1		 		
+tss.eax:    resd 1
 tss.ecx:    resd 1
 tss.edx:    resd 1
 tss.ebx:    resd 1
@@ -3894,7 +3894,7 @@ tss.esi:    resd 1
 tss.edi:    resd 1
 ; tss offset 72
 tss.ES:     resw 1
-	    resw 1	
+	    resw 1
 tss.CS:	    resw 1
 	    resw 1
 tss.SS:	    resw 1
@@ -3904,19 +3904,19 @@ tss.DS:	    resw 1
 tss.FS:	    resw 1
 	    resw 1
 tss.GS:	    resw 1
-	    resw 1		
+	    resw 1
 tss.LDTR:   resw 1
 	    resw 1
-; tss offset 100		
-	    resw 1		
+; tss offset 100
+	    resw 1
 tss.IOPB:   resw 1
 ; tss offset 104 
 tss_end:
 
 k_page_dir:  resd 1 ; Kernel's (System) Page Directory address
-		    ; (Physical address = Virtual address)	 	
+		    ; (Physical address = Virtual address)
 memory_size: resd 1 ; memory size in pages
-free_pages:  resd 1 ; number of free pages		
+free_pages:  resd 1 ; number of free pages
 next_page:   resd 1 ; offset value in M.A.T. for
 		    ; first free page search
 last_page:   resd 1 ; offset value in M.A.T. which
@@ -3929,12 +3929,12 @@ mat_size:    resd 1 ; Memory Allocation Table size in pages
 
 ; 20/11/2020
 ;vbe2bios:    resw 1 ; VBE2 video bios ID (bochs/qemu)
-;		    ; (0B0C4h or 0B0C5h for bochs/plex86 vgabios)				
+;		    ; (0B0C4h or 0B0C5h for bochs/plex86 vgabios)
 
 ; 02/09/2014 (Retro UNIX 386 v1)
 ; 04/12/2013 (Retro UNIX 8086 v1)
 CRT_START:   resw 1 	  ; starting address in regen buffer
-			  ; NOTE: active page only	
+			  ; NOTE: active page only
 CURSOR_POSN: resw 8 ; cursor positions for video pages
 ACTIVE_PAGE: 
 ptty: 	     resb 1 ; current tty
@@ -3963,15 +3963,15 @@ com1p:       resb 1  ;;0E3h
 com2p:       resb 1  ;;0E3h
 
 ; 17/11/2015
-; request for response (from the terminal)	
-req_resp:    resw 1 			
+; request for response (from the terminal)
+req_resp:    resw 1
 ; 07/11/2015
 ccomport:    resb 1 ; current COM (serial) port
 		    ; (0= COM1, 1= COM2)
 ; 09/11/2015
 comqr:	     resb 1 ; 'query or response' sign (u9.s, 'sndc')
 ; 07/11/2015
-rchar:	     resw 1 ; last received char for COM 1 and COM 2		
+rchar:	     resw 1 ; last received char for COM 1 and COM 2
 schar:	     resw 1 ; last sent char for COM 1 and COM 2
 
 ; 22/08/2014 (RTC)
@@ -3981,7 +3981,7 @@ time_minutes: resb 1
 time_hours:   resb 1
 date_wday:    resb 1
 date_day:     resb 1
-date_month:   resb 1			
+date_month:   resb 1
 date_year:    resb 1
 date_century: resb 1
 
@@ -4020,14 +4020,14 @@ timer_set: resd 16*4   ; 256 bytes memory space for 16 timer events
 	;       Owner:	        resb 1 ; 0 = free
 	;		  	       ;>0 = process number (u.uno)
 	;	Callback:	resb 1 ; 0 = response byte address (phy)
-	;				 1 = callback address (virtual)				
+	;				 1 = callback address (virtual)
 	;	Interrupt:      resb 1 ; 0 = Timer interrupt (or none)
-	;		   	       ; 1 = Real Time Clock interrupt 
+	;		   	       ; 1 = Real Time Clock interrupt
 	;	Response:       resb 1 ; 0 to 255, signal return value
 	;	Count Limit:	resd 1 ; count of ticks (total/set)
 	;	Current Count: 	resd 1 ; count of ticks (current)
 	;	Response Addr:  resd 1 ; response byte (pointer) address
-	;			       ; (or callback -user service- address)	
+	;			       ; (or callback -user service- address)
 
 
 ; 17/04/2021
@@ -4037,10 +4037,10 @@ timer_set: resd 16*4   ; 256 bytes memory space for 16 timer events
 ; 09/03/2015
 ;swpq_count: resw 1 ; count of pages on the swap queue
 ;swp_drv:    resd 1 ; logical drive description table address of the swap drive/disk
-;swpd_size:  resd 1 ; size of swap drive/disk (volume) in sectors (512 bytes). 		  				
+;swpd_size:  resd 1 ; size of swap drive/disk (volume) in sectors (512 bytes).
 ;swpd_free:  resd 1 ; free page blocks (4096 bytes) on swap disk/drive (logical)
 ;swpd_next:  resd 1 ; next free page block
-;swpd_last:  resd 1 ; last swap page block	
+;swpd_last:  resd 1 ; last swap page block
 
 alignb 4
 
@@ -4058,14 +4058,14 @@ PF_Count:	resd 1	; total page fault count
 ; 29/04/2016 (TRDOS 386 = TRDOS v2.0)
 ; 22/08/2015 (Retro UNIX 386 v1)
 buffer: 
-	resb	8 
+	resb	8
 readi_buffer:
 	resb 	512
 	resb	8
 writei_buffer:
-	resb	512	
+	resb	512
 ; 24/10/2016
-	resb	8 
+	resb	8
 rw_buffer:
 	resb 	2048  ; general purposed, r/w sector buffer
 

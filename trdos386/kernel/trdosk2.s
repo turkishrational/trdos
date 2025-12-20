@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.8) - DRV INIT : trdosk2.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - DRV INIT : trdosk2.s
 ; ----------------------------------------------------------------------------
-; Last Update: 22/05/2024 (Previous: 29/08/2023)
+; Last Update: 19/12/2025 (Previous: 22/05/2024, TRDOS 386 v2.0.8)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -14,6 +14,7 @@
 ;
 
 ldrv_init: ; Logical Drive Initialization
+	; 19/12/2025 (TRDOS 386 Kernel v2.0.10)
 	; 22/05/2024 (TRDOS 386 Kernel v2.0.8)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 30/08/2020
@@ -131,6 +132,9 @@ loc_validate_next_hdp_partition0:
 	; EDI = 0 -> Primary Partition
 	; EDI > 0 -> Extended Partition's Start Sector
 	call 	validate_hd_fat_partition
+
+; 19/12/2025
+%if 0
 	jnc 	short loc_set_valid_hdp_partition_entry
 
 	;pop	edx
@@ -138,7 +142,9 @@ loc_validate_next_hdp_partition0:
 	mov	edx, [esp]  ; ****
 	mov	esi, [esp+4] ; *** ; 30/01/2018
 	call	validate_hd_fs_partition
+%endif
 	jc	short loc_validate_next_hdp_partition1
+
 loc_set_valid_hdp_partition_entry:
 	mov 	cl, [Last_DOS_DiskNo] 
 	add 	cl, 'A'
@@ -640,6 +646,7 @@ vhdp_check_FAT16_lba:
 	dec	al
 
 loc_set_valid_hd_partition_params:
+	; 19/12/2025 (TRDOS 386 Kernel v2.0.10)
 	; 30/07/2022
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 15/07/2020
@@ -698,6 +705,9 @@ loc_hd_drv_FAT_boot_validation:
 	cmp	word [esi+BS_Validation], 0AA55h
 	jne	short loc_not_a_valid_fat_partition4
 	cmp	byte [esi+BPB_Media], 0F8h
+	jne	short loc_not_a_valid_fat_partition4
+	; 19/12/2025
+	cmp	word [esi+BPB_BytsPerSec], 512
 	jne	short loc_not_a_valid_fat_partition4
 
 	; 25/07/2022
@@ -836,7 +846,11 @@ loc_set_hd_FAT_fs_free_sectors:
 loc_validate_hd_FAT_partition_retn:
 	retn
 
+; 19/12/2025
+%if 0
+
 validate_hd_fs_partition:
+	; 19/12/2025 (TRDOS 386 v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 03/02/2018
 	; 09/12/2017
@@ -1006,6 +1020,8 @@ use_hdfs_RDT_sector_params:
 loc_validate_hd_fs_partition_retn:
 	retn
 
+%endif
+
 load_masterboot:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 14/07/2020 (Reset function has been removed)
@@ -1142,6 +1158,7 @@ loc_gfc_pass_inc_free_cluster_count:
 	jmp	short loc_gfc_loop_get_next_cluster
 
 floppy_drv_init:
+	; 19/12/2025 (TRDOS 386 Kenrel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 09/12/2017
 	; 06/07/2016
@@ -1192,6 +1209,9 @@ use_fd_boot_sector_params:
 	mov	esi, ebx
 	cmp	word [esi+BS_Validation], 0AA55h
 	jne	short read_fd_boot_sector_stc_retn
+
+; 19/12/2025
+%if 0
         cmp     word [esi+bs_FS_Identifier], 'SF'
 	;jne	use_fd_fatfs_boot_sector_params
 	; 25/07/2022
@@ -1277,12 +1297,17 @@ read_fd_RDT_sector_stc_retn:
 	stc
 read_fd_RDT_sector_retn:
 	retn
+%endif
 
 use_fd_fatfs_boot_sector_params:
 	cmp	byte [esi+BS_BootSig], 29h
-	jne	short read_fd_RDT_sector_stc_retn
+	;jne	short read_fd_RDT_sector_stc_retn
+	; 19/12/2025
+	jne	short read_fd_boot_sector_stc_retn
 	cmp	byte [esi+BPB_Media], 0F0h
-	jb	short read_fd_RDT_sector_retn
+	;jb	short read_fd_RDT_sector_retn
+	; 19/12/2025
+	jb	short read_fd_boot_sector_retn
 	push	edi
 	add	edi, LD_BPB
 	;mov	ecx, 16
@@ -1529,6 +1554,7 @@ fd_init_FAT_sectors_no_load_error:
         jmp     fd_init_get_next_cluster_readnext
 
 get_FAT_volume_name:
+	; 19/12/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 10/01/2016 (TRDOS 386 = TRDOS v2.0)
 	; 12/09/2009
@@ -1549,11 +1575,12 @@ get_FAT_volume_name:
 	add	esi, Logical_DOSDisks
 	mov     al, [esi+LD_Name]
 	mov     ah, [esi+LD_FATType]
-	cmp     ah, 1
-	jb    	short loc_gfvn_dir_load_err
+	; 19/12/2025
+	;cmp	ah, 1
+	;jb    	short loc_gfvn_dir_load_err
 	cmp 	al, 'A'
 	jb      short loc_gfvn_dir_load_err
-	cmp 	ah, 2 
+	cmp 	ah, 2
 	ja      short get_FAT32_root_cluster
 	
 	call    load_FAT_root_directory
