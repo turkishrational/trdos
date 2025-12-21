@@ -1942,7 +1942,7 @@ loc_mkdir_update_sub_dir_cluster:
 	mov	[FAT_ClusterCounter], ecx ; 0 ; Reset
 	dec	ecx ; 0FFFFFFFFh
 
-	; ESI = Logical DOS Drive Descisption Table address
+	; ESI = Logical DOS Drive Description Table address
 	call	update_cluster
 	jnc	short loc_mkdir_save_fat_buffer_3
 	or	eax, eax ; EAX = 0 -> cluster value is 0 or eocc
@@ -4271,7 +4271,7 @@ csftdf2_2:
 	mov	esi, percentagestr
 	call	print_msg
 
-        jmp	csftdf2_save_file ; 25/03/2016
+	jmp	csftdf2_save_file ; 25/03/2016
 
 csftdf2_print_percentage:
 	; 09/12/2017
@@ -5274,7 +5274,7 @@ loc_createfile_save_fat_buffer_1:
 
 	mov	byte [FAT_ClusterCounter], 0 ; 21/03/2016
 
-	mov	bx, 0FF01h ; add free clusters 
+	mov	bx, 0FF01h ; add free clusters
 	call	calculate_fat_freespace
 
 	;inc	eax ; 0FFFFFFFFh -> 0 ; recalculation is needed!

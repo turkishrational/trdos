@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - File System Procedures : trdosk5s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procedures : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 19/12/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 21/12/2025 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -467,7 +467,7 @@ read_fat_file_sectors: ; 18/03/2016
 
 	call	disk_read
 	jnc	short rclust_retn
-	
+
 	; 15/10/2016 (15h -> 17)
 	mov	eax, 17 ; Drive not ready or read error !
 	retn
@@ -508,6 +508,7 @@ read_fs_sectors:
 %endif
 
 get_first_free_cluster:
+	; 21/12/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 02/03/2016
 	; 21/02/2016 (TRDOS 386 = TRDOS v2.0)
@@ -535,10 +536,19 @@ get_first_free_cluster:
 	cmp	byte [esi+LD_FATType], 2
 	jna	short loc_gffc_get_first_fat_free_cluster0
 
+; 21/12/2025 - TRDOS 386 v2.0.10
+%if 1
+	; FAT32 - FSINFO - first free cluster
+	xor	edx, edx
+	dec	edx ; -1
+	xchg	edx, [esi+LD_BPB+BPB_Reserved+4]
+
+%else	
 loc_gffc_get_first_fat32_free_cluster:
 	; 02/03/2016
 	call	get_fat32_fsinfo_sector_parms
 	jc	short loc_gffc_get_first_fat_free_cluster0
+%endif
 
 loc_gffc_check_fsinfo_parms:
 	;;mov	ebx, DOSBootSectorBuff
@@ -606,6 +616,16 @@ retn_stc_from_get_first_free_cluster:
 loc_gffc_check_for_set:
 	; 02/03/2016
 	pop	ebx
+
+	; 21/12/2025
+	;;;
+	cmp	byte [esi+LD_FATType], 2
+	jna	short loc_gffc_check_for_set_@
+
+	mov	[esi+LD_BPB+BPB_Reserved+4], eax
+
+loc_gffc_check_for_set_@:
+	;;;
 
 	; EBX = FAT32 FSINFO sector buffer address
 	; (EBX = 0, if the drive has not got FAT32 fs or
@@ -769,7 +789,7 @@ update_cluster:
 	;
 	;
 	; (Modified registers: EAX, EBX, -ECX-, EDX)
-	
+
 	mov	[FAT_CurrentCluster], eax
 	mov	[ClusterValue], ecx
 
@@ -930,7 +950,7 @@ loc_update_fat16_buffer:
 	mov	[ebx], cx ; 16 bits !
 
 	mov	byte [FAT_BuffValidData], 2
-	
+
 	cmp	ax, 2
 	jb	short return_uc_fat16_stc
 	cmp	eax, [LastCluster]
@@ -1019,7 +1039,7 @@ pass_uc_fat12_errc:
 	; EAX = FAT Beginning Sector
 	; EDX = 0
 	mov	cl, [FAT_BuffValidData]
-	; TRDOS v1 has a FATal bug here ! 
+	; TRDOS v1 has a FATal bug here !
 	; (it does not have 'cmp cl, 2' instruction here !
 	;  while 'jne' is existing !)
 	cmp	cl, 2 ; 2 = dirty buffer (must be written to disk)
@@ -1188,7 +1208,7 @@ loc_update_fat32_buffer:
 	add	ebx, FAT_Buffer ; 26/02/2016
 	mov	eax, [ebx]
 	and	eax, 0FFFFFFFh ; 28 bit cluster value
-	
+
 	mov	edx, [FAT_CurrentCluster] ; 01/03/2016
 
 	mov 	[FAT_CurrentCluster], eax
@@ -1196,7 +1216,7 @@ loc_update_fat32_buffer:
 	;;;
 	; 29/08/2024
 	and	ecx, 0FFFFFFFh ; 28 bit cluster value
-	;;; 
+	;;;
 	mov	[ebx], ecx ; 29/02/2016
 
 	mov	byte [FAT_BuffValidData], 2
@@ -1239,12 +1259,12 @@ loc_upd_fat32_c3:
 
 loc_upd_fat32_c4:
 	cmp	eax, 2
-	jb	short return_uc_fat32_stc ; 25/07/2022 
+	jb	short return_uc_fat32_stc ; 25/07/2022
 
 pass_uc_fat32_c_zero_check_2:
 	cmp	eax, [LastCluster]
 	ja	short return_uc_fat32_stc ; 25/07/2022
-	
+
 	jmp     loc_fat_buffer_updated
 
 save_fat_buffer:
@@ -1370,6 +1390,7 @@ loc_save_FAT_buff_write_err:
 	retn
 
 calculate_fat_freespace:
+	; 21/12/2025 (TRDOS 386 Kernel v2.0.10)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 23/03/2016
 	; 02/03/2016
@@ -1603,7 +1624,10 @@ loc_check_fcc_FSINFO_op1:
 	dec	edx ; 0FFFFFFFFh
 	mov	eax, [esi+LD_BPB+BPB_Reserved]
 	cmp	eax, edx
-	jnb	short loc_put_fcc_invalid_sign
+	;jnb	short loc_put_fcc_invalid_sign
+	; 21/12/2025
+	jnb	short loc_fat32_ffc_recalc_needed
+
         add     eax, [CFS_CC] ; free cluster count on disk + current count
 	jc	short loc_put_fcc_invalid_sign
 
@@ -1616,9 +1640,9 @@ loc_cfs_FAT32_get_rcalc_parms:
 	mov	[esi+LD_BPB+BPB_Reserved+4], edx ; First Free Cluster
 loc_cfs_write_FSINFO_sector:
 	mov	[esi+LD_BPB+BPB_Reserved], eax ; Free cluster count
-	; 01/03/2016
+
 	call	set_fat32_fsinfo_sector_parms
-        jc      short loc_put_fcc_invalid_sign
+	jc      short loc_put_fcc_invalid_sign
 
 loc_set_FAT32_free_sectors:
 	; 29/02/2016
@@ -1844,7 +1868,7 @@ get_fat32_fsinfo_sector_parms:
 	movzx	eax, word [esi+LD_BPB+FAT32_FSInfoSec]
 	add	eax, [esi+LD_StartSector]
 	mov	[CFS_FAT32FSINFOSEC], eax
-	
+
         mov     ebx, DOSBootSectorBuff
 	;mov	ecx, 1
 	; 25/07/2022
@@ -2083,7 +2107,7 @@ loc_add_new_cluster_calc_FAT_freespace:
 	;mov	bl, 01h ; 27/08/2024
 	; NOTE: EAX value will be added to Free Cluster Count
 	; (Free Cluster Count is decreased when EAX value is negative)
-        call    calculate_fat_freespace
+	call	calculate_fat_freespace
 	; ECX = 0 -> no error, ECX > 0 -> error or invalid return
 	and	ecx, ecx ; ECX = 0 -> valid free sector count
 	jz	short loc_add_new_cluster_return_cluster_number
