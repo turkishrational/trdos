@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.7 - video.s
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.10 - video.s
 ; ----------------------------------------------------------------------------
-; Last Update: 29/11/2023 (Previous: 07/08/2022 - Kernel v2.0.5)
+; Last Update: 21/12/2025 (Previous: 29/11/2023 - Kernel v2.0.7)
 ; ----------------------------------------------------------------------------
 ; Beginning: 16/01/2016
 ; ----------------------------------------------------------------------------
@@ -243,7 +243,7 @@ int31h:  ; Video BIOS
 VIDEO_IO_1:
 	;sti				; INTERRUPTS BACK ON
 	cld				; SET DIRECTION FORWARD
-	
+
 	;cmp	ah, M1L/4		; TEST FOR WITHIN TABLE RANGE
 	;jnb	short M4		; BRANCH TO EXIT IF NOT A VALID COMMAND
 
@@ -270,7 +270,9 @@ VGA_func: ; 26/11/2020
 	;
 	sti
 	cmp	ah, 4Fh
-	je	short VBE_func
+	;je	short VBE_func
+	; 21/12/2025
+	je	VBE_func
 
 	; 04/12/2020
 	mov	[video_eax], eax
@@ -295,12 +297,15 @@ VGA_func_std:
 	; 06/12/2020
 	; 03/12/2020
 	cmp	ah, 0Fh
-	ja	short VGA_funcs_0	; only CGA funcs will be handled by	
+	;ja	short VGA_funcs_0	; only CGA funcs will be handled by
+	; 21/12/2025
+	ja	VGA_funcs_0
+
 	; 06/12/2020			; vga bios firmware
-	; 03/12/2020			
+	; 03/12/2020
 	;test	ah, 7Fh ; set mode ?
 	;;or	ah, ah			; only 'set mode' will be handled by
-	;jnz	short VGA_funcs_0	; vga bios firmware	
+	;jnz	short VGA_funcs_0	; vga bios firmware
 	;jz	short vbe_pmi32_0
 
 	; 28/11/2020
@@ -318,9 +323,9 @@ VGA_func_std:
 
 	; 07/12/2020
 	cmp	byte [CRT_MODE], 7 ; current mode > 7 ?
-	jna	short VGA_funcs_0  ; no	
+	jna	short VGA_funcs_0  ; no
 
-	; when mode 3 is active, 
+	; when mode 3 is active,
 	; video bios functions are not redirected
 	; to VESA VBE3 PMI except 'set mode' function
 
@@ -337,6 +342,42 @@ vbe_pmi32_0:
 	;jne	short VGA_funcs_0
 vbe_pmi32_1:
 	jmp	vesa_vbe3_pmi
+
+; 21/12/2025 - TRDOS 386 v2.0.10
+; set character height (needed) for next system calls
+	;;;;
+vbe_pmi32_3:
+	push	esi
+	push	eax
+	mov	ah, al
+	and	ah, 7Fh
+	mov	esi, vga_g_modes
+vbe_pmi32_3_1:
+	lodsb
+	cmp	ah, al
+	je	short vbe_pmi32_3_3
+	cmp	esi, vga_g_modes+vga_g_mode_count
+	jb	short vbe_pmi32_3_1
+vbe_pmi32_3_2:
+	pop	eax
+	pop	esi
+	;jmp	short vbe_pmi32_1
+	jmp	vesa_vbe3_pmi
+vbe_pmi32_3_3:
+	sub	esi, vga_g_modes
+	shl	esi, 2  ; dword
+	add	esi, vga_g_mode_tbl_ptr
+	mov	esi, [esi]
+	lodsw
+	mov	[CRT_COLS], al
+	inc	ah
+	mov	[VGA_ROWS], ah
+	mov	al, [esi]
+	;lodsb
+	mov	[CHAR_HEIGHT], al
+	jmp	short vbe_pmi32_3_2
+	;;;;
+
 ;vbe_pmi32_2:
 	;cmp	ah, 04h ; set mode (no clear mem option)
 	;jne	short vbe_pmi32_1
@@ -344,26 +385,32 @@ vbe_pmi32_1:
 vbe_pmi32_2:
 	; 07/12/2020
 	cmp	byte [CRT_MODE], 7 ; current mode > 7 ?
-	ja	short vbe_pmi32_1  ; yes
+	;ja	short vbe_pmi32_1  ; yes
+	; 21/12/2025
+	ja	short vbe_pmi32_3
 
 	cmp	al, 7	; requested mode > 7 ?
 	jna	short VGA_funcs_0  ; no (CGA)
 
 	cmp	al, 13h
-	jna	short vbe_pmi32_1
+	;jna	short vbe_pmi32_1
+	; 21/12/2025
+	jna	short vbe_pmi32_3
 
 	test	al, 80h
 	jz	short VGA_funcs_0  ; unknown or special
 
-	cmp	al, 87h	; requested mode > 7 ? 
+	cmp	al, 87h	; requested mode > 7 ?
 			; (with no clear mem ops)
 	jna	short VGA_funcs_0  ; no (CGA)
 
 	cmp	al, 93h
-	jna	short vbe_pmi32_1
+	;jna	short vbe_pmi32_1
+	; 21/12/2025
+	jna	short vbe_pmi32_3
 
 	; > 13h video modes are unknown or special
- 	; they must be handled by kernel	
+ 	; they must be handled by kernel
 
 	; CGA video modes will be handled by kernel
 
@@ -395,9 +442,9 @@ VGA_funcs_0:
 VBE_func:
 	; 26/11/2020
 	;sti
-	push	ebp ; *** ; 27/11/2020	
+	push	ebp ; *** ; 27/11/2020
 	push	esi ; **** 
-	
+
 	; Note:
 	; ebx, ecx, edx, edi, ebp registers
 	; must be saved by VBE functions and
@@ -422,14 +469,14 @@ VBE_func:
 
 	;jmp	VESA_VBE3_PMI_CALL
 
-VBE_func_0:	
+VBE_func_0:
 	; Bochs/Plex86 VGAbios VBE extension
 	; (TRDOS 386 v2.0.3 can use VBE graphics modes on emulators)
 	; BOCHS/QEMU/VIRTUALBOX
- 
+
 	mov	ah, [vbe2bios]
-	cmp	ah, 0C0h		
-	jb	short VBE_unknown 	
+	cmp	ah, 0C0h
+	jb	short VBE_unknown
 	cmp	ah, 0C5h
 	ja	short VBE_unknown
 
@@ -443,9 +490,9 @@ VBE_func_1:
 	cmp	si, N1L
 	jnb	short VBE_unknown
 	;sti
-	
+
 	call	dword [esi+N1] ; call VBE function
-		
+
 	;jmp	short VBE_bios_return
 
 VBE_bios_return:
@@ -474,13 +521,12 @@ N1:
 	;dd	vbe_biosfn_set_get_disp_start
 	;dd	vbe_biosfn_set_get_dac_pal_frm
 	;dd	vbe_biosfn_set_get_palette_data
-	
-N1L	EQU	$ - N1
 
+N1L	EQU	$ - N1
 
 VESA_VBE3_PMI_CALL: ; VESA VBE video bios (firmware) functions
 		    ; by using VESA VBE3 Protected Mode Interface
-	
+
 	; 02/08/2022 - TRDOS 386 v2.0.5
 	; 29/11/2020
 	; 26/11/2020 - TRDOS 386 v2.0.3 video.s
@@ -492,7 +538,7 @@ VESA_VBE3_PMI_CALL: ; VESA VBE video bios (firmware) functions
 	;  or only standard/old VGA graphics modes would be used.)
 
 	; (TRDOS 386 v2.0.3 can use VESA VBE graphics modes if
-	;  the video bios is full compatible with VBE3 standard) 
+	;  the video bios is full compatible with VBE3 standard)
 
 	; 29/11/2020
 
@@ -509,7 +555,7 @@ VESA_VBE3_PMI_CALL: ; VESA VBE video bios (firmware) functions
 	call	dword [esi+P1] ; call VBE 3 function
 
 	pop	edi ; *****
-		
+
 	jmp	short VBE_bios_return
 
 P1:
@@ -543,7 +589,7 @@ P1L	EQU	$ - P1
 ;
 ;	push	ebx  ; buffer address
 ;	push	edx  ; function: save (01h) or restore (02h)
-;	call	
+;	call
 ;
 ;vbe3_pm_f03:
 ;	cmp	al, 2
@@ -552,11 +598,11 @@ P1L	EQU	$ - P1
 ;
 ;
 ;vbe3_pm_f1:
-;	
+;
 ;
 ;vbe3_pmi_f5B:
 ;	cmp	al, 09h
-;	jna	short vbe3_pm_f ; funcs 05h to 09h are usable 
+;	jna	short vbe3_pm_f ; funcs 05h to 09h are usable
 ;	
 ;	cmp	al, 0Bh ; Get/Set pixel clock, last function
 ;	jne	short VBE_unknown 
@@ -564,16 +610,16 @@ P1L	EQU	$ - P1
 ;			; because of system-user buff transfers)
 ;vbe3_pm_f:
 ;	mov	byte [vbe3_pm_fn], al	; set
-;	; prepare 16 bit pm segments & registers for pmi call 
+;	; prepare 16 bit pm segments & registers for pmi call
 ;	call	VESA_VBE3_PM_FUNCTION
 ;
 ;
 
 	; 26/11/2020
 VBE_unknown:
-	mov	ax, 0100h  ; ah = 1 : Function call failed	
-			   ; al = 0 : Function is not supported	
-	
+	mov	ax, 0100h  ; ah = 1 : Function call failed
+			   ; al = 0 : Function is not supported
+
 	jmp	short VBE_bios_return
 
 vbe3_pmfn_return_ctrl_info:
@@ -591,14 +637,14 @@ vbe3_pmfn_return_ctrl_info:
 	;	AX = VBE return status
 	;	     AX = 004Fh -> succeeded
 	;	     AX <> 004Fh -> failed
-	; 
+	;
 	; Modified registers: eax (+ edi for kernel's own call)
 
 	; NOTE: TRDOS 386 v2 (v2.0.3) kernel calls this function
 	; during startup while cpu is in real mode
 	; (by using int 10h, 4F02h) and saves VbeInfoBlock at
 	; VBE3INFOBLOCK address (97E00h for TRDOS 386 v2.0.3).
-	;	
+	;
 	; So...
 	; This VBE function is adjusted to return/move same info
 	; from VBE3INFOBLOCK to user's buffer in EDI.
@@ -608,7 +654,7 @@ vbe3_pmfn_return_ctrl_info:
 	and	edi, edi
 	jz	short vbe3_func_fail ; invalid buffer address !
 
-;_vbe3_pmfn_return_ctrl_info:		
+;_vbe3_pmfn_return_ctrl_info:
 	;or	edi, edi
 	;jnz	short _vbe_biosfn_return_ctrl_info
 	;
@@ -618,16 +664,16 @@ vbe3_pmfn_return_ctrl_info:
 	;;	   by using VESA VBE3 video bios's pmi
 	;
 	;;push	edi
-	;; far call to VESA VBE3 PMI 
+	;; far call to VESA VBE3 PMI
 	;;mov	ax, 4F00h ; Return VBE Controller Info
 	;mov	edi, VBE3INFOBLOCK-VBE3SAVERESTOREBLOCK
-	;; ES selector base address = VBE3SAVERESTOREBLOCK 
+	;; ES selector base address = VBE3SAVERESTOREBLOCK
 	;call	int10h_32bit_pmi
 	;;pop	edi
 	;mov	edi, VBE3INFOBLOCK ; retn to the kernel sub
 	;cmp	ax, 004Fh
 	;je	short vbe_ctrl_info_retn
-	;stc	
+	;stc
 	;retn
 
 _vbe_biosfn_return_ctrl_info:
@@ -662,16 +708,16 @@ vbe_biosfn_return_ctrl_info:
 	; Output:
 	;	AX = VBE return status
 	;	     AX = 004Fh -> succeeded
-	;	     AX <> 004Fh -> failed   
-	; 
+	;	     AX <> 004Fh -> failed
+	;
 	; Modified registers: eax
 
 	and	edi, edi
 	jz	short vbe3_func_fail ; invalid buffer addr !
-	jmp	short _vbe_biosfn_return_ctrl_info 
+	jmp	short _vbe_biosfn_return_ctrl_info
 
 vbe3_pmfn_return_mode_info:
-	; 02/08/2022 (TRDOS 386 Kernel v2.0.5)	
+	; 02/08/2022 (TRDOS 386 Kernel v2.0.5)
 	; 21/12/2020
 	; 12/12/2020
 	;
@@ -684,16 +730,16 @@ vbe3_pmfn_return_mode_info:
 	;      EDI = 0 -> kernel call
 	;		  (do not transfer ModeInfoBlock
 	;		  to user's buffer address)
-	;	AX = 4F01h	
+	;	AX = 4F01h
 	; Output:
 	;	AX = VBE return status
 	;	     AX = 004Fh -> succeeded
-	;	     AX <> 004Fh -> failed   
-	; 
+	;	     AX <> 004Fh -> failed
+	;
 	; Modified registers: eax, esi, edi
 
 	; int 31h (int 10h) entrance
-	
+
 	or	edi, edi
 	jnz	short _vbe3_pmfn_return_mode_info
 
@@ -701,8 +747,8 @@ vbe3_func_fail:
 	mov	eax, 014Fh ; ah = 1 : Function call failed
 			   ; al = 4Fh : Function is supported
 	retn
-	
-	; jump from '_vbe_biosfn_return_mode_info' 
+
+	; jump from '_vbe_biosfn_return_mode_info'
 _vbe3_pmfn_return_mode_info:
 	push	edi
 
@@ -714,10 +760,10 @@ _vbe3_pmfn_return_mode_info:
 	;rep	stosd
 	;pop	ecx
 
-	; far call to VESA VBE3 PMI 
+	; far call to VESA VBE3 PMI
 	;mov	ax, 4F01h ; Return VBE Mode Information
 	mov	edi, VBE3MODEINFOBLOCK-VBE3SAVERESTOREBLOCK
-	; ES selector base address = VBE3SAVERESTOREBLOCK 
+	; ES selector base address = VBE3SAVERESTOREBLOCK
 	call	int10h_32bit_pmi
 
 	pop	edi
@@ -734,7 +780,7 @@ _vbe3_pmfn_return_mode_info:
 	jne	short vbe3_func_retn  ; failed !
 
 	push	ecx
-	mov	esi, VBE3MODEINFOBLOCK		
+	mov	esi, VBE3MODEINFOBLOCK
 	;mov	ecx, 256
 	; 02/08/2022
 	sub	ecx, ecx
@@ -747,7 +793,7 @@ _vbe3_pmfn_return_mode_info:
 	xor	eax, eax
 	mov	al, 4Fh ; successful
 vbe3_func_success:
-vbe3_func_retn:	
+vbe3_func_retn:
 	retn
 
 vbe3_pmfn_return_current_mode:
@@ -768,11 +814,11 @@ vbe3_pmfn_return_current_mode:
 	;	  bit 15 
 	;	      = 0 Memory cleared at last mode set
 	;	      = 1 Memory not cleared at last mode set
-	; 
+	;
 	; Modified registers: eax, ebx
 
 	; int 31h (int 10h) entrance
-	
+
 	; far call to VESA VBE3 PMI 
 
 	;mov	eax, 4F03h ; Return Current VBE Mode
@@ -795,14 +841,14 @@ vbe3_pmfn_set_mode:
 	;	  bit 0-13 = Mode number
 	;	  bit 14 = 0 Windowed frame buffer model
 	;	         = 1 Linear frame buffer model
-	;	  bit 15 
+	;	  bit 15
 	;	      = 0 Memory cleared at last mode set
 	;	      = 1 Memory not cleared at last mode set
 	; Output:
 	;	AX = VBE return status
 	;	     AX = 004Fh -> succeeded
 	;	     AX <> 004Fh -> failed
-	; 
+	;
 	; Modified registers: eax, ebx, esi (21/12/2020)
 
 	; int 31h (int 10h) entrance
@@ -821,19 +867,19 @@ vbe3_pmfn_set_mode:
 	;; use internal VBE mode set procedure
 	;; for non-vbe (std VGA/CGA) modes
 	;
-	;; (it is useful -as 4F02h function- 
+	;; (it is useful -as 4F02h function-
 	;;  to jump 'vbe_biosfn_set_mode'
 	;;  instead of direct jump to '_set_mode')
 	;; ((eliminates additional push-pops and settings))
- 
-	;jmp	vbe_biosfn_set_mode	
+
+	;jmp	vbe_biosfn_set_mode
 
 vbe3_sm_0: 
 	;;push	ds  ; *
 	;;push	es  ; **
 	;;push	ebp ; ***
-	;;push	esi ; **** 
-	
+	;;push	esi ; ****
+
 	; Fit bx to VESA VBE2 type mode setting
 	; (bx bit 11 is used for custom CRTC values in VBE3)
 	; clear bit 9 to 11 (clear bh bit 1 to bit 3)
@@ -850,12 +896,12 @@ vbe3_sm_4:
 	jne	short vbe3_sm_1    ; no
 
 	; save mode 03h video pages and cursor positions
-	push	edi ; **!***	
+	push	edi ; **!***
 	push	ecx ; ******
 	;push	esi
-	
+
 	call	save_mode3_multiscreen
-	
+
 	;pop	esi
 	pop	ecx ; ******
 	pop	edi ; **!***
@@ -891,7 +937,7 @@ vbe3_sm_3:
 	; set offset (es base addr is VBE3SAVERESTOREBLOCK) 
 	sub	edi, VBE3SAVERESTOREBLOCK
 	jmp	short vbe3_sm_4
-	
+
 vesa_vbe3_pmi:
 	; 29/11/2023 - TRDOS 386 v2.0.7
 	; 12/12/2020
@@ -906,7 +952,7 @@ vesa_vbe3_pmi:
 
 	; 04/12/2020
 	; Only 'set mode' will be redirected to vbe3 video bios
-	; (by setting mode 3 multiscreen parameters before and after) 
+	; (by setting mode 3 multiscreen parameters before and after)
 
 	; 29/11/2023 - TRDOS 386 v2.0.7
 	push	eax
@@ -1003,11 +1049,11 @@ vbe3_pmi_4:
 ;vbe3_pmi_5:
 	;mov	[CRT_MODE], al
 
-	call	int10h_32bit_pmi	
+	call	int10h_32bit_pmi
 
 	cmp	byte [CRT_MODE], 3  ; new video mode
 	;jne	vbe3_pmi_8	; video mode <> 03h
-	jne	short vbe3_pmi_8	
+	jne	short vbe3_pmi_8
 
 	;push	eax ; 04/12/2020
 	push	ebx
@@ -1082,15 +1128,15 @@ vbe3_pmi_4:
 	shl	bl, 1
 	add	ebx, CURSOR_POSN
 	mov	dx, [ebx]
-	and	dx, dx		
+	and	dx, dx
 	jz	short vbe3_pmi_7
-	
+
 	;dx = cursor position (dl = column, dh = row)
 	;mov	bh, [ACTIVE_PAGE] ; 06/12/2020
 	mov	bh, al
 	mov	ah, 02h ; set cursor position
 	call	int10h_32bit_pmi
-	
+
 	;jmp	short vbe3_pmi_7
 
 ;vbe3_pmi_6:
@@ -1157,7 +1203,7 @@ int10h_32bit_pmi:
 	shl	eax, 16  ; move function number (ax) to hw
 	mov	esi, [pmid_addr] ; linear address of
 				 ; PMInfo.Entrypoint pointer
-	;mov	ax, [esi+PMInfo.EntryPoint]	
+	;mov	ax, [esi+PMInfo.EntryPoint]
 	mov	ax, [esi]	 
 	rol	eax, 16 ; move PM entry address to hw
 			; and move function number to lw (ax)
@@ -1196,7 +1242,7 @@ vbe3_pmfn_save_restore_state:
 	;	     to hold the state buffer (if DL=00h)
 
 	; Modified registers: eax, ebx, esi, edi
-	
+
 	and	ebx, ebx ; user's buffer address
 	jnz	short _vbe3_pmfn_save_restore_state
 
@@ -1231,11 +1277,11 @@ _vbe3_pmfn_srs_0:
 	; BIOS data will not be saved and restored
 	; (to prevent protected mode page fault error)
 	and	cl, ~2 ; and cl, not 2
-	
+
 	; 24/01/2021
 	;mov	bl, 1
 	inc	bl ; = 1
-	;shl	bx, cl 
+	;shl	bx, cl
 	; 02/08/2022
 	shl	ebx, cl
 	and	bx, [vbe3stbsflags]
@@ -1259,7 +1305,7 @@ _vbe3_pmfn_srs_1:
 	; 24/01/2021
 	;call	_vbe3_pmfn_srs_8
 	; ebx = 0
-	call	_vbe3_pmfn_srs_9	
+	call	_vbe3_pmfn_srs_9
 	cmp	ax, 004Fh
 	jne	short _vbe3_srs_retn
 	; 24/01/2021
@@ -1268,7 +1314,7 @@ _vbe3_pmfn_srs_1:
 	; 24/01/2021
 	;mov	ax, 1
 	mov	al, 1
-	;shl	ax, cl		
+	;shl	ax, cl
 	; 02/08/2022
 	shl	eax, cl
 	or	[vbe3stbsflags], ax ; set flag for state option
@@ -1319,7 +1365,7 @@ _vbe3_pmfn_srs_2:
 
 	cmp	dl, 1
 	jne	short _vbe3_pmfn_srs_6 ; restore state
-	
+
 	; save video state
 	;xor 	ebx, ebx ; points to VBE3SAVERESTOREBLOCK
 	;mov	ax, 4F04h
@@ -1327,7 +1373,7 @@ _vbe3_pmfn_srs_2:
 
 	; 24/01/2021
 	call	_vbe3_pmfn_srs_7
-	
+
 	cmp	ax, 004Fh
 	jne	short _vbe3_pmfn_srs_4
 
@@ -1454,25 +1500,25 @@ SET_MODE:
 	; Check if current mode is 
 	; Bochs/Plex86 VBE graphics mode
 	cmp	byte [CRT_MODE], 0FFh ; VESA VBE graphics mode
-	jb	short _set_mode_      ; signature  	
-				      ; VBE mode number is in	 
+	jb	short _set_mode_      ; signature
+				      ; VBE mode number is in
 				      ; [video_mode] bit 0to8
 	mov	bl, al ; save video mode
 	call	dispi_get_enable
-	push	eax ; save current VBE dispi status 
+	push	eax ; save current VBE dispi status
 	; Disable Bochs/Plex86 VBE dispi
-	;mov	ax, 0 ; VBE_DISPI_DISABLED 
+	;mov	ax, 0 ; VBE_DISPI_DISABLED
 	xor	eax, eax ; 0 
 	call	dispi_set_enable
 	mov	al, bl ; restore video mode
 	call	_set_mode
-	pop	eax ; restore current VBE dispi status 
+	pop	eax ; restore current VBE dispi status
 	jnc	short VIDEO_RETURN
 	; ! unimplemented or invalid video mode number !
 	; VBE dispi must be enabled again
 	; (return to run on current VBE graphics mode)
 	;;mov	al, [video_mode+1] ; bit 8 to 15
-	;;and	al, 0C0h ; isolate bit 14 and bit 15 
+	;;and	al, 0C0h ; isolate bit 14 and bit 15
 	;;or	al, 1 ; VBE_DISPI_ENABLED
 	call	dispi_set_enable
 	jmp	short _video_func_err
@@ -1481,7 +1527,7 @@ _set_mode_:
 	; VGA bios (non-VBE) 'setmode' procedure
 
 	; 26/11/2020 (TRDOS v2.0.3)
-	
+
 ;------------------------------------------------------
 ; SET MODE					      :
 ;	THIS ROUTINE INITIALIZES THE ATTACHMENT TO    :
@@ -1499,8 +1545,8 @@ _set_mode_:
 	; 26/11/2020
 _video_func_err:
 	xor	eax, eax ; function call failed
-	dec	eax  ; 0FFFFFFFFh ; - 1	
-	jmp	short _video_return	
+	dec	eax  ; 0FFFFFFFFh ; - 1
+	jmp	short _video_return
 
 ; 12/05/2016
 ; 16/01/2016 (TRDOS 386 = TRDOS v2.0)
@@ -1527,7 +1573,7 @@ M15:	; VIDEO_RETURN_C
 	iretd		; ALL DONE
 
 set_txt_mode:
-	
+
 	; 29/07/2016
 	; 27/06/2016
 	mov	al, 3 ; 26/11/2020 (bit 7 = 0)
@@ -1558,7 +1604,7 @@ _set_mode:
 	;	(bochs/plex86 video bios code)
 	; call from 'SET_MODE'
 	;	(TRDOS 386 v2 default, IBM PC/AT rom bios code)
-	; continue from 'set_txt_mode'	
+	; continue from 'set_txt_mode'
 
 	; INPUT:
 	;	al = VGA video mode
@@ -1587,7 +1633,7 @@ _set_mode:
 	; for case 1:
 	; Current mode is 03h and next/requested mode is not 03h
 	;	- save mode (set mode 03h flag)
-	;	- save 8 video pages (which are will be restored)	
+	;	- save 8 video pages (which are will be restored)
 	;	- save active page number (which will be reactivated)
 	;	- set active page to 0 always (no multi screen)
 	;	- save 8 cursor positions (which will be restored)
@@ -1601,7 +1647,7 @@ _set_mode:
 	;
 	; for case 3:
 	; Current mode is not 03h and next/requested mode is 03h
-	;	- restore video pages (8 video pages were saved)	
+	;	- restore video pages (8 video pages were saved)
 	;	- restore active page number (which were saved)
 	;	- restore 8 cursor positions (which were saved)
 	;	- reset/clear mode 03h flag
@@ -1626,12 +1672,12 @@ _set_mode:
 	; check current video mode if it is 03h
 	or	ah, ah ; 80h or 0 ('noclearmem' option)
 	jnz	short _sm_1 ; do not clear display page
- 	
+
 	; 26/11/2020
 	; Note:
 	; [CRT_MODE] = 0FFh for VESA VBE video modes
 	; [video_mode] = standard VGA and VESA VBE video modes
-	
+
 	cmp	[CRT_MODE], al	; 03h
 	jne	short _sm_2	; case 3 ([p_crt_mode] = 03h)
 
@@ -1642,7 +1688,7 @@ _set_mode:
 	; 19/11/2020
 	; If '_set_mode' procedure is called for video mode 3
 	;     while video mode is 3, video page will be cleared
-	;     and cursor position of video page will be reset.	 
+	;     and cursor position of video page will be reset.
 
 	; clear display page
 	mov	byte [p_crt_mode], 80h ; clear page sign
@@ -1653,14 +1699,14 @@ _sm_0:
 	; 05/12/2020
 	cmp	byte [CRT_MODE], 3 ; is current mode 03h?
 	jne	short _sm_1	; case 4 ; [p_crt_mode] = 03h
-	
+
 	; case 1
 	; [p_crt_mode] = 0
 
 	; 19/11/2020
 	; If '_set_mode' procedure is called for a video mode
 	;     except video mode 3 while current video mode
-	;     is 3, all video pages of mode 3 will be copied 
+	;     is 3, all video pages of mode 3 will be copied
 	;     to 98000h address as backup, before mode change.
 	
 _sm_save_pm:
@@ -1690,9 +1736,9 @@ _sm_save_pm:
 	;;mov	[ACTIVE_PAGE], cl ; 0
 	;xchg	cl, [ACTIVE_PAGE]
 	;mov	[p_crt_page], cl  ; previous page (for mode 3)
-	
+
 	; [ACTIVE_PAGE] = 0 
-	
+
 	jmp	short _sm_2	; case 1 - 19/11/2020
 _sm_1:
 	; 26/11/2020
@@ -1766,7 +1812,7 @@ _sm_5: 	; 25/07/2016
 	mov	[VGA_MTYPE], al
 
 	mov	edi, ebx
-	add	edi, vga_dac_s 	
+	add	edi, vga_dac_s
 	shl	bl, 2 ; byte -> dword
 	add	ebx, vga_mode_tbl_ptr
 
@@ -1786,7 +1832,7 @@ _sm_5: 	; 25/07/2016
 	; al = 14, ah = 15 (If [CHAR_HEIGHT] = 16)
 	mov	[esi], ax
 
-	push	esi ; *	
+	push	esi ; *
 
 	; 17/04/2021
 	mov	dh, 03h
@@ -1813,7 +1859,7 @@ _sm_5: 	; 25/07/2016
 	inc	ch
 	; ecx = 256
 	call	gray_scale_summing
-	pop	ebx	
+	pop	ebx
 _sm_6:
 	; Reset Attribute Ctl flip-flop
 	;mov	dx, 3DAh ; VGAREG_ACTL_RESET
@@ -1852,10 +1898,10 @@ _sm_7:
 	out	dx, al ; 0
 	;inc	dx ; 3C5h ; VGAREG_SEQU_DATA
 	; 17/04/2021
-	inc	dl ; dx = 3C5h	
+	inc	dl ; dx = 3C5h
 	mov	al, 3
 	out	dx, al
-	mov	ah, 1	
+	mov	ah, 1
 _sm_8:
 	mov	al, ah
 	;mov	dx, 3C4h ; VGAREG_SEQU_ADDRESS
@@ -1869,7 +1915,7 @@ _sm_8:
 	inc	dl
 	out	dx, al
 	cmp	ah, 4 ; number of sequ regs
-	jnb	short _sm_9		
+	jnb	short _sm_9
 	inc	ah 
 	jmp	short _sm_8
 _sm_9:
@@ -1882,7 +1928,7 @@ _sm_10:
 	;mov	dx, 3CEh ; VGAREG_GRDC_ADDRESS
 	; 17/04/2021
 	mov	dl, 0CEh
-	out	dx, al	
+	out	dx, al
 	lodsb
 	;inc	dx ; 3CFh ; VGAREG_GRDC_DATA
 	; 17/04/2021
@@ -1934,7 +1980,7 @@ _sm_12:
 	;mov	dx, 3C0h ; VGAREG_ACTL_ADDRESS
 	; 17/04/2021
 	mov	dl, 0C0h
-	mov	al, 20h  
+	mov	al, 20h
         out     dx, al   ; set bit 5 to 1
 	;mov	dx, 3DAh ; VGAREG_ACTL_RESET
 	; 17/04/2021
@@ -1946,7 +1992,7 @@ _sm_12:
         ;ja	short _sm_15
 
 	test	byte [noclearmem], 80h
-	jnz	short _sm_15	
+	jnz	short _sm_15
 
 	; 29/07/2016
 	xor	eax, eax
@@ -1960,7 +2006,7 @@ _sm_12:
 	mov	edi, 0B8000h
 	je	short _sm_13	; CGA graphics mode
 	; 08/08/2016
-	mov	[VGA_INT43H], eax ; 0 ; default font 
+	mov	[VGA_INT43H], eax ; 0 ; default font
 	mov	ax, 0720h	; CGA text mode
 _sm_13:
 	rep	stosw
@@ -2002,7 +2048,7 @@ _sm_15:
 	mov	[VGA_ROWS], ah
 	; 10/08/2016
 	mov	al, [ebx+2]
-	mov	[CHAR_HEIGHT], al 
+	mov	[CHAR_HEIGHT], al
 	; 29/07/2016
 	; length of regen buffer in bytes
 	mov	cx, [ebx+3] ; 'slength_l'
@@ -2032,7 +2078,7 @@ _sm_16:
 	mov	cx, [CURSOR_MODE] ; restore cursor mode (initial value)
 	xchg	cx, [esi] ; cl = start line, ch = end line
 			  ; reset to initial value
-	xchg 	ch, cl  ; ch = start line, cl = end line  
+	xchg 	ch, cl  ; ch = start line, cl = end line
 	mov	[CURSOR_MODE], cx ; save (fixed) cursor mode
 
 	; 27/07/2016
@@ -2059,7 +2105,7 @@ _sm_17:
 	;sub	ax, ax ; eax = 0
 	sub	eax, eax ; 17/11/2020
 	mov	edi, CURSOR_POSN
-	stosd	
+	stosd
 	stosd
 	stosd
 	stosd
@@ -2077,7 +2123,7 @@ _sm_24:
 	;je	short _sm_19
 
  	;; copy and activate 8x16 font
-	
+
 	; 26/07/2016
 	mov	al, 04h
 	;sub	bl, bl
@@ -2105,7 +2151,7 @@ _sm_19:
 	;mov	cx, 4000h ; 16K words (32K)
 	;
 	xor	al, al
-        cmp     [p_crt_mode], al ; 0 
+        cmp     [p_crt_mode], al ; 0
         ja      short _sm_20 ; 03h, 80h or 83h
 
 	; case 1 - 19/11/2020
@@ -2134,18 +2180,18 @@ _sm_19:
 
 	; Here,
 	; video memory already cleared if [noclearmem] <> 80h
-	
+
 	;mov	ax, 0720h
 	;mov	cx, 4000h ; 16K words (32K)
 	;mov	edi, 0B8000h
 	;rep	stosw
 	;sub	al, al
-	
+
 	;jmp	short _sm_23
 
 	; Set hardware side for the new active video page
- 
-	jmp	_set_active_page ; 19/11/2020	
+
+	jmp	_set_active_page ; 19/11/2020
 
 _sm_20:
 	; 19/11/2020
@@ -2182,7 +2228,7 @@ _sm_20:
 
 	; 12/12/2020
 	;; restore video pages
-	;mov	esi, 98000h ; 30/07/2016 
+	;mov	esi, 98000h ; 30/07/2016
 	;mov	edi, 0B8000h
 	;mov	cx, 2000h ; 8K dwords (32K)
 	;rep	movsd
@@ -2196,7 +2242,7 @@ _sm_20:
 	;;mov	ecx, 4	; restore all cursor positions (16 bytes)
 	;mov	cl, 4
 	;rep 	movsd
-	
+
 	; 12/12/2020
 	call	_restore_mode3_multiscreen
 
@@ -2214,8 +2260,8 @@ _sm_21:
 	; User has requested to set video mode 3 again while
 	; current video mode is 3.. that means, set mode 03h
 	; parameters again and clear video page.
-	; ('noclearmem' option effects the result) 
-	
+	; ('noclearmem' option effects the result)
+
 	; 19/11/2020
 	test	byte [noclearmem], 80h
 	jnz	short _sm_22	; 'do not clear video memory'
@@ -2243,7 +2289,7 @@ _sm_21:
 _sm_22:
 	;mov	[p_crt_mode], al ; 0 ; reset
 	; 19/11/2020
-	;and	byte [p_crt_mode], 3 ; 83h -> 3, 80h -> 0  
+	;and	byte [p_crt_mode], 3 ; 83h -> 3, 80h -> 0
 	and	byte [p_crt_mode], 7Fh ; 83h -> 3, 80h -> 0
 _sm_23:
 	; al = video page number
@@ -2263,7 +2309,7 @@ save_mode3_multiscreen:
 	; Modified registers: ecx (=0), esi, edi
 	
 	; 12/12/2020
-	; moved here from '_set_mode'	
+	; moved here from '_set_mode'
 	; 03/07/2016
 	; save video pages
 	mov	esi, 0B8000h
@@ -2274,12 +2320,12 @@ save_mode3_multiscreen:
 	mov	ch, 20h
 	; ecx = 2000h 
 	rep	movsd
-	
+
 	mov	byte [p_crt_mode], 3 ; previous mode, backup sign
 	; 26/11/2020
 	xchg	cl, [ACTIVE_PAGE]
 	mov	[p_crt_page], cl  ; save as previous active page
-	
+
 	; save cursor positions
 	mov	esi, CURSOR_POSN
 	mov	edi, cursor_pposn ; cursor positions backup
@@ -2304,7 +2350,7 @@ restore_mode3_multiscreen:
 	mov	[ACTIVE_PAGE], al ; current mode 3 active page
 
 	; 12/12/2020
-	; moved here from 'vesa_vbe3_pmi'	
+	; moved here from 'vesa_vbe3_pmi'
 
 	; 07/12/2020
 	; restore CRT_START according to ACTIVE_PAGE
@@ -2326,7 +2372,7 @@ r_m3_ms_0:
 	jnz	short r_m3_ms_0
 r_m3_ms_1:
 	; 12/12/2020
-	; moved here from '_set_mode'	
+	; moved here from '_set_mode'
 _restore_mode3_multiscreen:
 	; Modified registers: ecx, esi, edi
 
@@ -2385,7 +2431,7 @@ cursor_shape_fix:
 	; 12/04/2021
 	push	eax
 	; {
-   	; if(CL!=(CH+1))	
+   	; if(CL!=(CH+1))
 	inc	al
 	cmp	ah, al   ; ah != al + 1
         je      short csf_1
@@ -2399,7 +2445,7 @@ csf_1:
  	; }
    	; else		; ah = al + 1
     	; {
-	inc	ah	; ah = ah + 1   
+	inc	ah	; ah = ah + 1
 	; CH = ((CL+1) * cheight / 8) - 2;
 	mov	al, [CHAR_HEIGHT]
 	mul	ah
@@ -2454,14 +2500,14 @@ _set_ctype:
 ; OUTPUT	
 ;	NONE
 ;------------------------------------------------
-	
+
 	; 02/08/2022 (TRDOS 386 Kernel v2.0.5)
 	;
 	; 07/07/2016
 	; Fixing cursor start and stop line depending on
 	; current character height (=16)
 	; (Note: Default/initial values are 6 and 7.
-	; If set values are 6 (start) & 7 (stop) and 
+	; If set values are 6 (start) & 7 (stop) and
 	; [CHAR_HEIGHT] = 16 :
 	; After fixing, start line will be 14, stop line
 	; will be 15.)
@@ -2497,7 +2543,7 @@ SET_CPOS:
 	ja	short set_cpos_inv_vp
 	;
 	cmp	byte [CRT_MODE], 7
-	ja	short vga_set_cpos ; 12/09/2016	
+	ja	short vga_set_cpos ; 12/09/2016
 	call	_set_cpos
 set_cpos_inv_vp:   ; 02/08/2022
         jmp     VIDEO_RETURN
@@ -2574,7 +2620,7 @@ get_cpos:
 	; BH = Video page number (0 to 7)
 	;
 	shl	bh, 1 ; WORD OFFSET
-	movzx	esi, bh 
+	movzx	esi, bh
 	movzx	edx, word [esi+CURSOR_POSN]
 	retn
 
@@ -2616,7 +2662,7 @@ ACT_DISP_PAGE:
 	;and 	al, al
         ;jnz	VIDEO_RETURN
 	;;sub	al, al ; 0 ; force to page 0
-adp_1:	
+adp_1:
 	call	set_active_page
 adp_2:
         jmp     VIDEO_RETURN
@@ -2692,9 +2738,9 @@ position:
 	; DX = ROW, COLUMN POSITION
 	;movzx	eax, byte [CRT_COLS] ; 27/06/2015
 	xor	eax, eax ; 02/09/2014
-	mov	al, 80   ; determine bytes to row	
+	mov	al, 80   ; determine bytes to row
 	mul	dh	 ; row value
-	;xor	dh, dh   ; 0	
+	;xor	dh, dh   ; 0
 	;add	ax, dx	 ; add column value to the result
 	; 16/04/2021
 	add	al, dl
@@ -2702,7 +2748,7 @@ position:
 	; 02/08/2022
 	shl	eax, 1
 	;shl	ax, 1	; * 2 for attribute bytes
-		; EAX = AX = OFFSET OF CHAR POSITION IN REGEN BUFFER 
+		; EAX = AX = OFFSET OF CHAR POSITION IN REGEN BUFFER
 	retn
 
 find_position:
@@ -2810,7 +2856,7 @@ _scroll_up:  ; from 'write_tty'
 	;jnb	GRAPHICS_UP ; 26/06/2016
 	; 18/11/2020
 	cmp	ah, 4
- 	jb	short n0	
+ 	jb	short n0
 	cmp	ah, 7 ; TEST FOR BW CARD 
 		      ;	(80x25 text, mono)
 	je	short n0 ; same with mode 3 for TRDOS 386
@@ -2841,7 +2887,7 @@ n3:
         add	si, [CRT_LEN]
         dec	al
 	jnz	short n3
-n4:	
+n4:
 	call	scroll_position ; 16/01/2016
         jz      short n6 
 
@@ -2944,17 +2990,17 @@ scroll_position:
 	;shl	eax, 1
 	add	eax, eax
 	;
-	;push	ax	; offset 
+	;push	ax	; offset
 	;push	dx
 	; 12/04/2021
-	push	eax	; offset 
+	push	eax	; offset
 	push	edx
 	;
 	; 04/04/2014
-	mov	dx, 3DAh ; guaranteed to be color card here	
+	mov	dx, 3DAh ; guaranteed to be color card here
 n9:                      ; wait_display_enable
         in      al, dx   ; get port
-	test	al, RVRT ; wait for vertical retrace	
+	test	al, RVRT ; wait for vertical retrace
 	jz	short n9 ; wait_display_enable
 	mov	al, 25h
 	mov	dl, 0D8h ; address control port
@@ -3054,7 +3100,7 @@ _scroll_down: ; 27/06/2016
 	;jnb	GRAPHICS_DOWN ; 26/06/2016
 	; 18/11/2020
 	cmp	ah, 4
- 	jb	short _n0	
+ 	jb	short _n0
 	cmp	ah, 7 ; TEST FOR BW CARD 
 		      ;	(80x25 text, mono)
 	je	short _n0 ; same with mode 3 for TRDOS 386
@@ -3080,12 +3126,12 @@ n13:
 	call	n10	; MOVE ONE ROW
 
 	push	ecx
-	mov	cl, [CRT_COLS] 
+	mov	cl, [CRT_COLS]
 	add	cl, cl
         sub	esi, ecx  ; next line
         sub	edi, ecx
         pop	ecx
-	
+
 	dec	ch	 ; count of lines to move
 	jnz	short n13 ; row loop
 	; ch = 0
@@ -3099,12 +3145,12 @@ n15:
 	mov	cl, [CRT_COLS]
 	add	cl, cl
         sub	edi, ecx
-        
+
 	dec	dh
 	jnz	short n15
 	;
 	; 18/11/2020
-	cld	; clear direction flag	
+	cld	; clear direction flag
 	;
 	jmp	n16 ; 27/06/2016
 
@@ -3162,7 +3208,7 @@ _read_ac_current:
 	; 12/05/2016 
 	; 18/01/2016
 
-	mov	ah, [CRT_MODE] ; current video mode	
+	mov	ah, [CRT_MODE] ; current video mode
 	cmp	ah, 4
  	jb	short p10
 	; 18/11/2020
@@ -3180,9 +3226,9 @@ p10:
 	;
 
 	; 18/11/2020
-	; convert display mode to a zero value 
+	; convert display mode to a zero value
 	; for 80 column color mode
-	;mov	ah, [CRT_MODE]	
+	;mov	ah, [CRT_MODE]
 	;sub	ah, 2
 	;shr	ah, 1
 	;jnz	short p13
@@ -3192,8 +3238,8 @@ p10:
 	;xor	bl, bl	; 0
 	cmp	byte [CRT_MODE], 03h ; 80x25 color text
 	;je	short p11    ; Note: Only mode 03h and mode 01h are
-	;inc	bl	; 1  ;       in use by TRDOS 386 as text modes	
-	;jmp	short p14    ;       (07h, 00h and 02h are redirected)		
+	;inc	bl	; 1  ;       in use by TRDOS 386 as text modes
+	;jmp	short p14    ;       (07h, 00h and 02h are redirected)
 	jne	short p13
 
 	; 05/12/2020
@@ -3254,12 +3300,12 @@ WRITE_AC_CURRENT:
 	jna	short write_ac_c
 
 	call	vga_write_char_attr
-	jmp     VIDEO_RETURN	
+	jmp     VIDEO_RETURN
 
 write_ac_c:
 	call	_write_c_current
 
-	movzx	esi, bh ; video page number (0 to 7)	
+	movzx	esi, bh ; video page number (0 to 7)
 	mov	[esi+chr_attrib], bl ; color/attribute
 
         jmp     VIDEO_RETURN
@@ -3316,10 +3362,10 @@ _write_c_current:  ; from 'write_tty'
 	; VIDEO.ASM - 06/10/85 VIDEO DISPLAY BIOS
 
 	; 18/11/2020
-	mov	ah, [CRT_MODE] ; current video mode	
+	mov	ah, [CRT_MODE] ; current video mode
 	cmp	ah, 4
  	jb	short p40
-	
+
 	;cmp	byte [CRT_MODE], 4
         ;jnb	GRAPHICS_WRITE ; 26/06/2016
 
@@ -3362,8 +3408,8 @@ p40:
 	;xor	bl, bl	; 0
 	cmp	byte [CRT_MODE], 03h ; 80x25 color text
 	;je	short p41    ; Note: Only mode 03h and mode 01h are
-	;inc	bl	; 1  ;       in use by TRDOS 386 as text modes	
-	;jmp	short p43    ;       (07h, 00h and 02h are redirected)			
+	;inc	bl	; 1  ;       in use by TRDOS 386 as text modes
+	;jmp	short p43    ;       (07h, 00h and 02h are redirected)
 	; 05/12/2020
 	jne	short p44
 p46:
@@ -3389,7 +3435,7 @@ p42:			;  wait for either retrace high
 	in	al, dx ; get status again
 	test	al, RVRT+RHRZ ; is horizontal or vertical retrace high
 	jz	short p42 ; wait until either retrace active
-p43:	
+p43:
 	sti
 p44:
 	mov	ax, [esp] ; restore the character (al) & attribute (ah)
@@ -3510,7 +3556,7 @@ _write_tty:
 	; (some error) messages and also mainprog command interpreter
 	; (in kernel) uses "_write_tty".
 	; So, here video mode must be set to 3 if it is not 3.
- 
+
 	cli	; disable interrupts
 	;
 	; 01/09/2014
@@ -3522,7 +3568,7 @@ set_mode_3:
 	push	eax
 	;call	_set_mode
 	; 18/11/2020 
-	call	set_txt_mode  ; set video mode to 03h 
+	call	set_txt_mode  ; set video mode to 03h
 	pop	eax
 	pop	ebx
 	;
@@ -3543,7 +3589,7 @@ _write_tty_m3: ; 24/06/2016 (m3 -> _write_tty_m3)
 	je	short u9
 	;
 	; write the char to the screen
-u0:	
+u0:
 	; al = character
 	; bl = attribute/color
 	; bh = video page number (0 to 7)
@@ -3583,13 +3629,13 @@ u2:
 	; al = character, ah = attribute
 	; bh = video page number
 	; 18/11/2020
-	mov	bl, ah ; color/attribute 	
+	mov	bl, ah ; color/attribute
 u3:
 	;;mov	ax, 0601h 	; scroll one line
 	;;sub	cx, cx		; upper left corner
 	;;mov	dh, 25-1 	; lower right row
 	;;;mov	dl, [CRT_COLS]
-	;mov	dl, 80		; lower right column	
+	;mov	dl, 80		; lower right column
 	;;dec	dl
 	;;mov	dl, 79
 
@@ -3622,7 +3668,7 @@ u3:
 u6:				; set-cursor-inc
 	inc	dh		; next row
 				; set cursor
-;u7:					
+;u7:
 	;;mov	ah, 02h
 	;;jmp	short u4 	; establish the new cursor
 	;call	_set_cpos
@@ -3667,7 +3713,7 @@ tsloop:
 	; 05/12/2020
 	; bx is preserved in '_write_tty_m3'
 	; 18/11/2020
-	;pop	bx  ; BL = color/attribute, Bh = video page 
+	;pop	bx  ; BL = color/attribute, Bh = video page
 	;pop	ax  ; AL = character
 	; 12/04/2021
 	;pop	cx
@@ -3675,7 +3721,7 @@ tsloop:
 	dec	cl
 	jnz	short tsloop
 	retn
-bs:	
+bs:
 	; back space found
 
 	or	dl, dl 		; is it already at start of line
@@ -3707,7 +3753,7 @@ _set_cpos:
 	; 01/09/2014
 	; 30/08/2014 (Retro UNIX 386 v1)
 	;
-	; 04/12/2013 - 12/12/2013 (Retro UNIX 8086 v1) 
+	; 04/12/2013 - 12/12/2013 (Retro UNIX 8086 v1)
 	;
 	; VIDEO.ASM - 06/10/85  VIDEO DISPLAY BIOS
 	;
@@ -3738,13 +3784,13 @@ _set_cpos:
 ;	retn
 		; DX = row/column
 m18:
-	call	position ; determine location in regen buffer	
+	call	position ; determine location in regen buffer
 	mov	cx, [CRT_START]
 	add	cx, ax  ; add char position in regen buffer
 			; to the start address (offset) for this page
 	shr	cx, 1	; divide by 2 for char only count
 	mov	ah, 14	; register number for cursor
-	;call	m16	; output value to the 6845	
+	;call	m16	; output value to the 6845
 	;retn
 
 	;-----	THIS ROUTINE OUTPUTS THE CX REGISTER
@@ -3760,8 +3806,8 @@ m16:
 	inc	dl
 	jmp	$+2	; i/o delay
 	mov	al, ch	; data
-	out	dx, al	
-	;dec	dx	
+	out	dx, al
+	;dec	dx
 	; 17/04/2021
 	dec	dl
 	mov	al, ah
@@ -3871,7 +3917,7 @@ g7:				; 1/64 second per count (bl)
 	or	al, ah		; recover value of port_b
 	out	PORT_B, al	; restore speaker status
 	popfd			; restore interrupt flag state
-u12:	
+u12:
 	retn
 
 REFRESH_BIT equ	00010000b 	; REFRESH TEST BIT
@@ -3907,7 +3953,7 @@ waitf:
 ;	      	MEMORY REFRESH TIMER 1 OUTPUT USED AS REFERENCE
 ; EXIT:
 ;	       	AFTER (CX) TIME COUNT (PLUS OR MINUS 16 MICROSECONDS)
-;	(CX) = 0	
+;	(CX) = 0
 ;-------------------------------------------------------------------------------
 
 ; Refresh period: 30 micro seconds (15-80 us)
@@ -3927,7 +3973,7 @@ waitf:
 ;	cmp	al, ah			; DID IT JUST CHANGE
 ;	je	short WAITF1		; WAIT FOR A CHANGE IN OUTPUT LINE
 ;	mov	ah, al			; SAVE NEW FLAG STATE
-;	loop	WAITF1			; DECREMENT HALF CYCLES TILL COUNT END		
+;	loop	WAITF1			; DECREMENT HALF CYCLES TILL COUNT END
 	;
 	; 17/12/2014
 	;
@@ -4024,7 +4070,7 @@ P57:
 
 	;mov	ax, 0200h		; SET NEW CURSOR POSITION
 	;int	10h
-P50next:	
+P50next:
 	push	ecx ; ****
 	push	ebx ; *** ; 18/11/2020
 	push	esi ; **
@@ -4084,7 +4130,7 @@ P53:
 	; 18/11/2020
 	;mov	ebx, [esp+4]	; ***
 
-	movzx	esi, bh ; video page number (0 to 7)	
+	movzx	esi, bh ; video page number (0 to 7)
 	mov	[esi+chr_attrib], bl ; color/attribute
 
 	inc	dl			; INCREMENT COLUMN COUNTER
@@ -4163,7 +4209,7 @@ vga_write_string:
 	; AL = 03h: Use attributes in string; update cursor
 	
 	; biosfn_write_string(GET_AL(),GET_BH(),GET_BL(),CX,GET_DH(),GET_DL(),ES,BP);
-	; static void biosfn_write_string (flag,page,attr,count,row,col,seg,offset) 
+	; static void biosfn_write_string (flag,page,attr,count,row,col,seg,offset)
 
 	; // Read curs info for the page
  	; biosfn_get_cursor_pos(page,&dummy,&oldcurs);
@@ -4263,7 +4309,7 @@ vga_wstr_5:
 	; dh = lower right row
 	;
 	; al = line count (AL=0 means blank entire fields)
-	; bl = fill value for blanked lines	
+	; bl = fill value for blanked lines
 	; bh = unused
 
 GRAPHICS_UP:
@@ -4361,10 +4407,10 @@ vga_graphics_up:
 	; dh = lower right row
 	;
 	; al = line count (AL=0 means blank entire fields)
-	; bl = fill value for blanked lines	
+	; bl = fill value for blanked lines
 	; bh = unused
 	;
-	; ah = [CRT_MODE], current video mode	
+	; ah = [CRT_MODE], current video mode
 
 	mov	bh, al ; 31/07/2016
 	mov	esi, vga_g_modes
@@ -4380,9 +4426,9 @@ vga_g_up_0:
 	retn	; nothing to do
 vga_g_up_1:
 	mov	al, bh ; 31/07/2016
-	add	esi, vga_g_memmodel - (vga_g_modes + 1)  
+	add	esi, vga_g_memmodel - (vga_g_modes + 1)
 	; [ESI] = VGA memory model number (LINEAR8, PLANAR4, PLANAR1)
-	
+
 	; if(rlr>=nbrows)rlr=nbrows-1;
  	; if(clr>=nbcols)clr=nbcols-1;
  	; if(nblines>nbrows)nblines=0;
@@ -4397,7 +4443,7 @@ vga_g_up_2:
 	jb	short vga_g_up_3
 	mov	dl, [CRT_COLS]
 	dec	dl
-vga_g_up_3:	
+vga_g_up_3:
 	cmp	al, [VGA_ROWS]
 	jna	short vga_g_up_4
 	sub	al, al ; 0
@@ -4417,11 +4463,11 @@ vga_g_up_4:
 	; 12/04/2021
 	push	eax
 	mov	al, [VGA_ROWS]
-	dec	al  
+	dec	al
 	cmp	dh, al ; rlr = nbrows-1
 	jne	short vga_g_up_5
         mov     al, [CRT_COLS]  ; = VGA_COLS
-	dec	al 
+	dec	al
  	cmp	dl, al ; clr = nbcols-1
 	;jne	short vga_g_up_5
 	;;pop	ax
@@ -4439,22 +4485,22 @@ vga_g_up_4:
 	; 08/08/2016
 	movzx	eax, byte [CHAR_HEIGHT]
 	mul	edx
-	; eax = byte count	
+	; eax = byte count
 	mov	ecx, eax
 	;; 07/08/2016
 	;shl	dx, 3 ; * 8 ; * [CHAR_HEIGHT]
 	;mov	ecx, edx
 	mov	al, bl ; fill value for blanked lines
 	mov	edi, 0A0000h
-	rep	stosb		
-	
+	rep	stosb
+
 	;mov	ax, 5
 	; 03/08/2022
 	xor	ah, ah
 	mov	al, 5
 
 	mov	dx, 3CEh ; VGAREG_GRDC_ADDRESS
-	out	dx, ax ; 0005h	
+	out	dx, ax ; 0005h
 
 	retn
 
@@ -4489,7 +4535,7 @@ vga_g_up_l0:
 	jz	short vga_g_up_l2
 	mov	ah, al
 	add	ah, ch ; i+nblines
-	;jc	short vga_g_up_l2	
+	;jc	short vga_g_up_l2
 	cmp	ah, dh
 	ja	short vga_g_up_l2
 	; else
@@ -4514,7 +4560,7 @@ vga_g_up_pl0:
  	;{for(i=rul;i<=rlr;i++)
   	; if((i+nblines>rlr)||(nblines==0))
 	and	al, al
-	jz	short vga_g_up_pl2	
+	jz	short vga_g_up_pl2
 	mov	ah, al
 	add	ah, ch ; i+nblines
 	;jc	short vga_g_up_pl2
@@ -4573,14 +4619,14 @@ vgamem_copy_pl4:
 	mul	edx ; * ysrc
 	; eax = ysrc * cheight * nbcols
 	; edx = 0
-	mov	dl, cl ; edx = xstart	
+	mov	dl, cl ; edx = xstart
  	add	eax, edx
 	mov	esi, eax ; src
 	mov	dl, ch ; ydest
 	pop	eax ; cheight * nbcols
 	mul	edx
 	; eax = ydest * cheight * nbcols
-	mov	dl, cl ; edx = xstart	
+	mov	dl, cl ; edx = xstart
  	add	eax, edx
 	mov	edi, eax ; dest
 	; esi = src
@@ -4623,7 +4669,7 @@ vgamem_copy_pl4_1:
 	pop	eax
 	pop	edx
 
-	retn	
+	retn
 
 vgamem_fill_pl4:
 	; 08/08/2016
@@ -4693,8 +4739,8 @@ vgamem_fill_pl4_1:
 	out	dx, ax
 
 	pop	eax
-	pop	edx 
-	
+	pop	edx
+
 	retn
 
 vgamem_copy_l8:
@@ -4750,7 +4796,7 @@ vgamem_copy_l8:
 	pop	eax ; cheight * nbcols
 	mul	edx
 	; eax = ydest * cheight * nbcols
-	mov	dl, cl ; edx = xstart	
+	mov	dl, cl ; edx = xstart
  	add	eax, edx
 	mov	edi, eax ; dest
 	;shl	di, 3 ; * 8 ; 06/08/2016
@@ -4888,7 +4934,7 @@ vgamem_fill_l8_1:
 	;out	dx, ax
 
 	pop	eax
-	pop	edx 
+	pop	edx
 
 	retn
 
@@ -4917,7 +4963,7 @@ vgamem_fill_l8_1:
 	; dh = lower right row
 	;
 	; al = line count (AL=0 means blank entire fields)
-	; bl = fill value for blanked lines	
+	; bl = fill value for blanked lines
 	; bh = unused
 
 GRAPHICS_DOWN:
@@ -5023,12 +5069,12 @@ vga_graphics_down:
 	; dh = lower right row
 	;
 	; al = line count (AL=0 means blank entire fields)
-	; bl = fill value for blanked lines	
+	; bl = fill value for blanked lines
 	; bh = unused
 	;
-	; ah = [CRT_MODE], current video mode	
+	; ah = [CRT_MODE], current video mode
 
-        cld     ; !!! Clear direction flag !!! 
+        cld     ; !!! Clear direction flag !!!
 
 	mov	bh, al ; 31/07/2016
 
@@ -5045,9 +5091,9 @@ vga_g_down_0:
 	retn	; nothing to do
 vga_g_down_1:
 	mov	al, bh ; 31/07/2016
-	add	esi, vga_memmodel - (vga_modes + 1)  
+	add	esi, vga_memmodel - (vga_modes + 1)
 	; [ESI] = VGA memory model number (LINEAR8, PLANAR4, PLANAR1)
-	
+
 	; if(rlr>=nbrows)rlr=nbrows-1;
  	; if(clr>=nbcols)clr=nbcols-1;
  	; if(nblines>nbrows)nblines=0;
@@ -5062,7 +5108,7 @@ vga_g_down_2:
 	jb	short vga_g_down_3
 	mov	dl, [CRT_COLS]
 	dec	dl
-vga_g_down_3:	
+vga_g_down_3:
 	cmp	al, [VGA_ROWS]
 	jna	short vga_g_down_4
 	sub	al, al ; 0
@@ -5080,11 +5126,11 @@ vga_g_down_4:
 
 	push	eax ; push ax ; 12/04/2021
 	mov	al, [VGA_ROWS]
-	dec	al  
+	dec	al
 	cmp	dh, al ; rlr = nbrows-1
 	jne	short vga_g_down_5
         mov     al, [CRT_COLS]  ; = VGA_COLS
-	dec	al 
+	dec	al
  	cmp	dl, al ; clr = nbcols-1
 	;jne	short vga_g_down_5
  	; 12/04/2021
@@ -5101,21 +5147,21 @@ vga_g_down_4:
 	; 08/08/2016
 	movzx	eax, byte [CHAR_HEIGHT]
 	mul	edx
-	; eax = byte count	
+	; eax = byte count
 	mov	ecx, eax
 	;; 07/08/2016
 	;shl	dx, 3 ; * 8 ; * [CHAR_HEIGHT]
 	;mov	ecx, edx
 	mov	al, bl ; fill value for blanked lines
 	mov	edi, 0A0000h
-	rep	stosb			
-	
+	rep	stosb
+
 	; 03/08/2022
-	xor	ah, ah ; 0 
-	
+	xor	ah, ah ; 0
+
 	mov	al, 5
 	mov	dx, 3CEh ; VGAREG_GRDC_ADDRESS
-	out	dx, ax ; 0005h	
+	out	dx, ax ; 0005h
 
 	retn
 
@@ -5149,7 +5195,7 @@ vga_g_down_l0:
 	jz	short vga_g_down_l2
 	mov	ah, al
 	add	ah, ch
-	;jc	short vga_g_down_l2	
+	;jc	short vga_g_down_l2
 	xchg	ch, dh
 	cmp	ch, ah
 	jb	short vga_g_down_l2
@@ -5160,7 +5206,7 @@ vga_g_down_l0:
 	call	vgamem_copy_l8
 vga_g_down_l1:
 	xchg	dh, ch
-	dec	dh 
+	dec	dh
 	cmp	dh, ch
 	jnb	short vga_g_down_l0
 	retn
@@ -5169,7 +5215,7 @@ vga_g_down_l2:
 	; vgamem_fill_pl4(cul,i,cols,nbcols,cheight,attr);
 	call	vgamem_fill_l8
 	jmp	short vga_g_down_l1
-		 
+
 vga_g_down_planar:
 	; cl = upper left column ; cul
 	; ch = upper left row ; rul
@@ -5182,7 +5228,7 @@ vga_g_down_pl0:
 	jz	short vga_g_down_pl2
 	mov	ah, al
 	add	ah, ch
-	;jc	short vga_g_down_pl2	
+	;jc	short vga_g_down_pl2
 	xchg	ch, dh
 	cmp	ch, ah
 	jb	short vga_g_down_pl2
@@ -5415,7 +5461,7 @@ S11:
 	jmp	short S14		; GO MATCH THE SAVED CODE POINTS
 
 ;-----	MEDIUM RESOLUTION READ
-S12:	
+S12:
 	;sal	si, 1			; OFFSET*2 SINCE 2 BYTES/CHAR
 	; 03/08/2022
 	sal	esi, 1
@@ -5460,7 +5506,7 @@ S17:
 	jnz	short S16		; DO ALL OF THEM
 
 ;-----	CHARACTER IS FOUND ( AL=0 IF NOT FOUND )
-S18:	
+S18:
 	add	esp, 8			; READJUST THE STACK, THROW AWAY SAVE
 	retn				; ALL DONE
 
@@ -5659,8 +5705,8 @@ read_dot_retn:	; 03/08/2022
 	jmp	_video_return
 
 read_dot_cga:
-	;je	VIDEO_RETURN ; 7	
-	cmp	ah, 4 ; graphics ? 
+	;je	VIDEO_RETURN ; 7
+	cmp	ah, 4 ; graphics ?
 	;jb	VIDEO_RETURN ; no, text mode, nothing to do
 	; 03/08/2022
 	jb	short read_dot_retn
@@ -5693,8 +5739,8 @@ write_dot_retn:	; 03/08/2022
 	jmp	VIDEO_RETURN
 
 write_dot_cga:
-	;je	VIDEO_RETURN ; 7	
-	cmp	ah, 4 ; graphics ? 
+	;je	VIDEO_RETURN ; 7
+	cmp	ah, 4 ; graphics ?
 	;jb	VIDEO_RETURN ; no, text mode, nothing to do
 	; 03/08/2022
 	jb	short write_dot_retn
@@ -5826,7 +5872,7 @@ load_dac_palette:
 	;mov	ecx, 256   ; always 256*3 values
 	; 02/08/2022
 	xor	ecx, ecx
-	inc	ch	
+	inc	ch
 	; ecx = 256
 
 	;push	esi
@@ -5839,7 +5885,7 @@ load_dac_palette:
 	jnz	short l_dac_p_1
 l_dac_p_0:
 	mov	esi, palette0
-	jmp	short l_dac_p_4	
+	jmp	short l_dac_p_4
 l_dac_p_1:
 	mov	esi, palette1
 	jmp	short l_dac_p_4
@@ -5857,7 +5903,7 @@ l_dac_p_4:
 	lodsb
 	out	dx, al	; Blue
 	and	ah, ah
-	jz	short l_dac_p_5	
+	jz	short l_dac_p_5
 	dec	ah
 	loop	l_dac_p_4
 	;pop	esi
@@ -5940,7 +5986,7 @@ g_s_s_1:
 	; 12/04/2021
 	pop	edx
 	add	ax, dx
-	add	ax, 80h  
+	add	ax, 80h
 	mov	al, 3Fh
 	cmp	ah, al	; if(i>0x3f)i=0x3f
 	jna	short g_s_s_2
@@ -5980,7 +6026,7 @@ g_s_s_3:
 	retn
 
 vga_write_char_attr:
-vga_write_char_only: 
+vga_write_char_only:
 	; 08/07/2016 (TRDOS 386 = TRDOS v2.0)
 	;
 	; derived from 'Plex86/Bochs VGABios' source code
@@ -5996,7 +6042,7 @@ vga_write_char_only:
 	; BL = Color of character
 	; OUTPUT ->
 	; Regen buffer updated
- 
+
 	mov 	ah, [CRT_MODE]
 	mov	dx, [CURSOR_POSN] ; cursor pos for page 0
 
@@ -6012,10 +6058,10 @@ vga_wca_0:
 vga_wca_1:
 	retn	; nothing to do
 vga_wca_2:
-	add	esi, vga_memmodel - (vga_modes + 1)  
+	add	esi, vga_memmodel - (vga_modes + 1)
 	; [ESI] = VGA memory model number (LINEAR8, PLANAR4, PLANAR1)
 
-	; biosfn_write_char_attr (car,page,attr,count) 
+	; biosfn_write_char_attr (car,page,attr,count)
 	; AL = car, page = 0, BL = attr, CX = count
 	cmp	byte [esi], PLANAR4
 	je	short vga_wca_planar
@@ -6029,9 +6075,9 @@ vga_wca_linear8:
 	cmp	dl, [CRT_COLS]
 	jnb	short vga_wca_1
 	; write_gfx_char_lin(car,attr,xcurs,ycurs,nbcols);
-	; AL = car, BL = attr, DL = xcurs, DH = ycurs, 
+	; AL = car, BL = attr, DL = xcurs, DH = ycurs,
 	; [CRT_COLS] = nbcols
-	call	write_gfx_char_lin	 
+	call	write_gfx_char_lin
 	dec	cx ; count
 	inc	dl ; xcurs
 	jmp	short vga_wca_linear8
@@ -6149,7 +6195,7 @@ wgfxl_3:
 	jz	short wgfxl_4  ; data = 0, zf = 1
 	mov	al, bl ; data = attr;
 wgfxl_4:
-	; write_byte(0xa000,dest+j,data);		
+	; write_byte(0xa000,dest+j,data);
 	stosb  ; dest + j (+ 0A0000h)
 	;inc	dl ; j++
 	;cmp	dl, 8
@@ -6204,7 +6250,7 @@ write_gfx_char_pl4:
 
 	; write_gfx_char_pl4(car,attr,xcurs,ycurs,nbcols,cheight)
 	; INPUT ->
-	; AL = car, BL = attr, DL = xcurs, DH = ycurs, 
+	; AL = car, BL = attr, DL = xcurs, DH = ycurs,
 	; [CRT_COLS] = nbcols, [CHAR_HEIGHT] = cheight
 	; OUTPUT ->
 	; Regen buffer updated
@@ -6230,7 +6276,7 @@ wgfxpl_f2:
 	; default:
 	;  fdata = &vgafont8;
 	mov	esi, vgafont8
-	mov	ah, 8	
+	mov	ah, 8
 wgfxpl_f3:
 	; al = car
 	mul	ah ; ah = cheight
@@ -6277,10 +6323,10 @@ wgfxpl_f3:
 	jmp	short wgfxpl_f5
 wgfxpl_f4:
 	; outw(VGAREG_GRDC_ADDRESS, 0x0003);
-	mov	ax, 0003h	
+	mov	ax, 0003h
 wgfxpl_f5:
 	out	dx, ax
-	;	
+	;
 	sub	bh, bh ; i = 0
 wgfxpl_0:
 	; for(i=0;i<cheight;i++)
@@ -6311,7 +6357,7 @@ wgfxpl_1:
 	mov	al, bl ; attr;
 	and	al, 0Fh	; attr&0x0f
 wgfxpl_2:
-	; write_byte(0xa000,dest,0x00);		
+	; write_byte(0xa000,dest,0x00);
 	mov	[edi], al ; dest (+ 0A0000h)
 	inc	cl ; j++
 	cmp	cl, 8
@@ -6356,7 +6402,7 @@ vga_write_pixel:
 	;	(AH = [CRT_MODE])
 	; OUTPUT ->
 	; 	none
- 
+
 	mov	bl, al ; pixel value
 	;mov 	ah, [CRT_MODE]
 	mov	esi, vga_modes
@@ -6370,7 +6416,7 @@ vga_wp_0:
 	jb	short vga_wp_0
 	retn	; nothing to do
 vga_wp_1:
-	add	esi, vga_memmodel - (vga_modes + 1)  
+	add	esi, vga_memmodel - (vga_modes + 1)
 	; [ESI] = VGA memory model number (LINEAR8, PLANAR4, PLANAR1)
 	mov	edi, 0A0000h
 	;
@@ -6392,7 +6438,7 @@ vga_wp_linear8:
 	add	edi, eax ; addr
 	; write_byte(0xa000,addr,AL);
 	mov	[edi], bl
-	retn    
+	retn
 vga_wp_planar:
 	; addr = CX/8+DX*read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS);
 	movzx	eax, cx
@@ -6418,7 +6464,7 @@ vga_wp_planar:
 	mov	ax, 0205h
 	out	dx, ax
 	; data = read_byte(0xa000,addr);
-	mov	al, [edi] ; (delay?)	
+	mov	al, [edi] ; (delay?)
 	; if (AL & 0x80)
 	; {
 	;  outw(VGAREG_GRDC_ADDRESS, 0x1803);
@@ -6456,7 +6502,7 @@ vga_read_pixel:
 	;	(AH = [CRT_MODE])
 	; OUTPUT ->
 	; 	AL = pixel value
-	 
+
 	;mov 	ah, [CRT_MODE]
 	mov	esi, vga_modes
 	mov	edi, esi
@@ -6491,7 +6537,7 @@ vga_rp_linear8:
 	add	edi, eax ; addr
 	; attr=read_byte(0xa000,addr);
 	mov	al, [edi] ; pixel value
-	retn    
+	retn
 vga_rp_planar:
 	; addr = CX/8+DX*read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS);
 	movzx	eax, cx
@@ -6530,7 +6576,7 @@ vga_rp_2:
 	mov	bh, 1
 	shl	bh, cl ; (0x01 << i)
 	or	bl, bh ; attr |= (0x01 << i)
-	mov	al, bl ; pixel value	
+	mov	al, bl ; pixel value
 vga_rp_3:	
 	retn
 
@@ -6593,13 +6639,13 @@ vga_wtty_2:
 	or	dl, dl ; xcurs (column)
 	jz	short vga_wtty_1
 	dec	dl ; xcurs--;
-        jmp     short vga_wtty_12 
+        jmp     short vga_wtty_12
 vga_wtty_3:			
 	cmp	bh, 0Dh ; carriage return (\r)
 	jne	short vga_wtty_4
 	; xcurs=0;
 	sub	dl, dl ; 0
-        jmp     short vga_wtty_12 
+        jmp     short vga_wtty_12
 vga_wtty_4:	
 	cmp	bh, 0Ah ; new line (\n)
 	jne	short vga_wtty_5
@@ -6637,7 +6683,7 @@ vga_wtty_7:
 	retn
 	;
 vga_wtty_8:
-	add	esi, vga_g_memmodel - (vga_g_modes + 1)  
+	add	esi, vga_g_memmodel - (vga_g_modes + 1)
 	; [ESI] = VGA memory model number (LINEAR8, PLANAR4, PLANAR1)
 	mov	edi, 0A0000h
 	;
@@ -6649,7 +6695,7 @@ vga_wtty_8:
 	je	short vga_wtty_planar
 vga_wtty_linear8:
 	; write_gfx_char_lin(car,attr,xcurs,ycurs,nbcols);
-	; AL = car, BL = attr (color), DL = xcurs, DH = ycurs, 
+	; AL = car, BL = attr (color), DL = xcurs, DH = ycurs,
 	; [CRT_COLS] = nbcols
 	call	write_gfx_char_lin
 	jmp	short vga_wtty_9
@@ -6694,7 +6740,7 @@ vga_wtty_11:
 	; al = nblines = 1, bl = attr (color) = 0
 	; ch = rul, cl = cul, dh = rlr, dl = clr, page = 0
 	; dir = SCROLL_UP
-	
+
 	mov	al, 1
 	sub	bl, bl ; 0 ; blank/black line (attr=0) will be used
 	;sub	cx, cx ; 0,0
@@ -6710,9 +6756,9 @@ vga_wtty_11:
 	push	edx
 	mov	dl, [CRT_COLS]
 	dec	dl ; nbcols -1
-	
+
 	mov	ah, [CRT_MODE]
-	
+
 	; biosfn_scroll(0x01,0x00,0,0,nbrows-1,nbcols-1,page,SCROLL_UP);
 	call	vga_graphics_up
 	; 04/08/2016
@@ -6721,7 +6767,7 @@ vga_wtty_11:
 	pop	edx
 
 	;dec	dh ; ycurs-=1
-	jmp	short vga_wtty_12 
+	jmp	short vga_wtty_12
 
 font_setup:
 	; 03/08/2022 (TRDOS 386 v2.0.5)
@@ -6755,7 +6801,7 @@ font_setup:
 	or	al, al ; 0
 	jz	short font_setup_0
 	cmp	al, 10h
-	jne	short font_setup_1	
+	jne	short font_setup_1
 font_setup_0:
 	call	transfer_user_fonts
 	jc	short font_setup_error
@@ -6770,7 +6816,7 @@ font_setup_1:
 	cmp	al, 1
 	je	short font_setup_2
 	cmp	al, 11h
-	jne	short font_setup_3	
+	jne	short font_setup_3
 font_setup_2:
 	; AX = 1111H ; Load and Activate ROM 8x14 Character Set (EGA/VGA)
 	; (BL = font block to load (EGA: 0-3; VGA: 0-7))
@@ -6788,7 +6834,7 @@ font_setup_3:
 	cmp	al, 2
 	je	short font_setup_4
 	cmp	al, 12h
-	jne	short font_setup_5	
+	jne	short font_setup_5
 font_setup_4:
 	; AX = 1112H ; Load and Activate ROM 8x8 Character Set (EGA/VGA)
 	; (BL = font block to load (EGA: 0-3; VGA: 0-7))
@@ -6803,7 +6849,7 @@ font_setup_5:
 	cmp	al, 4
 	je	short font_setup_6
 	cmp	al, 14h
-	jne	short font_setup_7	
+	jne	short font_setup_7
 font_setup_6:
 	; AX = 1114H ; Load and Activate ROM 8x16 Character Set (EGA/VGA)
 	; (BL = font block to load (EGA: 0-3; VGA: 0-7))
@@ -6860,9 +6906,9 @@ font_setup_7:
 	jne	short font_setup_error ; invalid !
 	mov	cl, dh
 	xchg	dl, dh
-	; number of chars, cx = 80h 
+	; number of chars, cx = 80h
 	; start char, dl = 80h
-font_setup_8:	
+font_setup_8:
 	call	transfer_user_fonts
 	pop	edx
 	pop	ecx
@@ -6877,36 +6923,36 @@ font_setup_9:
         ; break;
 	cmp	al, 22h
 	jne	short font_setup_10
-	call	load_gfx_8_14_chars	
+	call	load_gfx_8_14_chars
         jmp     VIDEO_RETURN 
-font_setup_10:	
+font_setup_10:
 	; case 0x23:
         ; biosfn_load_gfx_8_8_dd_chars(GET_BL());
         ; break;
 	cmp	al, 23h
 	jne	short font_setup_11
-	call	load_gfx_8_8_chars	
+	call	load_gfx_8_8_chars
         jmp     VIDEO_RETURN 
-font_setup_11:	
+font_setup_11:
 	; case 0x24:
         ; biosfn_load_gfx_8_16_chars(GET_BL());
         ; break;
 	cmp	al, 24h
 	jne	short font_setup_12
-	call	load_gfx_8_16_chars	
+	call	load_gfx_8_16_chars
         jmp     VIDEO_RETURN 
 font_setup_12:
  	; case 0x30:
         ; biosfn_get_font_info(GET_BH(),&ES,&BP,&CX,&DX);
         ; break;
 	cmp	al, 30h
-	jne	short font_setup_13			
+	jne	short font_setup_13
 	call	get_font_info
 	; eax = return value (info: 4 bytes for 4 parms)
 	; eax = 0 -> invalid function (input)
         jmp     _video_return
 font_setup_13:
-	cmp	al, 03h ; AX = 1103h	
+	cmp	al, 03h ; AX = 1103h
 	jne	short font_setup_14
 	; biosfn_set_text_block_specifier:
 	; BL = font block selector code	
@@ -6918,7 +6964,7 @@ font_setup_13:
 	;mov	al, 03h
 	out	dx, ax
 	jmp     VIDEO_RETURN 
-	
+
 font_setup_14:
 	sub	eax, eax ; 0 = invalid function
         jmp     _video_return
@@ -6953,14 +6999,14 @@ transfer_user_fonts:
 	; copy system font to user font
 
 	mov	cl, 64 ; 64 dwords
-	
+
 	cmp	bh, 16
 	je	short transfer_user_fonts_2
 	cmp	bh, 8
 	je	short transfer_user_fonts_1
 
 	mov	ebp, vgafont14
-	retn 
+	retn
 
 transfer_user_fonts_1:
 	mov	edi, VGAFONT8USER
@@ -6976,7 +7022,7 @@ transfer_user_fonts_3:
 	retn
 
 transfer_user_fonts_4:
-	stc	
+	stc
 	retn
 	
 transfer_user_fonts_5:
@@ -6991,7 +7037,7 @@ transfer_user_fonts_5:
 	cmp	bh, 14 ; 8x14 font
 		       ; (there is not an alternative buffer)
 	jne	short transfer_user_fonts_6
-	
+
 	; use system's 8x14 font space if permission flag is 1
 	test	byte [ufont], 80h
 	jz	short transfer_user_fonts_4 ; not allowed
@@ -7004,23 +7050,23 @@ transfer_user_fonts_5:
 	;	system is not in multi tasking/user mode
 	;	while [multi_tasking] = 0 and [u.uid] = 0
 
-	;push	edx	
+	;push	edx
 	; 02/08/2022
 	xchg	edx, ecx
 	;xor	ah, ah
 	; 02/08/2022
 	xor	eax, eax
-	mov	al, bh ; mov al, 14 
+	mov	al, bh ; mov al, 14
 	;mul	cx 
 	; 02/08/2022
-	mul	edx  ; char count * 14	
+	mul	edx  ; char count * 14
 	; 02/08/2022
 	mov	edx, ecx ; ascii code
 	mov	ecx, eax
-		; ecx = byte count 
+		; ecx = byte count
 	;pop	edx
 	; 02/08/2022
-	;xor	eax, eax	
+	;xor	eax, eax
 	xor	ah, ah
 	mov	al, bh ; mov ax, 14 ; bytes per character
 	;mul	dx
@@ -7029,7 +7075,7 @@ transfer_user_fonts_5:
 	mul	edx
 	mov	edx, eax ; char offset
 	mov	edi, vgafont14
-	jmp	short transfer_user_fonts_8			
+	jmp	short transfer_user_fonts_8
 transfer_user_fonts_6:
 	cmp	bh, 8 ; 8x8 font
 	jne	short transfer_user_fonts_7 ; 8x16 font
@@ -7040,7 +7086,7 @@ transfer_user_fonts_6:
 	shl	ecx, 3 ; byte count
 	; 09/01/2021
 	mov	edi, VGAFONT8USER
-	test	byte [ufont], 8  ; already loaded ?	
+	test	byte [ufont], 8  ; already loaded ?
 	jnz	short transfer_user_fonts_8 ; yes
 	mov	esi, vgafont8
 	call	transfer_user_fonts_10
@@ -7054,7 +7100,7 @@ transfer_user_fonts_7:
 	shl	edx, 4 ; byte offset
 	shl	ecx, 4 ; byte count
  	mov	edi, VGAFONT16USER
-	test	byte [ufont], 16  ; already loaded ?	
+	test	byte [ufont], 16  ; already loaded ?
 	jnz	short transfer_user_fonts_8 ; yes
 	mov	esi, vgafont16
 	call	transfer_user_fonts_10
@@ -7075,7 +7121,7 @@ transfer_user_fonts_8:
 	jc	short transfer_user_fonts_9
 	; 05/01/2021
 	;mov	ebp, Cluster_Buffer
-	
+
 	or	byte [ufont], bh 
 			; 8x8 or 8x16 user font ready 
 transfer_user_fonts_9:
@@ -7132,7 +7178,7 @@ load_text_user_pat:
 	xor	ch, ch
 ltup_1:
 	mov	al, bl
-	mul	bh	
+	mul	bh
 	;movzx	esi, ax
 	; 02/08/2022
 	mov	esi, eax
@@ -7326,16 +7372,16 @@ ssl_2:
 	mov	al, dh
 	and	al, 2
 	shl	eax, 7
-	;mov	cx, ax ; (ovl & 0x02) << 7)	
+	;mov	cx, ax ; (ovl & 0x02) << 7)
 	; 02/08/2022
 	mov	ecx, eax
 	sub	ah, ah
 	mov	al, dh ; ovl
-	;and	ax, 40h			
+	;and	ax, 40h
 	;shl	ax, 3  ; (ovl & 0x40) << 3)
 	;inc	ax ; + 1 
 	;add	ax, cx
-	; 02/08/2022	
+	; 02/08/2022
 	and	al, 40h
 	shl	eax, 3
 	inc	eax
@@ -7357,7 +7403,7 @@ ssl_2:
 	;shl	ax, 1
 	; 02/08/2022
 	shl	eax, 1
-	mov 	[CRT_LEN], ax	
+	mov 	[CRT_LEN], ax
 	retn
 
 load_text_8_14_pat:
@@ -7399,8 +7445,8 @@ load_text_8_14_pat:
 	;xchg	dx, bx
 	;and	dl, 4
 	;shl	dx, 11
-	;add	dx, bx 	
- 
+	;add	dx, bx
+
 	;xor	dx, dx  ; blockaddr = 0
 	; Always block 0 for TRDOS 386 ! (blockaddr=0)
 
@@ -7409,7 +7455,7 @@ load_text_8_14_pat:
 	mov	esi, vgafont14
 	mov	edi, 0A0000h
 	; 02/08/2022
-	sub	ecx, ecx		
+	sub	ecx, ecx
 lt8_14_1:
 	;mov	al, bl
 	;mul	bh
@@ -7481,8 +7527,8 @@ load_text_8_8_pat:
 	;xchg	dx, bx
 	;and	dl, 4
 	;shl	dx, 11
-	;add	dx, bx 	
- 
+	;add	dx, bx
+
 	;xor	dx, dx  ; blockaddr = 0
 	; Always block 0 for TRDOS 386 ! (blockaddr=0)
 
@@ -7503,7 +7549,7 @@ load_text_8_8_pat:
 	mov	esi, VGAFONT8USER
 	jmp	short lt8_8_1
 lt8_8_0:
-	mov	esi, vgafont8	
+	mov	esi, vgafont8
 lt8_8_1:
 	;mov	al, bl
 	;mul	bh
@@ -7516,7 +7562,7 @@ lt8_8_1:
 	;movzx	edi, ax ; dest
 	;add	edi, 0A0000h
 	; 02/08/2022
-	;movzx	ecx, bh 		
+	;movzx	ecx, bh
 	mov	cl, bh
 	rep	movsb
 	add	edi, 24 ; 32 - 8
@@ -7575,8 +7621,8 @@ load_text_8_16_pat:
 	;xchg	dx, bx
 	;and	dl, 4
 	;shl	dx, 11
-	;add	dx, bx 	
- 
+	;add	dx, bx
+
 	;xor	dx, dx  ; blockaddr = 0
 	; Always block 0 for TRDOS 386 ! (blockaddr=0)
 
@@ -7611,7 +7657,7 @@ lt8_16_1:
 	;movzx	edi, ax ; dest
 	;add	edi, 0A0000h
 	;movzx	ecx, bh
-	mov	ecx, eax ; 16	
+	mov	ecx, eax ; 16
 	rep	movsb
 	add	edi, eax ; add edi, 16
 	inc	bl
@@ -7645,9 +7691,9 @@ load_gfx_user_chars:
 	; /* set 0x43 INT pointer */
     	; write_word(0x0, 0x43*4, BP);
     	; write_word(0x0, 0x43*4+2, ES);
-	
+
 	; 08/01/2021
-		
+
 	; BL   screen rows code: 00H = user-specified (in DL)
         ;                        01H = 14 rows
         ;                        02H = 25 rows
@@ -7698,7 +7744,7 @@ l_gfx_uc_3:
 	;    write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 24);
 	;    break;
 	; bl = 2 or bl > 3
-	mov	byte [VGA_ROWS], 25  ; not 24 !	
+	mov	byte [VGA_ROWS], 25  ; not 24 !
     	; }
 l_gfx_uc_4:
     	; write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, CX);
@@ -7721,7 +7767,7 @@ load_gfx_8_14_chars:
     	; write_word(0x0, 0x43*4, &vgafont14);
     	; write_word(0x0, 0x43*4+2, 0xC000);
 	mov	dword [VGA_INT43H], vgafont14
-		
+
 	; BL    screen rows code: 00H = user-specified (in DL)
         ;                         01H = 14 rows
         ;                         02H = 25 rows
@@ -7767,7 +7813,7 @@ l_gfx_8_14c_4:
     	; write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, 14);
         mov     byte [CHAR_HEIGHT], 14
 	; }
-	retn	
+	retn
 
 load_gfx_8_8_chars:
 	; 08/08/2016
@@ -7798,7 +7844,7 @@ load_gfx_8_8_chars:
 	and	bl, bl
 	jnz	short l_gfx_8_8c_1
 	mov	[VGA_ROWS], dl  ; not DL-1 !
-	jmp	short l_gfx_8_8c_4 	
+	jmp	short l_gfx_8_8c_4
 l_gfx_8_8c_1:
 	; case 1:
 	;    write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 13);
@@ -7807,7 +7853,7 @@ l_gfx_8_8c_1:
 	jnz	short l_gfx_8_8c_2
 	; bl = 1
 	mov	byte [VGA_ROWS], 14  ; not 13 !
-	jmp	short l_gfx_8_8c_4 	
+	jmp	short l_gfx_8_8c_4
 l_gfx_8_8c_2:
 	dec	bl
 	jz	short l_gfx_8_8c_3 ; bl = 2
@@ -7824,7 +7870,7 @@ l_gfx_8_8c_3:
 	;    write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 24);
 	;    break;
 	; bl = 2 or bl > 3
-	mov	byte [VGA_ROWS], 25  ; not 24 !	
+	mov	byte [VGA_ROWS], 25  ; not 24 !
     	; }
 l_gfx_8_8c_4:
     	; write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, 8);
@@ -7861,7 +7907,7 @@ load_gfx_8_16_chars:
 	and	bl, bl
 	jnz	short l_gfx_8_16c_1
 	mov	[VGA_ROWS], dl  ; not DL-1 !
-	jmp	short l_gfx_8_16c_4 	
+	jmp	short l_gfx_8_16c_4
 l_gfx_8_16c_1:
 	; case 1:
 	;    write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 13);
@@ -7887,14 +7933,14 @@ l_gfx_8_16c_3:
 	;    write_byte(BIOSMEM_SEG,BIOSMEM_NB_ROWS, 24);
 	;    break;
 	; bl = 2 or bl > 3
-	mov	byte [VGA_ROWS], 25  ; not 24 !	
+	mov	byte [VGA_ROWS], 25  ; not 24 !
     	; }
 l_gfx_8_16c_4:
     	; write_byte(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT, 16);
         mov     byte [CHAR_HEIGHT], 16
 	; }
 	retn
-			
+
 get_font_info:
 	; 03/08/2022 (TRDOS 386 v2.0.5)
 	; 08/01/2021 (TRDOS 386 v2.0.3)
@@ -7918,7 +7964,7 @@ get_font_info:
 	;    BL > 0 -> Get requested character font data
 	;	 BL = 1 -> vgafont8
 	;        BL = 2 -> vgafont14
-	;	 BL = 3 -> vgafont16   
+	;	 BL = 3 -> vgafont16
 	;	;08/01/2021
 	;	 BL = 4 -> user defined 8x8 font
 	;	 BL = 5 -> user defined 8x14 font
@@ -7928,7 +7974,7 @@ get_font_info:
 	;	 ECX = Number of characters from the 1st char
 	;	 ECX >= 256 -> All (256-BH) characters
 	;	 ECX = 0 -> All characters (BH = unused)
-	;        EDX = User's Buffer Address	
+	;        EDX = User's Buffer Address
 	; OUTPUT ->
 	;    AL = height (scanlines), bytes per character
 	;    AH = screen rows
@@ -7948,7 +7994,7 @@ get_font_info:
 	; 08/01/2021
 	cmp	bl, 4
 	jb	short gfi_5
-	je	short gfi_3	
+	je	short gfi_3
 	cmp	bl, 6
 	je	short gfi_4
 	; bh = 5 or bh > 6
@@ -8017,7 +8063,7 @@ gfi_8:
 	; edx = 0FFh = 255
 	;mov	dx, 255
 	sub	dl, bh
-	;inc	dx	
+	;inc	dx
 	; 03/08/2022
 	inc	edx
 	cmp	ecx, edx
@@ -8065,7 +8111,7 @@ set_all_palette_reg:
 	sub	ecx, ecx
 	mov	cl, 17
 	mov	edi, esp
-	sub	esp, 20	 	 
+	sub	esp, 20
 	call	transfer_from_user_buffer
 	;jc	VIDEO_RETURN
 
@@ -8150,10 +8196,10 @@ vga_palf_101B:
 	cmp	al, 1Bh
 	;jne	short vga_palf_unknown
 	ja	short vga_palf_unknown
- 
+
 	call	gray_scale_summing
         jmp     VIDEO_RETURN 
-	
+
 vga_pal_funcs:
 	; 07/08/2022
 	; 10/08/2016
@@ -8171,7 +8217,7 @@ vga_palf_1002:
         je      short set_all_palette_reg
 	; 07/08/2022
 	ja	short vga_palf_1003
-	jmp	short set_overscan_border_color 
+	jmp	short set_overscan_border_color
 	; 07/08/2022
 ;vga_palf_1001:
 ;	cmp	al, 1
@@ -8243,7 +8289,7 @@ vga_palf_101A:
 set_overscan_border_color:
 	; 10/08/2016
 	; Set Overscan/Border Color Register
-	; BH = 6-bit RGB color to display 
+	; BH = 6-bit RGB color to display
 	;      for that attribute
 	
 	mov	bl, 11h
@@ -8257,7 +8303,7 @@ set_single_palette_reg:
 	; Set One Palette Register
 	; BL = register number to set
 	;     (a 4-bit attribute nibble: 00h-0Fh)
-	; BH = 6-bit RGB color to display 
+	; BH = 6-bit RGB color to display
 	;      for that attribute
 
 	cmp	bl, 14h
@@ -8367,7 +8413,7 @@ set_pel_mask:
 
 read_pel_mask:
 	; 10/08/2016
-	; Output: BL = mask value 
+	; Output: BL = mask value
 	mov	dx, 3C6h ; VGAREG_PEL_MASK
 	in	al, dx
 	mov	[esp+12], al ; bl
@@ -8539,7 +8585,7 @@ get_all_palette_reg:
 	mov	edi, edx
 	mov	ebx, esp
 	mov	esi, ebx
-	sub	esp, 20	 
+	sub	esp, 20
 
 	mov	cl, 0
 get_palette_loop:
@@ -8593,7 +8639,7 @@ get_palette_loop:
 	;mov	ecx, 17 ; transfer (byte) count
 	; 03/08/2022
 	sub	ecx, ecx
-	mov	cl, 17	
+	mov	cl, 17
 
 	; ESI = source address in system space
 	; EDI = user's buffer address
@@ -8711,7 +8757,7 @@ get_dac_16_page:
 	jmp	VIDEO_RETURN
 
 ; 23/11/2020 - TRDOS 386 v2.0.3
-; VBE 2 BOCHS/QEMU emulator extensions 
+; VBE 2 BOCHS/QEMU emulator extensions
 ;	for TRDOS 386 v2 kernel (video bios)
 
 ; BOCH/QEMU VBE2 VGA BIOS code 
@@ -8838,13 +8884,13 @@ _vbe_biosfn_return_mode_info:
 	;
 
 	; pushes for subroutine stack pops compatibility
-	
+
 	;push	ds  ; *
 	;push	es  ; **
 
 	push	ebp ; ***
-	push	esi ; **** 
-	
+	push	esi ; ****
+
 	xor	edi, edi  ; mov edi, 0
 
 	cmp	byte [vbe3], 3
@@ -8852,7 +8898,7 @@ _vbe_biosfn_return_mode_info:
 
 	;sub	edi, edi  ; 0 = kernel call (sign)
 	;	; no transfer to user's buffer
-	
+
 	; cx = Video mode (for 4F01h, with LFB flag)
 
 	mov	ax, 4F01h
@@ -8868,16 +8914,16 @@ _vbe_biosfn_return_mode_info:
 	mov	esi, VBE3MODEINFOBLOCK - 2
 	mov	[esi], cx ; MODEINFO.mode
 	call	set_lfbinfo_table
-	jmp	short _vbe_rmi_3  ; cf = 0 
+	jmp	short _vbe_rmi_3  ; cf = 0
 _vbe_rmi_1:
 	cmp	byte [vbe3], 2
 	jb	short _vbe_rmi_3 ; cf = 1
 	mov	al, [vbe2bios] ; 0C0h-0C5h for emu (*)
-	cmp	al, 0C0h ; BOCHS/QEMU/VIRTUALBOX (*) ? 
+	cmp	al, 0C0h ; BOCHS/QEMU/VIRTUALBOX (*) ?
 	jb	short _vbe_rmi_3  ; cf = 1
 	cmp	al, 0C5h ; (*)
-	ja	short _vbe_rmi_2 ; unknown vbios !? 
-	
+	ja	short _vbe_rmi_2 ; unknown vbios !?
+
 	;xor	edi, edi  ; 0 = kernel call (sign)
 	;	; no transfer to user's buffer
 
@@ -8890,28 +8936,28 @@ _vbe_rmi_1:
 	je	short _vbe_rmi_3  ; cf = 0
 _vbe_rmi_2:
 	stc
-	; cf = 1	
+	; cf = 1
 _vbe_rmi_3:
 	pop	esi ; ****
 	pop	ebp ; ***
-	
+
 	;pop	es  ; **
 	;pop	ss  ; *
-	
+
 	retn
 
 
-; * (TRDOS 386, INT 31h, VESA Video Bios functions) 
+; * (TRDOS 386, INT 31h, VESA Video Bios functions)
 ; * ---------------------------------------------------------
 ; * Function 01h - Return VBE Mode Information
 ; * ---------------------------------------------------------
 ; * Input:
 ; *		AX = 4F01h
 ; *		CX = Mode number
-; *    (ES:DI) EDI = Pointer to ModeInfoBlock structure	
+; *    (ES:DI) EDI = Pointer to ModeInfoBlock structure
 ; * Output:
 ; *		AX = VBE Return Status
-; * 
+; *
 ; *----------------------------------------------------------
 ; *
 
@@ -8936,7 +8982,7 @@ vbe_biosfn_return_mode_info:
 	;;push	ds  ; *
 	;;push	es  ; **
 	;;push	ebp ; ***
-	;;push	esi ; **** 
+	;;push	esi ; ****
 
 	test	ch, 1
 	jnz	short vbe_rmi_1
@@ -8952,12 +8998,12 @@ vbe_rmi_0:
 vbe_rmi_1:
 	push	edx ; *****
 	push	ecx ; ******
-	push	ebx ; *******	
+	push	ebx ; *******
 	push	edi ; ********
-	
+
 	; 14/12/2020
 	mov	ebx, ecx
- 			
+
 	;xor	eax, eax
 	and	bh, 0C1h ; use bit 15, 14, 8 only (for bh)
 	mov	[vbe_mode_x], bh
@@ -8968,7 +9014,7 @@ vbe_rmi_1:
 	; Alternative 2 (instead of 'Mode_info_find_mode')
 	call	set_mode_info_list ; (alternative 2)
 
-	; eax = 0	
+	; eax = 0
 
 	;mov	bx, [esi] ; mode
 
@@ -9005,12 +9051,12 @@ vbe_rmi_2:
 	; 12/12/2020
 	;mov	[edi+LFBINFO.LFB_addr+2], ax
 vbe_rmi_3:
-	;test	byte [esi+MODEINFO.WinAAttributes], 1 
+	;test	byte [esi+MODEINFO.WinAAttributes], 1
 	;		; VBE_WINDOW_ATTRIBUTE_RELOCATABLE = 1
         ;jz	short vbe_rmi_4
 	;; 11/12/2020
 	;; In fact, this is far call address in (Bochs/BGA) Video Bios
-	;; Direct user access to kernel subroutines is not possible 
+	;; Direct user access to kernel subroutines is not possible
 	;; in TRDOS 386. Also, TRDOS 386 kernel will support only LFB.
 	;; Bank select may be a seperate sysvideo function in future
 	;; (if it will be required).
@@ -9066,8 +9112,8 @@ vbe_rmi_6: ; 12/12/2020
 	;pop	edi ; ********
 	;pop	ebx ; *******
 	;pop	ecx ; ******
-	;pop	edx ; *****	
-	
+	;pop	edx ; *****
+
 	;;pop	esi ; ****
 	;;pop	ebp ; ***
 	;;pop	es  ; **
@@ -9081,7 +9127,7 @@ set_lfbinfo_table:
 	; Set/Fill LFBINFO structure/table
 	;
 	; Input:
-	;	esi = Mode info list address 
+	;	esi = Mode info list address
 	; Output:
 	;	LFB_Info address is filled with LFBINFO
 	;	edi = LFB_Info address
@@ -9103,7 +9149,7 @@ set_lfbinfo_table:
 	mov	ax, [esi+MODEINFO.YResolution]
 	mov	[edi+LFBINFO.Y_res], ax
 	; eax = Y_res ; screen height
-	; 19/12/2020	
+	; 19/12/2020
 	mul	edx ; X_res*Y_res
 	; edx = 0
 	mov	dl, [edi+LFBINFO.bpp]
@@ -9119,7 +9165,7 @@ set_lfbinfo_table:
 	mov	[edi+LFBINFO.reserved], dl ; not necessary
 	retn
 
-; * (TRDOS 386, INT 31h, VESA Video Bios functions) 
+; * (TRDOS 386, INT 31h, VESA Video Bios functions)
 ; * ---------------------------------------------------------
 ; * Function 02h - Set VBE Mode
 ; * ---------------------------------------------------------
@@ -9128,7 +9174,7 @@ set_lfbinfo_table:
 ; *		BX = Desired Mode to set
 ; * Output:
 ; *		AX = VBE Return Status
-; * 
+; *
 ; *----------------------------------------------------------
 ; *
 
@@ -9156,11 +9202,11 @@ vbe_biosfn_set_mode:
 	;;push	es  ; **
 	;;push	ebp ; ***
 	;;push	esi ; **** 
-	
-	; 11/12/2020 			
+
+	; 11/12/2020
 	push	edx ; *****
 	push	ecx ; ******
-	push	ebx ; *******	
+	push	ebx ; *******
 	push	edi ; ********
 
 	;xor	eax, eax
@@ -9177,7 +9223,7 @@ vbe_biosfn_set_mode:
 vbe_sm_0:
 	; 27/11/2020
 	mov	al, 80h
-	;test	bh, 80h ; VBE_MODE_PRESERVE_DISPLAY_MEMORY 	
+	;test	bh, 80h ; VBE_MODE_PRESERVE_DISPLAY_MEMORY
 	;jnz	short vbe_sm_1 ; no_clear
 	;; clear
 	;sub	al, al ; 0
@@ -9190,13 +9236,13 @@ vbe_sm_1:
 	;;cmp	bx, 100h ; VBE_MODE_VESA_DEFINED
 	;;jna	short vbe_sm_2
 	;and	bh, 1
-	;jnz	short vbe_sm_3 
+	;jnz	short vbe_sm_3
 
 	; BX <= 1FFh
 
 	; 27/11/2020
-	;or	bl, al	; al = 80h if no_clear option is set 
-	;		; al = 0 if no_clear option is not set 
+	;or	bl, al	; al = 80h if no_clear option is set
+	;		; al = 0 if no_clear option is not set
 
 	; 25/11/2020
 	; VBE DISPI will be disabled in 'biosfn_set_video_mode'
@@ -9224,11 +9270,11 @@ biosfn_set_video_mode:
 	; Modified registers: esi
 
 	; 'dispi_set_enable(VBE_DISPI_DISABLED);'
-	
+
 	;mov	ax, 0 ; VBE_DISPI_DISABLED 
 	xor	eax, eax ; 0 
 	call	dispi_set_enable
-	
+
 	mov	al, bl
 	;jmp	_set_mode ; (in 'biosfn_set_video_mode' sub)
 	call	_set_mode ; will return with cf=1 only if
@@ -9346,7 +9392,7 @@ vbe_sm_4:
 	; 11/12/2020
 	pop	eax
 	;pop	edi
-vbe_sm_5:	
+vbe_sm_5:
   	;'dispi_set_bpp(cur_info->info.BitsPerPixel);'
 	; 11/12/2020 (al = bits per pixel, ah = 0)
 	;xor	ah, ah
@@ -9383,7 +9429,7 @@ vbe_sm_5:
 
 	; 27/11/2020
 	jmp	vbe_sm_ret1 ; Function call successful
-	
+
 	; 27/11/2020
 	;mov	al, 4Fh
 	;	; eax = 004Fh = Function call successful
@@ -9422,7 +9468,7 @@ vbe_biosfn_return_current_mode:
 	;;push	es  ; **
 	;;push	ebp ; ***
 	;;push	esi ; **** 
-	 			
+
 	;push	edx ; *****
 
 	; (vbe.c)
@@ -9447,14 +9493,14 @@ vbe_gm_0:
 		; bit 15 = last mode set no_clear option
 		;	   0 - video memory cleared
 		;	   1 - video memory not cleared
-	
+
 vbe_gm_return:
 	;pop	edx ; ******
 	movzx	ebx, ax
 ;vbe_srs_retn:
 	xor	eax, eax ; 0
 	mov	al, 4Fh ; ax = 004Fh (successful)
-	retn	
+	retn
 
 vbe_gm_1:
 	; legacy (old, standard) CGA/VGA bios video mode
@@ -9484,9 +9530,9 @@ vbe_gm_1:
 ; *    (ES:BX) EBX = Pointer to buffer (if DL <> 00h)
 ; * Output:
 ; *		AX = VBE Return Status
-; *		BX = Number of 64-byte blocks 
+; *		BX = Number of 64-byte blocks
 ; *		     to hold the state buffer (if DL=00h)
-; * 
+; *
 ; *----------------------------------------------------------
 ; *
 
@@ -9502,7 +9548,7 @@ vbe_biosfn_save_restore_state:
 	; Input:
 	;	dl = sub function
 	;	cl = requested state
-	;      ebx = pointer to buffer (if dl<>00h) 
+	;      ebx = pointer to buffer (if dl<>00h)
 	; Output:
 	;	ax = 004Fh (successful)
 	;	ah > 0 -> error
@@ -9510,7 +9556,7 @@ vbe_biosfn_save_restore_state:
 	;	     to hold the state buffer (if DL=00h)
 
 	; Modified registers: eax, ebx, edi
-	
+
 	; 14/01/2021
 	or	ebx, ebx ; user's buffer address
 	jnz	short _vbe_biosfn_save_restore_state
@@ -9543,7 +9589,7 @@ _vbe_biosfn_save_restore_state:
 			; invalid sub function
 	cmp	ecx, 0Fh
 	ja	short vbe_srs_7 ; invalid !
-	
+
 	and	dl, dl
 	jnz	short vbe_srs_4
 
@@ -9591,7 +9637,7 @@ vbe_srs_0:  ; 16/01/2021
 	; 13/01/2021
 	pop	ecx
 	pop	edx
-	pop	edi	
+	pop	edi
 
 	retn
 
@@ -9601,7 +9647,7 @@ vbe_srs_0:  ; 16/01/2021
 	; return to 'sysvideo'
 	;mov	ebx, ecx ; transfer count
 	;	; (byte count for saving current video state)
-	;jmp	short vbe_srs_retn 
+	;jmp	short vbe_srs_retn
 
 vbe_srs_4:
 	; 23/01/2021
@@ -9635,7 +9681,7 @@ vbe_srs_6:
 	; 23/01/2021
 	and	ebx, ebx 
 	jz	short vbe_srs_retn ; the caller is kernel
-	
+
 	mov	esi, VBE3SAVERESTOREBLOCK
 	sub	edi, esi
 	mov	ecx, edi ; transfer count in bytes
@@ -9674,9 +9720,9 @@ vbe_srs_11:
 	mov	esi, ebx ; user's buffer address
 	; 23/01/2021
 	;push	ebx
-	
+
 	call	vbe_srs_gbs
-	
+
 	; restore video state
 
 	;mov	edi, VBE3SAVERESTOREBLOCK
@@ -9795,7 +9841,7 @@ biosfn_save_video_state:
 	mov	dl, 0D4h
 	in	al, dx
 	stosb
-  	;mov	dx, VGAREG_GRDC_ADDRESS ; 3CEh 
+  	;mov	dx, VGAREG_GRDC_ADDRESS ; 3CEh
         mov	dl, 0CEh
 	in	al, dx
 	stosb
@@ -9831,7 +9877,7 @@ bfn_svs_0:
 	stosb	; (4 bytes in loop)
 	pop	eax
 	;mov	dx, VGAREG_SEQU_ADDRESS ; 3C4h
-	;dec	dl	
+	;dec	dl
 	inc	al  ; i++
 	dec	ch
 	jnz	short bfn_svs_0
@@ -9863,7 +9909,7 @@ bfn_svs_1:
 	stosb	; (25 bytes in loop)
 	pop	eax
 	;mov	dx, VGAREG_VGA_CRTC_ADDRESS ; 3D4h
-	;dec	dl	
+	;dec	dl
 	inc	al  ; i++
 	dec	ch
 	jnz	short bfn_svs_1
@@ -9933,15 +9979,15 @@ bfn_svs_3:
 
 	; (total 70 bytes are written above as controller hardware state)
 
-bfn_svs_4:		
+bfn_svs_4:
 	; 12/01/2021 (TRDOS 386 v2.0.3)
 	test	cl, 2
 	jz	short bfn_svs_6
 
 	; VIDEO BIOS DATA
 	; !!! this data is valid for TRDOS 386 v2 kernel only !!!
-	; (this is not same with BOCHS/PLEX86 video bios, BIOS data)  
-  
+	; (this is not same with BOCHS/PLEX86 video bios, BIOS data)
+
     	; if (CX & 2) {
         ;write_byte(ES, BX, read_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MODE)); BX++;
         ;write_word(ES, BX, read_word(BIOSMEM_SEG,BIOSMEM_NB_COLS)); BX += 2;
@@ -9970,17 +10016,17 @@ bfn_svs_4:
 
 	mov	ax, 3D4h ; CRTC_ADDR, always 3D4h (color VGA) for TRDOS 386 v2
 	stosw
-	mov	al, [CRT_MODE] ; Current video mode (0FFh for VESA VBE modes) 
+	mov	al, [CRT_MODE] ; Current video mode (0FFh for VESA VBE modes)
 	stosb
 	mov	al, [CRT_MODE_SET] ; 29h for mode 03h ; TRDOS 386 feature only !
-	stosb	
- 	mov	ax, [video_mode] ; Current VESA VBE (SVGA, extended VGA) mode 
-	stosw			 ; (valid if [CRT_MODE] = 0FFh)	
+	stosb
+ 	mov	ax, [video_mode] ; Current VESA VBE (SVGA, extended VGA) mode
+	stosw			 ; (valid if [CRT_MODE] = 0FFh)
 	mov	ax, [CRT_LEN] ; page size (in bytes)
 	stosw
 	mov	ax, [CRT_START] ; video page start offset
  	stosw
-	mov	al, [CRT_COLS] ; nbcols, characters per row	
+	mov	al, [CRT_COLS] ; nbcols, characters per row
 	stosb
 	mov	al, [VGA_ROWS] ; nbrows, (character) rows per page (not rows-1)
 	stosb
@@ -9996,17 +10042,17 @@ bfn_svs_4:
 	; (bochs/plex86 does not use and return those)
 	mov	al, [CRT_PALETTE] ; current color palette ; TRDOS 386 feature only !
 	stosb
-	mov	al, [ACTIVE_PAGE] ; current video page 
+	mov	al, [ACTIVE_PAGE] ; current video page
 	stosb
 	mov	ax, [CURSOR_MODE] ; cursor type
 	stosw
-	;mov	eax, [CURSOR_POSN] ; cursor position for video page 0 and 1 
+	;mov	eax, [CURSOR_POSN] ; cursor position for video page 0 and 1
 	;stosd
-	;mov	eax, [CURSOR_POSN+4] ; cursor position for video page 2 and 3 
+	;mov	eax, [CURSOR_POSN+4] ; cursor position for video page 2 and 3
 	;stosd
-	;mov	eax, [CURSOR_POSN+8] ; cursor position for video page 4 and 5 
+	;mov	eax, [CURSOR_POSN+8] ; cursor position for video page 4 and 5
 	;stosd
-	;mov	eax, [CURSOR_POSN+12] ; cursor position for video page 6 and 7 
+	;mov	eax, [CURSOR_POSN+12] ; cursor position for video page 6 and 7
 	;stosd
 	push	esi
 	mov	ch, 4
@@ -10016,7 +10062,7 @@ bfn_svs_5:
 	dec	ch
 	jnz	short bfn_svs_5
 	pop	esi
-	; (font addr) protected mode address in kernel's/system memory space 
+	; (font addr) protected mode address in kernel's/system memory space
 	; (not accessable/meaningful address value by user)
 	mov	eax, [VGA_INT43H] ; VGA current (default) font address
 	stosd
@@ -10092,7 +10138,7 @@ vbe_biosfn_save_video_state:
 	; (vbe.c)
 
 	; modified registers: eax, edx, edi, ch
-	
+
 	; input: edi = state buffer address
 	; output: 
 	;	 VBE DISPI register contents will be saved
@@ -10117,10 +10163,10 @@ vbe_biosfn_save_video_state:
 	;mov	eax, 04h  ; VBE_DISPI_INDEX_ENABLE
 	 ;03/08/2022
 	out	dx, ax
-	;mov	dx, 01CFh ; VBE_DISPI_IOPORT_DATA	
+	;mov	dx, 01CFh ; VBE_DISPI_IOPORT_DATA
 	inc	dl
 	in	ax, dx ; enable (status)
-	stosw 
+	stosw
 	and	ax, 1 ; VBE_DISPI_ENABLED
 	jnz	short vbe_bfn_svs_0
 	; 23/01/2021
@@ -10139,9 +10185,9 @@ vbe_bfn_svs_0:
 
 	;sub	eax, eax
 	sub	al, al ; eax = 0
-	
+
 	; from VBE_DISPI_INDEX_XRES
-	;   to VBE_DISPI_INDEX_BPP	
+	;   to VBE_DISPI_INDEX_BPP
 
  	mov	ch, 3
 	; al = 0 ; VBE_DISPI_INDEX_XRES - 1
@@ -10168,7 +10214,7 @@ vbe_bfn_svs_1:
 	stosw
 	pop	eax
 	dec	ch
-	jnz	short vbe_bfn_svs_1		
+	jnz	short vbe_bfn_svs_1
 	retn
 
 biosfn_restore_video_state:
@@ -10219,7 +10265,7 @@ bfn_rvs_1:
 	out	dx, al
 	pop	eax
 	;mov	dx, VGAREG_SEQU_ADDRESS ; 3C4h
-	;dec	dl	
+	;dec	dl
 	inc	al  ; i++
 	dec	ch
 	jnz	short bfn_rvs_1
@@ -10241,7 +10287,7 @@ bfn_rvs_1:
 	out	dx, ax
 
 	; // Set CRTC regs
-       
+
 	; for(i=0;i<=0x18;i++) {
         ;   if (i != 0x11) {
 	sub	al, al ; 0
@@ -10267,7 +10313,7 @@ bfn_rvs_2:
 	jne	short bfn_rvs_3
 	lodsb
 	mov	ah, al ; *
-	mov	al, 18 
+	mov	al, 18
 bfn_rvs_3:
 	dec	ch
 	jnz	short bfn_rvs_2
@@ -10381,7 +10427,7 @@ bfn_rvs_5:
 	mov	dl, 0D4h
 	lodsb
 	out	dx, al
-	;mov	dx, VGAREG_GRDC_ADDRESS ; 3CEh 
+	;mov	dx, VGAREG_GRDC_ADDRESS ; 3CEh
         mov	dl, 0CEh
 	lodsb
 	out	dx, al
@@ -10395,7 +10441,7 @@ bfn_rvs_5:
 
 	; (total 70 bytes are read above as controller hardware state)
 
-bfn_rvs_6:		
+bfn_rvs_6:
 	; 13/01/2021
 	test	cl, 2
 	jz	short bfn_rvs_9
@@ -10403,7 +10449,7 @@ bfn_rvs_6:
 	; VIDEO BIOS DATA
 	; !!! this data is valid for TRDOS 386 v2 kernel only !!!
 	; (this is not same with BOCHS/PLEX86 video bios, BIOS data)  
-  
+
     	; if (CX & 2) {
 	;write_byte(BIOSMEM_SEG,BIOSMEM_CURRENT_MODE, read_byte(ES, BX)); BX++;
         ;write_word(BIOSMEM_SEG,BIOSMEM_NB_COLS, read_word(ES, BX)); BX += 2;
@@ -10444,8 +10490,8 @@ bfn_rvs_7:
 	lodsb
 	mov	[CRT_MODE_SET], al ; 29h for mode 03h ; TRDOS 386 feature only !
 	lodsw	
- 	mov	[video_mode], ax ; Current VESA VBE (SVGA, extended VGA) mode 
-	lodsw		 ; (valid if [CRT_MODE] = 0FFh)	
+ 	mov	[video_mode], ax ; Current VESA VBE (SVGA, extended VGA) mode
+	lodsw		 ; (valid if [CRT_MODE] = 0FFh)
 	mov	[CRT_LEN], ax ; page size (in bytes)
 	lodsw
 	mov	[CRT_START], ax ; video page start offset
@@ -10461,29 +10507,29 @@ bfn_rvs_7:
 	mov	[VGA_SWITCHES], al ; feature bit switches
 	lodsb
 	mov	[VGA_MODESET_CTL], al ; basic mode set options
-	; followings are only used by TRDOS 386 v2 (IBM PC/AT ROMBIOS) code 
+	; followings are only used by TRDOS 386 v2 (IBM PC/AT ROMBIOS) code
 	; (bochs/plex86 does not use and return those)
 	lodsb
 	mov	[CRT_PALETTE], al ; current color palette ; TRDOS 386 feature only !
 	lodsb
-	mov	[ACTIVE_PAGE], al ; current video page 
+	mov	[ACTIVE_PAGE], al ; current video page
 	lodsw
 	mov	[CURSOR_MODE], ax ; cursor type
 	;lodsd
 	;mov	[CURSOR_POSN], eax ; cursor position for video page 0 and 1 
 	;lodsd
-	;mov	[CURSOR_POSN+4], eax ; cursor position for video page 2 and 3 
+	;mov	[CURSOR_POSN+4], eax ; cursor position for video page 2 and 3
 	;lodsd
-	;mov	[CURSOR_POSN+8], eax ; cursor position for video page 4 and 5 
+	;mov	[CURSOR_POSN+8], eax ; cursor position for video page 4 and 5
 	;lodsd
-	;mov	[CURSOR_POSN+12], eax ; cursor position for video page 6 and 7 
+	;mov	[CURSOR_POSN+12], eax ; cursor position for video page 6 and 7
 	mov	ch, 4
 	mov	edi, CURSOR_POSN
 bfn_rvs_8:
 	movsd
 	dec	ch
 	jnz	short bfn_rvs_8
-	; (font addr) protected mode address in kernel's/system memory space 
+	; (font addr) protected mode address in kernel's/system memory space
 	; (not accessable/meaningful address value by user)
 	lodsd
 	mov	[VGA_INT43H], eax ; VGA current (default) font address
@@ -10536,14 +10582,14 @@ bfn_rvs_10:
 
 	; /* color select register */
 	lodsb	 ; skip 
-	
+
 	mov	al, ah ; * ; v
 
 	;mov	dx, VGAREG_DAC_WRITE_ADDRESS ; 3C8h
 	;mov	dl, 0C8h
 	dec	dl ; dx  = 3C8h
 	out	dx, al ; * ; v
-	
+
 	; (total 772 bytes are read above as DAC state)
 bfn_rvs_11:
 	retn
@@ -10610,7 +10656,7 @@ vbe_bfn_rvs_1:
 	; VBE_DISPI_ENABLED
 
 	; from VBE_DISPI_INDEX_XRES
-	;   to VBE_DISPI_INDEX_BPP	
+	;   to VBE_DISPI_INDEX_BPP
 
  	mov	ch, 3
 	sub	al, al ; 0 ; VBE_DISPI_INDEX_XRES - 1
@@ -10635,7 +10681,7 @@ vbe_bfn_rvs_1:
 	; ax = 4
 vbe_bfn_rvs_2:
 	inc	al ; from VBE_DISPI_INDEX_XRES
-		     ; to VBE_DISPI_INDEX_BPP	
+		     ; to VBE_DISPI_INDEX_BPP
 	;mov	dx, 01CEh ; VBE_DISPI_IOPORT_INDEX
 	;mov	dl, 0CEh
 	out	dx, ax
@@ -10647,11 +10693,11 @@ vbe_bfn_rvs_2:
 	pop	eax
 	dec	dl ; 1CEh
 	dec	ch
-	jnz	short vbe_bfn_rvs_2		
+	jnz	short vbe_bfn_rvs_2
 	retn
 
 ; ---------------------------------------------------------
- 
+
 dispi_set_enable:
 	; 03/08/2022
 	; 23/11/2020
@@ -10832,7 +10878,7 @@ dispi_set_bank:
 	;out	dx, ax
 	;pop	edx
 	;retn
-	
+
 	; 25/11/2020
 	; Modified registers: edx
 	;;push	edx
@@ -10854,7 +10900,7 @@ dispi_get_enable:
 	;	ax = vbe dispi status
 	;
 	; Modified registers: eax
-	
+
 	;push	edx
 	;mov	dx, 01CEh ; VBE_DISPI_IOPORT_INDEX
 	;mov	ax, 04h	  ; VBE_DISPI_INDEX_ENABLE
@@ -10907,7 +10953,7 @@ vga_compat_setup:
 	;	none
 	;
 	; Modified registers: eax, edx
-	
+
 	; 26/11/2020
   	;push	eax
   	;push	edx
@@ -10963,7 +11009,7 @@ vga_compat_setup:
   	; 03/08/2022
 	inc	dl
 	in	al, dx ; read overflow register
-  	and	al, 0BDh ; clear VDE 9th and 10th bits	
+  	and	al, 0BDh ; clear VDE 9th and 10th bits
   	test	ah, 01h
   	jz	short bit8_clear
   	or	al, 02h ; VDE 9th bit (bit 8) in bit 1
@@ -10980,7 +11026,7 @@ bit9_clear:
 	mov	dl, 0D4h
 	mov	ax, 0009h ; Maximum scan line register
   	out	dx, ax	; Reset
-  	mov	al, 17h ; Mode control register		
+  	mov	al, 17h ; Mode control register
   	out	dx, al
  	;mov	dx, 3D5h ; VGAREG_VGA_CRTC_DATA
   	inc	dl
@@ -11012,7 +11058,7 @@ bit9_clear:
 	out	dx, ax
 	;mov	dx, 3C4h ; VGAREG_SEQU_ADDRESS
 	; 03/08/2022
-	mov	dl, 0C4h 
+	mov	dl, 0C4h
 	mov	ax, 0F02h ; Map mask register, all planes
 	out	dx, ax
 
@@ -11034,7 +11080,7 @@ bit9_clear:
 	out	dx, al
 	;mov	dx, 3D5h ; VGAREG_VGA_CRTC_DATA
 	inc	dl
-	in	al, dx	
+	in	al, dx
 	or	al, 40h	 ; enable double word mode
 	out	dx, al
 	;mov	dx, 3DAh ; VGAREG_ACTL_RESET
@@ -11068,12 +11114,12 @@ bit9_clear:
 	;mov	dx, 3CEh ; VGAREG_GRDC_ADDRESS
 	; 03/08/2022
 	mov	dl, 0CEh
-	mov	al, 05h	 ; Mode register	
+	mov	al, 05h	 ; Mode register
 	out	dx, al
 	;mov	dx, 3CFh ; VGAREG_GRDC_DATA
 	inc	dl
-	in	al, dx	
-	and	al, 9Fh	 ; clear shift register 
+	in	al, dx
+	and	al, 9Fh	 ; clear shift register
 	or	al, 40h  ; set shift register to 2
 	out	dx, al
 
@@ -11099,7 +11145,7 @@ vga_set_virt_width:
   	;mov	ebx, eax
   	;call	dispi_get_bpp ; bits per pixel
 	;cmp	al, 4
-	;ja	short set_width_svga  ; 8, 16, 24, 32 
+	;ja	short set_width_svga  ; 8, 16, 24, 32
 	;shr	bx, 1
 ;set_width_svga:
 	;shr	bx, 3
@@ -11195,23 +11241,23 @@ set_mode_info_list:
 	; 24/11/2020
 	; (vbetables-gen.c)
 	; Input:
-	;	BX = VBE mode (including bochs special modes) 
+	;	BX = VBE mode (including bochs special modes)
 	; Output:
 	;	;;EAX = MODE_INFO_LIST address
 	;	EAX = 0 ; 11/12/2020
 	;	ESI = MODE_INFO_LIST address ; 11/12/2020
 	;	(if mode is not found, ESI = 0)
 	;
-	; Modified registers: eax, ebx, ecx, edx, esi, edi 
+	; Modified registers: eax, ebx, ecx, edx, esi, edi
 
 	mov	esi, b_vbe_modes ; bochs mode info base table
 	mov	edi, MODE_INFO_LIST ; mode info list (4F01h)
 sml_0:
-	lodsw	
+	lodsw
 	cmp	ax, bx ; is mode number same ?
 	je	short sml_1 ; yes
 	lodsd
-	lodsw	
+	lodsw
 	cmp	esi, end_of_b_vbe_modes
 	jb	short sml_0
 	; not found
@@ -11244,7 +11290,7 @@ sml_1:
 	mov	eax, VBE_DISPI_TOTAL_VIDEO_MEMORY_MB * 1024 * 1024
 	div	ecx
 		; eax = pages = vram_size / (height*pitch)
-	
+
 	;mov	cx, ax
 	mov	ecx, eax ; pages 
 		
@@ -11314,10 +11360,10 @@ sml_3:
 	; 14/12/2020
 	;mov	al, 255
 	dec	al ; 255
-	cmp	ecx, eax ; ecx <= 261, eax = 255 
+	cmp	ecx, eax ; ecx <= 261, eax = 255
 	;cmp	cx, ax
 	jnb	short sml_4
-	mov	al, cl	 
+	mov	al, cl
 sml_4:
 	stosb	; NumberOfImagePages (1 byte)
 	sub	al, al
@@ -11341,7 +11387,7 @@ sml_4:
 	cmp	cl, 32
 	jb	short sml_5
 	mov	al, VBE_DIRECTCOLOR_RESERVED_BITS_AVAILABLE
-sml_5: 
+sml_5:
 	stosb	; DirectColorModeInfo
 
 	; // Mandatory information for VBE 2.0 and above
@@ -11362,7 +11408,7 @@ sml_5:
      	;stosb	; BnkNumberOfPages = 0
      	;stosb	; LinNumberOfPages = 0
 
-	stosd	; pitch (word), 0 (byte), 0 (byte)  
+	stosd	; pitch (word), 0 (byte), 0 (byte)
 
 	lodsd	; LinRedMaskSize (AL), LinRedFieldPosition (AH)
 	     	; LinGreenMaskSize (16), LinGreenFieldPosition (24)
@@ -11377,8 +11423,8 @@ sml_5:
 	;mov	eax, MODE_INFO_LIST
 	; 11/12/2020
 	mov	esi, MODE_INFO_LIST
-	
-	retn	
+
+	retn
 
 ; end of set_mode_info_list ; edi = set_mode_info_list + 68
 
@@ -11448,7 +11494,7 @@ pci_read_reg:
 	;
 	; Modified registers: eax, edx
 
-	mov	eax, 00800000h 
+	mov	eax, 00800000h
 	mov	ax, cx
 	shl	eax, 8
 	mov	al, dl
@@ -11545,13 +11591,13 @@ restore_vesa_video_state:
 	;	eax = 0 -> buffer size problem
 	;	eax > 0 and ax <> 004Fh -> failed
 	;
-	; Modified regs: eax, ebx, ecx, edx, esi, edi 
+	; Modified regs: eax, ebx, ecx, edx, esi, edi
 
-	;movzx	ecx, word [vbe3stbufsize]  
+	;movzx	ecx, word [vbe3stbufsize]
 	;cmp	cx, 32 ; 32 * 64 bytes
 	;ja	short r_v_b_s_fail
 
-	movzx	ecx, byte [vbe3stbufsize]; <=32	
+	movzx	ecx, byte [vbe3stbufsize]; <=32
 	;shl	cx, 4 ; dword count for movsd
 	; 02/08/2022
 	shl	ecx, 4 ; <= 32*16 dwords (32*64 bytes)
@@ -11584,7 +11630,7 @@ save_vesa_video_state:
 	;	eax = 0 -> buffer size problem
 	;	eax > 0 and ax <> 004Fh -> failed
 	;
-	; Modified regs: eax, ebx, ecx, edx, esi, edi 
+	; Modified regs: eax, ebx, ecx, edx, esi, edi
 
 	;cmp	word [vbe33stbufsize], 32  
 	;			; 32 * 64 bytes
@@ -11605,7 +11651,7 @@ save_vesa_video_state:
 	mov	esi, VBE3SAVERESTOREBLOCK ; destination
 					; (vbe3 pmi buff)
 	mov	edi, VBE3VIDEOSTATE ; source (kernel buff)
-	rep	movsd	
+	rep	movsd
 	retn
 
 dispi_set_bank_farcall:
@@ -11617,10 +11663,10 @@ dispi_set_bank_farcall:
 	; Input: 
 	;	bx = 0000h, set bank number
 	;	   = 0100h, get bank number
-	;	dx = bank number (if bx = 0)	
+	;	dx = bank number (if bx = 0)
 	; Output:
 	;	dx = bank number
-		 	
+
 	cmp	bx, 0100h
 	je	short dispi_set_bank_farcall_get
 	or	bx, bx
