@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.7 - vidata.s
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.10 - vidata.s
 ; ----------------------------------------------------------------------------
-; Last Update: 17/10/2023 (Previous: 24/11/2020)
+; Last Update: 21/12/2025 (Previous: 17/10/2023 - Kernel v2.0.7)
 ; ----------------------------------------------------------------------------
 ; Beginning: 16/01/2016
 ; ----------------------------------------------------------------------------
@@ -13,12 +13,12 @@
 ; Derived from 'Retro UNIX 386 Kernel - v0.2.1.0' source code by Erdogan Tan
 ; vidata.inc (11/03/2015)
 ;
-; Derived from 'IBM PC-AT' BIOS source code (1985) 
+; Derived from 'IBM PC-AT' BIOS source code (1985)
 ; ****************************************************************************
 
 ; Retro UNIX 386 v1 Kernel - VIDATA.S
 ; Last Modification: 11/03/2015
-;		    (Data section for 'VIDEO.INC')	
+;		    (Data section for 'VIDEO.INC')
 ;
 ; ///////// VIDEO DATA ///////////////
 
@@ -61,12 +61,12 @@ VGA_MODESET_CTL: db	051h	; Basic mode set options (VGA video flags)
 				; ROM BIOS DATA AREA Offset 89h
 				; Bit 7, 4 : Mode
 				;	  01 : 400-line mode
-				; Bit 6	: Display switch enabled = 1			
+				; Bit 6	: Display switch enabled = 1
 				; Bit 5	: Reserved = 0
-				; Bit 3	: Default palette loading 
+				; Bit 3	: Default palette loading
 				;	  disabled = 0
 				; Bit 2 : Color monitor = 0
-				; Bit 1 = Gray scale summing 
+				; Bit 1 = Gray scale summing
 				;	  disabled = 0
 				; Bit 0 = VGA active = 1
 VGA_ROWS:	db	25
@@ -101,14 +101,15 @@ vga_g_mode_count equ $ - vga_g_modes
 vga_mode_tbl_ptr:
 	; 25/07/2016
 	dd	vga_mode_03h
-	dd	vga_mode_03h ; mode 02h -> mode 03h 
+	dd	vga_mode_03h ; mode 02h -> mode 03h
 	dd	vga_mode_01h
 	dd	vga_mode_01h ; mode 00h -> mode 01h
 	;dd	vga_mode_07h
 	dd	vga_mode_03h ; mode 07h -> mode 03h
 	dd	vga_mode_04h
-	dd	vga_mode_04h ; mode 05h -> mode 04h	
+	dd	vga_mode_04h ; mode 05h -> mode 04h
 	dd	vga_mode_06h
+vga_g_mode_tbl_ptr: ; 21/12/2025
 	dd	vga_mode_13h
 	dd	vga_mode_F0h
 	dd	vga_mode_12h
@@ -116,7 +117,7 @@ vga_mode_tbl_ptr:
 	dd	vga_mode_0Dh
 	dd	vga_mode_0Eh
 	dd	vga_mode_10h
-	dd	vga_mode_11h	
+	dd	vga_mode_11h
 
 vga_memmodel: 
 	; 25/07/2016
@@ -136,8 +137,8 @@ vga_g_memmodel: ; 31/07/2016
 ;	; 08/07/2016
 ;	db 	4, 4, 4, 4, 4, 2, 2, 1, 8, 4, 4, 4, 4, 4, 4, 1
 vga_dac_s:
-	db	2, 2, 2, 2, 0, 1, 1, 1, 3, 3, 2, 2, 1, 1, 2, 2  
-						; (vgatables.h, VGAMODES, dac) 
+	db	2, 2, 2, 2, 0, 1, 1, 1, 3, 3, 2, 2, 1, 1, 2, 2
+						; (vgatables.h, VGAMODES, dac)
 						; 17/11/2020
 vga_params:
 	; 23/11/2020
@@ -159,11 +160,11 @@ vga_params:
 	; Offset	# Bytes		Contents
 	;
 	;  0		1		# columns
-	;  1		1  		# rows - 1 
+	;  1		1  		# rows - 1
 	;  2		1		Pixels/character
-	;  3-4		2		Page length		
+	;  3-4		2		Page length
 	;  5-8		4		Sequencer Registers
-	;  9		1		Miscellaneous Register	
+	;  9		1		Miscellaneous Register
 	;  10-34	25		CRTC Registers
 	;  35-54	20		Attribute Registers
 	;  55-63	9		Graphics Controller Registers
@@ -251,7 +252,7 @@ vga_mode_13h:  ; mode 13h, 300*200, 256 colors, linear
 	db 	40, 24, 8, 00h, 0FAh ; tw, th-1, ch, slength (5)
 	db	01h, 0Fh, 00h, 0Eh ; sequ regs (4)
 	db	63h	; misc reg (1)
-	db	5Fh, 4Fh, 50h, 82h, 54h, 80h, 0BFh, 1Fh 
+	db	5Fh, 4Fh, 50h, 82h, 54h, 80h, 0BFh, 1Fh
 	db 	00h, 041h, 00h, 00h, 00h, 00h, 00h, 00h
 	db	9Ch, 8Eh, 8Fh, 28h, 40h, 96h, 0B9h, 0A3h
 	;db	9Ch, 0Eh, 8Fh, 28h, 40h, 96h, 0B9h, 0A3h ; 17/10/2023
@@ -260,14 +261,14 @@ vga_mode_13h:  ; mode 13h, 300*200, 256 colors, linear
  	db	08h, 09h, 0Ah, 0Bh, 0Ch, 0Dh, 0Eh, 0Fh
  	db	41h, 00h, 0Fh, 00h  ; actl regs (20)
 	; 10/11/2020
- 	;db	41h, 01h, 0Fh, 13h  ; actl regs (20) 
+ 	;db	41h, 01h, 0Fh, 13h  ; actl regs (20)
 	db	00h, 00h, 00h, 00h, 00h, 40h, 05h, 0Fh, 0FFh ; grdc regs (9)
 vga_mode_setl equ $ - vga_mode_13h  ; = 64
 vga_mode_F0h:  ; mode X ; 320*240, 256 colors, planar
 	db 	40, 24, 8, 00h, 00h ; tw, th-1, ch, slength
 	db	01h, 0Fh, 00h, 06h ; sequ regs
 	db	0E3h	; misc reg
-	db	5Fh, 4Fh, 50h, 82h, 54h, 80h, 0Dh, 3Eh 
+	db	5Fh, 4Fh, 50h, 82h, 54h, 80h, 0Dh, 3Eh
  	db 	00h, 41h, 00h, 00h, 00h, 00h, 00h, 00h
 	db	0EAh, 0ACh, 0DFh, 28h, 00h, 0E7h, 06h, 0E3h
 	db	0FFh	; crtc regs (25)
@@ -362,12 +363,12 @@ end_of_vga_params:
 
 ; 23/11/2020
 ; VBE 2 BOCHS/QEMU emulator extensions 
-;	for TRDOS 386 v2 kernel (video bios)  
+;	for TRDOS 386 v2 kernel (video bios)
 
 ; vbetables.h by Volker Rupper (02/01/2020)
 
 b_vbe_modes:
-	;/* standard VESA modes */	
+	;/* standard VESA modes */
 	dw 100h,  640, 400,  8
 	dw 101h,  640, 480,  8
 	dw 103h,  800, 600,  8
@@ -418,11 +419,11 @@ WINA_ATTRIBUTES equ WA1|WA2|WA3
 MODE_INFO_LIST: 
 
 ; 24/11/2020
-; '%if 0' disables 24 mode info tables here, until %endif 
+; '%if 0' disables 24 mode info tables here, until %endif
 ; ('set_mode_info_list' will set only 1 list for selected mode)
 ; (Purpose: To save about 1 KB kernel size by removing fixed data)
 
-			dw	0100h ; 640x400x8 
+			dw	0100h ; 640x400x8
 ModeAttributes1: 	dw	MODE_ATTRIBUTES
 WinAAttributes1: 	db	WINA_ATTRIBUTES
 WinBAttributes1: 	db	0
@@ -513,7 +514,7 @@ LinBlueFieldPosition2: 	db	0
 LinRsvdMaskSize2: 	db	0
 LinRsvdFieldPosition2: 	db	0
 MaxPixelClock2:		dd	0
-			
+
 			dw	0103h ; 800x600x8
 ModeAttributes3: 	dw	MODE_ATTRIBUTES
 WinAAttributes3: 	db	WINA_ATTRIBUTES
@@ -559,7 +560,7 @@ LinBlueFieldPosition: 	db	0
 LinRsvdMaskSize: 	db	0
 LinRsvdFieldPosition: 	db	0
 MaxPixelClock:		dd	0
-			
+
 			dw	0105h ; 1024x768x8
 ModeAttributes4: 	dw	MODE_ATTRIBUTES
 WinAAttributes4: 	db	WINA_ATTRIBUTES
@@ -651,7 +652,7 @@ LinBlueFieldPosition5:	db	0
 LinRsvdMaskSize5:	db	0
 LinRsvdFieldPosition5:	db	0
 MaxPixelClock5:		dd	0
-	
+
 			dw	010Fh ; 320x200x24
 ModeAttributes6: 	dw	MODE_ATTRIBUTES
 WinAAttributes6: 	db	WINA_ATTRIBUTES
@@ -697,7 +698,7 @@ LinBlueFieldPosition6:	db	0
 LinRsvdMaskSize6:	db	0
 LinRsvdFieldPosition6:	db	0
 MaxPixelClock6:		dd	0
-	
+
 			dw	0111h ; 640x480x16
 ModeAttributes7: 	dw	MODE_ATTRIBUTES
 WinAAttributes7: 	db	WINA_ATTRIBUTES
@@ -835,7 +836,7 @@ LinBlueFieldPosition9:	db	0
 LinRsvdMaskSize9:	db	0
 LinRsvdFieldPosition9:	db	0
 MaxPixelClock9:		dd	0
-	
+
 			dw	0115h ; 800x600x24
 ModeAttributes10: 	dw	MODE_ATTRIBUTES
 WinAAttributes10: 	db	WINA_ATTRIBUTES
@@ -1157,7 +1158,7 @@ LinBlueFieldPosition16:	db	0
 LinRsvdMaskSize16:	db	8
 LinRsvdFieldPosition16:	db	24
 MaxPixelClock16:	dd	0
-	
+
 			dw	0144h ; 1024x768x32
 ModeAttributes17: 	dw	MODE_ATTRIBUTES
 WinAAttributes17: 	db	WINA_ATTRIBUTES
@@ -1203,7 +1204,7 @@ LinBlueFieldPosition17:	db	0
 LinRsvdMaskSize17:	db	8
 LinRsvdFieldPosition17:	db	24
 MaxPixelClock17:	dd	0
-	
+
 			dw	0146h ; 320x200x8
 ModeAttributes18: 	dw	MODE_ATTRIBUTES
 WinAAttributes18: 	db	WINA_ATTRIBUTES
@@ -1341,7 +1342,7 @@ LinBlueFieldPosition20:	db	0
 LinRsvdMaskSize20:	db	0
 LinRsvdFieldPosition20:	db	0
 MaxPixelClock20:	dd	0
-	
+
 			dw	018Fh ; 1280x720x32
 ModeAttributes21: 	dw	MODE_ATTRIBUTES
 WinAAttributes21: 	db	WINA_ATTRIBUTES
@@ -1387,7 +1388,7 @@ LinBlueFieldPosition21:	db	0
 LinRsvdMaskSize21:	db	8
 LinRsvdFieldPosition21:	db	24
 MaxPixelClock21:	dd	0
-			
+
 			dw	0190h ; 1920x1080x16
 ModeAttributes22: 	dw	MODE_ATTRIBUTES
 WinAAttributes22: 	db	WINA_ATTRIBUTES
@@ -1433,7 +1434,7 @@ LinBlueFieldPosition22:	db	0
 LinRsvdMaskSize22:	db	0
 LinRsvdFieldPosition22:	db	0
 MaxPixelClock22:	dd	0
-			
+
 			dw	0191h ; 1920x1080x24
 ModeAttributes23: 	dw	MODE_ATTRIBUTES
 WinAAttributes23: 	db	WINA_ATTRIBUTES
@@ -1536,7 +1537,7 @@ direct_color_fields:
 	; 24/11/2020
 
 ; (vbetables-gen.c)
-; // Direct Color fields 
+; // Direct Color fields
 ; (required for direct/6 and YUV/7 memory models)
 ; switch(pm->depth) {
     
