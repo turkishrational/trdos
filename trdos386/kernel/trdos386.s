@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.10
 ; ----------------------------------------------------------------------------
-; Last Update: 22/12/2025 (Previous: 11/08/2025)
+; Last Update: 28/12/2025 (Previous: 11/08/2025)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -204,7 +204,7 @@ endstruc
  
 [BITS 16]       ; We need 16-bit intructions for Real mode
 
-[ORG 0] 
+[ORG 0]
 	; 12/11/2014
 	; Save boot drive number (that is default root drive)
 	mov	[boot_drv], dl ; physical drv number
@@ -690,12 +690,12 @@ mi_7:
 	mov	edi, edx
 	shr	edi, 15		  ; convert M.A.T. address to
 				  ; byte offset in M.A.T.
-				  ; (1 M.A.T. byte points to 
+				  ; (1 M.A.T. byte points to
 				  ;	      32768 bytes)
-				  ; Note: MEM_ALLOC_TBL address 
-				  ; must be aligned on 128 KB 
+				  ; Note: MEM_ALLOC_TBL address
+				  ; must be aligned on 128 KB
 				  ; boundary!
-	add	edi, edx	  ; points to M.A.T.'s itself	
+	add	edi, edx	  ; points to M.A.T.'s itself
 	; eax = 0
 	sub	[free_pages], ecx ; 07/11/2014
 mi_8:
@@ -807,7 +807,7 @@ mi_14:
 	;
 	; Linear/FLAT (1 to 1) memory paging for the kernel is OK, here.
 	;
-	
+
 	; Enable paging
 	;
         mov     eax, [k_page_dir]
@@ -1344,7 +1344,9 @@ _VBE3PMI_fcall:
 
 	mov	ebp, esp ; save 32 bit stack pointer
 
-	mov	esi, eax
+	;mov	esi, eax
+	; 28/12/2025 (PMI32 BugFix)
+	movzx	esi, ax
 
 	cli
 
@@ -2017,7 +2019,7 @@ T5:
 	MOV	AL,0CH			; bit 3 = enable IRQ & DMA,
 					; bit 2 = enable controller
 					;	1 = normal operation
-					;	0 = reset	
+					;	0 = reset
 					; bit 0, 1 = drive select
 					; bit 4-7 = motor running bits
 	MOV	DX,03F2H		; FDC CTL PORT
@@ -2916,7 +2918,7 @@ rtc_p8:
 	; the program's response (signal return) byte
 	; 06/06/2016
 	;mov	edi, [esi+12] ; response address
-	mov	[edi], ah     ; response value 
+	mov	[edi], ah     ; response value
 	;
 	rol	eax, 16
 	; 15/01/2017
@@ -2968,7 +2970,7 @@ bcd_to_ascii:
 	retn
 
 ; 15/12/2020
-real_mem_16m_64k: 
+real_mem_16m_64k:
 	dw	0	; Real size of system memory (if > 16MB)
 			; as number of 64K blocks - 256
 			; (This is for saving real system memory
@@ -3041,7 +3043,7 @@ memory_info:
 	; edx = calculated free pages
 	; ecx = 0
 	mov 	eax, [free_pages]
-	cmp	eax, edx ; calculated free mem value 
+	cmp	eax, edx ; calculated free mem value
 		; and initial free mem value are same or not?
 	jne 	short pmim ; print mem info with '?' if not
 	push 	edx ; free memory in pages
@@ -3058,7 +3060,7 @@ memory_info:
 pmim:
 	mov	esi, msg_memory_info
 	;
-	mov	ah, 07h ; Black background, 
+	mov	ah, 07h ; Black background,
 			; light gray forecolor
 print_kmsg: ; 29/01/2016
 	mov	[ccolor], ah
@@ -3280,7 +3282,7 @@ _vbe3_CS:  ; vesa vbe3 bios uses this as code seg (same addr with _vbe3_DS)
 _vbe3_BDS: ; vesa vbe3 bios uses this as equivalent of rombios data segment
 	; limit = 1536, base addr = 0, P/DPL/1/Type/E/W/A = 92h, 16 bit
 	dw 05FFh, 0, 9200h, 0 ; Note: base addr will be initialized
-			; 40h ; VBE3A000 
+			; 40h ; VBE3A000
 _A0000Sel: ; VGA default video memory address
 	; limit = 65536, base addr = 0A0000h, 16 bit
 	dw 0FFFFh, 0, 920Ah, 0
@@ -3349,7 +3351,7 @@ gdt_end:
 		;	 = 100000h * 1000h (G=1) = 4GB
 		;; Limit = FFBFFh (=> FFBFFh+1= FFC00h) // bits 0-15, 48-51 //
 		;	 = FFC00h * 1000h (G=1) = 4GB - 4MB
-		; G= Granularity (1= 4KB), B= Big (32 bit), 
+		; G= Granularity (1= 4KB), B= Big (32 bit),
 		; AVL= Available to programmers	
 
 gdtd:
@@ -3547,7 +3549,7 @@ IRQ_list: ; 28/02/2017 ('syscalbac')
 	dd	0
 
 ; 20/08/2014
-  ; /* This is the default interrupt "handler" :-) */ 
+  ; /* This is the default interrupt "handler" :-) */
   ; Linux v0.12 (head.s)
 int_msg:
 	db "Unknown interrupt ! ", 0
@@ -3666,7 +3668,7 @@ pdskml:
 	jz	short pdskm_ok
 	push	esi
 	; 13/05/2016
-        mov     ebx, 7  ; Black background, 
+        mov     ebx, 7  ; Black background,
 			; light gray forecolor
 			; Video page 0 (bh=0)
 	call	_write_tty
@@ -3722,7 +3724,7 @@ dskx:
 
 setup_error_msg:
 	db	0Dh, 0Ah
-	db	'Disk Setup Error !' 
+	db	'Disk Setup Error !'
 	db	0Dh, 0Ah,0
 
 next2line: ; 08/02/2016
@@ -3775,7 +3777,7 @@ starting_msg:
 	;;;db "Turkish Rational DOS v2.0 [23/06/2024] ...", 0
 	;;db "Turkish Rational DOS v2.0 [29/12/2024] ...", 0
 	;db "Turkish Rational DOS v2.0 [28/01/2025] ...", 0
-	db "Turkish Rational DOS v2.0 [22/12/2025] ...", 0
+	db "Turkish Rational DOS v2.0 [28/12/2025] ...", 0
 
 NextLine:
 	db 0Dh, 0Ah, 0
@@ -4071,9 +4073,9 @@ rw_buffer:
 
 %if 1
 ; 17/01/2021
-edid_info:	resb 128 ; VESA EDID (monitor capabilities) info	
+edid_info:	resb 128 ; VESA EDID (monitor capabilities) info
 ; 28/11/2020
-pmi32:		resb 1	; (>0) use VESA VBE3 protected mode calls 
+pmi32:		resb 1	; (>0) use VESA VBE3 protected mode calls
 vbe_mode_x:	resb 1  ; VESA VBE3 video bios mode set options
 video_mode:	resw 1	; VESA VBE3 video mode (with option flags)
 ; 30/11/2020
@@ -4095,15 +4097,15 @@ LFB_Info:
 		resb 16	; Linear Frame Buffer info block
 
 ;24/11/2020 - TRDOS 386 v2.0.3
-; BOCHS/PLEX86 VESA VBE3 MODE INFO extension to TRDOS 386 v2 kernel	
+; BOCHS/PLEX86 VESA VBE3 MODE INFO extension to TRDOS 386 v2 kernel
 MODE_INFO_LIST:
-		resb 68	; mode + 66 byte VESA vbe3 mode info (4F01h) 
+		resb 68	; mode + 66 byte VESA vbe3 mode info (4F01h)
 %endif
 
 ; 05/01/2021
 ufont:		resb 1	; (VGA graphics) user font flags
 			; bit 7 - permission flag for int 31h
-			; bit 4 - 8x16 user font ready/loaded flag  
+			; bit 4 - 8x16 user font ready/loaded flag
 			; bit 3 - 8x8 user font ready/loaded flag
 			; bit 1 - select 8x16 user font (sysvideo)
 			; bit 0 - select 8x8 user font (sysvideo)
@@ -4115,9 +4117,9 @@ srvso:		resb 1	; video state buffer save/restore option
 VideoStateID:	resd 1	; used to verify state saved by same prog
 ; 29/01/2021
 v_width:	resw 1	; screen (display page) width
-v_ops:		resb 1	; 'sysvideo' graphics data transfer option	
+v_ops:		resb 1	; 'sysvideo' graphics data transfer option
 v_bpp:		resb 1	; bits per pixels ('sysvideo')
-v_mem:		resd 1	; video memory ('sysvideo')	
+v_mem:		resd 1	; video memory ('sysvideo')
 v_siz:		resd 1	; video page size ('sysvideo')
 v_str:		resd 1	; window start adress ('sysvideo')
 v_end:		resd 1	; window end (end+1) adress ('sysvideo')

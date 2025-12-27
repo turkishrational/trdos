@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - INITIALIZED DATA : trdosk9.s
 ; ----------------------------------------------------------------------------
-; Last Update: 22/12/2025 (Previous: 29/12/2024 - Kernel v2.0.9)
+; Last Update: 28/12/2025 (Previous: 29/12/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -17,13 +17,13 @@
 ; FILE.ASM [29/10/2009] Last Update: 09/10/2011
 
 ; 12/02/2016
-Last_DOS_DiskNo: 
+Last_DOS_DiskNo:
 		db 1 ; A: = 0 & B: = 1
 
-Restore_CDIR:	
+Restore_CDIR:
 		db 0FFh ; Initial value -> any number except 0
 
-msg_CRLF_temp:  
+msg_CRLF_temp:
 		db 07h, 0Dh, 0Ah, 0
 
 Magic_Bytes:
@@ -31,7 +31,7 @@ Magic_Bytes:
 		db 1
 mainprog_Version:
 		db 7
-		db "[TRDOS] Main Program v2.0.10 (22/12/2025)"
+		db "[TRDOS] Main Program v2.0.10 (28/12/2025)"
 		db 0Dh, 0Ah
 		db "(c) Erdogan Tan 2005-2025"
 		db 0Dh, 0Ah, 0
@@ -58,7 +58,7 @@ Cmd_LongName:	db "LONGNAME", 0
 Cmd_Date:	db "DATE", 0
 Cmd_Time:	db "TIME", 0
 Cmd_Run:	db "RUN", 0
-Cmd_Set:	db "SET", 0 
+Cmd_Set:	db "SET", 0
 Cmd_Cls:	db "CLS", 0
 Cmd_Show:	db "SHOW", 0
 Cmd_Del:	db "DEL", 0
@@ -79,7 +79,7 @@ Cmd_Device:	db "DEVICE", 0
 Cmd_DevList:	db "DEVLIST", 0
 Cmd_Chdir:	db "CHDIR", 0
 Cmd_Beep:	db "BEEP", 0
-		
+
 		db 0
 
 ; 15/02/2016 (FILE.ASM, 09/10/2011)
@@ -87,7 +87,7 @@ invalid_fname_chars:
 		db 22h, 27h, 28h, 29h, 2Ah, 2Bh, 2Ch, 2Fh
 		db 3Ah, 3Bh, 3Ch, 3Dh, 3Eh, 3Fh, 40h
 		db 5Bh, 5Ch, 5Dh, 5Eh, 60h
-sizeInvFnChars  equ ($ - invalid_fname_chars)                
+sizeInvFnChars  equ ($ - invalid_fname_chars)
 ;
 
 Msg_Enter_Date:
@@ -269,7 +269,7 @@ Decimal_File_Count:
 str_files:	db " file(s) & "
 Decimal_Dir_Count: 
 		times 6 db 0
-str_dirs:       
+str_dirs:
 		db " directory(s) "
 		db 0Dh, 0Ah, 0
 
@@ -286,8 +286,8 @@ Msg_Name_Exists: db "File or directory name exists!"
                 db 0Dh, 0Ah, 0
 Msg_DoYouWantMkdir:
                 db "Do you want to make directory ", 0
-Msg_YesNo:      db " (Y/N) ? ", 0  
-Y_N_nextline:	db 0, 0Dh, 0Ah, 0 
+Msg_YesNo:      db " (Y/N) ? ", 0
+Y_N_nextline:	db 0, 0Dh, 0Ah, 0
 Msg_OK:		db "OK.", 0Dh, 0Ah, 0
 
 ; 27/02/2016
@@ -327,26 +327,26 @@ Rename_NewName: times 13 db 0
 ; 08/03/2016
 ; CMD_INTR.ASM - 01/08/2010 - 23/04/2011
 msg_not_same_drv:
-                db "Not same drive!" 
-                db 0Dh, 0Ah, 0 
+                db "Not same drive!"
+                db 0Dh, 0Ah, 0
 
 Msg_DoYouWantMoveFile:
                 db "Do you want to move file", 0
 
 msg_insufficient_disk_space:
-                db "Insufficient disk space!" 
+                db "Insufficient disk space!"
                 db 0Dh, 0Ah, 0
 
 ; 01/08/2010
-msg_source_file: 
+msg_source_file:
 		db 0Dh, 0Ah, "Source file name      :   "
-msg_source_file_drv: 
+msg_source_file_drv:
 		db " :", 0
-msg_destination_file: 
+msg_destination_file:
 		db 0Dh, 0Ah, "Destination file name :   "
-msg_destination_file_drv: 
+msg_destination_file_drv:
 		db " :", 0
-msg_copy_nextline: 
+msg_copy_nextline:
 		db 0Dh, 0Ah, 0
 
 ; 15/03/2016
@@ -354,7 +354,7 @@ msg_copy_nextline:
 
 Msg_DoYouWantOverWriteFile:
                 db "Do you want to overwrite file ",0
-  
+
 Msg_DoYouWantCopyFile:
                 db "Do you want to copy file",0
 
@@ -375,7 +375,7 @@ Msg_No_Set_Space:
                 db "Insufficient environment space!"
                 db 0Dh, 0Ah, 0
 ; 18/04/2016
-isc_msg:	
+isc_msg:
 		db 0Dh, 0Ah
 		db "INVALID SYSTEM CALL", 0
 usi_msg:
@@ -431,16 +431,16 @@ align 2
 ;		;db 'PRINTER',0   ; 9
 ;		;db 'CDROM'	  ; 20
 ;		;db 'CDROM0'	  ; 20
-;		;db 'CDROM1'	  ; 21		
+;		;db 'CDROM1'	  ; 21
 ;		;db 'DVD'	  ; 22
 ;		;db 'DVD0'	  ; 22
-;		;db 'DVD1'	  ; 23		
+;		;db 'DVD1'	  ; 23
 ;		;db 'USB'	  ; 24
 ;		;db 'USB0'	  ; 24
 ;		;db 'USB1'	  ; 25
 ;		;db 'USB2'	  ; 26
 ;		;db 'USB3'        ; 27
-;		;db 'KEYBOARD'	  ; 1	
+;		;db 'KEYBOARD'	  ; 1
 ;		;db 'MOUSE'	  ; 28
 ;		;db 'SOUND'	  ; 29
 ;		;db 'VGA',0,0,0,0 ; 30
@@ -448,7 +448,7 @@ align 2
 ;		;db 'AUDIO',0,0,0 ; 29
 ;		;db 'VIDEO',0,0,0 ; 32
 ;		;db 'MUSIC',0,0,0 ; 33
-;		;db 'ETHERNET'	  ; 34 		
+;		;db 'ETHERNET'	  ; 34
 ;		;db 'SD0',0,0,0,0,0 ; 35
 ;		;db 'SD1',0,0,0,0,0 ; 36
 ;		;db 'SD2',0,0,0,0,0 ; 37
@@ -496,7 +496,7 @@ align 2
 ;		dd ocvt ;tty9 ; 19
 ;		;dd ocvt ;com1 ; 18
 ;		;dd ocvt ;com2 ; 19
-;		dd sret ;null ; 20  
+;		dd sret ;null ; 20
 ;KDEV_CADDR:
 ;		dd ctty ;tty  ; 1
 ;		dd cret ;mem  ; 2
@@ -543,7 +543,7 @@ align 2
 ; 		dd rcvt ;tty9 ; 19
 ; 		;dd rcvt ;com1 ; 18
 ; 		;dd rcvt ;com2 ; 19
-;		dd rnull ;null ; 20  
+;		dd rnull ;null ; 20
 ;KDEV_WADDR:
 ;		dd wtty ;tty  ; 1
 ;		dd wmem ;mem  ; 2
@@ -566,7 +566,7 @@ align 2
 ; 		dd xmtt ;tty9 ; 19
 ; 		;dd xmtt ;com1 ; 18
 ; 		;dd xmtt ;com2 ; 19
-;		dd wnull ;null ; 20  
+;		dd wnull ;null ; 20
 
 ; DEV_ACCESS bits:
 	; bit 0 = accessable by normal users
@@ -576,12 +576,12 @@ align 2
 	; bit 4 = block device if it is set
 	; bit 5 = 16 bit or 1024 byte data
 	; bit 6 = 32 bit or 2048 byte data
-	; bit 7 = installable device driver	
+	; bit 7 = installable device driver
 
 ;KDEV_ACCESS: ; 08/10/2016
 ;		db  00000111b	; tty, 1
-;		db  00000111b	; mem, 2	
-;		db  10001111b	; fd0, 3	
+;		db  00000111b	; mem, 2
+;		db  10001111b	; fd0, 3
 ;		db  10001111b	; fd1, 4
 ;		db  10001111b	; hd0, 5
 ;		db  10001111b	; hd1, 6
@@ -627,4 +627,4 @@ dma_cnt:	db 1,3,5,7,0C2h,0C6h,0CAh,0CEh
 dma_page:	db 87h,83h,81h,82h,8Fh,8Bh,89h,8Ah ; 03/08/2017
 dma_mask:	db 0Ah,0Ah,0Ah,0Ah,0D4h,0D4h,0D4h,0D4h
 dma_mod:	db 0Bh,0Bh,0Bh,0Bh,0D6h,0D6h,0D6h,0D6h
-dma_flip:	db 0Ch,0Ch,0Ch,0Ch,0D8h,0D8h,0D8h,0D8h	
+dma_flip:	db 0Ch,0Ch,0Ch,0Ch,0D8h,0D8h,0D8h,0D8h

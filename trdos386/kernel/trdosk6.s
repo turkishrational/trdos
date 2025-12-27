@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 19/12/2025  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 27/12/2025  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -12787,6 +12787,7 @@ sysbreak_3: ; 1:
 	jmp	sysret
 
 sysseek: ; / moves read write pointer in an fsp entry
+	; 27/12/2025 - TRDOS 386 v2.0.10
 	; 06/11/2016 - TRDOS 386 (TRDOS v2.0)
 	; 22/06/2015 (Retro UNIX 386 v1 - Beginning)
 	; 07/07/2013 - 05/08/2013 (Retro UNIX 8086 v1)
@@ -12809,11 +12810,18 @@ sysseek: ; / moves read write pointer in an fsp entry
 	;		 the r/w pointer
 	;	ptrname - a switch indicated above
 	;
-	; Inputs: r0 - file descriptor 
+	; Inputs: r0 - file descriptor
+	;	; 27/12/2025
+	;	EBX = File descriptor (number) -user-
+	;	ECX = Offset (plus)
+	;	EDX = 0 -> set to offset in ECX
+	;	    = 1 -> set to current offset + offset in ECX
+	;	    = 2 -> set to file size + offset in ECX
 	; Outputs: -
+	;	EAX = (new) File Offset ; 27/12/2025
 	; ...............................................................
-	;	
-	; Retro UNIX 8086 v1 modification: 
+	;
+	; Retro UNIX 8086 v1 modification:
 	;       'sysseek' system call has three arguments; so,
 	;	* 1st argument, file descriptor is in BX (BL) register
 	;	* 2nd argument, offset is in CX register
@@ -12826,9 +12834,13 @@ sysseek: ; / moves read write pointer in an fsp entry
 
 	add	eax, [u.base]
 	mov	[ebx], eax
+	; 27/12/2025
+sysseek_@:
+	mov	[u.r0], eax ; return (new) file offset
 	jmp	sysret
 
 systell: ; / get the r/w pointer
+	; 27/12/2025 - TRDOS 386 v2.0.10
 	; 06/11/2016 - TRDOS 386 (TRDOS v2.0) - temporary !-
 	; 22/06/2015 (Retro UNIX 386 v1 - Beginning)
 	; 07/07/2013 - 05/08/2013 (Retro UNIX 8086 v1)
@@ -12836,23 +12848,39 @@ systell: ; / get the r/w pointer
 	; Retro UNIX 8086 v1 modification:
 	; ! 'systell' does not work in original UNIX v1,
 	; 	    it returns with error !
-	; Inputs: r0 - file descriptor 
+	; Inputs: r0 - file descriptor
+	;	; 27/12/2025
+	;	EBX = File descriptor (number) -user-
+	;	ECX = ignored
+	;	EDX = 0 -> return current file offset
+	;	    = 1 -> return current file offset
+	;	    = 2 -> return file size
+	;	    > 2 -> return current file offset
+	;
 	; Outputs: r0 - file r/w pointer
 
 	;xor	ecx, ecx ; 0
+	;
+	; 27/12/2025
+	cmp	edx, 2
+	je	short systell_@
 	mov	edx, 1 ; 05/08/2013
+systell_@:
 	;call 	seektell
 	call 	seektell0 ; 05/08/2013
 	;; 06/11/2016
-	;; mov	eax, [ebx]
-	mov	[u.r0], eax
-	jmp	sysret
+	;;mov	eax, [ebx]
+	; 27/12/2025
+	;mov	[u.r0], eax
+	;jmp	sysret
+	jmp	short sysseek_@
 
 ; Original unix v1 'systell' system call:
 		; jsr r0,seektell
 		; br error4
 
 seektell:
+	; 24/04/2025 - TRDOS 386 v2.0.10
 	; 06/11/2016 - TRDOS 386 (TRDOS v2.0)
 	; 03/01/2016
 	; 22/06/2015 (Retro UNIX 386 v1 - Beginning)
@@ -12872,7 +12900,7 @@ seektell:
 	;	Argument 2, offset is in CX;
 	;	Argument 3, ptrname/switch is in DX register.
 	;
-	; ((Return -> eax = base for offset (position= base+offset))
+	; ((Return -> eax = base for offset (position = base+offset))
 	;
 	mov 	[u.base], ecx ; offset
 seektell0:
@@ -12935,8 +12963,8 @@ sysintr: ; / set interrupt handling
 	; Inputs: -
 	; Outputs: -
 	; ...............................................................
-	;	
-	; Retro UNIX 8086 v1 modification: 
+	;
+	; Retro UNIX 8086 v1 modification:
 	;       'sysintr' system call sets u.intr to value of BX
 	;	then branches into sysquit.
 
@@ -12949,7 +12977,7 @@ sysintr: ; / set interrupt handling
 	;	bx > 0 -> enable CTRL+BREAK (also default at start)
 	;		-u.intr will be set to 0FFFFh, u.quit will be used-
 	;	NOTE: u.quit is flag for CTRL+BREAK key press status
-	;	      -1 = pressed -termination request-, 0 = not pressed 
+	;	      -1 = pressed -termination request-, 0 = not pressed
 	; OUTPUT:
 	;	none
 
@@ -12975,7 +13003,7 @@ sysquit:
 	; 07/07/2013 (Retro UNIX 8086 v1)
 	;
 	; 'sysquit' turns off the quit signal. it puts the argument of
-	; the call in u.quit. u.tty is checked if to see if a control 
+	; the call in u.quit. u.tty is checked if to see if a control
 	; tty exists. If one does the interrupt character in the tty
 	; buffer is cleared and 'sysret'is called. If one does not exits
 	; 'sysret' is just called.
@@ -12994,7 +13022,7 @@ sysquit:
 	; Inputs: -
 	; Outputs: -
 	; ...............................................................
-	;	
+	;
 	; Retro UNIX 8086 v1 modification: 
 	;       'sysquit' system call sets u.quit to value of BX
 	;	then branches into 'sysret'.
@@ -13029,7 +13057,7 @@ sysquit:
 	dec	eax ; -1
 sysquit_@:
 	mov	[u.r0], eax
-	jmp	sysret	
+	jmp	sysret
 
 %if 0
 
@@ -13037,9 +13065,9 @@ anyi:
 	; 23/07/2022
 	; 06/10/2016 (TRDOS 386 = TRDOS v2.0)
 	; Major Modification!
-	; TRDOS 386 does not permit to delete a file while it is open 
+	; TRDOS 386 does not permit to delete a file while it is open
 	; The role of 'anyi' procedure has beeen changed to ensure that.
-	; 	
+	;
 	; 22/06/2015 (Retro UNIX 386 v1 - Beginning)
 	; 25/04/2013 (Retro UNIX 8086 v1)
 	;
@@ -13077,7 +13105,7 @@ anyi:
 	; Modified Registers: EBX
 
 	xor	ebx, ebx
-anyi_0: 
+anyi_0:
 	cmp	byte [ebx+OF_MODE], 0 ; 0 = empty entry
 	ja	short anyi_2 ; 1 (r), 2 (w) or 3 (r&w)
 anyi_1:
@@ -13085,7 +13113,7 @@ anyi_1:
 	cmp	bl, OPENFILES ; max. count of open files
 	jb	short anyi_0
 	xor	eax, eax
-	retn 
+	retn
 anyi_2:
 	cmp	dl, [ebx+OF_DRIVE]
 	jne	short anyi_1
@@ -13095,7 +13123,7 @@ anyi_2:
 	je	short anyi_3
 	;shr	bx, 2 ; /4 (byte offset)
 	shr	ebx, 2 ; 23/07/2022
-	jmp	short anyi_1 	
+	jmp	short anyi_1
 anyi_3:
 	;shr	bx, 2 ; /4 (bytes offset) (index)
 	shr	ebx, 2 ; 23/07/2022
@@ -13115,7 +13143,7 @@ syssleep:
 	;
 	; Retro UNIX 8086 v1 feature only
 	; (INPUT -> none)
-	
+
 	; Temporary - 24/07/2022
 	mov	[u.r0], ebx
 	;
@@ -13142,7 +13170,7 @@ _vp_clr:
 	;
 	; Retro UNIX 8086 v1 feature only !
 	;
-	; INPUTS -> 
+	; INPUTS ->
 	;   BH = video page number
 	;
 	; OUTPUT ->
@@ -13337,7 +13365,7 @@ pcmsg5:
 	; 05/12/2020
 	; writing message by using
 	; VESA VBE3 video bios protected mode interface
-	
+
 	mov	ah, 0Eh
 pcmsg6:
 	lodsb
@@ -13377,7 +13405,7 @@ glerr_1:
 glerr_2:
 	inc	ebx ; FFFFFFFFh -> 0, FFFFFFFEh -> FFFFFFFFh
 	jz	short glerr_2 ; page fault count for process
-	inc	ebx ; FFFFFFFFh -> 0	
+	inc	ebx ; FFFFFFFFh -> 0
 	jnz	short glerr_0
 	mov	eax, [PF_Count] ; total page fault count
         jmp     short glerr_1
@@ -13431,7 +13459,7 @@ load_and_run_file:
 	push	_end_of_mainprog ; we must not return to here !
 	push	dword [mainprog_return_addr]
 	mov	ebp, esp ; **
-	;	
+	;
 	pushfd  ; EFLAGS      ; IRETD ; ***
 	push	KCODE ; cs    ; IRETD
 	push	eax ; * (eip) ; IRETD
@@ -13551,7 +13579,7 @@ readi:
 	; 11/03/2013 - 31/07/2013 (Retro UNIX 8086 v1)
 	;
 	; Reads from a file whose the first cluster number in EAX
-	; 
+	;
 	; INPUTS ->
 	;    EAX - First cluster number of the file
 	;    u.count - byte count user desires
@@ -13662,13 +13690,13 @@ mget_r:
 
 	cmp	[readi.valid], cl ; 0
 	jna	short mget_r_0
-	
+
 	cmp	ch, [readi.drv]
 	jne	short mget_r_0
 
 	cmp	eax, [readi.fclust]
 	jne	short mget_r_3
-	
+
 	mov	eax, ebx ; file offset
 	mov	cx, [readi.bpc]
 	inc	ecx ; <= 65536
@@ -13702,7 +13730,7 @@ mget_r_0:
 	;shr	cl, 1	; 1 for 512 bytes, 4 for 2048 bytes
 	; 19/12/2025
 	mov	cl, 1
-	jmp	short mget_r_2	
+	jmp	short mget_r_2
 %endif
 mget_r_1:
 	mov	cl, [esi+LD_BPB+BPB_SecPerClust]
@@ -13800,7 +13828,7 @@ mget_r_9:
 	; 30/07/2022
 	xor	ecx, ecx
 	inc	cl
-	; ecx = 1	
+	; ecx = 1
 
 	; 29/04/2016
 	;xor	dl, dl
@@ -13841,7 +13869,7 @@ mget_r_12:
 trans_addr_r:
 	; 12/10/2016
 	; 02/05/2016 - TRDOS 386 (TRDOS v2.0)
-	; Translate virtual address to physical address 
+	; Translate virtual address to physical address
 	; for reading from user's memory space
 	; 04/06/2015 - 18/10/2015 (Retro UNIX 386 v1)
 
@@ -13854,7 +13882,7 @@ trans_addr_w:
 	; Translate virtual address to physical address
 	; for writing to user's memory space
 	; 04/06/2015 - 18/10/2015 (Retro UNIX 386 v1)
-	
+
 	sub	edx, edx
 	inc	dl ; 1 (write access sign)
 trans_addr_rw:
@@ -13875,7 +13903,7 @@ passc_0:
 	test	dl, PTE_A_WRITE ; writable page
 	pop	edx
 	jnz	short passc_1
-	
+
 	and 	dl, dl
 	jz	short passc_1
 	; read only (duplicated) page -must be copied to a new page-
@@ -13891,7 +13919,7 @@ passc_0:
 	;mov 	ecx, PAGE_SIZE
 	;sub	ecx, ebx
 	add	eax, ebx
-passc_1: 
+passc_1:
 	mov 	[u.pbase], eax ; physical address
 	mov	[u.pcount], cx ; remain byte count in page (1-4096)
 	pop	ebx
@@ -13909,14 +13937,14 @@ sioreg:
 	; 29/04/2016 - TRDOS 386 (TRDOS v2.0)
 	; 19/05/2015 - 25/07/2015 (Retro UNIX 386 v1)
 	; 12/03/2013 - 22/07/2013 (Retro UNIX 8086 v1)
-	; INPUTS -> 
+	; INPUTS ->
 	;     EBX = system buffer (data) address (r5)
 	;     [u.fofp] = pointer to file offset pointer
 	;     [u.base] = virtual address of the user buffer
 	;     [u.pbase] = physical address of the user buffer
 	;     [u.count] = byte count
 	;     [u.pcount] = byte count within page frame
-	; OUTPUTS -> 
+	; OUTPUTS ->
 	;     ESI = user data offset (r1)
 	;     EDI = system (I/O) buffer offset (r2)
 	;     ECX = byte count (r3)
@@ -13924,7 +13952,7 @@ sioreg:
 	;	(If EAX > 0, transfer will continue from the next page)
         ;
 	; ((Modified registers:  EDX))
- 
+
         mov     esi, [u.fofp]
         mov     edi, [esi]
 	mov	ecx, edi
@@ -14013,17 +14041,17 @@ tswap:
 	;
 
 	NOTE:
-	;* [u.pri] priority level is specified by run queue which is process 
+	;* [u.pri] priority level is specified by run queue which is process
 	;  comes to run from.
 	;* Initial [u.pri] is 1 ('normal/regular') for programs 
 	;  (which are launched by MainProg or 'sysexec'), it is changed
 	;  to 2 ('high') by timer event, if program uses 'systimer' system call.
-	;* Program (Process) also can change it's running priority 
+	;* Program (Process) also can change it's running priority
 	;  from 1 to 0 or up to 2 by using 'syspri' system call; but,
 	;  if program selects priority level 2 (high) for running, next time
 	;  it is reduced to 1 (normal/regular) because 'syspri' adds this
 	;  program to 'run for normal' queue while running duration is a bit
-	;  protected from swap/switch out immediate, behalf of other high 
+	;  protected from swap/switch out immediate, behalf of other high
 	;  priority process in sequence. Program (with high priority) will not
 	;  be swapped/switched out (by timer event) before it's time quantum
 	;  will be elapsed, but, this will be temporary if program is not using
@@ -14056,11 +14084,11 @@ tswap:
 tswap_1:
 	mov 	al, [u.uno]
 	       	; movb u.uno,r1 / move users process number to r1
-		; mov  $runq+4,r2 
+		; mov  $runq+4,r2
 			; / move lowest priority queue address to r2
       	; ebx = run queue
 	call 	putlu
-		; jsr r0,putlu / create link from last user on Q to 
+		; jsr r0,putlu / create link from last user on Q to
 		             ; / u.uno's user
 
 switch: ; Retro UNIX 386 v1
@@ -14105,7 +14133,7 @@ swap:
 	;    s.stack - swap stack used as an internal stack for swapping.
 	; OUTPUTS ->
 	;    (original unix v1 -> present process to its disk block)
-	;    (original unix v1 -> new process into core -> 
+	;    (original unix v1 -> new process into core ->
 	;	   Retro Unix 8086 v1 -> segment registers changed 
 	;	   for new process)
 	;    u.quant = 3 (Time quantum for a process)
@@ -14125,7 +14153,7 @@ swap:
 	;a process in normal priority run queue will be selected
 	;or a proces in low priority run queue will be selected if normal
 	;priority level run queue is empty.
-	
+
 	; 21/05/2016 -(3 priority levels, 3 run queues)
 	mov	esi, runq ; 'runq_event' ; high priority, 'run for event'
 	mov	byte [priority], 3 ; high priority + 1
@@ -14214,10 +14242,10 @@ wswap:  ; < swap out, swap to disk >
 	;	saving 'u' structure and user registers for task switching).
 	;	u.usp - points to kernel stack address which contains
 	;		user's registers while entering system call.
-	;	u.sp  - points to kernel stack address 
+	;	u.sp  - points to kernel stack address
 	;		to return from system call -for IRET-.
-	;	[u.usp]+32+16 = [u.sp] 
-	;	[u.usp] -> edi, esi, ebp, esp (= [u.usp]+32), ebx, 
+	;	[u.usp]+32+16 = [u.sp]
+	;	[u.usp] -> edi, esi, ebp, esp (= [u.usp]+32), ebx,
 	;		edx, ecx, eax, gs, fs, es, ds, -> [u.sp].
 	;
 	; Retro UNIX 8086 v1 modification ->
@@ -14231,13 +14259,13 @@ wswap:  ; < swap out, swap to disk >
 	;    u.break - points to end of program
 	;    u.usp - stack pointer at the moment of swap
 	;    core - beginning of process program
-	;    ecore - end of core 	
+	;    ecore - end of core
 	;    user - start of user parameter area
 	;    u.uno - user process number
 	;    p.dska - holds block number of process
 	; OUTPUTS ->
 	;    swp I/O queue
-	;    p.break - negative word count of process 
+	;    p.break - negative word count of process
 	;    r1 - process disk address
 	;    r2 - negative word count
 	;
@@ -14365,7 +14393,7 @@ rswap:  ; < swap in, swap from disk >
 	cmp	byte [u.fpsave], 0
 	jna	short rswp_retn
 	frstor	[u.fpregs] ; restore floating point regs (94 bytes)
-			; 108 bytes (22/08/2024)	
+			; 108 bytes (22/08/2024)
 rswp_retn:
 	push	eax	; 'rswap' return address
 	retn
@@ -14427,7 +14455,7 @@ putlu_1: ; 1:
 	mov	[ebx-1], al
        		; movb r1,-1(r2) / user is only user; 
 			    ; / put process no. at beginning and at end
-putlu_2: ; 2: 
+putlu_2: ; 2:
 	mov	[ebx], al
        		; movb r1,(r2) / user process in r1 is now the last entry
 			     ; / on the queue
@@ -14439,7 +14467,7 @@ putlu_2: ; 2:
 
 sysver:
 	; 29/04/2016 - TRDOS 386 (TRDOS v2.0)
-	mov	dword [u.r0], 200h ; AH = major version, AL = minor version 
+	mov	dword [u.r0], 200h ; AH = major version, AL = minor version
 	jmp	sysret
 
 syspri: ; change running priority (of the process)
@@ -14534,7 +14562,7 @@ syspri_1:
 				 ; [u.pri] is set to high
 				 ; but 'runq_event' queue is set
 				 ; only by the kernel's timer
-				 ; event function (timer interrupt). 
+				 ; event function (timer interrupt).
 	call	putlu
 syspri_2:
 	jmp	sysret
@@ -14553,16 +14581,16 @@ cpass: ; / get next character from user area of core and put it in AL (r1)
 	;     zf = 1 -> transfer count has been completed
         ;
 	; ((Modified registers: EAX, EDX, ECX))
-	
+
 	; 30/07/2022
 	sub	eax, eax
-	
+
 	cmp	[u.count], eax ; 0
 	;cmp 	dword [u.count], 0  ; have all the characters been transferred
 			    	    ; i.e., u.count, # of chars. left
 	jna	short cpass_3	    ; to be transferred = 0?) yes, branch
 	dec	dword [u.count]	    ; no, decrement u.count
-        ; 19/05/2015 
+        ; 19/05/2015
 	;(Retro UNIX 386 v1 - translation from user's virtual address
 	;		      to physical address
 	; 30/07/2022
@@ -14578,7 +14606,7 @@ cpass: ; / get next character from user area of core and put it in AL (r1)
 	call	trans_addr_r
 cpass_1:
 	dec	word [u.pcount]
-cpass_2: 
+cpass_2:
 	mov	edx, [u.pbase]
 	mov	al, [edx]	; take the character pointed to
 				; by u.base and put it in r1
@@ -14618,7 +14646,7 @@ transfer_to_user_buffer: ; fast transfer
 	jz	short ttub_4
 
 	mov	[u.count], ecx
-	
+
 	push	edi
 	push	esi
 	push	ebx
@@ -14632,14 +14660,14 @@ ttub_1:
 	; [u.pgdir] = user's page directory
        	call	get_physical_addr_x ; get physical address
 	jc	short ttub_5
-	; eax = physical address 
+	; eax = physical address
 	; ecx = remain byte count in page (1-4096)
 	mov	edi, eax
 	mov	eax, [u.count]
 	cmp	ecx, eax
 	jna	short ttub_2
 	mov	ecx, eax
-ttub_2:	
+ttub_2:
 	sub	eax, ecx
 	add	ebx, ecx
 	rep	movsb
@@ -14706,7 +14734,7 @@ tfub_1:
 	cmp	ecx, eax
 	jna	short tfub_2
 	mov	ecx, eax
-tfub_2:	
+tfub_2:
 	sub	eax, ecx
 	add	ebx, ecx
 	rep	movsb
@@ -14741,7 +14769,7 @@ sysfff: ; <Find First File>
 	;           -derived from TRDOS v1.0, INT_21H.ASM-
 	;            ("loc_INT21h_find_first_file")
 	; TRDOS 8086 (v1.0)
-        ; 	07/08/2011 
+        ; 	07/08/2011
         ;	Find First File
 	;	INPUT:
         ;	    CX= Attributes
@@ -14760,9 +14788,9 @@ sysfff: ; <Find First File>
 	;	    	2 - File not found
 	;	       18 - No more files
         ;
-	; TRDOS 386 (v2.0) 
+	; TRDOS 386 (v2.0)
 	; 15/10/2016
-	;	
+	;
         ; INPUT ->
         ;	   CL = File attributes
 	;     	      bit 0 (1) - Read only file (R)
@@ -14798,7 +14826,7 @@ sysfff: ; <Find First File>
 	;          cf = 1 -> Error code in AL
 	;
 	; Modified Registers: EAX (at the return of system call)
-	;  
+	;
 	; TR-DOS FindFile (FFF) Structure (128 bytes):
 	; 09/10/2011 (DIR.ASM) - 10/02/2016 (trdoskx.s)
 	;
@@ -14948,7 +14976,7 @@ sysfnf_12:
 
         ;mov	esi, FindFile_DirEntry
 	call	get_file_name
-	
+
 	; 25/08/2024
 	; ecx <= 7 (from 'get_file_name')
 	;mov	cl, [FFF_Valid] ; (*)
@@ -15104,7 +15132,7 @@ stsfnf_2:
 	inc	byte [SWP_DRV_chg]
 
 	call	change_current_drive
-	jc	short sysfnf_err_1 ; read error ! 
+	jc	short sysfnf_err_1 ; read error !
 				   ; (do not stop, because
 				   ; we don't have a
 				   ; 'no more files'
@@ -15116,7 +15144,7 @@ sysfnf_3:
 	mov	eax, [FindFile_DirCluster]
 	and	eax, eax
 	jnz	short sysfnf_6
-        
+
 	cmp	byte [Current_FATType], 2
 	ja	short sysfnf_err_0 ; invalid, we neeed to stop !?
 
@@ -15127,14 +15155,14 @@ sysfnf_3:
 %endif
 
 	cmp	byte [DirBuff_ValidData], al ; 0
-	jna	short sysfnf_4 
+	jna	short sysfnf_4
 
 	cmp	eax, [DirBuff_Cluster] ; 0 ?
 	je	short sysfnf_9
 
 	;cmp	byte [Current_Dir_Level], 0
-        ;ja	short sysfnf_4  
-        ;jna	short sysfnf_9 
+        ;ja	short sysfnf_4
+        ;jna	short sysfnf_9
 
 sysfnf_4:
 	inc	byte [SWP_DRV_chg]
@@ -15210,7 +15238,7 @@ writei:
 	; 12/03/2013 - 31/07/2013 (Retro UNIX 8086 v1)
 	;
 	; Write data to file with first cluster number in EAX
-	; 
+	;
 	; INPUTS ->
 	;    EAX - First cluster number of the file
 	;    EBX - File number (Open file index number)
@@ -15242,7 +15270,7 @@ writei_1:
 dskw:
 	mov	[writei.ofn], bl ; Open file number
 	mov	[setfmod], cl ; 0 ; reset 'update lm date&time' sign
-dskw_0: 
+dskw_0:
 	; 26/10/2016
 	; 22/10/2016, 23/10/2016, 25/10/2016
 	; 19/10/2016 - TRDOS 386 (TRDOS v2.0)
@@ -15279,7 +15307,7 @@ dskw_1: ; in as no past info. is to be saved
 	inc	cl
 	; ecx = 1
 	call	disk_read
-	;call	dskrd 	; / no, must retain old info.. 
+	;call	dskrd 	; / no, must retain old info..
 		       	; / Hence, read block 'r1' into an I/O buffer
 	jnc	short dskw_2
 
@@ -15873,7 +15901,7 @@ update_file_lmdt: ; & update file size
 	; 03/09/2024
 	add	ah, 'A'
 	mov	al, [esi+LD_FATType]
-	
+
 	cmp	byte [DirBuff_ValidData], 1
 	jb	short uflmdt_4
 
@@ -16184,7 +16212,7 @@ sysalloc_1:
 	jna	short sysalloc_3 ; begin addr not less than the limit
 	cmp	edx, ecx
 	jb	short sysalloc_3 ; end address overs the limit
-sysalloc_2:	
+sysalloc_2:
 	; EAX = Beginning (physical) addr of the allocated mem block
 	; ECX = Num of allocated bytes (rounded up to page borders) 
 	push	eax ; * ; 04/03/2017
@@ -16446,7 +16474,7 @@ syscalbac:
 	;	    r/w.
 	;
 	; TRDOS 386 - IRQ CALLBACK structures (parameters):
-	;	
+	;
 	;	   [u.irqlock] = 1 word, IRQ flags (0-15) that indicates
 	;			which IRQs are locked by (that) user.
 	;		        Lock and unlock (by user) will change
@@ -16521,7 +16549,7 @@ sysfpstat:
 	; INPUT ->
 	;	BL = 0 -> reset
 	;	BL = 1 -> set (FPU register will be saved and restored)
-	;	
+	;
 	; OUTPUT ->
 	;	cf = 0 -> no error, FPU is ready...
 	;		  (EAX = 0)
@@ -17488,9 +17516,9 @@ sysrename_7:
 	; 'trdosk3.s' (MainProg's 'rename' command) ; 13/11/2017
 	mov	esi, DestinationFile_Name ; (Rename_NewName)
 	mov	cx, [SourceFile_DirEntryNumber] 
-	mov	ax, [SourceFile_DirEntry+20] ; First Cluster, HW 
+	mov	ax, [SourceFile_DirEntry+20] ; First Cluster, HW
 	shl	eax, 16
-	mov	ax, [SourceFile_DirEntry+26] ; First Cluster, LW 
+	mov	ax, [SourceFile_DirEntry+26] ; First Cluster, LW
   	movzx	ebx, byte [SourceFile_LongNameEntryLength]
    	call	rename_directory_entry
 	;jc	short sysrename_error
@@ -17536,7 +17564,7 @@ sysprompt:
 	; 30/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 31/12/2017 (TRDOS 386 = TRDOS v2.0)
 	;
-        ; INPUT -> 
+        ; INPUT ->
 	;	EBX = 0 -> use default prompt
 	;	EBX > 0 -> prompt string (ASCIIZ) address
 	;		  (Max. 11 characters except ZERO tail)
