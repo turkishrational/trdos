@@ -42,6 +42,9 @@ sarý yapýyor... (7 pixel geniþlikteki karakterin hemen saðýnýn tepedeki
 kernelin ilgili 8*8 karakter yazma prosedüründe hata olabilir.
 (Video Mode 13h)
 
+(28/12/2025 - Yukarýdaki kusur artýk yok. Nasýl düzeldi bilmiyorum.
+Emülatörde ve gerçek bilgisayarda porblemsiz görüntü oluyor.) 
+
 ; 27/02/2025
 VGA veya VESA modunda userfont vs yazdýrýlýrken
 sys _video, 020Fh, [wcolor], 8001h
@@ -55,3 +58,54 @@ nasýl bir kusur oluþuyor: potbori.mp3'den sonra alana kvp.mp3 yazýnca,
 görüntü kvp.mp3.mp3 oluyor. Bu durum mp3_file_name string alanýndan
 deðil, drawpplayingscreen esnasýnda önceki potbori.mp3 yazýsýnýn
 silinmemesinden ileri geliyor çünkü burada boþluk karakteri var.
+
+(28/12/2025 - Yukarýdaki kusurun background color yöntemi ile düzeltilmesi
+için sysvideo sistem çaðrýsýnda yapýlacak deðiþiklik veya ekleme
+piksel oerasyonlarýnda karýþýklýðý artýracaðý için, onun yerine
+boþluk karakterinin tam dolu karakter (user font) olarak yazýlmasý daha
+uygun görünüyor. mp3play8.s'de 28/02/2025 bu deðiþikliði yapmýþým.)
+
+; mp3play8.s
+;;;;;;;;;;;;;;;;;;;
+
+		mov	ebp, PlayingScreen ; ((formatted text))
+		; 26/01/2025
+		mov	esi, 0 ; row 0, column 0
+p_d_x:
+		mov	byte [columns], 80
+p_d_x_n:
+		xor	edx, edx
+		mov	dl, [ebp]
+		and	dl, dl
+		jz	short p_d_x_ok
+
+		; 28/02/2025
+		;;;;
+		cmp	dl, 20h
+		jne	short p_d_x_@
+
+		; 28/02/2025 ; !!!!
+		; clear previous character pixels
+		mov	edi, fillblock
+		sys	_video, 020Fh, 0, 8001h
+		jmp	short p_d_x_@@
+p_d_x_@:
+		shl	edx, 4 ; * 16 (for 8x16 font)
+
+		mov	edi, fontbuff2 ; start of user font data
+		add	edi, edx
+
+		; 26/12/2024
+		sys	_video, 020Fh, 0Fh, 8001h ; 8x16 user font
+p_d_x_@@:
+		inc	ebp
+		add	si, 8 ; next char pos
+		dec	byte [columns]
+		jnz	short p_d_x_n	; next column
+		xor	si, si
+		add	esi, 000E0000h	; next row ; 8*14
+		jmp	short p_d_x
+p_d_x_ok:
+		retn
+
+;;;;;;;;;;;;;;;;;;;
