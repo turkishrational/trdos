@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 17/12/2025 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 02/01/2026 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2877,6 +2877,8 @@ loc_next_sum:
 	retn
 
 make_sub_directory:
+	; 02/01/2026
+	; 01/01/2026
 	; 17/12/2025
 	; 01/12/2025
 	; 06/08/2025
@@ -3504,6 +3506,8 @@ loc_mkdir_dirup_err:	; 14/07/2025
 	retn
 
 loc_mkdir_anc_@:
+; 02/01/2026
+%if 0
 	cmp	byte [edx+LD_FATType], 2
 	jna	short loc_mkdir_anc_1 ; not FAT32
 	; FAT32 fs
@@ -3526,6 +3530,8 @@ loc_mkdir_anc_2:
 	cmp	ecx, ebx
 	jna	short loc_mkdir_anc_3
 	mov	dword [esi], 2
+%endif
+
 loc_mkdir_anc_3:
 	; [mkdir_dirsector] = phys sector address
 	;	of the 1st sector of the new cluster
@@ -3621,6 +3627,9 @@ zerodir_ok:
 	; 01/12/2025
 	xor	edi, edi ; 0
 %endif
+
+; 02/01/2026
+%if 0
 	cmp	byte [edx+LD_FATType], 2
 	jna	short loc_mkdir_dec_fat_fc ; not FAT32
 
@@ -3636,11 +3645,12 @@ zerodir_ok:
 	inc	ecx
 	mov	[edx+LD_BPB+FAT32_FirstFreeClust], ecx
 
+; 02/01/2026
 ; 17/12/2025
-%if 0
-	; 01/12/2025
-	inc	edi
-%endif
+;%if 0
+;	; 01/12/2025
+;	inc	edi
+;%endif
 	mov	eax, [edx+LD_Clusters] ; Last Cluster - 1
 	inc	eax  ; last cluster
 	cmp	ecx, eax
@@ -3676,14 +3686,17 @@ loc_mkdir_dec_fat32_fc:
 	movzx	eax, byte [mkdir_SecPerClust]
 	sub	[edx+LD_FreeSectors], eax
 
+; 02/01/2026
 ; 17/12/2025
-%if 0
-	; 01/12/2025
-	cmp	byte [edx+LD_FATType], 2
-	jna	short loc_mkdir_skip_dec_fc_@ ; not FAT32
-	inc	edi
-	jmp	short loc_mkdir_set_fsinfo_mf
-%endif
+;%if 0
+;	; 01/12/2025
+;	cmp	byte [edx+LD_FATType], 2
+;	jna	short loc_mkdir_skip_dec_fc_@ ; not FAT32
+;	inc	edi
+;	jmp	short loc_mkdir_set_fsinfo_mf
+;%endif
+
+%endif ; 02/01/2026
 
 loc_mkdir_skip_dec_fc:
 ; 17/12/2025
@@ -3747,6 +3760,8 @@ loc_mkdir_error:	; error code in EAX
 	push	eax
 	mov	eax, [mkdir_FFCluster]
 	call	RELEASE
+; 01/01/2026
+%if 0
 	jc	short loc_mkdir_error_3
 	;;;;
 	cmp	byte [edx+LD_FATType], 2
@@ -3764,6 +3779,7 @@ loc_mkdir_error_2:
 	; change first free cluster number
 	mov	[ebx], eax
 loc_mkdir_error_3:
+%endif
 	mov	esi, edx ; LDRVT address
 	;call	dirup_@
 	;;;;
@@ -4004,8 +4020,9 @@ convert_current_date_time:
 
 	retn
 
+; 02/01/2026
 ; 07/12/2025 - TRDOS 386 v2.0.10 (v2.1)
-%if 1
+%if 0
 
 save_directory_buffer:
 	; 30/07/2022
@@ -4282,7 +4299,7 @@ loc_update_parent_dir_lmdt_bw:
 	;xor	al, al
 %endif
 loc_update_parent_dir_lmdt_restore_cdirlevel:
- 	;current directory level restoration
+ 	; current directory level restoration
 	; 15/07/2025
 	xor	eax, eax ; 0 ; clc
 	mov	ah, [UPDLMDT_CDirLevel]
@@ -4707,6 +4724,7 @@ loc_lcde_load_dir_cluster_1:
 %endif
 
 remove_file:
+	; 01/01/2026
 	; 21/07/2025 (TRDOS 386 Kernel v2.0.10)
 	;  (Ref: DOS_DELETE, Retro DOS v5.0 - ibmdos7.s)
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -4775,23 +4793,25 @@ loc_delfile_unlink_cluster_chain:
 	mov	edx, esi
 	call	RELEASE
 	jc	short loc_del_file_err_retn
-
-	cmp	byte [edx+LD_FATType], 2
-	jna	short remove_file_1 ; not FAT32
-
-	; FAT32 fs
-	lea	ebx, [edx+LD_BPB+FAT32_FirstFreeClust]
-	jmp	short remove_file_2
-
-remove_file_1:
-	; FAT16 or FAT12 fs
-	lea	ebx, [edx+LD_BPB+FAT_FirstFreeClust]
-remove_file_2:
-	mov	eax, [DelFile_FCluster]
-	cmp	eax, [ebx]
-	jnb	short remove_file_3
-	; replace first free cluster value
-	mov	[ebx], eax
+; 01/01/2026
+;%if 0
+;	cmp	byte [edx+LD_FATType], 2
+;	jna	short remove_file_1 ; not FAT32
+;
+;	; FAT32 fs
+;	lea	ebx, [edx+LD_BPB+FAT32_FirstFreeClust]
+;	jmp	short remove_file_2
+;
+;remove_file_1:
+;	; FAT16 or FAT12 fs
+;	lea	ebx, [edx+LD_BPB+FAT_FirstFreeClust]
+;remove_file_2:
+;	mov	eax, [DelFile_FCluster]
+;	cmp	eax, [ebx]
+;	jnb	short remove_file_3
+;	; replace first free cluster value
+;	mov	[ebx], eax
+;%endif
 remove_file_3:
 	;;;;
 	; 21/07/2025
@@ -5142,6 +5162,7 @@ loc_rename_direntry_update_parent_dir_lm_date:
 	retn
 
 move_source_file_to_destination_file:
+	; 02/01/2026
 	; 16/12/2025
 	; 13/11/2025
 	; 22/09/2025
@@ -5670,6 +5691,8 @@ msftdf_mkde_dirup_err:
 	retn
 
 msftdf_anc_@:
+; 02/01/2026
+%if 0
 	cmp	byte [edx+LD_FATType], 2
 	jna	short msftdf_anc_1 ; not FAT32
 	; FAT32 fs
@@ -5690,6 +5713,8 @@ msftdf_anc_2:
 	cmp	ecx, ebx
 	jna	short msftdf_anc_3
 	mov	dword [esi], 2
+%endif
+
 msftdf_anc_3:
 	; [createfile_dirsector] = physical sector address
 	;	of the 1st sector of the new cluster
@@ -5847,11 +5872,12 @@ msftdf_retn:
 	retn
 
 copy_source_file_to_destination_file:
+	; 02/01/2026
+	; 01/01/2026
 	; 17/12/2025
-	; 15/12/2025	
+	; 15/12/2025
 	; 01/12/2025
-	; 13/11/2025
-	; 11/11/2025
+	; 11/11/2025, 13/11/2025
 	; 09/11/2025, 10/11/2025
 	; 07/11/2025
 	; 18/10/2025
@@ -6470,6 +6496,8 @@ csftdf2_df_release_cc_1:
 
 	; free sectors already adjusted in RELEASE
 
+; 02/01/2026
+%if 0
 	cmp	byte [edx+LD_FATType], 2
 	jna	short csftdf2_df_release_cc_2 ; not FAT32
 
@@ -6486,6 +6514,7 @@ csftdf2_df_release_cc_3:
 	jnb	short csftdf2_df_release_cc_4
 	; replace first free cluster value
 	mov	[ebx], eax
+%endif
 	
 ; 17/12/2025
 %if 0
@@ -6761,6 +6790,7 @@ csftdf2_enable_percentage_display:
 
 	; 11/10/2025 - TRDOS 386 v2.0.10
 csftdf2_load_file:
+	; 01/01/2026
 	; 17/12/2025
 	; 13/05/2016
 	; 19/03/2016
@@ -6891,10 +6921,16 @@ csftdf2_write_fat_file_err:
 	; is it already allocated ?
 	or	ebx, ebx
 	jz	short csftdf2_write_fat_file_err2 ; no
+
+	; 01/01/2026
+	push	eax ; error code
+
 	mov	eax, ebx
 
 	call	RELEASE
 
+; 01/01/2026
+%if 0
 	; free sectors already adjusted in RELEASE
 	cmp	byte [edx+LD_FATType], 2
 	jna	short csftdf2_write_fat_file_err_rcc1
@@ -6912,6 +6948,9 @@ csftdf2_write_fat_file_err_rcc2:
 	jnb	short csftdf2_write_fat_file_err2
 	; replace first free cluster value
 	mov	[ebx], eax
+%endif
+	; 01/01/2026
+	pop	eax ; error code
 	;***
 csftdf2_write_fat_file_err2:
 	jmp	csftdf2_rw_error
@@ -8053,6 +8092,8 @@ csftdf2_save_file_@:
 	call	BUFWRITE
 	jc	short csftdf2_write_error
 
+; 02/01/2026
+%if 0
 	; 18/10/2025
 	;;;
 	cmp	byte [edx+LD_FATType], 2
@@ -8062,15 +8103,10 @@ csftdf2_save_file_@:
 	; 17/12/2025 (Set FSINFO modified flag)
 	mov	byte [edx+LD_BPB+BS_FAT32_Reserved1], -1
 	jmp	short csftdf2_save_file_cffc_2
+%endif
 
-	; 17/10/2025
-csftdf2_write_error:
-	; 18/03/2016
-	;mov	al, 1Dh ; write error
-	; 31/08/2024
-	mov	al, ERR_DRV_WRITE ; 18 ; write error
-	jmp	csftdf2_rw_error
-
+; 02/01/2026
+%if 0
 csftdf2_save_file_cffc_1:
 	; FAT16 or FAT12 fs
 	lea	esi, [edx+LD_BPB+FAT_FirstFreeClust]
@@ -8088,6 +8124,7 @@ csftdf2_save_file_cffc_2:
 	cmp	ecx, ebx
 	jna	short csftdf2_save_file_cffc_3
 	mov	dword [esi], 2
+%endif
 
 csftdf2_save_file_cffc_3:
 	; 18/10/2025
@@ -8113,6 +8150,15 @@ csftdf2_save_file_cffc_3:
 	retn
 	;;;
 
+; 02/01/2026
+	; 17/10/2025
+csftdf2_write_error:
+	; 18/03/2016
+	;mov	al, 1Dh ; write error
+	; 31/08/2024
+	mov	al, ERR_DRV_WRITE ; 18 ; write error
+	jmp	csftdf2_rw_error
+
 %endif
 
 csftdf2_save_fs_file:
@@ -8126,6 +8172,7 @@ csftdf2_save_fs_file:
 	retn
 
 create_file:
+	; 02/01/2026
 	; 01/12/2025
 	; 19/11/2025
 	; 11/11/2025
@@ -8398,6 +8445,8 @@ loc_createfile_dirup_err:
 
 	; 06/08/2025 - TRDOS 386 v2.0.10
 loc_createfile_anc_@:
+; 02/01/2026
+%if 0
 	cmp	byte [edx+LD_FATType], 2
 	jna	short loc_createfile_anc_1 ; not FAT32
 	; FAT32 fs
@@ -8425,6 +8474,8 @@ loc_createfile_anc_4:
 	cmp	ecx, ebx
 	jna	short loc_createfile_anc_3
 	mov	dword [esi], 2
+%endif
+
 loc_createfile_anc_3:
 	; [createfile_dirsector] = phys sector address
 	;	of the 1st sector of the new cluster

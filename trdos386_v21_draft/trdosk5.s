@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 16/12/2025 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 02/01/2026 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2156,7 +2156,7 @@ set_fat32_fsinfo_sector_parms:
 	; INPUT ->
 	;	ESI = Logical dos drive description table address
 	;	[esi+LD_BPB+BPB_Reserved] = Free Cluster Count
-	;	[esi+LD_BPB+BPB_Reserved+4] = First Free Cluster 
+	;	[esi+LD_BPB+BPB_Reserved+4] = First Free Cluster
 	; OUTPUT ->
 	;	ESI = Logical dos drive description table address
 	; 	CF = 0 -> OK..
@@ -2200,10 +2200,10 @@ get_fat32_fsinfo_sector_parms:
 	;	CF = 0 -> OK..
 	;	   EAX = FsInfo sector address
 	;	   ECX = Free cluster count
-	;	   EDX = First free cluster 	
+	;	   EDX = First free cluster
 	;	CF = 1 -> Error code in AL (EAX)
 	;	   EBX = 0
-	;	
+	;
 	;	[CFS_FAT32FSINFOSEC] = FAT32 FSINFO sector address
         ;
 	; (Modified registers: EAX, EBX, ECX, EDX)
@@ -2235,7 +2235,7 @@ get_fat32_fsinfo_sector_parms:
 
 	retn
 
-loc_read_FAT32_fsinfo_sec_stc: 
+loc_read_FAT32_fsinfo_sec_stc:
 	; 15/10/2016 (0Bh -> 28)
 	;mov	eax, 28 ; Invalid format!
 	; 25/07/2022
@@ -2259,8 +2259,9 @@ loc_read_FAT32_fsinfo_sec_stc_retn:
 
 %endif
 
+; 01/01/2026
 ; 07/12/2025 - TRDOS 3865 v2.0.10 (v2.1)
-%if 1
+%if 0
 
 add_new_cluster:
 	; 30/08/2024
@@ -2519,7 +2520,7 @@ write_fat_file_sectors:
 
 	call	disk_write
 	jnc	short wclust_retn
-	
+
 	; 15/10/2016 (1Dh -> 18)
 	mov	eax, 18 ; Drive not ready or write error !
 	retn
@@ -2572,7 +2573,7 @@ get_cluster_by_index:
 	;	cf = 1 -> Error code in AL (EAX)
 	;
 	;(Modified registers: EAX, ECX, EBX, EDX)
-	;	
+	;
 	cmp	byte [esi+LD_FATType], 1
         ;jb	short get_fs_section_by_index
 	; 01/07/2025
@@ -2664,7 +2665,7 @@ get_fs_sbi_6:
 	retn
 
 get_last_section:
-	; 22/10/2016 (TRDOS 386 = TRDOS v2.0)	
+	; 22/10/2016 (TRDOS 386 = TRDOS v2.0)
 	; INPUT ->
 	; 	EAX = (The 1st) FDT number/address
 	; 	ESI = Logical DOS Drive Description Table address
@@ -2673,7 +2674,7 @@ get_last_section:
 	; 	EDX = Last sector of the section (0,1,2,3,4...)
 	;	[glc_index] = sector index number of the last sector
 	;		      (for file, not for the last section)
-	;		   	
+	;
 	;	cf = 1 -> Error code in AL (EAX)
 	;
 	;(Modified registers: EAX, ECX, EBX, EDX)
@@ -2689,6 +2690,7 @@ get_last_section:
 ; 21/04/2025 - TRDOS 386 v2.0.10
 
 update_directory_entry:
+	; 02/01/2026
 	; 03/05/2025
 	; 29/04/2025
 	; 27/04/2025
@@ -2706,11 +2708,17 @@ update_directory_entry:
 	;	eax, edx, ecx, esi, edi, ebp
 	;
 
+	; 02/01/2026
+	shl	ebx, 2
+
 	mov	eax, [ebx+OF_DIRSECTOR] ; (physical sector number)
+	; 02/01/2026
+	shr	ebx, 2
 	xor	edx, edx
 	mov	dh, [ebx+OF_DRIVE]	; (logical drive number)
-	
-	; convert logical drv sector number to physical disk sector number
+	add	edx, Logical_DOSDisks
+
+	; convert logical drv sector num to physical disk sector num
 	;add	eax, [edx+LD_StartSector] ; ! physical address !
 	mov	cl, [edx+LD_PhyDrvNo]
 
@@ -2720,7 +2728,7 @@ update_directory_entry:
 
 	; esi = [CurrentBuffer]
 	or	byte [esi+BUFFINFO.buf_flags], buf_isDIR
-	
+
 	xor	eax, eax
 	mov	al, dir_entry.size ; 32
 	mul	byte [ebx+OF_DIRPOS]
@@ -2765,7 +2773,7 @@ ude_2:
 	mov	[edi+DirEntry_Attr], al
 
 	push	ebx
-	
+
 	shl	ebx, 2
 	mov	eax, [ebx+OF_FCLUSTER]
 	mov	[edi+DirEntry_FstClusLO], ax
@@ -2773,12 +2781,16 @@ ude_2:
 	mov	[edi+DirEntry_FstClusHI], ax
 
 	mov	eax, [ebx+OF_DATETIME] ; lw = time, hw = date
-	mov	[edi+DirEntry_CrtTime], eax ; hw = DirEntry_CrtDate
+
+	;mov	[edi+DirEntry_CrtTime], eax ; hw = DirEntry_CrtDate
+	; 02/01/2026
+	; set last modification date & time
+	mov	[edi+DirEntry_WrtTime], eax ; hw = DirEntry_WrtDate
 
 	mov	eax, [ebx+OF_SIZE]
 	mov	[edi+DirEntry_FileSize], eax
 
-	mov	esi, [CurrentBuffer] 
+	mov	esi, [CurrentBuffer]
 
 	test	byte [esi+BUFFINFO.buf_flags], buf_dirty
 	jnz	short ude_3		; already dirty buffer
@@ -2823,6 +2835,7 @@ ude_4:
 ; 21/04/2025 - TRDOS 386 v2.0.10
 
 GETFATBUFFER:
+	; 01/01/2026
 	; 09/11/2025
 	; 19/10/2025
 	; 22/07/2025
@@ -2835,6 +2848,7 @@ GETFATBUFFER:
 	jmp	short getb_x
 
 GETBUFFER_NPR:
+	; 01/01/2026
 	; 09/11/2025
 	; 19/10/2025
 	; 22/07/2025
@@ -2848,6 +2862,7 @@ GETBUFFER_NPR:
 	jmp	short getb_x
 
 GETBUFFER:
+	; 01/01/2026
 	; 09/11/2025
 	; 19/10/2025
 	; 22/07/2025
@@ -2977,7 +2992,7 @@ getb_9:
 	call	BUFWRITE	; write out the dirty buffer
 	;jc	short getb_11
 	; 05/06/2025
-	jc	short getb_12
+	jc	short getb_12	; eax = ERR_DRV_WRITE  
 
 	mov	eax, ebp	; restore sector number
 getb_10:
@@ -3010,6 +3025,9 @@ getb_10:
 	jmp	short getb_14
 
 getb_11:
+	; 01/01/2026
+	mov	eax, ERR_DRV_READ ; 'disk read error !'
+
 	; 05/06/2025
 	pop	ebp ; **** ; disk sector number
 	; 28/04/2025
@@ -3653,6 +3671,7 @@ IsEOF_FAT32:
 ; 28/04/2025 - TRDOS 386 v2.0.10
 
 FATSECRD:
+	; 01/01/2026
 	; 28/04/2025
 	; (MSDOS -> FATSECRD) - Ref: Retro DOS v5 - ibmdos7.s
 	; Read a FAT sector
@@ -3664,7 +3683,7 @@ FATSECRD:
 	; OUTPUT:
 	;	Calls to disk bios (disk_read)
 	;
-	;	if cf = 1 -> eax = error code
+	;;;;	if cf = 1 -> eax = error code
 	;
 	; Modified registers:
 	;	EAX, ECX, EDX
@@ -3699,7 +3718,8 @@ fatsecrd_1:
 	; 28/04/2025
 	;mov	edx, esi ; LDRVT address for failed disk read
 
-	mov	eax, ERR_DRV_READ ; 'disk read error !'
+	; 01/01/2026
+	;mov	eax, ERR_DRV_READ ; 'disk read error !'
 	stc
 fatsecrd_2:
 	retn
@@ -5352,7 +5372,7 @@ adc_15:
 	;call	UNPACK		; Get first cluster allocated for return
 	;jc	short adc_10
 	;mov	[NEXTCLUSTER], eax
-	;call	RESTFATBYT      ; Restore correct cluster 0 value
+	;call	RESTFATBYT	; Restore correct cluster 0 value
 	;jc	short adc_10
 
 	; 21/11/2025
@@ -5366,7 +5386,7 @@ adc_15:
 	sub	ebx, ebx ; 0
 	call	PACK	; mark cluster free
 	; FAT write error !
-	mov	eax, ERR_MISC ; 27 ; miscellaneous/other errors	
+	mov	eax, ERR_MISC ; 27 ; miscellaneous/other errors
 	stc
 	retn
 adc_18:
@@ -5460,6 +5480,7 @@ RELEASE:
 RELEASE_nc:	; 21/07/2025
        	xor	ebx, ebx
 RELBLKS:
+	; 01/01/2026
 	; 16/12/2025
 	; 13/12/2025
 	; 01/12/2025
@@ -5510,16 +5531,23 @@ RELBLKS:
 	or	ebx, ebx
 	jnz	short rblks_3 ; Was putting EOF mark
 
+	; 01/01/2026
+	xor	ecx, ecx
+
 	cmp	byte [edx+LD_FATType], 2
 	jna	short rblks_1 ; not FAT32
 
 	; FAT32 fs
 	lea	ebx, [edx+LD_BPB+FAT32_FreeClusters]
+	; 01/01/2026
+	lea	esi, [edx+LD_BPB+FAT32_FirstFreeClust]
 	jmp	short rblks_2
 
 rblks_1:
 	; FAT16 or FAT12 fs
 	lea	ebx, [edx+LD_BPB+FAT_FreeClusters]
+	; 01/01/2026
+	lea	esi, [edx+LD_BPB+FAT_FirstFreeClust]
 
 	; 19/10/2025
 	; (clear carry flag is needed here for FAT12 fs)
@@ -5527,8 +5555,10 @@ rblks_1:
 rblks_2:
 	mov	eax, [ebx]
 	inc	eax ; -1 -> 0
-	;jz	short NO_DEALLOC ; Free count not valid
-	jz	short rblks_3
+	;;jz	short NO_DEALLOC ; Free count not valid
+	;jz	short rblks_3
+	; 01/01/2026
+	jz	short rblks_5
 
 	; Increase free count by 1
 
@@ -5537,6 +5567,22 @@ rblks_2:
 	; 17/07/2025
 	add	[edx+LD_FreeSectors], eax
 
+	; 01/01/2026
+	inc	ecx
+rblks_5:
+	mov	eax, [esi]
+	inc	eax ; -1 -> 0
+	jz	short rblks_6 ; First free cluster not valid
+
+	cmp	eax, [NEXTCLUSTER]
+	jna	short rblks_6
+	mov	ecx, [NEXTCLUSTER]
+	mov	[esi], ecx
+	jmp	short rblks_7
+rblks_6:
+	and	ecx, ecx
+	jz	short rblks_3 ; FSINFO not modified
+rblks_7:
 	; 01/12/2025
 	cmp	byte [edx+LD_FATType], 2
 	jna	short rblks_3 ; not FAT32

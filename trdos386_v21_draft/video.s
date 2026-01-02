@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.10 - video.s
 ; ----------------------------------------------------------------------------
-; Last Update: 21/12/2025 (Previous: 29/11/2023 - Kernel v2.0.7)
+; Last Update: 22/12/2025 (Previous: 29/11/2023 - Kernel v2.0.7)
 ; ----------------------------------------------------------------------------
 ; Beginning: 16/01/2016
 ; ----------------------------------------------------------------------------
@@ -210,6 +210,8 @@ M1:	dd	SET_MODE	; TABLE OF ROUTINES WITHIN VIDEO I/O
 	dd	WRITE_STRING	; 23/06/2016 (TRDOS 386)
 M1L	EQU	$ - M1
 
+; 22/12/2025
+; 21/12/2025 - TRDOS 386 v2.0.10
 ; 29/11/2023 - TRDOS 386 v2.0.7
 ;	[VESA VBE3-PMI functions]
 ;	(fixing page table problems for LFB/PMI for >2.5GB main memory)
@@ -260,7 +262,7 @@ VGA_func: ; 26/11/2020
 
 	; 26/11/2020
 	push	eax ; -
-	
+
 	mov	ax, KDATA 		; POINT DS: TO DATA SEGMENT
 	mov	ds, ax
 	mov	es, ax
@@ -343,30 +345,32 @@ vbe_pmi32_0:
 vbe_pmi32_1:
 	jmp	vesa_vbe3_pmi
 
-; 21/12/2025 - TRDOS 386 v2.0.10
-; set character height (needed) for next system calls
+;vbe_pmi32_2:
+	;cmp	ah, 04h ; set mode (no clear mem option)
+	;jne	short vbe_pmi32_1
+
+vbe_pmi32_2:
+
+	; 22/12/2025
+	; 21/12/2025 - TRDOS 386 v2.0.10
+	; set character height (needed) for next system calls
 	;;;;
 vbe_pmi32_3:
 	push	esi
 	push	eax
 	mov	ah, al
 	and	ah, 7Fh
-	mov	esi, vga_g_modes
+	mov	esi, vga_modes
 vbe_pmi32_3_1:
 	lodsb
 	cmp	ah, al
-	je	short vbe_pmi32_3_3
-	cmp	esi, vga_g_modes+vga_g_mode_count
+	je	short vbe_pmi32_3_2
+	cmp	esi, vga_modes+vga_mode_count
 	jb	short vbe_pmi32_3_1
 vbe_pmi32_3_2:
-	pop	eax
-	pop	esi
-	;jmp	short vbe_pmi32_1
-	jmp	vesa_vbe3_pmi
-vbe_pmi32_3_3:
-	sub	esi, vga_g_modes
+	sub	esi, vga_modes
 	shl	esi, 2  ; dword
-	add	esi, vga_g_mode_tbl_ptr
+	add	esi, vga_mode_tbl_ptr
 	mov	esi, [esi]
 	lodsw
 	mov	[CRT_COLS], al
@@ -375,27 +379,20 @@ vbe_pmi32_3_3:
 	mov	al, [esi]
 	;lodsb
 	mov	[CHAR_HEIGHT], al
-	jmp	short vbe_pmi32_3_2
+vbe_pmi32_4:
+	pop	eax
+	pop	esi
 	;;;;
 
-;vbe_pmi32_2:
-	;cmp	ah, 04h ; set mode (no clear mem option)
-	;jne	short vbe_pmi32_1
-
-vbe_pmi32_2:
 	; 07/12/2020
 	cmp	byte [CRT_MODE], 7 ; current mode > 7 ?
-	;ja	short vbe_pmi32_1  ; yes
-	; 21/12/2025
-	ja	short vbe_pmi32_3
+	ja	short vbe_pmi32_1  ; yes
 
 	cmp	al, 7	; requested mode > 7 ?
 	jna	short VGA_funcs_0  ; no (CGA)
 
 	cmp	al, 13h
-	;jna	short vbe_pmi32_1
-	; 21/12/2025
-	jna	short vbe_pmi32_3
+	jna	short vbe_pmi32_1
 
 	test	al, 80h
 	jz	short VGA_funcs_0  ; unknown or special
@@ -405,9 +402,7 @@ vbe_pmi32_2:
 	jna	short VGA_funcs_0  ; no (CGA)
 
 	cmp	al, 93h
-	;jna	short vbe_pmi32_1
-	; 21/12/2025
-	jna	short vbe_pmi32_3
+	jna	short vbe_pmi32_1
 
 	; > 13h video modes are unknown or special
  	; they must be handled by kernel

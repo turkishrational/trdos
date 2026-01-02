@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 08/12/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 02/01/2026 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -553,7 +553,7 @@ csftdf_sf_cs:	      resb 1
 csftdf_df_spc:	      resb 1
 csftdf_df_cs:	      resb 1
 ; 09/11/2025
-csftdf_sf_sector:     resd 1		
+csftdf_sf_sector:     resd 1
 
 ; 18/10/2025 - TRDOS 386 v2.0.10
 
@@ -603,28 +603,36 @@ readi.fclust:	resd 1 ; first cluster of the current cluster
 ; 01/07/2025
 ;readi.fs_index: resd 1 ; sector index in disk/file section (for Singlix FS)
 ; 08/12/2025
-readi.buffer:	resd 1 ; readi sector buffer address
+;readi.buffer:	resd 1 ; readi sector buffer address
 
 ;alignb 4
 
+; 02/01/2026
+writei.ofn:	resb 1 ; open file number (to be written) ; 23/10/2016
 writei.valid:	resb 1 ; valid data (>0 = valid for writei)
 writei.drv:	resb 1 ; drive number (0, 1,2,3,4..)
-writei.spc:	resb 1 ; sectors per cluster for 'writei' drive
+;writei.spc:	resb 1 ; sectors per cluster for 'writei' drive
 writei.s_index: resb 1 ; sector index in current cluster (buffer)
-writei.sector:	resd 1 ; current disk sector
+; 01/01/2026
+;writei.sector:	resd 1 ; current disk sector
 ;writei.bpc:	resw 1 ; bytes per cluster - 1
 ;writei.offset:	resw 1 ; byte offset in cluster buffer
 ; 08/12/2025
 writei.bpc:	resd 1 ; bytes per cluster
-writei.offset:	resd 1 ; byte offset in cluster buffer
+;writei.offset:	resd 1 ; byte offset in cluster buffer
 writei.cluster: resd 1 ; current cluster number
 writei.c_index:	resd 1 ; cluster index of the current cluster (0,1,2,3..)
 writei.fclust:  resd 1 ; first cluster of the current cluster
-writei.fs_index: resd 1 ; sector index in disk/file section (for Singlix FS)
+;writei.fs_index: resd 1 ; sector index in disk/file section (for Singlix FS)
 ;writei.buffer:	resd 1 ; writei sector buffer address
 writei.lclust:	resd 1 ; writei last cluster (mget_w) ; 23/10/2016
-writei.l_index:	resd 1 ; writei last cluster index (mget_w) ; 23/10/2016
-writei.ofn:	resb 1 ; open file number (to be written) ; 23/10/2016
+;writei.l_index: resd 1 ; writei last cluster index (mget_w) ; 23/10/2016
+; 01/01/2026
+writei.n_clust: resd 1 ; 1st of added clusters
+writei.lc_index: resd 1 ; new last cluster's index number
+writei.nc_count: resd 1 ; new (added) cluster count
+writei.pc_index: resd 1 ; previous last cluster index
+writei.p_cluster: resd 1 ; previous last cluster
 
 alignb 4
 
@@ -836,13 +844,14 @@ OF_STATUS:	resb OPENFILES  ; (bit 0 = read, bit 1 = write)
 OF_OPENCOUNT:	resb OPENFILES  ; Open counts of open files
 OF_POINTER:	resd OPENFILES	; File seek/read/write pointer
 OF_SIZE:	resd OPENFILES	; File sizes of open files (in bytes)
-OF_DIRFCLUSTER:	resd OPENFILES  ; Directory First Clusters of open files
-OF_DIRCLUSTER:	resd OPENFILES  ; Directory (Entry) Clusters of open files
+; 02/01/2026
+;OF_DIRFCLUSTER:resd OPENFILES  ; Directory First Clusters of open files
+;OF_DIRCLUSTER:	resd OPENFILES  ; Directory (Entry) Clusters of open files
 OF_VOLUMEID:	resd OPENFILES  ; Vol ID for removable drives of open files
-OF_CCLUSTER:	resd OPENFILES  ; Current clusters of open files
-OF_CCINDEX:	resd OPENFILES  ; Cluster index numbers of current clusters
+;OF_CCLUSTER:	resd OPENFILES  ; Current clusters of open files
+;OF_CCINDEX:	resd OPENFILES  ; Cluster index numbers of current clusters
 ; 24/10/2016
-OF_DIRENTRY:	resw OPENFILES  ; Directory entry index no. in dir cluster
+;OF_DIRENTRY:	resw OPENFILES  ; Directory entry index no. in dir cluster
 				; Sector index = entry index / 16
 ; 21/04/2025 - TRDOS 386 v2.0.10
 OF_DIRSECTOR:	resd OPENFILES	; Directory Sector Numbers of open files
@@ -852,7 +861,7 @@ OF_NAME:	resb OPENFILES*12 ; File name in directory entry format
 OF_ATTRIB:	resb OPENFILES	; File attributes
 OF_DATETIME:	resd OPENFILES	; Last modification time (LW) and date (hw)
 ; 11/07/2025
-OF_LCLUSTER:	resd OPENFILES  ; Last clusters of open files
+;OF_LCLUSTER:	resd OPENFILES  ; Last clusters of open files
 
 ;alignb 2
 
@@ -879,7 +888,7 @@ DEV_INT_HNDLR:	resd 16		; Device Interrupt Handler addr, if > 0
 ; 26/02/2017 ; IRQ Callback parameters ('syscalbac')
 ;Index: ; 0 to 8
 ;	0 = IRQ3, 1 = IRQ4, 2 = IRQ5, 3 = IRQ7
-;	4 = IRQ9, 5 = IRQ10, 6 = IRQ11, 7 = IRQ12, 8 = IRQ13  
+;	4 = IRQ9, 5 = IRQ10, 6 = IRQ11, 7 = IRQ12, 8 = IRQ13
 IRQ.owner:	resb 9		; owner, 0 = free, >0 = [u.uno]
 IRQ.dev:	resb 9		; 0 = default/kernel, >0 = device number
 IRQ.method:	resb 9 		; 0 = Signal Response Byte, 1 = Callback
@@ -927,7 +936,7 @@ audio_cb_addr:	resd 1  ; callback service address or s.r.b. address
 
 audio_bps:	resb 1  ; selected mode: 8 bit, 16 bit
 audio_stmo:	resb 1	; selected mode: mono /stereo
-audio_freq: 	resw 1	; sampling rate
+audio_freq:	resw 1	; sampling rate
 ; 20/11/2023
 VRA:		resb 1
 audio_mode:	resb 1

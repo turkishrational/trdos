@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 17/12/2025  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 01/01/2026  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -4730,6 +4730,7 @@ loc_rmdir_directory_not_empty:
 %endif
 
 delete_sub_directory:
+	; 01/01/2026
 	; 17/12/2025
 	; 05/12/2025
 	; 17/07/2025
@@ -5173,29 +5174,31 @@ del_sub_dir_8:
 	mov	eax, [rmdir_FCluster]
 	call	RELEASE
 	jc	short NOTDIRPATHPOP
-
-	cmp	byte [edx+LD_FATType], 2
-	jna	short del_sub_dir_9 ; not FAT32
-
-	; FAT32 fs
-	lea	ebx, [edx+LD_BPB+FAT32_FirstFreeClust]
-
-	; 17/12/2025
-	; (set FSINFO modified flag)
-	;mov	byte [edx+LD_BPB+BS_FAT32_Reserved1], -1
-
-	jmp	short del_sub_dir_10
-
-del_sub_dir_9:
-	; FAT16 or FAT12 fs
-	lea	ebx, [edx+LD_BPB+FAT_FirstFreeClust]
-del_sub_dir_10:
-	mov	eax, [rmdir_FCluster]
-	cmp	eax, [ebx]
-	jnb	short del_sub_dir_11
-	; replace first free cluster value
-	mov	[ebx], eax
-del_sub_dir_11:
+; 01/01/2026
+;%if 0
+;	cmp	byte [edx+LD_FATType], 2
+;	jna	short del_sub_dir_9 ; not FAT32
+;
+;	; FAT32 fs
+;	lea	ebx, [edx+LD_BPB+FAT32_FirstFreeClust]
+;
+;	; 17/12/2025
+;	; (set FSINFO modified flag)
+;	;mov	byte [edx+LD_BPB+BS_FAT32_Reserved1], -1
+;
+;	jmp	short del_sub_dir_10
+;
+;del_sub_dir_9:
+;	; FAT16 or FAT12 fs
+;	lea	ebx, [edx+LD_BPB+FAT_FirstFreeClust]
+;del_sub_dir_10:
+;	mov	eax, [rmdir_FCluster]
+;	cmp	eax, [ebx]
+;	jnb	short del_sub_dir_11
+;	; replace first free cluster value
+;	mov	[ebx], eax
+;del_sub_dir_11:
+;%endif
 	;;;;
 	; 18/07/2025
 	movzx	ecx, byte [rmdir_LNEL]
