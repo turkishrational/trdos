@@ -1865,7 +1865,7 @@ syscreat_4:
 	;mov	[FindFile_Drv], al ; OF_DRIVE
 
 	mov	eax, [createfile_entrypos] ; dir entry position
-	shr	eax, 5 ; /32 ; directory enty sequence number
+	shr	eax, 5 ; /32 ; directory entry sequence number
 	mov	[FindFile_DirEntryNumber], al ; OF_DIRPOS
 	mov	eax, [createfile_dirsector]
 	mov	[FindFile_DirSector], eax ; OF_DIRSECTOR
@@ -16006,6 +16006,7 @@ find_next_fs_file:
 	retn
 
 writei:
+	; 03/01/2026
 	; 02/01/2026
 	; 01/01/2026
 	; 08/12/2025 - TRDOS 386 v2.0.10 (v2.1)
@@ -16235,11 +16236,20 @@ dskw_5:
 	jna	short dskw_6
 	mov	[ebx+OF_SIZE], eax
 dskw_6:
+	; 03/01/2026
+	mov	eax, [writei.fclust]
+	cmp	[ebx+OF_FCLUSTER], eax ; 0 ?
+	je	short dskw_6_@ ; no
+	; OF_FCLUSTER value is ZERO here (new file)
+	; so, it must be set
+	mov	[ebx+OF_FCLUSTER], eax
+dskw_6_@:
 	; 02/01/2026
 	;shr	bl, 2
         cmp     dword [u.count], 0 ; / any more data to write?
 	jna	short dskw_7
-	mov	eax, [writei.fclust]
+	; 03/01/2026
+	;mov	eax, [writei.fclust]
 	jmp	dskw_0 ; / yes, branch
 
 	; 01/01/2026
@@ -16697,6 +16707,7 @@ mget_w_19:
 %else
 	; 01/01/2026
 mget_w:
+	; 03/01/2026
 	; 02/01/2026
 	; 01/01/2026 - TRDOS 386 v2.0.10 (v2.1)
 	; 03/09/2024
@@ -16846,7 +16857,7 @@ mget_w_7:
 	mov	[writei.lc_index], eax ; last cluster index
 
 	; 01/01/2026
-	and	ebx, ebx ; fist cluster
+	and	ebx, ebx ; first cluster
 	jz	short mget_w_8 ; zero, new file
 
 	sub	edx, edx
@@ -16891,9 +16902,16 @@ mget_w_11:
 	; 01/01/2026
 	mov	edx, esi ; LDRVT address
 	; eax = Last cluster of file (0 if null file)
+	; 03/01/2026
+	push	eax
 	call	ADD_NEW_CLUSTER
+	pop	ecx
 	jc	short mget_w_err
 	mov	[writei.n_clust], eax ; 1st of the new clusters
+	; 03/01/2026
+	or	ecx, ecx
+	jnz	short mget_w_12
+	mov	[writei.fclust], eax
 mget_w_12:
 	dec	dword [writei.nc_count]
 	jz	short mget_w_14
@@ -16915,6 +16933,10 @@ mget_w_err:
 	jmp	error
 
 mget_w_14:
+	; 03/01/2026
+	; new last cluster is also current cluster
+	mov	[writei.cluster], eax
+	;
 	mov	ebx, [writei.n_clust] ; 1st of added clusters
 	mov	eax, [writei.lclust] ; (previous) last cluster
 	or	eax, eax
@@ -16972,7 +16994,7 @@ mget_w_20:
 	; ECX = Cluster sequence number after the beginning cluster
 	; ESI = Logical DOS Drive Description Table address
 	call	get_cluster_by_index
-	jc	short mget_w_err ; error code in EAX
+	jc	mget_w_err ; error code in EAX
 
 	mov	edx, esi ; LDRVT address
 
