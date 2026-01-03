@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 02/01/2026  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 03/01/2026  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1525,6 +1525,7 @@ sysfork_5: ; 2:
 		; br sysret1
 
 syscreat: ; < create file >
+	; 03/01/2026
 	; 06/08/2025
 	; 05/08/2025 - TRDOS 386 v2.0.10
 	;	(Major Modification)
@@ -1579,7 +1580,7 @@ syscreat: ; < create file >
 	;	* 2nd argument, mode is in CX register
 	;
 	;	AX register (will be restored via 'u.r0') will return
-	;	to the user with the file descriptor/number 
+	;	to the user with the file descriptor/number
 	;	(index to u.fp list).
 	;
 	;call	arg2
@@ -1606,7 +1607,7 @@ syscreat: ; < create file >
 	;          cf = 1 -> Error code in AL
 	;
 	; Modified Registers: EAX (at the return of system call)
-	; 
+	;
 	; Note: If the file is existing and it has not any one
 	;	of S,H,R,V,D attributes, it will be truncated
 	;	to zero length; otherwise, access error will be
@@ -1627,8 +1628,8 @@ syscreat_0:
 	; file name is forced, change directory as temporary
 	;mov	ax, 1
 	;mov	[FFF_Valid], ah ; 0 ; reset ; 17/10/2016
-	;call	set_working_path 
-	call	set_working_path_x ; 17/10/2016	
+	;call	set_working_path
+	call	set_working_path_x ; 17/10/2016
 	;jc	short syscreat_err
 	; 23/07/2022
 	jnc	short syscreat_3
@@ -1755,7 +1756,7 @@ syscreat_3:
 	mov	[edi+DirEntry_LastAccDate], dx ; 18
 	mov	[edi+DirEntry_WrtTime], ax ; 22
 	mov	[edi+DirEntry_WrtDate], dx ; 24
-	
+
 	; copy modified directory entry to FindFile_DirEntry field
 	mov	esi, edi
 	mov	edi, FindFile_DirEntry
@@ -1796,22 +1797,24 @@ truncate_file_sbd_skip:
 	call	RELEASE
 	jc	short syscreate_truncate_err
 
-	cmp	byte [edx+LD_FATType], 2
-	jna	short truncate_file_1 ; not FAT32
+; 03/01/2026
+;	cmp	byte [edx+LD_FATType], 2
+;	jna	short truncate_file_1 ; not FAT32
+;
+;	; FAT32 fs
+;	lea	ebx, [edx+LD_BPB+FAT32_FirstFreeClust]
+;	jmp	short truncate_file_2
+;
+;truncate_file_1:
+;	; FAT16 or FAT12 fs
+;	lea	ebx, [edx+LD_BPB+FAT_FirstFreeClust]
+;truncate_file_2:
+;	mov	eax, [FindFile_FirstCluster]
+;	cmp	eax, [ebx]
+;	jnb	short skip_truncate
+;	; replace first free cluster value
+;	mov	[ebx], eax
 
-	; FAT32 fs
-	lea	ebx, [edx+LD_BPB+FAT32_FirstFreeClust]
-	jmp	short truncate_file_2
-
-truncate_file_1:
-	; FAT16 or FAT12 fs
-	lea	ebx, [edx+LD_BPB+FAT_FirstFreeClust]
-truncate_file_2:
-	mov	eax, [FindFile_FirstCluster]
-	cmp	eax, [ebx]
-	jnb	short skip_truncate
-	; replace first free cluster value
-	mov	[ebx], eax
 %endif
 
 	; 05/08/2025 - TRDOS 386 v2.0.10
@@ -1838,7 +1841,7 @@ skip_truncate:
 %endif
 	; 05/08/2025
 	; set last access date of the parent dir
-	;mov 	byte [LMDT_Flag], 0
+	;mov	byte [LMDT_Flag], 0
 	call	update_parent_dir_lmdt
 	; ignore any errors (only last access date is updated)
 
@@ -1850,9 +1853,27 @@ skip_truncate:
 
 syscreat_4:
 	; now... open file for write
-	xor	eax, eax ; file size = 0
+	;xor	eax, eax ; file size = 0
 	mov	edi, FindFile_DirEntry
 	mov	dl, 1 ; open file for writing
+
+	; 03/01/2026
+	; set parameters for sysopen
+
+	;;mov	al, [createfile_phydrv]
+	;mov	al, [Current_Drv]
+	;mov	[FindFile_Drv], al ; OF_DRIVE
+
+	mov	eax, [createfile_entrypos] ; dir entry position
+	shr	eax, 5 ; /32 ; directory enty sequence number
+	mov	[FindFile_DirEntryNumber], al ; OF_DIRPOS
+	mov	eax, [createfile_dirsector]
+	mov	[FindFile_DirSector], eax ; OF_DIRSECTOR
+
+	xor	eax, eax ; file size = 0
+
+	;mov	bl, [FindFile_DirEntry+11]
+	mov	bl, [edi+DirEntry_Attr] ; OF_ATTRIB
 	jmp	sysopen_2
 
 sysmkdir_err:
@@ -1884,7 +1905,7 @@ syscreat_1:
 syscreat_2:
 	mov	esi, FindFile_Name
 	;xor	edx, edx
-	xor	eax, eax ; File Size  = 0
+	xor	eax, eax ; File Size = 0
 	xor	ebx, ebx
 	dec 	ebx ; FFFFFFFFh -> create empty file
 	            ;              (only for FAT fs)
@@ -2100,6 +2121,8 @@ sysopen_access_err:
 sysopen_2:
 	; 02/01/2026
 	; save file attributes
+	;;mov	dh, [FindFile_DirEntry+11]
+	;mov	dh, [edi+DirEntry_Attr]
 	mov	dh, bl
 
 	; esi = Directory Entry (FindFile_DirEntry) Location
@@ -2736,14 +2759,14 @@ syswrite: ; < write to file >
 	; Outputs: *u.r0 - number of bytes written.
 	; ...............................................................
 	;
-	; Retro UNIX 8086 v1 modification: 
+	; Retro UNIX 8086 v1 modification:
 	;       'syswrite' system call has three arguments; so,
 	;	* 1st argument, file descriptor is in BX register
 	;	* 2nd argument, buffer address/offset in CX register
 	;	* 3rd argument, number of bytes is in DX register
 	;
 	;	AX register (will be restored via 'u.r0') will return
-	;	to the user with number of bytes written. 
+	;	to the user with number of bytes written.
 	;
 	; INPUT ->
         ;	   EBX = File handle (descriptor/index)
@@ -2872,7 +2895,7 @@ device_read:
 ;	jmp	dword [ebx+KDEV_WADDR-4]
 
 rw1:
-	; 01/01/2026 (TRDOS 386 v2.0.10) ((v2.1)) 
+	; 01/01/2026 (TRDOS 386 v2.0.10) ((v2.1))
 	; 27/09/2024
 	; 03/09/2024 (TRDOS 386 v2.0.9)
 	; 17/04/2021 (TRDOS 386 v2.0.4)
@@ -2950,7 +2973,7 @@ rw2:
 
 	; 02/01/2026 - TRDOS 386 v2.0.10 (v2.1)
 	; check if open file's removable disk drive
-	;	is changed or not 
+	;	is changed or not
 	; (used by syswrite and sysread)
 check_openfile_volumeid:
 	cmp	byte [ebx+OF_DRIVE], 2 ; A or B
@@ -3006,7 +3029,7 @@ systimer:
 	;
 	;	NOTE: If callback (user service) method is used,
 	;	    EDX will point to the return address (of service
-	;	    procedure) in user's space instead of signal 
+	;	    procedure) in user's space instead of signal
 	;	    response byte address. (TRDOS 386 kernel will
 	;	    direct the cpu to that address -in user's space-
 	;	    at the return of system call or interrupt 
@@ -3094,7 +3117,7 @@ systimer_cb0:
 
 systimer_cb1:
 	movzx	esi, byte [u.uno] ; process number
-	;shl	si, 2	
+	;shl	si, 2
 	; 23/07/2022
 	shl	esi, 2
 	mov	[esi+p.tcb-4], edx ; set process timer callback address
@@ -3104,9 +3127,9 @@ systimer_cb1:
 systimer_cb2:
 	cmp	bh, 2
         je      short systimer_5  ; only 18.2 ticks per second is usable
-				  ; 10 milliseconds (100 Hertz) timer 
+				  ; 10 milliseconds (100 Hertz) timer
 				  ; will be set later (18/05/2016)
-        ja      short systimer_6 
+        ja      short systimer_6
 
 	and	bh, bh
 	;jz	systimer_9        ; stop timer event(s)
@@ -3302,7 +3325,7 @@ systimer_21:	; 23/07/2022
 	dec	dl  ; 16 -> 15 ... 1 -> 0
 	shl	dl, 4 ; * 16
 	movzx	edi, dl
-	add	edi, esi ; timer_set 
+	add	edi, esi ; timer_set
 
 	cmp	al, [edi] ; process number
         ;jne	systimer_4
@@ -3758,7 +3781,7 @@ sysvideo: ; VIDEO DATA TRANSFER FUNCTIONS
 	;		              (VESA VBE video modes)
 	;		         BL = bits per pixel
 	;			      8 = 256 colors, 8
-	;		             16 = 65536 colors, 5-6(G)-5 
+	;		             16 = 65536 colors, 5-6(G)-5
 	;		             24 = RGB, 16M colors, 8-8-8
 	;		             32 = RGB + alpha bytes, 8-8-8-8
 	;		     If BH = 0FFh
@@ -3949,7 +3972,7 @@ sysvideo: ; VIDEO DATA TRANSFER FUNCTIONS
 	;	ECX = virtual start address of user's video buffer
 	;	EDX is same with EDX input
 	;
-	;	(Note: Memory page boundaries will be applied 
+	;	(Note: Memory page boundaries will be applied
 	;	 to buffer size and buff start addr by rounding down.
 	;	 Rounded size & address values must not be zero.)
 	;	-Normally, it is expected to request mapping by using
@@ -4598,7 +4621,7 @@ sysvideo_9_2:
 	sub	dl, cl
 	jc	short sysvideo_7 ; invalid, [u.r0] = 0
 
-	or	cl, cl ; left column 
+	or	cl, cl ; left column
 	jz	short sysvideo_9_3 ; 0
 
 	; 21/11/2020
@@ -4615,7 +4638,7 @@ sysvideo_9_3:
 	pop	esi ; ****
 
 	inc	bh  ; row count
-	
+
 	;mov	edx, 80*2
 	mov	dl, 80*2  ; bytes per row
 	;
@@ -4812,7 +4835,7 @@ sysvideo_15_5:
 	mov	eax, [LFB_ADDR] ; [LFB_Info+LFBINFO.LFB_addr]
 	or	eax, eax
 	jnz	short sysvideo_15_6
-	mov	ax, [def_LFB_addr] ; default LFB addr 
+	mov	ax, [def_LFB_addr] ; default LFB addr
 				   ; (for vbe mode 118h)
 	shl	eax, 16
 	; 27/12/2020
@@ -4820,7 +4843,7 @@ sysvideo_15_5:
 sysvideo_15_6:
 	; 29/01/2021
 	mov	[v_mem], eax ; save video memory address
-	
+
 	; 27/12/2020
 	; 26/12/2020
 	mov	eax, [ebp+2] ; width, height
@@ -4891,7 +4914,7 @@ sysvideo_15_8:
 sysvideo_15_9:
 	; system to user display page or window copy
 	;test	byte [v_ops], 1 ; window copy ?
-	test	bl, 1	
+	test	bl, 1
 	jnz	short sysvideo_15_10
 
 	; display page (full screen copy)
@@ -5077,7 +5100,7 @@ pix_op_cpy:
 	;        (HW = row, CX = column)
 	;  EDX = size (rows, colums)
 	;        (HW = rows, DX = columns)
-	;	 (0 -> invalid 	
+	;	 (0 -> invalid
 	;        (1 -> horizontal or vertical line)
 	;  If bit 4 of BL or [v_ops] = 0 -full screen-
 	;     ECX and EDX will not be used
@@ -5315,7 +5338,7 @@ pix_op_sub_w:
 
 	test	byte [v_ops], 20h ; masked color subtract ?
 	jz	short pix_op_sub_w_0 ; no
-	jmp	m_pix_op_sub_w 
+	jmp	m_pix_op_sub_w
 			; window sub color except mask color
 pix_op_sub_w_0:
 	; ecx = bytes per row (to be applied)
@@ -7812,7 +7835,7 @@ pix_op_chr_fpos_8:
 	jnz	short pix_op_chr_fpos_6
 	; scale = 3
 	mov	cl, dh ; 16 or 8 (height/rows)
-	shl	cl, 1 
+	shl	cl, 1
 	add	cl, dh ; 48 or 24 rows
 	mov	dh, 24 ; columns (width)
 	jmp	short pix_op_chr_f2p
@@ -7970,7 +7993,7 @@ m_pix_op_cpy:
 	;
 	; INPUT:
 	;   ecx = transfer count (bytes)
-	;   edi = [v_mem] = start address of LFB 
+	;   edi = [v_mem] = start address of LFB
 	;   esi = user's buffer address (virtual)
 	;
 	; OUTPUT:
@@ -9020,7 +9043,7 @@ m_pix_op_or_w:
 
 	; window
 	;mov	edi, [v_str] ; LFB start address
-	;mov	esi, edi 
+	;mov	esi, edi
 
 	cmp	byte [v_bpp], 8 ; 8bpp
 	ja	short m_pix_op_or_w_1
@@ -9269,7 +9292,7 @@ m_pix_op_not_32:
 	lodsd 
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_not_32_1 ; exclude
-	not	dword [edi]	
+	not	dword [edi]
 	add	dword [u.r0], 4 ; +4
 m_pix_op_not_32_1:
 	add	edi, 4 ; +4
@@ -9748,7 +9771,7 @@ sysvideo_39:
 	; 23/11/2020
 	; BH = 3
 	; PIXEL READ/WRITE
-	
+
 	; 07/02/2021
 	; 04/01/2021 (TRDOS 386 v2.0.3)
 	cmp	bl, 3
@@ -10132,7 +10155,7 @@ sysvideo_39_51:
 
 sysvideo_39_52:
 	cmp	dh, 5 ; 08/02/2021
-	;cmp	bl, 5 ; write pixels to user defined positions 
+	;cmp	bl, 5 ; write pixels to user defined positions
 	jna	short sysvideo_39_53
 	jmp	sysvideo_39_66
 sysvideo_39_53:
@@ -10146,7 +10169,7 @@ sysvideo_39_53:
 	; ecx = transfer count (bytes)
 
 	; write pixels by using (user) defined positions
-	; ecx = byte count (1,2,3,4 times pixel count)	
+	; ecx = byte count (1,2,3,4 times pixel count)
 	; edi = system buffer address
 
 	push	esi ; *
@@ -10214,7 +10237,7 @@ sysvideo_39_63:
 	loop	sysvideo_39_62
 sysvideo_39_64:
 	pop	ecx ; **
-	pop	esi ; *	
+	pop	esi ; *
 	sub	ebp, ecx
 	jna	short sysvideo_39_56
 	add	esi, ecx
@@ -10242,7 +10265,7 @@ sysvideo_39_68:
 	call	transfer_from_user_buffer
 	jc	short sysvideo_39_56 ; error
 	; ecx  = transfer count
-	
+
 	; write pixels & colors as defined in user buffer
 	; ecx = byte count (2,4,6,8 times pixel count)
 	; edi = system buffer address
@@ -10383,7 +10406,7 @@ sysvideo_18:
 	mov	eax, 0A0000h
 	mov	ecx, 16 ; 16 pages (16*4K=64K)
 	mov	ebx, eax ; 12/05/2017 ; virtual = physical
-	call	direct_memory_access	
+	call	direct_memory_access
 	;jc	sysret
 	; 23/07/2022
 	jc	short sysvideo_18_0
@@ -10454,7 +10477,7 @@ sysvideo_17_5:
 	xor	ebx, ebx
 	mov	bl, [LFB_Info+LFBINFO.bpp] ; bits per pixel
 	mov	bh, [LFB_Info+LFBINFO.mode] ; XX part of 1XXh
-sysvideo_26_4: ; 23/12/2020	
+sysvideo_26_4: ; 23/12/2020
 	mov	ebp, [u.usp]  ; ebp points to user's registers
 	mov	[ebp+20], edx ; return to user with EDX value
 	mov	[ebp+16], ebx ; EBX
@@ -10523,7 +10546,7 @@ sysvideo_20_1:
 	; simulate _int10h (int 31h) for func 4F02h
 	;pushfd
 	;push	cs
-	;push	sysvideo_20_1_retn 
+	;push	sysvideo_20_1_retn
 	;push	es ; *
 	;push	ds ; **	; SAVE WORK AND PARAMETER REGISTERS
 	;jmp	VBE_func
@@ -10644,7 +10667,7 @@ sysvideo_21:
 	;ja	sysvideo_27
 	; 23/07/2022
 	ja	short sysvideo_21_21
-		
+
 	; BH = 11
 	; set/read DAC color registers (for 8bpp)
 
@@ -11000,7 +11023,7 @@ sysvideo_22_2:
 sysvideo_22_3:
 	; 22/01/2021
 	mov	bh, [srvso] ; state options (> 80h -> svga)
-	mov	[u.r0], bx ; function result is return value 
+	mov	[u.r0], bx ; function result is return value
 	jmp	short sysvideo_25 
 
 sysvideo_22_4:
@@ -11062,7 +11085,7 @@ sysvideo_22_7:
 	; same video mode number.
 
 	cmp	byte [vbe3], 3
-	jne	short sysvideo_25 ; Only applicable 
+	jne	short sysvideo_25 ; Only applicable
 				  ; for VBE3 video hardware!
 	mov	bl, 32
 sysvideo_22_8:
@@ -11119,7 +11142,7 @@ sysvideo_26_2:
 	cmp	ebx, [LFB_SIZE] ; [LFB_Info+LFBINFO.LFB_size]
 	jna	short sysvideo_26_3
 	mov	ebx, [LFB_SIZE]
-sysvideo_26_3: 
+sysvideo_26_3:
 	push	edx
 	push	ebx	; buffer size in bytes
 	push	ecx	; user's buffer address
@@ -11155,7 +11178,7 @@ sysvideo_26_5:
 	; 28/02/2021
 	jz	short sysvideo_27_0 ; invalid LFB address
 
-	cmp	ah, 0F0h  
+	cmp	ah, 0F0h
 	;jnb	short sysvideo_25 ; nonsence !?
 	; 28/02/2021
 	jnb	short sysvideo_27_0 ; nonsence !?
@@ -11233,7 +11256,7 @@ sysvideo_27_3:
 	; enable system font overwrite 
 	;	if [multi_tasking]= 0 and [u.uid] = 0
 
-	;cmp	byte [multi_tasking], 0 
+	;cmp	byte [multi_tasking], 0
 	;			; multi tasking enabled ?
 	;ja	short sysvideo_27_0 ; yes
 	;; 19/01/2021 
@@ -11502,9 +11525,9 @@ sysvideo_28:
 
 	; BH = 14
 	; Save/Restore Super VGA video state
-	
+
 	; BL = options
-	;	bit 0 - Save (0) or Restore (1)	
+	;	bit 0 - Save (0) or Restore (1)
 	;	bit 1 - controller hardware state
 	;	bit 2 - BIOS data state
 	;	bit 3 - DAC state
@@ -11552,7 +11575,7 @@ sysvideo_28_0:
 	;  bit 1 : BIOS data state
 	;  bit 2 : DAC state
 	;  bit 3 : (extended) Register state
-	
+
 	test	bl, 32 ; bit 5
 	;jnz	sysvideo_28_7 ; user buffer
 	; 23/07/2022
@@ -11741,7 +11764,7 @@ sysvideo_28_12:
 
 	test	dl, 64 ; verify without transfer
 	jnz	short sysvideo_28_13 ; yes
-		
+
 	;mov	edi, esi
 	mov	esi, VBE3SAVERESTOREBLOCK
 	call	transfer_to_user_buffer
@@ -12198,7 +12221,7 @@ sysexec_7:
 	mov	ebx, CORE ; start address = 0 (virtual) + CORE
 	; 18/10/2015
 	mov	esi, pcore ; physical start address
-sysexec_8:	
+sysexec_8:
 	mov	ecx, PDE_A_USER + PDE_A_WRITE + PDE_A_PRESENT
 	call	make_page_table
 	;jc	panic
@@ -12678,7 +12701,7 @@ fclose:
 	; If i-node is active (i-number > 0) the entry in 
 	; u.fp list is cleared. If all the processes that opened
 	; that file close it, then fsp etry is freed and the file
-	; is closed. If not a return is taken. 
+	; is closed. If not a return is taken.
 	; If the file has been deleted while open, 'anyi' is called
 	; to see anyone else has it open, i.e., see if it is appears
 	; in another entry in the fsp table. Upon return from 'anyi'
@@ -12928,7 +12951,7 @@ sysbreak:
 	; Inputs: u.break - current breakpoint
 	; Outputs: u.break - new breakpoint 
 	;	area between old u.break and the stack (sp) is cleared.
-	; 
+	;
 	; ...............................................................
 	; 06/09/2024 - TRDOS 386 v2.0.9 - Major Modification -
 	;
@@ -13235,7 +13258,7 @@ sysintr: ; / set interrupt handling
 	; Inputs: -
 	; Outputs: -
 	; ...............................................................
-	;	
+	;
 	; Retro UNIX 8086 v1 modification: 
 	;       'sysintr' system call sets u.intr to value of BX
 	;	then branches into sysquit.
@@ -14899,7 +14922,7 @@ syspri_1:
 				 ; [u.pri] is set to high
 				 ; but 'runq_event' queue is set
 				 ; only by the kernel's timer
-				 ; event function (timer interrupt). 
+				 ; event function (timer interrupt).
 	call	putlu
 syspri_2:
 	jmp	sysret
@@ -14983,7 +15006,7 @@ transfer_to_user_buffer: ; fast transfer
 	jz	short ttub_4
 
 	mov	[u.count], ecx
-	
+
 	push	edi
 	push	esi
 	push	ebx
@@ -15569,7 +15592,7 @@ sysfff_20:
 
 	mov	edi, FindFile_LongName
 			; 129 bytes buffer
-	push	edi ; **2**		
+	push	edi ; **2**
 
 	test	ch, 80h	; bit 6 - use 128 bytes
 	;mov	ecx, 127
@@ -15623,7 +15646,7 @@ sysfff_23:
 	pop	edi ; *!*
 	jmp	sysfff_6 ; 02/06/2025
 	;;;;
-	
+
 ; 18/05/2025
 %if 0
 sysfnf_11:
@@ -15834,7 +15857,7 @@ sysfnf_3:
 	mov	eax, [FindFile_DirCluster]
 	and	eax, eax
 	jnz	short sysfnf_6
-        
+
 	cmp	byte [Current_FATType], 2
 	ja	short sysfnf_err_0 ; invalid, we neeed to stop !?
 	cmp	byte [Current_FATType], 1
@@ -16055,7 +16078,7 @@ dskw_0:
 	; 01/01/2026
 	mov	esi, [u.fofp]
 	mov	ebx, [esi]
-	and	ebx, 1FFh 
+	and	ebx, 1FFh
 	jnz	short dskw_1 ; / if its non-zero, branch
 			     ; if zero, file offset = 0,
 		       	     ; / 512, 1024,...(i.e., start of new block)
@@ -16131,8 +16154,8 @@ dskw_2: ; 3:
 	jmp	short dskw_err
 dskw_2_@:
 	; 01/01/2026
-	push	esi ; Buffer address
-	lea	ebx, [esi+BUFINSIZ]	
+	push	esi ; buffer header address
+	lea	ebx, [esi+BUFINSIZ] ; buffer data address
 	; 23/10/2016
 	;mov	byte [writei.valid], 1 ; writei buffer contains valid data
 	; 01/01/2025
@@ -17579,7 +17602,7 @@ syscalbac:
 	;		   can be performed (via INT 32h, AH = 1) efficiently
 	;		   in a loop to prevent a locked infinitive loop.
 	;
-	;	    Disk IRQs (6,14,15) have been phohibited from ring 3 
+	;	    Disk IRQs (6,14,15) have been phohibited from ring 3
 	;	    callback because, disk operations (file system services
 	;	    etc.) are independent from user program, for fast disk r/w.
 	;	    They are not more useful at ring 3 while they are in use
@@ -17949,7 +17972,7 @@ syschmod: ; Get & Change File (or Directory) Attributes
 	; 26/09/2024 - TRDOS 386 v2.0.9
 	; 23/07/2022 - TRDOS 386 v2.0.5
 	; 19/01/2021
-	; 30/12/2017 (TRDOS 386 = TRDOS v2.0) 
+	; 30/12/2017 (TRDOS 386 = TRDOS v2.0)
 	;
         ; INPUT ->
         ;          EBX = File/Directory (ASCIIZ) name address

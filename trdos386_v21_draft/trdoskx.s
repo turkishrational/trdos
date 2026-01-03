@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 02/01/2026 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 03/01/2026 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -116,15 +116,20 @@ LastCluster: resd 1
 ; 02/12/2023
 P_TIMER: resb 1 ; diskette change check (2 seconds)
 
-Dir_BuffDescriptor:
-DirBuff_DRV: resb 1
-DirBuff_FATType: resb 1
-DirBuff_ValidData: resb 1
-DirBuff_CurrentEntry: resw 1
-DirBuff_LastEntry: resw 1
+; 03/01/2026
+resw 1
+DirBuff_CurrentEntry: resb 1
+
+; 03/01/2026
+;Dir_BuffDescriptor:
+;DirBuff_DRV: resb 1
+;DirBuff_FATType: resb 1
+;DirBuff_ValidData: resb 1
+;DirBuff_CurrentEntry: resw 1
+;DirBuff_LastEntry: resw 1
 DirBuff_Cluster: resd 1
-DirBuffer_Size: resw 1
-;DirBuff_EntryCounter: resw 1
+;DirBuffer_Size: resw 1
+;;DirBuff_EntryCounter: resw 1
 
 ; 01/02/2016
 ; these are on (real mode) segment 8000h and later

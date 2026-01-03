@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 02/01/2026 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 03/01/2026 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1540,7 +1540,7 @@ loc_ffde_stc_retn_255:
 	;xor	ecx, ecx
 	;dec	ecx ; 0FFFFFFFFh
 	; 19/07/2025 (*)
-	; bl = 0 
+	; bl = 0
 	;xor	eax, eax
 loc_find_direntry_stc_retn:
 loc_check_ffde_retn_1:
@@ -3848,8 +3848,10 @@ loc_make_direntry_set_filesize:
 
 	retn
 %endif
+
+; 03/01/2026
 	; 14/07/2025 - temporary !
-make_directory_entry: ; temporary !!!!!!
+;make_directory_entry: ; temporary !!!!!!
 
 make_new_directory_entry:
 	; 13/07/2025 - TRDOS 386 v2.0.10
