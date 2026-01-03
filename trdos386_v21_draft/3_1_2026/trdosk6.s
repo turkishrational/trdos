@@ -17775,6 +17775,7 @@ sysrmdir_5:
 	jmp	sysret
 
 sysrmdir: ; Remove (Unlink) Directory
+	; 03/01/2026
 	; 22/09/2025
 	; 17/07/2025 - TRDOS 386 v2.0.10
 	; 23/07/2022 - TRDOS 386 v2.0.5
@@ -17872,7 +17873,9 @@ sysrmdir_4:
 	call	delete_sub_directory
 	;jnc	sysrmdir_5
 	; 23/07/2022
-	jc	short sysrmdir_6
+	;jc	short sysrmdir_6
+	; 03/01/2026
+	jc	short sysrmdir_err
 	jmp	sysrmdir_5
 
 ;	jc	short sysrmdir_6
@@ -17883,6 +17886,9 @@ sysrmdir_4:
 ;	;mov	[u.error], eax
 ;	call 	reset_working_path
 ;	jmp	sysret
+
+; 03/01/2026
+%if 0
 
 sysrmdir_6:
 	mov	[u.r0], eax
@@ -17921,6 +17927,8 @@ sysrmdir_9:
         jz	short sysrmdir_8 ; ecx = 0 -> OK
 	; ecx > 0 -> Error (Recalculation is needed)
 	jmp	short sysrmdir_7
+
+%endif
 
 syschdir: ; Change Current (Working) Drive & Directory (for user)
 	; 30/12/2017 (TRDOS 386 = TRDOS v2.0) 

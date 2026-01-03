@@ -97,15 +97,16 @@ DOSBootSectorBuff: resb 512
 ;MiniPartitionTable: resb 64 ;  40h
 ;MiniPartitionMagic: resw  1 ;  02h
 
-FAT_BuffDescriptor:
-FAT_CurrentCluster: resd 1
-FAT_BuffValidData: resb 1
-FAT_BuffDrvName: resb 1
-FAT_BuffOffset: resw 1
-FAT_BuffSector: resd 1
-
-FAT_ClusterCounter: resd 1
-LastCluster: resd 1
+; 03/01/2026
+;FAT_BuffDescriptor:
+;FAT_CurrentCluster: resd 1
+;FAT_BuffValidData: resb 1
+;FAT_BuffDrvName: resb 1
+;FAT_BuffOffset: resw 1
+;FAT_BuffSector: resd 1
+;
+;FAT_ClusterCounter: resd 1
+;LastCluster: resd 1
 
 ; 16/05/2016
 ;; 18/03/2016 (TRDOS v2.0)

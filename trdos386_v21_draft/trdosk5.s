@@ -1714,8 +1714,9 @@ loc_save_FAT_buff_write_err:
 
 %endif
 
+; 03/01/2026
 ; 07/12/2025 - TRDOS 3865 v2.0.10 (v2.1)
-%if 1
+%if 0
 
 calculate_fat_freespace:
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -2148,8 +2149,9 @@ truncate_cluster_chain:
 %endif
 %endif ; 07/12/2025
 
+; 03/01/2026
 ; 07/12/2025 - TRDOS 3865 v2.0.10 (v2.1)
-%if 1
+%if 0
 
 set_fat32_fsinfo_sector_parms:
 	; 15/10/2016
