@@ -5187,7 +5187,7 @@ ADD_NEW_CLUSTER:
 	;  If cf = 0
 	;     eax = First cluster allocated
 	;     FAT is fully updated
-	;     ; 14/07/2025	
+	;     ; 14/07/2025
 	;     ebx = eax input
 	;;;;  OF_FCLUST field of [current_file]
 	;;;;		is set if file was null
@@ -5202,7 +5202,7 @@ ADD_NEW_CLUSTER:
 	; edx = Logical DOS Drive Description Table address
 	; eax = Last cluster of file (0 if null file)
 	;; ecx = Number of clusters to allocate
-	; 19/11/2025	
+	; 19/11/2025
 	;mov 	[NEXTCLUSTER], eax
 	mov	[LASTCLUSTER], eax
 	;mov	[CLUSTERS], ecx
@@ -5410,7 +5410,7 @@ adc_18:
 
 dofastk:
 	movzx	esi, byte [current_file]
-	shl	esi, 2 ; * 4	
+	shl	esi, 2 ; * 4
 	mov	[esi+OF_FCLUSTER], eax ; first cluster
 	mov	[esi+OF_LCLUSTER], eax ; last cluster
 %endif

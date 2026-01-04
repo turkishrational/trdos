@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/01/2026  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 04/01/2026  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2971,6 +2971,7 @@ rw2:
 ;	mov	dword [u.error], eax
 ;	retn
 
+	; 03/01/2026
 	; 02/01/2026 - TRDOS 386 v2.0.10 (v2.1)
 	; check if open file's removable disk drive
 	;	is changed or not
@@ -2978,6 +2979,8 @@ rw2:
 check_openfile_volumeid:
 	cmp	byte [ebx+OF_DRIVE], 2 ; A or B
 	jnb	short same_volumeid ; not removable disk
+	;push	edx
+	;push	ecx
 	xor	edx, edx
 	mov	dh, [ebx+OF_DRIVE]
 	add	edx, Logical_DOSDisks+LD_BPB+VolumeID
@@ -2985,6 +2988,8 @@ check_openfile_volumeid:
 	mov	edx, ebx
 	shl	edx, 2
 	cmp	ecx, [edx+OF_VOLUMEID]
+	;pop	ecx
+	;pop	edx
 	je	short same_volumeid
 	mov	eax, ERR_DRV_NOT_SAME
 	stc
@@ -16105,7 +16110,7 @@ dskw_1: ; in as no past info. is to be saved
 	inc	cl
 	; ecx = 1
 	call	disk_read
-	;call	dskrd 	; / no, must retain old info.. 
+	;call	dskrd 	; / no, must retain old info..
 		       	; / Hence, read block 'r1' into an I/O buffer
 	jnc	short dskw_2
 %endif
@@ -16707,6 +16712,7 @@ mget_w_19:
 %else
 	; 01/01/2026
 mget_w:
+	; 04/01/2026
 	; 03/01/2026
 	; 02/01/2026
 	; 01/01/2026 - TRDOS 386 v2.0.10 (v2.1)
@@ -16755,10 +16761,11 @@ mget_w:
 	cmp	byte [esi+LD_FATType], 0
 	; 23/07/2022
 	ja	short mget_w_1
-	jmp	mget_w_22  ; Singlix FS
+	; 03/01/2026
+	jmp	mget_w_23 ; Singlix FS
 
 mget_w_1:
-	; 01/01/2026 
+	; 01/01/2026
 	;movzx	eax, word [esi+LD_BPB+BytesPerSec]
 	;movzx	edx, byte [esi+LD_BPB+SecPerClust]
 	;mov	[writei.spc], dl  ; sectors per cluster
@@ -16829,8 +16836,8 @@ mget_w_4:
 	jz	short mget_w_5 ; initial
 	dec	eax
 	cmp	eax, [writei.c_index]
-	je	mget_w_16 ; same
-	jb	short mget_w_6 ; previous < current
+	; 03/01/2026
+	jna	short mget_w_6 ; previous <= current
 
 	; set previous cluster index and cluster to the 1st cluster
 	sub	eax, eax ; 0
@@ -16853,6 +16860,8 @@ mget_w_7:
 	; div	ecx
 	; 01/01/2026
 	xor	edx, edx ; 0
+	; 04/01/2026
+	dec	eax ; last byte (0 based file offset)
 	div	dword [writei.bpc]
 	mov	[writei.lc_index], eax ; last cluster index
 
@@ -16876,12 +16885,9 @@ mget_w_7:
 	jmp	short mget_w_10
 
 mget_w_8:
-	; 01/01/2026
-	mov	[writei.lclust], ebx ; 0 ; last cluster
+	; 04/01/2026
 	mov	eax, ebx ; 0
-	inc	ebx ; 1
-	mov	[writei.nc_count], ebx ; new cluster count
-	jmp	short mget_w_11
+	jmp	short mget_w_10
 
 mget_w_9:
 	; get last cluster
@@ -16894,27 +16900,39 @@ mget_w_9:
 mget_w_10:
 	mov	[writei.lclust], eax ; last cluster of the file
 	mov	ecx, [writei.lc_index] ; new last cluster index
-	inc	ecx ; +1
+	; 03/01/2026
+	mov	edx, esi ; LDRVT address
+	; 04/01/2026
+	and	eax, eax ; 0 ?
+	jz	short mget_w_11 ; new (empty) file
 	sub	ecx, [glc_index] ; new index - last cluster index
+	; 03/01/2026
+	jna	mget_w_16  ; same (last) cluster
+	; 04/01/2026
+mget_w_11:
+	inc	ecx ; +1
 	mov	[writei.nc_count], ecx ; new cluster count
 
-mget_w_11:
 	; 01/01/2026
-	mov	edx, esi ; LDRVT address
+	;mov	edx, esi ; LDRVT address
 	; eax = Last cluster of file (0 if null file)
 	; 03/01/2026
 	push	eax
 	call	ADD_NEW_CLUSTER
 	pop	ecx
 	jc	short mget_w_err
+
 	mov	[writei.n_clust], eax ; 1st of the new clusters
 	; 03/01/2026
 	or	ecx, ecx
 	jnz	short mget_w_12
-	mov	[writei.fclust], eax
+	mov	[writei.fclust], eax ; First cluster
+	mov	[writei.cluster], eax
+	mov	[writei.c_index], ecx ; 0
 mget_w_12:
 	dec	dword [writei.nc_count]
 	jz	short mget_w_14
+
 	; eax = (new) last cluster
 	call	ADD_NEW_CLUSTER
 	jnc	short mget_w_12
@@ -16933,26 +16951,37 @@ mget_w_err:
 	jmp	error
 
 mget_w_14:
-	; 03/01/2026
-	; new last cluster is also current cluster
-	mov	[writei.cluster], eax
-	;
-	mov	ebx, [writei.n_clust] ; 1st of added clusters
 	mov	eax, [writei.lclust] ; (previous) last cluster
 	or	eax, eax
-	jnz	short mget_w_15
-	; new (null) file
-	mov	eax, ebx
-	mov	ebx, -1 ; last cluster sign
-	mov	[writei.lclust], eax
-mget_w_15:
+	; 04/01/2026
+	jz	short mget_w_15 ; new (empty) file
+		; First Cluster will be set in 'writei'
+		; (([write.fclust] -> [ebx+OF_FCLUSTER]))
+
+	mov	ebx, [writei.n_clust] ; 1st of added clusters
+	; eax = cluster to be updated/packed
+	; ebx = cluster data (next cluster)
+
 	; link new (allocated) clusters to file
 	call	PACK
 	jc	short mget_w_13
 
+mget_w_15:
 	; 01/01/2026
 	; set LMDT update flag
 	mov	byte [setfmod], 1
+
+	; 04/01/2026
+	mov	eax, [writei.lc_index]
+		; new last cluster's sequence number
+	inc	eax ; +1 (for new file size limit calculation)
+	push	edx
+	mul	dword [writei.bpc]
+	pop	edx
+	; this is needed for next call to mget_w
+	; (now, [i.size ] is file size upper limit without
+	;  adding a new cluster to the file)
+	mov	[i.size], eax
 
 mget_w_16:
 	mov	eax, [writei.cluster]
@@ -16971,39 +17000,33 @@ mget_w_17:
 
 	; 01/01/2026
 mget_w_18:
+	; 03/01/2026
+	mov	eax, [writei.p_cluster] ; beginning cluster
+	; 04/01/2026
+	or	eax, eax ; previously empty file ?
+	jz	short mget_w_22 ; yes, use [writei.cluster]
+
 	mov	ecx, [writei.c_index]
 	sub	ecx, [writei.pc_index]
-	jnb	short mget_w_19
-	; get cluster by index from the first cluster
-	mov	eax, [writei.fclust]
-	;mov	[writei.p_cluster], eax
-	mov	ecx, [writei.c_index]
-	;mov	[writei.pc_index], ecx
-	jmp	short mget_w_20
+	jna	short mget_w_20
 mget_w_19:
-	mov	eax, [writei.p_cluster] ; beginning cluster
-	; ecx = cluster sequence number after the beginning cluster
-	; sub	edx, edx ; 0
-mget_w_20:
-	or	ecx, ecx
-	jz	short mget_w_21
-
 	; EAX = Beginning cluster
-	; EDX = Sector index in disk/file section
-	;	(Only for SINGLIX file system!)
 	; ECX = Cluster sequence number after the beginning cluster
 	; ESI = Logical DOS Drive Description Table address
 	call	get_cluster_by_index
 	jc	mget_w_err ; error code in EAX
-
-	mov	edx, esi ; LDRVT address
-
+mget_w_20:
 	; EAX = Cluster number
-mget_w_21:
 	mov	[writei.cluster], eax
+mget_w_21:
+	mov	edx, esi ; LDRVT address
 	jmp	short mget_w_17
 
 mget_w_22:
+	mov	eax, [writei.cluster] ; [writei.fclust]
+	jmp	short mget_w_21
+
+mget_w_23:
 	; 01/01/2026
 	; temporary
 	; Singlix FS
