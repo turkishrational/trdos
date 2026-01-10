@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - UNINITIALIZED USER DATA : ubss.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED USER DATA : ubss.s
 ; ----------------------------------------------------------------------------
-; Last Update: 19/08/2024  (Previous: 07/08/2022)
+; Last Update: 09/01/2026  (Previous: 19/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -32,7 +32,7 @@ alignb 2
 %if 0
 
 inode:
-	;; 11/03/2013. 
+	;; 11/03/2013.
 	;;Derived from UNIX v1 source code 'inode' structure (ux).
 	;;i.
 	;
@@ -65,9 +65,9 @@ I_SIZE	equ $ - inode
 %endif 
 
 process:
-	; 23/07/2022 - TRDOS 386 Kernel v2.0.5 
+	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 27/02/2022
-	; 12/01/2022 - Retro UNIX 386 v1.2 
+	; 12/01/2022 - Retro UNIX 386 v1.2
 	; 19/12/2016
 	; 21/05/2016
 	; 19/05/2016 - TRDOS 386 (TRDOS v2.0)
@@ -75,7 +75,7 @@ process:
 	; 11/03/2013 - 05/02/2014 (Retro UNIX 8086 v1)
 	;Derived from UNIX v1 source code 'proc' structure (ux).
 	;p.
-	
+
         p.pid:   resw nproc
         p.ppid:  resw nproc
 	;p.break: resw nproc ; 12/01/2022 (p.break is not used)
@@ -85,7 +85,7 @@ process:
 	p.link:	 resb nproc
 	p.stat:	 resb nproc
 
-	; 06/05/2015 (Retro UNIX 386 v1 feature only !) 
+	; 06/05/2015 (Retro UNIX 386 v1 feature only !)
 	p.upage: resd nproc ; Physical address of the process's
 			    ; 'user' structure
 	; 21/05/2016
@@ -182,8 +182,9 @@ endstruc
 ; 23/07/2022
 ;fsp:	resb nfiles * 16 ; (*)
 
-idev:	resb 1
-cdev:	resb 1	
+; 09/01/2026
+;idev:	resb 1
+;cdev:	resb 1
 
 ; 15/04/2015
 ;fsp:	resb nfiles * 10 ; 11/05/2015 (8 -> 10)
@@ -203,9 +204,10 @@ cdev:	resb 1
 ;	4 -> hd2 (physical drive, hard disk 3), physical drive number = 82h
 ;	5 -> hd3 (physical drive, hard disk 4), physical drive number = 83h
 
-rdev:	resb 1 ; root device number ; Retro UNIX 8086 v1 feature only!
-	        ; as above, for physical drives numbers in following table
-mdev:	resb 1 ; mounted device number ; Retro UNIX 8086 v1 feature only!
+; 09/01/2026
+;rdev:	resb 1 ; root device number ; Retro UNIX 8086 v1 feature only!
+;	        ; as above, for physical drives numbers in following table
+;mdev:	resb 1 ; mounted device number ; Retro UNIX 8086 v1 feature only!
 
 ; 23/07/2022
 ;; 15/04/2015
@@ -216,10 +218,11 @@ mdev:	resb 1 ; mounted device number ; Retro UNIX 8086 v1 feature only!
 ;mnti:	 resw 1
 ; 07/08/2022
 mpid:	 resw 1
-;rootdir: resw 1
-rootdir: resd 1
+;;rootdir: resw 1
+; 09/01/2026
+;rootdir: resd 1
 
-; 21/05/2016 - TRDOS 386 (TRDOS v2.0) - priority levels, 3 run queues 
+; 21/05/2016 - TRDOS 386 (TRDOS v2.0) - priority levels, 3 run queues
 runq:
 runq_event:	 resw 1 ; high priority, 'run for event'            ; 2
 runq_normal:	 resw 1 ; normal/regular priority, 'run as reqular' ; 1
@@ -235,6 +238,7 @@ sysflg:	resb 1
 alignb 4
 
 user:
+	; 09/01/2026 - TRDOS 386 Kernel v2.0.10 (v2.1)
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 04/12/2021 - Retro UNIX 386 v1.2
 	; 13/01/2017
@@ -258,15 +262,19 @@ user:
 	u.sp:	  resd 1 ; esp (kernel stack at the beginning of 'sysent')
 	u.usp:	  resd 1 ; esp (kernel stack points to user's registers)
 	u.r0:	  resd 1 ; eax
-	u.cdir:	  resw 1
-		  resw 1 ; 23/07/2022
-	u.cdrv:	  resb 1 ; 23/07/2022
-		  resb 1
+	; 09/01/2026
+	;u.cdir:  resw 1
+	;	  resw 1 ; 23/07/2022
+	;u.cdrv:  resb 1 ; 23/07/2022
+	;	  resb 1
+	;
 	u.fp:	  resb 10
 	;u.fp:	  resb OPENFILES ; 23/07/202
-	u.fsp:	  ; 23/07/2022
+	;u.fsp:	  ; 23/07/2022
+		  resb 2 ; 09/01/2026
 	u.fofp:	  resd 1
-	u.dirp:	  resd 1
+	; 09/01/2026
+	;u.dirp:  resd 1
 	u.namep:  resd 1
 	u.off:	  resd 1
 	;	  resd 1 ; 23/07/2022 (64 bit fptr)
@@ -274,18 +282,18 @@ user:
 	u.count:  resd 1
 	u.nread:  resd 1
 	u.break:  resd 1 ; break
-	; 10/01/2017 (TRDOS 386, relocation and dword alignment)
-	; tty number (rtty, rcvt, wtty)
-	u.ttyp:	  resw 1 
-	u.ttyn:	  resb 1 ; 28/07/2013 - Retro Unix 8086 v1 feature only !
-	u.mode:   resb 1 ; 23/07/2022
+	;
+	; 09/01/2026
+	;u.mode:  resb 1 ; 23/07/2022
 	;u.resb:  resb 1 ; 10/01/2017 (TRDOS 386, temporary)
-	u.dirbuf: resb 16 ; 04/12/2015 (10 -> 16)
+	; 09/01/2026
+	;u.dirbuf: resb 16 ; 04/12/2015 (10 -> 16)
 	;u.pri:	  resw 1 ; 14/02/2014
+	; 09/01/2026
 	u.quant:  resb 1 ; Retro UNIX 8086 v1 Feature only ! (uquant)
-		  resb 1 ; 23/07/2022
-	u.pri:	  resb 1 ; Modification: 21/05/2016 (priority levels: 0, 1, 2)
-		  resb 1 ; 23/07/2022
+	;	  resb 1 ; 23/07/2022
+	u.pri:	  resb 1 ; Modification: 21/05/2016 (priority levels: 0,1,2)
+	;	  resb 1 ; 23/07/2022
 	u.intr:	  resw 1
 	u.quit:	  resw 1
 	;u.emt:	  resw 1 ; 10/10/2013
@@ -301,7 +309,14 @@ user:
 	; 23/07/2022
 	;u.procp: resd 1 ; /* pointer to proc structure */
 	u.uid:	  resb 1 ; uid
-	u.ruid:   resb 1
+	; 09/01/2026
+	;u.ruid:  resb 1
+	; 09/01/2026
+	; 10/01/2017 (TRDOS 386, relocation and dword alignment)
+	; tty number (rtty, rcvt, wtty)
+	u.ttyn:	  resb 1 ; 28/07/2013 - Retro Unix 8086 v1 feature only !
+	u.ttyp:	  resw 1
+	;
         u.upage:  resd 1 ; 16/04/2015 - Retro Unix 386 v1 feature only !
 	u.pgdir:  resd 1 ; 09/03/2015 (page dir addr of process)
 	u.ppgdir: resd 1 ; 06/05/2015 (page dir addr of the parent process)
@@ -309,11 +324,13 @@ user:
 	u.pcount: resw 1 ; 20/05/2015 (byte -transfer- count for page)
 	;u.pncount: resw 1
 		; 16/06/2015 (byte -transfer- count for page, 'namei', 'mkdir')
-	;u.pnbase:  resd 1
+	;u.pnbase: resd 1
 		; 16/06/2015 (physical base/transfer address, 'namei', 'mkdir')
 			 ; 09/06/2015
 	u.kcall:  resb 1 ; The caller is 'namei' (dskr) or 'mkdir' (dskw) sign
-	u.brwdev: resb 1 ; Block device number for direct I/O (bread & bwrite)
+		  resb 1 ; 09/01/2026
+	; 09/01/2026
+	;u.brwdev: resb 1 ; Block device number for direct I/O (bread & bwrite)
 			 ; 24/07/2015 - 24/06/2015
 	;u.args:  resd 1 ; arguments list (line) offset from start of [u.upage]
 			 ; (arg list/line is from offset [u.args] to 4096 in [u.upage])
@@ -325,8 +342,8 @@ user:
 	; 19/08/2024	 ; TRDOS 386 v2.0.9 ; STDIN/STDOUT/STDERR 
 	u.stdin:  resb 1 ; 0 is tty-r or > 0 is file (redirection)
 	u.stdout: resb 1 ; 0 is tty-w or > 0 is file (redirection)
-	u.ungetc: resb 1 ; u.getc is valid if u.ungetc > 0	
-	u.getc:	  resb 1 ; last char read on stdin	 	
+	u.ungetc: resb 1 ; u.getc is valid if u.ungetc > 0
+	u.getc:	  resb 1 ; last char read on stdin
 	;;;
 	; last error number
 	u.error:  resd 1 ; 28/07/2013 - 09/03/2015 
@@ -343,7 +360,7 @@ user:
 		; 28/02/2017 (TRDOS 386)
 	u.irqwait: resb 1 ; IRQ waiting for callback service flag (IRQ number, If > 0)
 	u.r_lock: resb 1 ; 'IRQ callback service is in progress' flag (IRQ lock)
-	u.r_mode: resb 1 ; running mode during hadware interrupt
+	u.r_mode: resb 1 ; running mode during hardware interrupt
 	; 23/07/2022
 	u.exit:	  resb 1 ; exit code
 	; 27/02/2017 (TRDOS 386)
@@ -373,7 +390,11 @@ argv:	resd 1	; argument list (recent) address for 'sysexec'
 ; 07/04/2013 - 31/07/2013 - Retro UNIX 8086 v1
 rw:	resb 1 ;; Read/Write sign (iget)
 ; 23/07/2022
-	resb 3
+	;resb 3 ; 09/01/2026
+
+; 09/01/2026
+cdev:	resb 1
+	resb 2 ; 09/01/2026
 
 alignb 4
 

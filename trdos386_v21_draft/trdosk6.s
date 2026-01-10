@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 04/01/2026  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 10/01/2026  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -28,8 +28,8 @@ sysent: ; < enter to system call >
 	; 16/04/2015 - 19/10/2015 (Retro UNIX 386 v1)
 	; 10/04/2013 - 18/01/2014 (Retro UNIX 8086 v1)
 	;
-	; 'unkni' or 'sysent' is sytem entry from various traps. 
-	; The trap type is determined and an indirect jump is made to 
+	; 'unkni' or 'sysent' is sytem entry from various traps.
+	; The trap type is determined and an indirect jump is made to
 	; the appropriate system call handler. If there is a trap inside
 	; the system a jump to panic is made. All user registers are saved
 	; and u.sp points to the end of the users stack. The sys (trap)
@@ -63,7 +63,7 @@ sysent: ; < enter to system call >
 	pushad  ; eax, ecx, edx, ebx, esp -before pushad-, ebp, esi, edi
 	;
 	; ESPACE = [ss:u.sp] - esp ; 4*12 = 48 ; 17/09/2015 ; 06/06/2016
-	; 	(ESPACE is size of space in kernel stack 
+	; 	(ESPACE is size of space in kernel stack
 	;	for saving/restoring user registers.)
 	;
 	push	eax ; 01/07/2015
@@ -86,6 +86,8 @@ sysent: ; < enter to system call >
 		; jmp panic ; / called if trap inside system
 	; 23/07/2022
 	jz	short sysent0
+	; 08/01/2026 - temporary (test)
+	;mov	byte [panicnum],'2'
 	jmp	panic
 ;1:
 sysent0:
@@ -103,7 +105,7 @@ sysent0:
 	jna	short sysent1
 	jmp	sysrele
 		; mov $s.syst+2,clockp
-		; mov r0,-(sp) / save user registers 
+		; mov r0,-(sp) / save user registers
 		; mov sp,u.r0 / pointer to bottom of users stack
 			   ; / in u.r0
 		; mov r1,-(sp)
@@ -392,7 +394,7 @@ sysret: ; < return from system call>
 	;
 	; Calling sequence:
 	;	jump table or 'br sysret'
-	; Arguments: 
+	; Arguments:
 	;	-
 	; ...............................................................
 	;
@@ -641,13 +643,13 @@ intrct0:
 		; cmp (sp)+,(sp)+ / pop clock pointer
 	; 1: / now in user area
 		; mov r1,-(sp) / save r1
-		; mov u.ttyp,r1 
+		; mov u.ttyp,r1
 			; / pointer to tty buffer in control-to r1
 		; cmpb 6(r1),$177
 			; / is the interrupt char equal to "del"
 		; beq 1f / yes, 1f
-		; clrb 6(r1) 
-		        ; / no, clear the byte 
+		; clrb 6(r1)
+		        ; / no, clear the byte
 			; / (must be a quit character)
 		; mov (sp)+,r1 / restore r1
 		; clr u.quit / clear quit flag
@@ -662,7 +664,7 @@ intrct0:
 		; cmp u.intr,$core / should control be
 				; / transferred to loc core?
 		; blo 1f
-		; jmp *u.intr / user to do rti yes, 
+		; jmp *u.intr / user to do rti yes,
 				; / transfer to loc core
 	; 1:
 		; sys 1 / exit
@@ -677,6 +679,7 @@ sysexit_@:	; 22/08/2024
 	mov	bl, 0FFh ;  exit code ; -1
 
 sysexit: ; <terminate process>
+	; 08/01/2026 - TRDOS 386 v2.0.10
 	; 22/08/2024
 	; 20/08/2024
 	; 18/08/2024 - TRDOS 386 v2.0.9
@@ -739,6 +742,7 @@ sysexit: ; <terminate process>
 	; 18/08/2024 - exit code (in EBX, BL)
 	mov	[u.exit], bl
 sysexit_0:
+	; 08/01/2026 (BugFix)
 	; 30/07/2022
 	; 23/01/2017
 	; 02/01/2017
@@ -757,7 +761,7 @@ sysexit_0:
 	sub	al, al ; 0
 	out	40h, al ; LB
 	out	40h, al ; HB
- 	; 
+ 	;
 	movzx	ebx, byte [u.uno]
 	;mov	bl, [u.uno] ; process number of dying process
 	cmp	byte [ebx+p.timer-1], al ; 0
@@ -768,7 +772,7 @@ sysexit_0:
  	;jz	short sysexit_12 ; no timer events
 	;mov	cl, al
 	mov	cl, [timer_events] ; 14/11/2017
-	;cli	; disable interrupts 
+	;cli	; disable interrupts
 	mov	ah, 16 ; number of available timer events
 	mov	esi, timer_set ; beginning address of timer events
 sysexit_7:
@@ -776,10 +780,12 @@ sysexit_7:
 	cmp	al, bl ; process number comparison
 	je	short sysexit_10
 	and	al, al
-	jz	short sysexit_9
+	jz	short sysexit_9 ; free
 sysexit_8:
 	dec	cl
 	jz	short sysexit_11
+	; 08/01/2026 (BugFix)
+	mov	al, 0
 sysexit_9:
 	dec	ah
 	jz	short sysexit_12
@@ -787,8 +793,9 @@ sysexit_9:
 	jmp	short sysexit_7
 
 sysexit_10:
-	;mov	byte [esi], 0
-	mov	word [esi], 0
+	; set timer event as free
+	mov	byte [esi], 0 ; 08/01/2026
+	;mov	word [esi], 0
 	;mov	dword [esi+12], 0
 	;
 	dec	byte [timer_events] ; 02/01/2017
@@ -801,7 +808,10 @@ sysexit_11:
 	sub	eax, eax ; 0
 sysexit_12:
 	; 26/02/2017 (Unlink IRQ callbacks belong to the user)
-	cmp	byte [u.irqc], 0 ; Count of IRQ callbacks
+	;cmp	byte [u.irqc], 0 ; Count of IRQ callbacks
+	; 08/01/2026
+	; eax = 0
+	cmp	byte [u.irqc], al ; 0 ?
 	jng	short sysexit_16 ; zero or invalid
 	; 28/02/2017
 	; clear IRQ callback flags (for 'sysrele' and 'sysret')
@@ -874,7 +884,7 @@ sysexit_1: ; 1:
 
 	;movzx	ebx, byte [u.uno]
 	mov	bl, [u.uno] ; 02/01/2017
-		; movb	u.uno,r1 / yes, move dying process's number to r1
+		; movb u.uno,r1 / yes, move dying process's number to r1
 	mov	[ebx+p.stat-1], ah ; 0, SFREE
 		; clrb p.stat-1(r1) / free the process
 	; 10/04/2017
@@ -993,7 +1003,7 @@ sysexit_5: ; 3:
 	mov	[ebx+p.exitc-1], al ; save it to use by the parent
 	;;;
 	;dec	byte [esi+p.stat-1]
-		; decb	p.stat-1(r1) / awaken it by putting it (parent)
+		; decb p.stat-1(r1) / awaken it by putting it (parent)
 	;;;
 	;mov	ax, si ; r1  (process number in AL)
 	; 18/08/2024
@@ -1030,7 +1040,7 @@ syswait: ; < wait for a processs to die >
 	;
 	; 'syswait' waits for a process die.
 	; It works in following way:
-	;    1) From the parent process number, the parent's 
+	;    1) From the parent process number, the parent's
 	; 	process name is found. The p.ppid table of parent
 	;	names is then searched for this process name.
 	;	If a match occurs, r2 contains child's process
@@ -1052,7 +1062,7 @@ syswait: ; < wait for a processs to die >
 	;	?
 	; Arguments:
 	;	-
-	; Inputs: - 
+	; Inputs: -
 	; Outputs: if zombie found, it's name put in u.r0.
 	; ...............................................................
 	;
@@ -1070,7 +1080,7 @@ syswait_0:
 	xor	esi, esi
 		; clr r2
 	xor	ecx, ecx ; 30/10/2013
-	;xor 	cl, cl
+	;xor	cl, cl
 		; clr r3 / initialize reg 3
 syswait_1: ; 1:
 	;add	si, 2
@@ -1136,7 +1146,7 @@ syswait_1: ; 1:
 	;sub	ax, ax
 	; 30/07/2022
 	sub	eax, eax ; 0
-	mov 	[esi+p.ppid-2], ax ; 0 ; 17/09/2015
+	mov	[esi+p.ppid-2], ax ; 0 ; 17/09/2015
 	jmp	sysret0 ; ax = 0
 	;
 	;jmp	sysret
@@ -1270,7 +1280,7 @@ sysfork: ; < create a new process >
 	;		//
 	;		// pid == 0 in child process;
 	;		// pid == -1 means error return
-	;		// in child, 
+	;		// in child,
 	;		//	parents id is in par_uid if needed
 	;
 	;		_fork:
@@ -1295,7 +1305,7 @@ sysfork: ; < create a new process >
 	;
 	;	; Routine for parent process here (just after 'jc')
 	;		mov	word ptr [pid_of_child], ax
-	;		jmp	next_routine_for_parent	
+	;		jmp	next_routine_for_parent
 	;
 	;	@@: ; routine for child process here
 	;		....
@@ -1310,7 +1320,7 @@ sysfork: ; < create a new process >
 ; / create a new process
 	; EBX = return address for child process
 	     ; (Retro UNIX 8086 v1 modification !)
-	xor 	esi, esi
+	xor	esi, esi
 		; clr r1
 sysfork_1: ; 1: / search p.stat table for unused process number
 	inc	esi
@@ -1325,7 +1335,7 @@ sysfork_1: ; 1: / search p.stat table for unused process number
 		; blt 1b / no, branch back
 	;
 	; Retro UNIX 8086 v1. modification:
-	;	Parent process returns from 'sysfork' to address 
+	;	Parent process returns from 'sysfork' to address
 	;	which is just after 'sysfork' system call in parent
 	;	process. Child process returns to address which is put
 	;	in BX register by parent process for 'sysfork'.
@@ -1346,7 +1356,7 @@ sysfork_2: ; 1:
 		; EAX = New page directory
 	jnc	short sysfork_3
 	pop	eax   ; UPAGE (user structure page) address
-	call 	deallocate_page
+	call	deallocate_page
 	jmp	error
 sysfork_3:
 	; Retro UNIX 386 v1 modification !
@@ -1383,18 +1393,18 @@ sysfork_3:
 		; movb u.uno,-(sp) / save parent process number
 	mov	edi, eax
         push	eax ; **
-	mov     al, [edi+p.ttyc-1] ; console tty (parent)
+	mov	al, [edi+p.ttyc-1] ; console tty (parent)
 	; 18/09/2015
 	;;mov	[esi+p.ttyc-1], al ; set child's console tty
 	;;mov	[esi+p.waitc-1], ah ; 0 ; reset child's wait channel
-	;mov    [esi+p.ttyc-1], ax ; al - set child's console tty
+	;mov	[esi+p.ttyc-1], ax ; al - set child's console tty
 				   ; ah - reset child's wait channel
 	; 23/07/2022
 	mov	[esi+p.ttyc-1], al ; set child's console tty
 	mov	eax, esi
 	mov	[u.uno], al ; child process number
-		;movb r1,u.uno / set child process number to r1
-        inc     byte [esi+p.stat-1] ; 1, SRUN, 05/02/2014
+		; movb r1,u.uno / set child process number to r1
+        inc	byte [esi+p.stat-1] ; 1, SRUN, 05/02/2014
 		; incb p.stat-1(r1) / set p.stat entry for child
 				; / process to active status
 		; mov u.ttyp,r2 / put pointer to parent process'
@@ -1419,8 +1429,8 @@ sysfork_3:
 		; inc mpid / increment m.pid; get a new process name
 	mov	ax, [mpid]
 	mov	[esi+p.pid-2], ax
-		;mov mpid,p.pid-2(r1) / put new process name
-				    ; / in child process' name slot
+		; mov mpid,p.pid-2(r1) / put new process name
+				     ; / in child process' name slot
 	pop	edx  ; * return address for the child process
 		     ; * Retro UNIX 8086 v1 feature only !
   	pop	ebx  ; **
@@ -1428,8 +1438,8 @@ sysfork_3:
 		; movb (sp),r2 / put parent process number in r2
 	; 23/07/2022
 	shl	ebx, 1
-	;shl 	bx, 1
-		;asl r2 / multiply by 2 to get index into below tables
+	;shl	bx, 1
+		; asl r2 / multiply by 2 to get index into below tables
 	;movzx eax, word [ebx+p.pid-2]
 	mov	ax, [ebx+p.pid-2]
 		; mov p.pid-2(r2),r2 / get process name of parent
@@ -1440,7 +1450,7 @@ sysfork_3:
 	mov	[u.r0], eax
 		; mov r2,*u.r0 / put parent process name on stack
 			     ; / at location where r0 was saved
-	mov 	ebp, [u.sp] ; points to return address (EIP for IRET)
+	mov	ebp, [u.sp] ; points to return address (EIP for IRET)
 	mov	[ebp], edx ; *, CS:EIP -> EIP
 			   ; * return address for the child process
 		; mov $sysret1,-(sp) /
@@ -1452,8 +1462,8 @@ sysfork_3:
 	push	sysret ; ***
 	mov	[u.usp], esp ; points to 'sysret' address (***)
 			     ; (for child process)
-	xor 	eax, eax
-	mov 	[u.ttyp], ax ; 0
+	xor	eax, eax
+	mov	[u.ttyp], ax ; 0
 	;
 	call	wswap ; Retro UNIX 8086 v1 modification !
 		; jsr r0,wswap / put child process out on drum
@@ -1465,25 +1475,25 @@ sysfork_3:
 	;shl	bx, 1
 	; 23/07/2022
 	shl	ebx, 1
-	mov     eax, [ebx+p.upage-4] ; UPAGE address ; 14/05/2015
+	mov	eax, [ebx+p.upage-4] ; UPAGE address ; 14/05/2015
 	call	rswap ; restore parent process 'u' structure,
 		      ; registers and return address (for IRET)
-		;movb (sp)+,u.uno / put parent process number in u.uno
-        movzx   eax, word [mpid]
+		; movb (sp)+,u.uno / put parent process number in u.uno
+        movzx	eax, word [mpid]
 	mov	[u.r0], eax
 		; mov mpid,*u.r0 / put child process name on stack
 			       ; / where r0 was saved
 		; add $2,18.(sp) / add 2 to pc on stack; gives parent
 			          ; / process return
 	;xor	ebx, ebx
-	xor     esi, esi
+	xor	esi, esi
 		;clr r1
 sysfork_4: ; 1: / search u.fp list to find the files
 	      ; / opened by the parent process
 	; 01/09/2015
 	;xor	bh, bh
-	;mov 	bl, [esi+u.fp]
-	mov 	al, [esi+u.fp]
+	;mov	bl, [esi+u.fp]
+	mov	al, [esi+u.fp]
 		; movb u.fp(r1),r2 / get an open file for this process
         ;or	bl, bl
 	or	al, al
@@ -1512,7 +1522,7 @@ sysfork_4: ; 1: / search u.fp list to find the files
 			     ; / using file, because child will now be
 			     ; / using this file
 sysfork_5: ; 2:
-        inc     esi
+        inc	esi
 		; inc r1 / get next open file
 	; 23/07/2022
 	cmp	si, OPENFILES ; = 10
@@ -1690,7 +1700,7 @@ syscreat_3:
 	;; normal file, OK to continue...
 
 	; 05/08/2025
-	; cl = new attributes 
+	; cl = new attributes
 	; (attr_volume_id and attr_directory flags will be ignored)
 	; ((attr_device flag is not used by TRDOS 386))
 
@@ -2027,14 +2037,14 @@ sysopen: ;<open file>
 	;	* 2nd argument, mode is in CX register
 	;
 	;	AX register (will be restored via 'u.r0') will return
-	;	to the user with the file descriptor/number 
+	;	to the user with the file descriptor/number
 	;	(index to u.fp list).
 	;
 	;call	arg2
 	; * name - 'u.namep' points to address of file/path name
 	;          in the user's program segment ('u.segmnt')
 	;          with offset in BX register (as sysopen argument 1).
-	; * mode - sysopen argument 2 is in CX register 
+	; * mode - sysopen argument 2 is in CX register
 	;          which is on top of stack.
 	;
 	; jsr r0,arg2 / get sys args into u.namep and on stack
@@ -2081,12 +2091,11 @@ sysopen_0:
 	;mov	ax, 1
 	;mov	[FFF_Valid], ah ; 0 ; reset ; 17/10/2016
 	;call	set_working_path
-	call	set_working_path_x ; 17/10/2016	
+	call	set_working_path_x ; 17/10/2016
 	jnc	short sysopen_1
 
 syscreat_err: ; ecx = file attributes (for 'syscreat')
-	pop	ecx ; open mode  
-	and	eax, eax  ; 0 -> Bad Path!
+	pop	ecx ; open mode	and	eax, eax  ; 0 -> Bad Path!
 	jnz	short sysopen_err
 	; eax = 0
 	mov	eax, ERR_DIR_NOT_FOUND ; Directory not found !
@@ -2482,7 +2491,7 @@ sysmkdir: ; < make directory >
 	;	mode - mode of the directory
 	; Inputs: (arguments)
 	; Outputs: -
-	;    (sets 'directory' flag to 1; 
+	;    (sets 'directory' flag to 1;
 	;    'set user id on execution' and 'executable' flags to 0)
 	; ...............................................................
 	;
@@ -2555,7 +2564,7 @@ sysmkdir_2:
 	jnc	short sysmkdir_4
 	jmp	sysopen_err
 
-sysmkdir_4:	
+sysmkdir_4:
 	mov	[u.r0], eax ; New sub dir's first cluster
         call 	reset_working_path
 	jmp	sysret
@@ -3746,7 +3755,7 @@ sysvideo: ; VIDEO DATA TRANSFER FUNCTIONS
 	;		Page directory & page tables of the user's
 	;		program will be updated to direct access to
 	;		0A0000h (64K) video (VGA) memory; if there is not
-	;		a permission conflict or lock!  
+	;		a permission conflict or lock!
 	;	        (User's program/process will have permission to
 	;		access locked display memory if the owner is
 	;		it's parent.)
@@ -6859,7 +6868,7 @@ pix_op_new_24:
 	; edi = start pixel address
 
 	stosw
-	ror	eax, 16	
+	ror	eax, 16
 	stosb
 	rol	eax, 16
 	loop	pix_op_new_24
@@ -7446,7 +7455,7 @@ pix_op_inc_24_0:
 	jnz	short pix_op_inc_24_1
 	;mov	eax, 0FFFFFFh  ; Max. value
 	dec	eax ; 0FFFFFFFFh
-pix_op_inc_24_1: 
+pix_op_inc_24_1:
 	stosw
 	shr	eax, 16
 	stosb
@@ -8200,7 +8209,7 @@ m_pix_op_new_24_0:
 	lodsw
 	shl	eax, 16
 	lodsb
-	rol	eax, 16	
+	rol	eax, 16
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_new_24_1 ; exclude
 	mov	[edi], dx
@@ -8360,7 +8369,7 @@ m_pix_op_add_8:
 	; 8 bit colors (256 colors)
 	mov	dl, al ; new color
 m_pix_op_add_8_0:
-	lodsb 
+	lodsb
 	cmp	al, [maskcolor]
 	je	short m_pix_op_add_8_1 ; exclude
 	inc	dword [u.r0] ; +1
@@ -8385,7 +8394,7 @@ m_pix_op_add_24_0:
 	lodsw
 	shl	eax, 16
 	lodsb
-	rol	eax, 16	
+	rol	eax, 16
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_add_24_2 ; exclude
 	add	dword [u.r0], 3 ; +3
@@ -8456,7 +8465,7 @@ m_pix_op_add_w:
 
 	; window
 	;mov	edi, [v_str] ; LFB start address
-	;mov	esi, edi 
+	;mov	esi, edi
 
 	cmp	byte [v_bpp], 8 ; 8bpp
 	ja	short m_pix_op_add_w_1
@@ -8610,7 +8619,7 @@ m_pix_op_sub_w:
 
 	; window
 	;mov	edi, [v_str] ; LFB start address
-	;mov	esi, edi 
+	;mov	esi, edi
 
 	cmp	byte [v_bpp], 8 ; 8bpp
 	ja	short m_pix_op_sub_w_1
@@ -8666,7 +8675,7 @@ m_pix_op_mix_8:
 	; 8 bit colors (256 colors)
 	mov	dl, al ; new (mixing) color
 m_pix_op_mix_8_0:
-	lodsb 
+	lodsb
 	cmp	al, [maskcolor]
 	je	short m_pix_op_mix_8_1 ; exclude
 	add	al, dl ; 25/02/2021
@@ -8691,7 +8700,7 @@ m_pix_op_mix_24_0:
 	lodsw
 	shl	eax, 16
 	lodsb
-	rol	eax, 16	
+	rol	eax, 16
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_mix_24_1 ; exclude
 	add	eax, edx
@@ -8840,7 +8849,7 @@ m_pix_op_and_24_0:
 	lodsw
 	shl	eax, 16
 	lodsb
-	rol	eax, 16	
+	rol	eax, 16
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_and_24_1 ; exclude
 	and	eax, edx
@@ -8876,7 +8885,7 @@ m_pix_op_and_32:
 	; 32 bit true colors
 	mov	edx, eax ; new color
 m_pix_op_and_32_0:
-	lodsd 
+	lodsd
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_and_32_1 ; exclude
 	and	[edi], edx ; 25/02/2021
@@ -8905,7 +8914,7 @@ m_pix_op_and_w:
 
 	; window
 	;mov	edi, [v_str] ; LFB start address
-	;mov	esi, edi 
+	;mov	esi, edi
 
 	cmp	byte [v_bpp], 8 ; 8bpp
 	ja	short m_pix_op_and_w_1
@@ -8960,7 +8969,7 @@ m_pix_op_or_8:
 	; 8 bit colors (256 colors)
 	mov	dl, al ; new color
 m_pix_op_or_8_0:
-	lodsb 
+	lodsb
 	cmp	al, [maskcolor]
 	je	short m_pix_op_or_8_1 ; exclude
 	or	[edi], dl
@@ -8983,7 +8992,7 @@ m_pix_op_or_24_0:
 	lodsw
 	shl	eax, 16
 	lodsb
-	rol	eax, 16	
+	rol	eax, 16
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_or_24_1 ; exclude
 	or	eax, edx
@@ -9103,7 +9112,7 @@ m_pix_op_xor_8:
 	; 8 bit colors (256 colors)
 	mov	dl, al ; new color
 m_pix_op_xor_8_0:
-	lodsb 
+	lodsb
 	cmp	al, [maskcolor]
 	je	short m_pix_op_xor_8_1 ; exclude
 	xor	[edi], dl
@@ -9126,7 +9135,7 @@ m_pix_op_xor_24_0:
 	lodsw
 	shl	eax, 16
 	lodsb
-	rol	eax, 16	
+	rol	eax, 16
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_xor_24_1 ; exclude
 	xor	eax, edx
@@ -9191,7 +9200,7 @@ m_pix_op_xor_w:
 
 	; window
 	;mov	edi, [v_str] ; LFB start address
-	;mov	esi, edi 
+	;mov	esi, edi
 
 	cmp	byte [v_bpp], 8 ; 8bpp
 	ja	short m_pix_op_xor_w_1
@@ -9243,7 +9252,7 @@ m_pix_op_not_0:
 	;jmp	short m_pix_op_not_8
 m_pix_op_not_8:
 	; 8 bit colors (256 colors)
-	lodsb 
+	lodsb
 	cmp	al, [maskcolor]
 	je	short m_pix_op_not_8_1 ; exclude
 	not	byte [edi]
@@ -9263,7 +9272,7 @@ m_pix_op_not_24:
 	lodsw
 	shl	eax, 16
 	lodsb
-	rol	eax, 16	
+	rol	eax, 16
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_not_24_1 ; exclude
 	not	eax
@@ -9294,7 +9303,7 @@ m_pix_op_not_3:
 	;jmp	short m_pix_op_not_32
 m_pix_op_not_32:
 	; 32 bit true colors
-	lodsd 
+	lodsd
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_not_32_1 ; exclude
 	not	dword [edi]
@@ -9322,7 +9331,7 @@ m_pix_op_not_w:
 
 	; window
 	;mov	edi, [v_str] ; LFB start address
-	;mov	esi, edi 
+	;mov	esi, edi
 
 	cmp	byte [v_bpp], 8 ; 8bpp
 	ja	short m_pix_op_not_w_1
@@ -9374,7 +9383,7 @@ m_pix_op_neg_0:
 	;jmp	short m_pix_op_neg_8
 m_pix_op_neg_8:
 	; 8 bit colors (256 colors)
-	lodsb 
+	lodsb
 	cmp	al, [maskcolor]
 	je	short m_pix_op_neg_8_1 ; exclude
 	neg	byte [edi]
@@ -9394,7 +9403,7 @@ m_pix_op_neg_24:
 	lodsw
 	shl	eax, 16
 	lodsb
-	rol	eax, 16	
+	rol	eax, 16
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_neg_24_1 ; exclude
 	neg	eax
@@ -9425,7 +9434,7 @@ m_pix_op_neg_3:
 	;jmp	short m_pix_op_neg_32
 m_pix_op_neg_32:
 	; 32 bit true colors
-	lodsd 
+	lodsd
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_neg_32_1 ; exclude
 	neg	dword [edi]
@@ -9453,7 +9462,7 @@ m_pix_op_neg_w:
 
 	; window
 	;mov	edi, [v_str] ; LFB start address
-	;mov	esi, edi 
+	;mov	esi, edi
 
 	cmp	byte [v_bpp], 8 ; 8bpp
 	ja	short m_pix_op_neg_w_1
@@ -9528,7 +9537,7 @@ m_pix_op_inc_24:
 	lodsw
 	shl	eax, 16
 	lodsb
-	rol	eax, 16	
+	rol	eax, 16
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_inc_24_1 ; exclude
 	inc	eax
@@ -9597,7 +9606,7 @@ m_pix_op_inc_w:
 
 	; window
 	;mov	edi, [v_str] ; LFB start address
-	;mov	esi, edi 
+	;mov	esi, edi
 
 	cmp	byte [v_bpp], 8 ; 8bpp
 	ja	short m_pix_op_inc_w_1
@@ -9672,12 +9681,12 @@ m_pix_op_dec_24:
 	lodsw
 	shl	eax, 16
 	lodsb
-	rol	eax, 16	
+	rol	eax, 16
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_dec_24_1 ; exclude
 	dec	eax
 	jns	short m_pix_op_dec_24_0
-	inc	eax 
+	inc	eax
 m_pix_op_dec_24_0:
 	mov	[edi], ax
 	shr	eax, 16
@@ -9709,7 +9718,7 @@ m_pix_op_dec_3:
 	;jmp	short m_pix_op_dec_32
 m_pix_op_dec_32:
 	; 32 bit true colors
-	lodsd 
+	lodsd
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_dec_32_1 ; exclude
 	dec	dword [edi]
@@ -9740,7 +9749,7 @@ m_pix_op_dec_w:
 
 	; window
 	;mov	edi, [v_str] ; LFB start address
-	;mov	esi, edi 
+	;mov	esi, edi
 
 	cmp	byte [v_bpp], 8 ; 8bpp
 	ja	short m_pix_op_dec_w_1
@@ -9884,14 +9893,14 @@ sysvideo_39_15:
 	rcr	ax, 1
 	jmp	short sysvideo_39_13
 sysvideo_39_16:
-	 ; swap pixel colors (16bpp)
+	; swap pixel colors (16bpp)
 	mov	eax, ecx
 	xchg	[edx], ax
 	jmp	short sysvideo_39_14
 sysvideo_39_17:
 	cmp	bh, 24
 	ja	short sysvideo_39_24
-	jb	short sysvideo_39_10  
+	jb	short sysvideo_39_10
 
 	; 24 bits per pixel
 	and	ecx, 0FFFFFFh
@@ -10020,7 +10029,7 @@ sysvideo_39_81:
 
 	; 02/03/2021
 	; 08/02/2021
-	;mov	ebp, edx ; pixel count  
+	;mov	ebp, edx ; pixel count
 	;shl	ebp, 2 ; byte count (pixel pos: 4 bytes)
 
 	; 06/03/2021
@@ -11954,7 +11963,7 @@ sysexec:
 	; 03/06/2013 - 06/12/2013 (Retro UNIX 8086 v1)
 	;
 	; 'sysexec' initiates execution of a file whose path name if
-	; pointed to by 'name' in the sysexec call. 
+	; pointed to by 'name' in the sysexec call.
 	; 'sysexec' performs the following operations:
 	;    1. obtains i-number of file to be executed via 'namei'.
 	;    2. obtains i-node of file to be exceuted via 'iget'.
@@ -11989,9 +11998,9 @@ sysexec:
 	; ...............................................................
 	;
 	; Retro UNIX 386 v1 modification:
-	;	User application runs in it's own virtual space 
+	;	User application runs in it's own virtual space
 	;	which is izolated from kernel memory (and other
-	;	memory pages) via 80386	paging in ring 3 
+	;	memory pages) via 80386	paging in ring 3
 	;	privilige mode. Virtual start address is always 0.
 	;	User's core memory starts at linear address 400000h
 	;	(the end of the 1st 4MB).
@@ -11999,7 +12008,7 @@ sysexec:
 	; Retro UNIX 8086 v1 modification:
 	;	user/application segment and system/kernel segment
 	;	are different and sysenter/sysret/sysrele routines
-	;	are different (user's registers are saved to 
+	;	are different (user's registers are saved to
 	;	and then restored from system's stack.)
 	;
 	;	NOTE: Retro UNIX 8086 v1 'arg2' routine gets these
@@ -12032,7 +12041,7 @@ sysexec:
 
 	;; 'bad command or file name'
 	;mov	eax, ERR_BAD_CMD_ARG ; 01h ; TRDOS 8086
-	
+
 	; 'file not found !' error
 	mov	eax, ERR_NOT_FOUND ; 02h ; TRDOS 8086
 sysexec_not_found_err:
@@ -12058,7 +12067,7 @@ sysexec_0:
 	;jz	short sysexec_0ext
 	jz	short sysexec_1 ; yes
 
-	; 13/11/2017 
+	; 13/11/2017
 	; /// TRDOS386 permission check for multiuser mode ///
 	; SYSTEM file or HIDDEN file !!
 	; (Only super user has permission to run this file.)
@@ -12198,14 +12207,14 @@ sysexec_6:
 	; 18/10/2015 ('sysexec_6')
 	; 23/06/2015
 	mov	eax, [u.pgdir] ; physical address of page directory
-	;cmp 	eax, [k_page_dir] ; TRDOS MainProg ?
+	;cmp	eax, [k_page_dir] ; TRDOS MainProg ?
 	;je	short sysexec_7
 	; 19/11/2017
 	mov	ebx, [u.ppgdir] ; phy addr of the parent's page dir
 	call	deallocate_page_dir
 sysexec_7:
 	call	make_page_dir
-	;jc	panic  ; allocation error 
+	;jc	panic  ; allocation error
 	;	       ; after a deallocation would be nonsence !?
 	; 23/07/2022
 	jc	short sysexec_panic
@@ -12219,7 +12228,7 @@ sysexec_7:
 	mov	eax, [edx] ; physical address of
 			   ; kernel's first page table (1st 4 MB)
 			   ; (PDE 0 of kernel's page directory)
-	mov 	edx, [u.pgdir]
+	mov	edx, [u.pgdir]
 	mov	[edx], eax ; PDE 0 (1st 4MB)
 	;
 	; 20/07/2015
@@ -12250,14 +12259,16 @@ sysexec_8:
 	; 20/07/2015
 	mov	ebx, (ECORE - PAGE_SIZE) + CORE
 	; ebx = virtual end address + segment base address - 4K
-        jmp     short sysexec_8
+        jmp	short sysexec_8
 sysexec_panic:
+	; 08/01/2026 - temporary (test)
+	;mov	byte [panicnum], '3'
 	; 23/07/2022
 	jmp	panic
 
 sysexec_9:
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
-	; 19/11/2017 
+	; 19/11/2017
 	; 24/04/2016 (TRDOS 386 = TRDOS v2.0)
 	; 25/06/2015 - 26/08/2015 - 18/10/2015
 	; move arguments from kernel stack to [ecore]
@@ -12284,10 +12295,10 @@ sysexec_9:
 	mov	eax, [argc]
 	or	eax, eax
 	jnz	short sysexec_10
-	mov 	ebx, edi
-	sub	ebx, 4 
+	mov	ebx, edi
+	sub	ebx, 4
 	mov	[ebx], eax ; 0
-	jmp 	short sysexec_13
+	jmp	short sysexec_13
 
 sysexec_10:
 	mov	ecx, [u.nread]
@@ -12311,19 +12322,19 @@ sysexec_10:
 
 	mov	edx, eax
 	inc	dl ; argument count + 1 for argc value
-	shl 	dl, 2  ; 4 * (argument count + 1)
+	shl	dl, 2  ; 4 * (argument count + 1)
 	; edx <= 128
 	mov	ebx, edi
 	;mov	edi, ebx ; 19//11/2017
 	; 23/07/2022 (*) - edi is already dword aligned -
 	;and	bl, 0FCh ; 32 bit (dword) alignment
-	sub 	ebx, edx
+	sub	ebx, edx
 	mov	edx, edi
 	rep	movsb
-	mov 	esi, edx
-	mov 	edi, ebx
+	mov	esi, edx
+	mov	edi, ebx
 	mov	edx, ECORE - PAGE_SIZE ; virtual addr. of the last page
-	sub 	edx, [ecore] ; difference (virtual - physical)
+	sub	edx, [ecore] ; difference (virtual - physical)
 	stosd	; eax = argument count
 sysexec_11:
 	mov	eax, esi
@@ -12348,8 +12359,8 @@ sysexec_13:
 	;
 	; ebx = beginning addres of argument list pointers
 		;	in user's stack
-	sub 	ebx, [ecore]
-	add     ebx, (ECORE - PAGE_SIZE)
+	sub	ebx, [ecore]
+	add	ebx, (ECORE - PAGE_SIZE)
 			; end of core - 4096 (last page)
 			; (virtual address)
 	mov	[argv], ebx
@@ -12374,10 +12385,10 @@ sysexec_13:
 	mov	ecx, [u.nread]
 	mov	[u.break], ecx ; virtual address (offset from start)
 	cmp	cl, 32
-        jne     short sysexec_15
+        jne	short sysexec_15
 	;:
 	; Retro UNIX 386 v1 (32 bit) executable file header format
-	mov	esi, [pcore] ; start address of user's core memory 
+	mov	esi, [pcore] ; start address of user's core memory
 		             ; (phys. start addr. of the exec. file)
 	lodsd
 	cmp	ax, 1EEBh ; EBH, 1Eh -> jump to +32
@@ -12421,7 +12432,7 @@ sysexec_17:
 	; 07/07/2025
 	;mov	eax, [ii] ; first cluster
 	;call	iclose
-	xor     eax, eax
+	xor	eax, eax
 
 	; 21/08/2024
 	;inc	al
@@ -12475,7 +12486,7 @@ sysexec_18:
 ;	mov	al, '.'
 ;	mov	bl, 07h
 ;	mov	bh, [u.ttyn]
-;	call 	_write_tty 
+;	call 	_write_tty
 ;
 ;	pop	ebp
 ;	add	ebp, 4
@@ -12490,8 +12501,8 @@ sysexec_18:
 	mov	ebp, [argv] ; user's stack pointer must point to argument
 			    ; list pointers (argument count)
 	cli
-        mov     esp, [tss.esp0] ; ring 0 (kernel) stack pointer
-	;mov   	esp, [u.sp] ; Restore Kernel stack
+        mov	esp, [tss.esp0] ; ring 0 (kernel) stack pointer
+	;mov	esp, [u.sp] ; Restore Kernel stack
 			    ; for this process
 	;add	esp, 20 ; --> EIP, CS, EFLAGS, ESP, SS
 	;;xor	eax, eax ; 0
@@ -12514,7 +12525,7 @@ sysexec_18:
 	sti
 	pushfd	; EFLAGS
 		; Set IF for enabling interrupts in user mode
-	;or	dword [esp], 200h 
+	;or	dword [esp], 200h
 	;
 	;mov	bx, UCODE
 	;push	bx ; user's code segment
@@ -12536,9 +12547,9 @@ sysexec_18:
 	; during 'iretd' intruction at the end of 'sysrele' (in u1.s):
 	mov	dx, UDATA ; 19/11/2017
 	mov 	es, dx ; UDATA
-	push 	es ; ds (UDATA)
-	push 	es ; es (UDATA)
-	push 	es ; fs (UDATA)
+	push	es ; ds (UDATA)
+	push	es ; es (UDATA)
+	push	es ; fs (UDATA)
 	push	es ; gs (UDATA)
 	mov	dx, KDATA
 	mov	es, dx
@@ -12563,7 +12574,7 @@ sysexec_18:
 get_argp:
 	; 08/08/2022
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
-	; 11/12/2021 - Retro UNIX 386 v1.2 
+	; 11/12/2021 - Retro UNIX 386 v1.2
 	; 14/11/2017 - TRDOS 386 (TRDOS v2.0)
 	; 18/10/2015 (nbase, ncount)
 	; 21/07/2015
@@ -12703,7 +12714,7 @@ fclose:
 	;
 	; Given the file descriptor (index to the u.fp list)
 	; 'fclose' first gets the i-number of the file via 'getf'.
-	; If i-node is active (i-number > 0) the entry in 
+	; If i-node is active (i-number > 0) the entry in
 	; u.fp list is cleared. If all the processes that opened
 	; that file close it, then fsp etry is freed and the file
 	; is closed. If not a return is taken.
@@ -13277,7 +13288,7 @@ sysintr: ; / set interrupt handling
 	;	bx > 0 -> enable CTRL+BREAK (also default at start)
 	;		-u.intr will be set to 0FFFFh, u.quit will be used-
 	;	NOTE: u.quit is flag for CTRL+BREAK key press status
-	;	      -1 = pressed -termination request-, 0 = not pressed 
+	;	      -1 = pressed -termination request-, 0 = not pressed
 	; OUTPUT:
 	;	none
 
@@ -13690,7 +13701,7 @@ sysgeterr:
 	;	   0 = last error code (which is in 'u.error')
 	;	   FFFFFFFFh = page fault count for running process
 	;	   FFFFFFFEh = total page fault count
-	;	   1 .. FFFFFFFDh = undefined 
+	;	   1 .. FFFFFFFDh = undefined
 	;
 	; Output -> EAX = last error number or page fault count
 	;	   (depending on EBX input)
@@ -13714,6 +13725,7 @@ glerr_3:
 	jmp	short glerr_1
 
 load_and_run_file:
+	; 10/01/2026
 	; 07/07/2025 - TRDOS 386 Kernel v2.0.10
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 18/11/2017
@@ -13753,7 +13765,7 @@ load_and_run_file:
 	; 'loc_load_run_file_8' address has 
 	; 'jmp loc_file_rw_restore_retn' instruction
 	; 'loc_file_rw_restore_retn:' will return to
-	; [mainprog_return_addr] 
+	; [mainprog_return_addr]
 	; just after 'call command_interpreter'
 	;
 	push	_end_of_mainprog ; we must not return to here !
@@ -13789,15 +13801,34 @@ load_and_run_file:
 	xor 	esi, esi
 cnpm_1: ; search p.stat table for unused process number
 	inc	esi
-	cmp	byte [esi+p.stat-1], 0 ; SFREE
+	; 10/01/2026
+	mov	al, [esi+p.stat-1]
+	cmp	al, 0
+	;cmp	byte [esi+p.stat-1], 0 ; SFREE
 				; is process active, unused, dead
 	jna	short cnpm_2	; it's unused so branch
+	;;;;
+	; 10/01/2026 - TRDOS 386 v2.0.10 (BugFix)
+	; (if the parent proc's number = 1, the child's status = 3)
+	cmp	al, 3 ; zombie ?
+	jne	short cnpm_3 ; al = 1
+	shl 	esi, 1
+	mov	ax, [esi+p.ppid-2] ; parent process's id
+	shr	esi, 1
+	cmp	ax, [p.pid] ; compare with process 1's process id
+	jbe	short cnpm_3 ; not MainProg (!?)
+	mov	byte [esi+p.stat-1], 0
+	jmp	short cnpm_2
+cnpm_3:
+	;;;;
 	cmp	si, nproc 	; all processes checked
 	jb	short cnpm_1    ; no, branch back
+	; 08/01/2026 - temporary (test) for BugFix
+	;mov	byte [panicnum],'4'
 cnpm_panic:
 	jmp	panic
 cnpm_2:
-	mov	eax, [u.pgdir] ; page directory of MainProg
+	mov	eax, [u.pgdir]	; page directory of MainProg
 	mov	[u.ppgdir], eax ; parent's page directory
 	call	allocate_page
 	;jc	panic
@@ -13969,7 +14000,7 @@ dskr_5:		; 23/07/2022
 	retn
 
 mget_r:
-	; 01/01/2026	
+	; 01/01/2026
 	; 09/12/2025
 	; 08/12/2025
 	; 01/07/2025 - TRDOS 386 Kernel v2.0.10
@@ -18800,7 +18831,7 @@ sysmem: ; Get Total&Free Memory amount
 sysprompt:
 	; Set TRDOS 386 Command Interpreter (MainProg) prompt
 	; 30/07/2022 (TRDOS 386 Kernel v2.0.5)
-	; 31/12/2017 (TRDOS 386 = TRDOS v2.0) 
+	; 31/12/2017 (TRDOS 386 = TRDOS v2.0)
 	;
         ; INPUT ->
 	;	EBX = 0 -> use default prompt

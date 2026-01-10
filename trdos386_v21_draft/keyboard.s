@@ -13,14 +13,14 @@
 ; Derived from 'Retro UNIX 386 Kernel - v0.2.1.0' source code by Erdogan Tan
 ; keyboard.inc (17/10/2015)
 ;
-; Derived from 'IBM PC-XT-286' BIOS source code (1986) 
+; Derived from 'IBM PC-XT-286' BIOS source code (1986)
 ; ****************************************************************************
 
 ; Ref: Retro UNIX 386 v1.2 - keyboard.s - 11/06/2022
 
 ; Retro UNIX 386 v1 Kernel - KEYBOARD.INC
 ; Last Modification: 17/10/2015
-;		    (Keyboard Data is in 'KYBDATA.INC')	
+;		    (Keyboard Data is in 'KYBDATA.INC')
 ;
 ; ///////// KEYBOARD FUNCTIONS (PROCEDURES) ///////////////
 
@@ -32,7 +32,7 @@
 ; (INT_16h - Retro UNIX 8086 v1 - U9.ASM, 30/06/2014)
 
 ;NOTE: 'k0' to 'k7' are name of OPMASK registers.
-;	(The reason of using '_k' labels!!!) (27/08/2014)    
+;	(The reason of using '_k' labels!!!) (27/08/2014)
 ;NOTE: 'NOT' keyword is '~' unary operator in NASM.
 ;	('NOT LC_HC' --> '~LC_HC') (bit reversing operator)
 
@@ -41,7 +41,7 @@ int16h:	; 30/06/2015
 	pushfd	; 28/08/2014
 	push 	cs
 	call 	KEYBOARD_IO_1 ; getc_int
-	retn	
+	retn
 
 ; 24/07/2022 - TRDOS 386 v2.0.5
 
@@ -65,13 +65,13 @@ _K3:
 
 getc_int:
 	; 28/02/2015
-	; 03/12/2014 (derivation from pc-xt-286 bios source code -1986-, 
+	; 03/12/2014 (derivation from pc-xt-286 bios source code -1986-,
 	;	      instead of pc-at bios - 1985-)
 	; 28/08/2014 (_k1d)
 	; 30/06/2014
 	; 03/03/2014
 	; 28/02/2014
-	; Derived from "KEYBOARD_IO_1" procedure of IBM "pc-xt-286" 
+	; Derived from "KEYBOARD_IO_1" procedure of IBM "pc-xt-286"
 	; rombios source code (21/04/1986)
 	;	 'keybd.asm', INT 16H, KEYBOARD_IO
 	;
@@ -84,7 +84,7 @@ getc_int:
 	;	(AH)= 00H  READ THE NEXT ASCII CHARACTER ENTERED FROM THE KEYBOARD,   :
 	;		   RETURN THE RESULT IN (AL), SCAN CODE IN (AH).              :
 	;		   THIS IS THE COMPATIBLE READ INTERFACE, EQUIVALENT TO THE   :
-	;                  STANDARD PC OR PCAT KEYBOARD				      :	
+	;                  STANDARD PC OR PCAT KEYBOARD				      :
 	;-----------------------------------------------------------------------------:
 	;	(AH)= 01H  SET THE ZERO FLAG TO INDICATE IF AN ASCII CHARACTER IS     :
 	;		   AVAILABLE TO BE READ FROM THE KEYBOARD BUFFER.	      :
@@ -93,11 +93,11 @@ getc_int:
 	;		   IF (ZF)= 0, THE NEXT CHARACTER IN THE BUFFER TO BE READ IS :
 	;		   IN (AX), AND THE ENTRY REMAINS IN THE BUFFER.              :
 	;		   THIS WILL RETURN ONLY PC/PCAT KEYBOARD COMPATIBLE CODES    :
-	;-----------------------------------------------------------------------------:	
+	;-----------------------------------------------------------------------------:
 	;	(AH)= 02H  RETURN THE CURRENT SHIFT STATUS IN AL REGISTER             :
 	;		   THE BIT SETTINGS FOR THIS CODE ARE INDICATED IN THE        :
 	;		   EQUATES FOR @KB_FLAG		                              :
-	;-----------------------------------------------------------------------------:	
+	;-----------------------------------------------------------------------------:
 	;	(AH)= 03H  SET TYPAMATIC RATE AND DELAY                               :
 	;	      (AL) = 05H                                                      :
 	;	      (BL) = TYPAMATIC RATE (BITS 5 - 7 MUST BE RESET TO 0)           :
@@ -139,7 +139,7 @@ getc_int:
 	;		   EXIT:   (AH) = 00H = SUCCESSFUL OPERATION                  :
 	;		           (AL) = 01H = UNSUCCESSFUL - BUFFER FULL            :
 	;		   FLAGS:  CARRY IF ERROR                                     :
-	;-----------------------------------------------------------------------------:		
+	;-----------------------------------------------------------------------------:
 	;	(AH)= 10H  EXTENDED READ INTERFACE FOR THE ENHANCED KEYBOARD,         :
 	;		   OTHERWISE SAME AS FUNCTION AH=0                            :
 	;-----------------------------------------------------------------------------:
@@ -178,7 +178,7 @@ KEYBOARD_IO_1:
 	mov	ebx, [esp]
 	;; 15/01/2017
 	; 02/01/2017
-	;;mov	byte [intflg], 32h	; keyboard interrupt 
+	;;mov	byte [intflg], 32h	; keyboard interrupt
 	sti
 	;
 	or	ah, ah			; CHECK FOR (AH)= 00H
@@ -187,14 +187,14 @@ KEYBOARD_IO_1:
         jz      short _K2               ; ASCII_STATUS
 	dec	ah			; CHECK FOR (AH)= 02H
         jz	short _K3		; SHIFT STATUS
-	dec	ah			; CHECK FOR (AH)= 03H	
+	dec	ah			; CHECK FOR (AH)= 03H
         jz      short _K300		; SET TYPAMATIC RATE/DELAY
-	sub	ah, 2			; CHECK FOR (AH)= 05H	
+	sub	ah, 2			; CHECK FOR (AH)= 05H
         ;jz	short _K500		; KEYBOARD WRITE
 	; 07/08/2022
 	jnz	short _KIO1
-	jmp	_K500         
-_KIO1:	
+	jmp	_K500
+_KIO1:
 	sub	ah, 11			; AH =  10H
 	jz	short _K1E		; EXTENDED ASCII READ
 	dec	ah			; CHECK FOR (AH)= 11H
@@ -232,11 +232,11 @@ _KIO_EXIT:
 ;	jmp	short _KIO_EXIT		; RETURN TO CALLER
 
 	;-----	ASCII CHARACTER
-_K1E:	
+_K1E:
 	call	_K1S			; GET A CHARACTER FROM THE BUFFER (EXTENDED)
 	call	_KIO_E_XLAT		; ROUTINE TO XLATE FOR EXTENDED CALLS
 	jmp	short _KIO_EXIT         ; GIVE IT TO THE CALLER
-_K1:	
+_K1:
 	call	_K1S			; GET A CHARACTER FROM THE BUFFER
 	call	_KIO_S_XLAT		; ROUTINE TO XLATE FOR STANDARD CALLS
 	jc	short _K1		; CARRY SET MEANS TROW CODE AWAY
@@ -250,7 +250,7 @@ _K2E:
 	pushf				; SAVE ZF FROM TEST
 	call	_KIO_E_XLAT		; ROUTINE TO XLATE FOR EXTENDED CALLS
 	jmp	short _K2A	        ; GIVE IT TO THE CALLER
-_K2:	
+_K2:
 	call	_K2S			; TEST FOR CHARACTER IN BUFFER
 	jz	short _K2B		; RETURN IF BUFFER EMPTY
 	pushf				; SAVE ZF FROM TEST
@@ -314,14 +314,14 @@ _K300:
 	jnz	short _KIO_EXIT		; RETURN IF SO
 	test	bh, 0FCh		; TEST FOR OUT-OF-RANGE DELAY
 	jnz	short _KIO_EXIT		; RETURN IF SO
-	mov	al, KB_TYPA_RD		; COMMAND FOR TYPAMATIC RATE/DELAY		
-	call	SND_DATA		; SEND TO KEYBOARD	
+	mov	al, KB_TYPA_RD		; COMMAND FOR TYPAMATIC RATE/DELAY
+	call	SND_DATA		; SEND TO KEYBOARD
 	;mov	cx, 5			; SHIFT COUNT
 	;shl	bh, cl			; SHIFT DELAY OVER
 	shl	bh, 5
 	mov	al, bl			; PUT IN RATE
 	or	al, bh			; AND DELAY
-	call	SND_DATA		; SEND TO KEYBOARD	
+	call	SND_DATA		; SEND TO KEYBOARD
         jmp     _KIO_EXIT               ; RETURN TO CALLER
 
 	;-----	WRITE TO KEYBOARD BUFFER
@@ -332,15 +332,15 @@ _K500:
 	mov	esi, ebx		; SAVE A COPY IN CASE BUFFER NOT FULL
 	call	_K4			; BUMP THE POINTER TO SEE IF BUFFER IS FULL
 	cmp	ebx, [BUFFER_HEAD]	; WILL THE BUFFER OVERRUN IF WE STORE THIS?
-	je	short _K502		; YES - INFORM CALLER OF ERROR		
-	mov	[esi], cx		; NO - PUT ASCII/SCAN CODE INTO BUFFER	
+	je	short _K502		; YES - INFORM CALLER OF ERROR
+	mov	[esi], cx		; NO - PUT ASCII/SCAN CODE INTO BUFFER
 	mov	[BUFFER_TAIL], ebx	; ADJUST 'IN TO' POINTER TO REFLECT CHANGE
 	sub	al, al			; TELL CALLER THAT OPERATION WAS SUCCESSFUL
 	jmp	short _K504		; SUB INSTRUCTION ALSO RESETS CARRY FLAG
 _K502:
 	mov	al, 01h			; BUFFER FULL INDICATION
 _K504:
-	sti				
+	sti
 	pop	esi			; RECOVER SI (esi)
         jmp     _KIO_EXIT               ; RETURN TO CALLER WITH STATUS IN AL
 
@@ -360,12 +360,12 @@ _K1S:
 _K1T:                                   ; ASCII READ
 	sti				; INTERRUPTS BACK ON DURING LOOP
 	nop				; ALLOW AN INTERRUPT TO OCCUR
-_K1U:	
+_K1U:
 	cli				; INTERRUPTS BACK OFF
         mov    	ebx, [BUFFER_HEAD] 	; GET POINTER TO HEAD OF BUFFER
         cmp     ebx, [BUFFER_TAIL] 	; TEST END OF BUFFER
 _k1x:
-	push	ebx			; SAVE ADDRESS		
+	push	ebx			; SAVE ADDRESS
 	pushf				; SAVE FLAGS
 	call	MAKE_LED		; GO GET MODE INDICATOR DATA BYTE
 	mov	bl, [KB_FLAG_2] 	; GET PREVIOUS BITS
@@ -435,7 +435,7 @@ _KIO_S1:
 	mov	ah, 1Ch			; CONVERT TO COMPATIBLE OUTPUT
 	;jmp	short _KIO_USE		; GIVE TO CALLER
 	retn
-_KIO_S2:		
+_KIO_S2:
 	cmp	ah, 84h			; IS IT ONE OF EXTENDED ONES?
 	ja	short _KIO_DIS		; YES, THROW AWAY AND GET ANOTHER CHAR
 	cmp	al, 0F0h		; IS IT ONE OF THE FILL-INs?
@@ -475,7 +475,7 @@ _K5:
 ; KEYBOARD (HARDWARE) INTERRUPT -  IRQ LEVEL 1
 ; (INT_09h - Retro UNIX 8086 v1 - U9.ASM, 07/03/2014)
 ;
-; Derived from "KB_INT_1" procedure of IBM "pc-at" 
+; Derived from "KB_INT_1" procedure of IBM "pc-at"
 ; rombios source code (06/10/1985)
 ; 'keybd.asm', HARDWARE INT 09h - (IRQ Level 1)
 
@@ -549,7 +549,7 @@ LC_E1		equ	00000001b	; LAST CODE WAS THE E1 HIDDEN CODE
 LC_E0		equ	00000010b	; LAST CODE WAS THE E0 HIDDEN CODE
 R_CTL_SHIFT	equ	00000100b	; RIGHT CTL KEY DOWN
 R_ALT_SHIFT	equ	00001000b	; RIGHT ALT KEY DOWN
-GRAPH_ON	equ	00001000b	; ALT GRAPHICS KEY DOWN (WT ONLY)	
+GRAPH_ON	equ	00001000b	; ALT GRAPHICS KEY DOWN (WT ONLY)
 KBX		equ	00010000b	; ENHANCED KEYBOARD INSTALLED
 SET_NUM_LK	equ	00100000b	; FORCE NUM LOCK IF READ ID AND KBX
 LC_AB		equ	01000000b	; LAST CHARACTER WAS FIRST ID CHARACTER
@@ -606,14 +606,14 @@ KB_INT_01:
 	;-----	READ CHARACTER FROM KEYBOARD INTERFACE
 	in	al, PORT_A		; READ IN THE CHARACTER
 	;
-	;-----	SYSTEM HOOK INT 15H - FUNCTION 4FH (ON HARDWARE INT LEVEL 9H) 	
+	;-----	SYSTEM HOOK INT 15H - FUNCTION 4FH (ON HARDWARE INT LEVEL 9H)
 	;mov	ah, 04Fh		; SYSTEM INTERCEPT - KEY CODE FUNCTION
 	;stc				; SET CY=1 (IN CASE OF IRET)
 	;int	15h			; CASETTE CALL (AL)=KEY SCAN CODE
 	;				; RETURNS CY=1 FOR INVALID FUNCTION
 	;jc	KB_INT_02		; CONTINUE IF CARRY FLAG SET ((AL)=CODE)
 	;jmp	K26			; EXIT IF SYSTEM HANDLES SCAN CODE
-	;				; EXÝT HANDLES HARDWARE EOI AND ENABLE		
+	;				; EXÝT HANDLES HARDWARE EOI AND ENABLE
 	;
 	;-----	CHECK FOR A RESEND COMMAND TO KEYBOARD
 KB_INT_02:				; 	  (AL)= SCAN CODE
@@ -666,7 +666,7 @@ UP0:
 	; 12/04/2021
 	jne	short K16
 	jmp	K62
-K16:	
+K16:
 	mov	bh, [KB_FLAG_3]		; LOAD FLAGS FOR TESTING
 	;
 	;-----	TEST TO SEE IF A READ_ID IS IN PROGRESS
@@ -706,8 +706,8 @@ NOT_ID:
 	or	byte [KB_FLAG_3], LC_E0+KBX ; SET FLAG BIT, SET KBX, AND
 	jmp	short EXIT		; THROW AWAY THIS CODE
 	; 12/04/2021
-	;jmp	K26A	
-TEST_E1:	
+	;jmp	K26A
+TEST_E1:
 	cmp	al, MC_E1		; IS THIS THE PAUSE KEY?
 	jne	short NOT_HC
 	or	byte [KB_FLAG_3], LC_E1+KBX ; SET FLAG BIT, SET KBX, AND
@@ -736,17 +736,17 @@ NOT_LC_E0:
 	repne	scasb			; CHECK IT
 	je	short EXIT		; THROW AWAY IF SO
 	; 12/04/2021
-	;je	K26A			
+	;je	K26A
 	;
 	cmp	al, NUM_KEY		; IS IT THE PAUSE KEY?
 	jne	short K16B		; NO, THROW AWAY & RESET FLAG
 	; 12/04/2021
 	;jne	K26
 	test	ah, 80h			; YES, IS IT THE BREAK OF THE KEY?
-	jnz	short K16B		; YES, THROW THIS AWAY, TOO	
+	jnz	short K16B		; YES, THROW THIS AWAY, TOO
 	; 24/07/2022
 	;jnz	K26
-        ; 20/02/2015 
+        ; 20/02/2015
 	test	byte [KB_FLAG_1],HOLD_STATE ; NO, ARE WE PAUSED ALREADY?
 	jnz	short K16B		; YES, THROW AWAY
 	; 12/04/2021
@@ -761,10 +761,10 @@ T_SYS_KEY:
 	test	ah, 80h			; CHECK IF THIS A BREAK CODE
 	jnz	short K16C		; DO NOT TOUCH SYSTEM INDICATOR IF TRUE
 	;
-	test	byte [KB_FLAG_1], SYS_SHIFT ; SEE IF IN SYSTEM KEY HELD DOWN 
+	test	byte [KB_FLAG_1], SYS_SHIFT ; SEE IF IN SYSTEM KEY HELD DOWN
 	jnz	short K16B		; IF YES, DO NOT PROCESS SYSTEM INDICATOR	
 	; 12/04/2021
-	;jnz	K26		
+	;jnz	K26
 	;
 	or	byte [KB_FLAG_1], SYS_SHIFT ; INDICATE SYSTEM KEY DEPRESSED
 	mov	al, EOI			; END OF INTERRUPT COMMAND
@@ -775,7 +775,7 @@ T_SYS_KEY:
 	; !!! SYSREQ !!! function/system call (INTERRUPT) must be here !!!
 	;MOV	AL, 8500H		; FUNCTION VALUE FOR MAKE OF SYSTEM KEY
 	;STI				; MAKE SURE INTERRUPTS ENABLED
-	;INT	15H			; USER INTERRUPT	
+	;INT	15H			; USER INTERRUPT
         jmp     K27A                    ; END PROCESSING
 	;
 K16B:	jmp	K26			; IGNORE SYSTEM KEY
@@ -791,7 +791,7 @@ K16C:
 	;MOV	AX, 8501H		; FUNCTION VALUE FOR BREAK OF SYSTEM KEY
 	;STI				; MAKE SURE INTERRUPTS ENABLED
 	;INT	15H			; USER INTERRUPT
-	;JMP	K27A			; INGONRE SYSTEM KEY				
+	;JMP	K27A			; IGNORE SYSTEM KEY
 	;
 	jmp     K27			; IGNORE SYSTEM KEY
 	;
@@ -854,7 +854,7 @@ K18A:
 	cmp	al, INS_KEY		; CHECK FOR INSERT KEY
 	jne	short K22		; JUMP IF NOT INSERT KEY
 	test	bl, ALT_SHIFT 		; CHECK FOR ALTERNATE SHIFT
-      	jz	short K18B		; JUMP IF NOT ALTERNATE SHIFT	
+      	jz	short K18B		; JUMP IF NOT ALTERNATE SHIFT
         ;jnz	K25			; JUMP IF ALTERNATE SHIFT
 	; 12/04/2021
 	jmp	short k20a ; K25
@@ -922,12 +922,12 @@ K23B:
 	or	al, [KB_FLAG_1]		; PUT IN LEFT ALÞT & CTL FLAGS
 	shl	al, cl			; MOVE BACK TO BITS 3 & 2
 	and	al, ALT_SHIFT+CTL_SHIFT ; FILTER OUT OTHER GARBAGE
-	or	[KB_FLAG], al		; PUT RESULT IN THE REAL FLAGS	
+	or	[KB_FLAG], al		; PUT RESULT IN THE REAL FLAGS
 	mov	al, ah
 K23D:
 	cmp	al, ALT_KEY+80h		; IS THIS ALTERNATE SHIFT RELEASE
 	jne	short K26		; INTERRUPT RETURN
-	;	
+	;
 	;-----	ALTERNATE SHIFT KEY RELEASED, GET THE VALUE INTO BUFFER
 	mov	al, [ALT_INPUT]
 	mov	ah, 0			; SCAN CODE OF 0
@@ -978,7 +978,7 @@ K27A:
 	;-----	NOT IN	HOLD STATE
 K28:					; NO-HOLD-STATE
 	cmp	al, 88			; TEST FOR OUT-OF-RANGE SCAN CODES
-	ja	short K26		; IGNORE IF OUT-OF-RANGE	
+	ja	short K26		; IGNORE IF OUT-OF-RANGE
 	;
 	test	bl, ALT_SHIFT 		; ARE WE IN ALTERNATE SHIFT
         jz	short K28A		; IF NOT ALTERNATE
@@ -991,8 +991,8 @@ K28:					; NO-HOLD-STATE
 	test	byte [KB_FLAG_1], SYS_SHIFT ; YES, IS SYSREQ KEY DOWN?
 	jz	short K29		;  NO, ALT STATE IS REAL
 	; 12/04/2021
-	;jnz	K38			; YES, THIS IS PHONY ALT STATE 
-        ;				; DUE TO PRESSING SYSREQ	
+	;jnz	K38			; YES, THIS IS PHONY ALT STATE
+        ;				; DUE TO PRESSING SYSREQ
 K28A:	jmp	K38
 	;
 	;-----	TEST FOR RESET KEY SEQUENCE (CTL ALT DEL)
@@ -1037,7 +1037,7 @@ K312:
 	; 12/04/2021
 	jne	short K32
 k312a:
-	jmp	K37B	
+	jmp	K37B
 	;
 	;-----	LOOK FOR KEY PAD ENTRY
 K32:					; ALT-KEY-PAD
@@ -1074,7 +1074,7 @@ K34:					; ALT-TOP-ROW
 	;
 	;-----	TRANSLATE ALTERNATE SHIFT PSEUDO SCAN CODES
 K35:					; ALT-FUNCTION
-	cmp	al, F11_M		; IS IT F11?	
+	cmp	al, F11_M		; IS IT F11?
 	jb	short K35A ; 20/02/2015	; NO, BRANCH
 	cmp	al, F12_M		; IS IT F12?
 	ja	short K35A ; 20/02/2015	; NO, BRANCH
@@ -1126,10 +1126,10 @@ K37C:
 K38:					; NOT-ALT-SHIFT
 					; BL STILL HAS SHIFT FLAGS
 	test	bl, CTL_SHIFT 		; ARE WE IN CONTROL SHIFT?
-	;;jnz	short K38A		; YES, START PROCESSING	
+	;;jnz	short K38A		; YES, START PROCESSING
         ;jz	K44			; NOT-CTL-SHIFT
 	; 12/04/2021
-	jnz	short K38A		; YES, START PROCESSING	
+	jnz	short K38A		; YES, START PROCESSING
 	jmp	K44			; NOT-CTL-SHIFT
 	;
 	;-----	CONTROL SHIFT, TEST SPECIAL CHARACTERS
@@ -1138,9 +1138,9 @@ K38A:
 	cmp	al, SCROLL_KEY		; TEST FOR BREAK
 	jne	short K39		; JUMP, NO-BREAK
 	test	bh, KBX			; IS THIS THE ENHANCED KEYBOARD?
-	jz	short K38B		; NO, BREAK IS VALID	
+	jz	short K38B		; NO, BREAK IS VALID
 	test	bh, LC_E0		; YES, WAS LAST CODE AN E0?
-	jz	short K39		; NO-BREAK, TEST FOR PAUSE	
+	jz	short K39		; NO-BREAK, TEST FOR PAUSE
 K38B:
 	mov	ebx, [BUFFER_HEAD] 	; RESET BUFFER TO EMPTY
 	mov	[BUFFER_TAIL], ebx
@@ -1152,7 +1152,7 @@ K38B:
 	;
 	; CTRL+BREAK code here !!!
 	;INT	1BH			; BREAK INTERRUPT VECTOR
-	; 17/10/2015	
+	; 17/10/2015
 	call	ctrlbrk ; control+break subroutine
 	;
 	;sub	ax, ax			; PUT OUT DUMMY CHARACTER
@@ -1163,7 +1163,7 @@ K38B:
 	;-----	TEST FOR PAUSE
 K39:					; NO_BREAK
 	test	bh, KBX			; IS THIS THE ENHANCED KEYBOARD?
-	jnz	short K41		; YES, THEN THIS CAN'T BE PAUSE	
+	jnz	short K41		; YES, THEN THIS CAN'T BE PAUSE
 	cmp	al, NUM_KEY		; LOOK FOR PAUSE KEY
 	jne	short K41		; NO-PAUSE
 K39P:
@@ -1194,7 +1194,7 @@ K41:					; NO-PAUSE
 	cmp	al, 55			; TEST FOR */PRTSC KEY
 	jne	short K42		; NOT-KEY-55
 	test	bh, KBX			; IS THIS THE ENHANCED KEYBOARD?
-	jz	short K41A		; NO, CTL-PRTSC IS VALID	
+	jz	short K41A		; NO, CTL-PRTSC IS VALID
 	test	bh, LC_E0		; YES, WAS LAST CODE AN E0?
 	jz	short K42B		; NO, TRANSLATE TO A FUNCTION
 K41A:	
@@ -1206,11 +1206,11 @@ K42:					; NOT-KEY-55
 	cmp	al, 15			; IS IT THE TAB KEY?
 	je	short K42B		; YES, XLATE TO FUNCTION CODE
 	cmp	al, 53			; IS IT THE / KEY?
-	jne	short K42A		; NO, NO MORE SPECIAL CASES	
+	jne	short K42A		; NO, NO MORE SPECIAL CASES
 	test	bh, LC_E0		; YES, IS IT FROM THE KEY PAD?
 	jz	short K42A		; NO, JUST TRANSLATE
 	mov	ax, 9500h		; YES, SPECIAL CODE FOR THIS ONE
-	jmp	K57			; BUFFER FILL	
+	jmp	K57			; BUFFER FILL
 K42A: 
 	;;mov	ebx, _K8		; SET UP TO TRANSLATE CTL
 	cmp	al, 59			; IS IT IN CHARACTER TABLE?
@@ -1221,15 +1221,15 @@ K42B:
 	mov	ebx, _K8		; SET UP TO TRANSLATE CTL
 	;jb	K56 ;; 20/02/2015
 	; 12/04/2021
-	jb	short K45F	
-	jmp	K64	
+	jb	short K45F
+	jmp	K64
         ;
 	;-----	NOT IN CONTROL SHIFT
 K44:					; NOT-CTL-SHIFT
 	cmp	al, 55			; PRINT SCREEN KEY?
 	jne	short K45		; NOT PRINT SCREEN
 	test	bh, KBX			; IS THIS ENHANCED KEYBOARD?
-	jz	short K44A		; NO, TEST FOR SHIFT STATE	
+	jz	short K44A		; NO, TEST FOR SHIFT STATE
 	test	bh, LC_E0		; YES, LAST CODE A MARKER?
 	jnz	short K44B		; YES, IS PRINT SCREEN
 	jmp	short K45C		; NO, TRANSLATE TO '*' CHARACTER
@@ -1273,7 +1273,7 @@ K45B:
 					; NO, LOWERCASE
 K45C:
 	mov	ebx, K10		; TRANSLATE TO LOWERCASE LETTERS
-	jmp	short K56	
+	jmp	short K56
 K45D:					; ALMOST-CAPS-STATE
 	test	bl, LEFT_SHIFT+RIGHT_SHIFT ; CL ON. IS SHIFT ON, TOO?
 	jnz	short K45C		; SHIFTED TEMP OUT OF CAPS STATE
@@ -1285,8 +1285,8 @@ K45F:	jmp	short K56
 K46:					; NOT IN-CORE AREA
 	cmp	al, 68			; TEST FOR F1 - F10
 	;ja	short K47		; JUMP IF NOT
-	;jmp	short K53		; YES, GO DO FN KEY PROCESS			
-	jna	short K53		
+	;jmp	short K53		; YES, GO DO FN KEY PROCESS
+	jna	short K53
 	;
 	;-----	HANDLE THE NUMERIC PAD KEYS
 K47:					; NOT F1 - F10
@@ -1301,7 +1301,7 @@ K48:
 	je	short K45E		; GO TRANSLATE
 	test	bh, LC_E0		; IS THIS ONE OFTHE NEW KEYS?
 	jnz	short K49		; YES, TRANSLATE TO BASE STATE
-	;		
+	;
 	test 	bl, NUM_STATE		; ARE WE IN NUM LOCK
 	jnz	short K50		; TEST FOR SURE
 	test	bl, LEFT_SHIFT+RIGHT_SHIFT ; ARE WE IN SHIFT STATE?
@@ -1309,13 +1309,13 @@ K48:
 	jnz	short K45E
 	;
 	;-----	BASE CASE FOR KEYPAD
-K49:					
+K49:
 	cmp	al, 76			; SPECIAL CASE FOR BASE STATE 5
 	jne	short K49A		; CONTINUE IF NOT KEYPAD 5
-	mov	al, 0F0h		; SPECIAL ASCII CODE	
+	mov	al, 0F0h		; SPECIAL ASCII CODE
 	jmp	short K57		; BUFFER FILL
 K49A:
-	mov	ebx, K10		; BASE CASE TABLE	
+	mov	ebx, K10		; BASE CASE TABLE
 	jmp	short K64		; CONVERT TO PSEUDO SCAN
 	;
 	;-----	MIGHT BE NUM LOCK, TEST SHIFT STATUS
@@ -1329,13 +1329,13 @@ K52:					; NOT A NUMPAD KEY
 	cmp	al, 86			; IS IT THE NEW WT KEY?
 	;jne	short K53		; JUMP IF NOT
 	;jmp	short K45B		; HANDLE WITH REST OF LETTER KEYS
-	je	short K45B		
+	je	short K45B
 	;
-	;-----	MUST BE F11 OR F12 
+	;-----	MUST BE F11 OR F12
 K53:					; F1 - F10 COME HERE, TOO
 	test	bl, LEFT_SHIFT+RIGHT_SHIFT ; TEST SHIFT STATE
 	jz	short K49		; JUMP, LOWER CASE PSEUDO SC'S
-		; 20/02/2015 
+		; 20/02/2015
 	mov	ebx, K11		; UPPER CASE PSEUDO SCAN CODES
 	jmp	short K64		; TRANSLATE SCAN
 	;
@@ -1346,7 +1346,7 @@ K56:					; TRANSLATE-CHAR
 	test	byte [KB_FLAG_3], LC_E0	; IS THIS A NEW KEY?
 	jz	short K57		; NO, GO FILL BUFFER
 	mov	ah, MC_E0		; YES, PUT SPECIAL MARKER IN AH
-	jmp	short K57		; PUT IT INTO THE BUFFER	
+	jmp	short K57		; PUT IT INTO THE BUFFER
 	;
 	;-----	TRANSLATE SCAN FOR PSEUDO SCAN CODES
 K64:					; TRANSLATE-SCAN-ORGD
@@ -1374,7 +1374,7 @@ K59:					; NEAR_INTERRUPT_RETURN
 _K60: ; 29/01/2016
 	cmp	ah, 68h	; ALT + F1 key
 	jb	short K61
-	cmp	ah, 6Fh ; ALT + F8 key	
+	cmp	ah, 6Fh ; ALT + F8 key
 	ja	short K61
 	;
 	mov	bl, [ACTIVE_PAGE]
@@ -1416,7 +1416,7 @@ K62:
 	mov	cx, 678			; DIVISOR FOR 1760 HZ
 	mov	bl, 4			; SHORT BEEP COUNT (1/16 + 1/64 DELAY)
 	call	beep			; GO TO COMMON BEEP HANDLER
-	jmp     K27			; EXIT   
+	jmp     K27			; EXIT
 
 SHIP_IT:
 	;---------------------------------------------------------------------------------

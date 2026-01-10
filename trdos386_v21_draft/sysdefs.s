@@ -21,7 +21,7 @@
 ; 	UNIX.ASM (MASM 6.11) --> SYSDEFS.INC (NASM 2.11)
 ; ----------------------------------------------------------------------------
 ;
-; Derived from UNIX Operating System (v1.0 for PDP-11) 
+; Derived from UNIX Operating System (v1.0 for PDP-11)
 ; (Original) Source Code by Ken Thompson (1971-1972)
 ; <Bell Laboratories (17/3/1972)>
 ; <Preliminary Release of UNIX Implementation Document>
@@ -87,7 +87,7 @@ ESPACE equ 48 ; [u.usp] (at 'sysent') - [u.sp] value for error return
 ; 19/05/2016
 ; 18/05/2016
 ; 29/04/2016
-; TRDOS 386 (TRDOS v2.0) system calls - temporary List 
+; TRDOS 386 (TRDOS v2.0) system calls - temporary List
 ; 14/07/2013 - 21/09/2015 (Retro UNIX 8086 & 386 system calls)
 _ver 	equ 0 ; Get TRDOS version (v2.0)
 _exit 	equ 1
@@ -141,7 +141,7 @@ _stdio	equ 46 ; STDIN/STDOUT functions (20/08/2024)
 
 %macro sys 1-4
     ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)
-    ; 03/09/2015	
+    ; 03/09/2015
     ; 13/04/2015
     ; Retro UNIX 386 v1 system call.
     %if %0 >= 2   
@@ -207,9 +207,9 @@ ERR_INV_FLAGS	   equ 23 ; 'invalid flags !' error
 ; For code compatibility with previous version of TRDOS (2011)
 ; (Temporary error codes for current TRDOS 386 -2016- version)
 ERR_NO_MORE_FILES  equ 12 ; 'no more files !' error
-ERR_PATH_NOT_FOUND equ  3 ; 'path not found !' error 
+ERR_PATH_NOT_FOUND equ  3 ; 'path not found !' error
 			  ; 'dir not found !' ; TRDOS 8086
-ERR_NOT_FOUND:	   equ  2 ; 'file not found !' ; TRDOS 8086
+ERR_NOT_FOUND	   equ  2 ; 'file not found !' ; TRDOS 8086
 ERR_DISK_SPACE	   equ 39 ; 'out of volume !' TRDOS 8086
 			  ; 'insufficient disk space !' ; 27h
 ERR_DISK_WRITE	   equ 30 ; 'disk write protected !' ; 16/10/2016

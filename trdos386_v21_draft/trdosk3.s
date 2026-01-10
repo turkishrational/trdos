@@ -8030,7 +8030,7 @@ load_and_execute_file:
 	; 06/05/2016 - 07/05/2016 - 11/05/2016
 	; 23/04/2016 - 24/04/2016
 	; 22/04/2016 (TRDOS 386 = TRDOS v2.0)
-	; 05/11/2011 
+	; 05/11/2011
 	; (TRDOS v1, CMDINTR.ASM, 'cmp_cmd_run', 'cmp_cmd_external')
 	; ('loc_run_check_filename')
 	; 29/08/2011
@@ -8230,11 +8230,11 @@ loc_run_find_executable_file_next:
 loc_load_and_run_file_@:
 	;;;
 	; 19/10/2025 (TRDOS 386 v2.0.10)
-	and	eax, eax ;zero file size check?
+	and	eax, eax ; zero file size check?
 	jnz	short loc_load_and_run_file_@@
 	mov	eax, ERR_FILE_SIZE
 		; 20, 'file size error !'
-	;mov	eax, ERR_ZERO_LENGTH 
+	;mov	eax, ERR_ZERO_LENGTH
 		; 20, 'zero length !' error
 	jmp	loc_run_cmd_failed
 loc_load_and_run_file_@@:

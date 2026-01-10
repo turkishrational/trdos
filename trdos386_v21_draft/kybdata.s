@@ -13,23 +13,23 @@
 ; Derived from 'Retro UNIX 386 Kernel - v0.2.1.0' source code by Erdogan Tan
 ; kybdata.inc (11/03/2015)
 ;
-; Derived from 'IBM PC-XT-286' BIOS source code (1986) 
+; Derived from 'IBM PC-XT-286' BIOS source code (1986)
 ; ****************************************************************************
 
 ; Retro UNIX 386 v1 Kernel - KYBDATA.INC
 ; Last Modification: 11/03/2015
-;		 (Data Section for 'KEYBOARD.INC')	
+;		 (Data Section for 'KEYBOARD.INC')
 ;
 ; ///////// KEYBOARD DATA ///////////////
 
 ; 24/07/2022 - TRDOS 386 Kernel v2.0.5
 ; 05/12/2014
-; 04/12/2014 (derived from pc-xt-286 bios source code -1986-) 
+; 04/12/2014 (derived from pc-xt-286 bios source code -1986-)
 ; 03/06/86  KEYBOARD BIOS
 
-;---------------------------------------------------------------------------------
+;-----------------------------------------------------------------------------
 ;	KEY IDENTIFICATION SCAN TABLES
-;---------------------------------------------------------------------------------
+;-----------------------------------------------------------------------------
 
 ;-----	TABLES FOR ALT CASE ------------
 ;-----	ALT-INPUT-TABLE 
@@ -66,7 +66,7 @@ _K8:	db	27,-1,0,-1,-1,-1	; Esc, 1, 2, 3, 4, 5
 	db	28,26,24,3,22,2		; Bkslash, Z, X, C, V, B
 	db	14,13,-1,-1,-1,-1	; N, M, ,, ., /, RShift
 	db	150,-1,' ',-1		; *, ALT, Spc, CL
-	;				;----- FUNCTIONS ------		
+	;				;----- FUNCTIONS ------
 	db 	94,95,96,97,98,99	; F1 - F6
 	db	100,101,102,103,-1,-1	; F7 - F10, NL, SL
 	db	119,141,132,142,115,143	; Home, Up, PgUp, -, Left, Pad5

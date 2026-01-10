@@ -13,7 +13,7 @@
 ; Derived from 'Retro UNIX 386 Kernel - v0.2.1.0' source code by Erdogan Tan
 ; diskinit.inc (10/07/2015)
 ;
-; Derived from 'IBM PC-XT-286' BIOS source code (1986) 
+; Derived from 'IBM PC-XT-286' BIOS source code (1986)
 ; ****************************************************************************
 
 ; Retro UNIX 386 v1 Kernel - DISKINIT.INC
@@ -35,7 +35,7 @@
 	; 12/11/2014 (Retro UNIX 386 v1 - beginning)
 	; Detecting disk drives... (by help of ROM-BIOS)
 	mov	dx, 7Fh
-L1:	
+L1:
 	inc	dl
 	mov	ah, 41h ; Check extensions present
 			; Phoenix EDD v1.1 - EDD v3
@@ -70,7 +70,7 @@ L3:
 	mov	[drv], dl
 	;
 	mov 	ah, 08h ; Return drive parameters
-	int	13h	
+	int	13h
 	jc	short L4
 		; BL = drive type (for floppy drives)
 		; DL = number of floppy drives
@@ -90,7 +90,7 @@ L3:
 L4:
 	mov	dl, 7Fh
 	; 24/12/2014
-	cmp	byte [hdc], 0 ; EDD present or not ?	
+	cmp	byte [hdc], 0 ; EDD present or not ?
 	;ja	L10	  ; yes, all fixed disk operations
 			  ; will be performed according to
 			  ; present EDD specification
@@ -100,9 +100,9 @@ L4:
 
 L5:
 	; 17/07/2020
-	; Note: Virtual CPU will not come here while 
+	; Note: Virtual CPU will not come here while
 	; running in QEMU, Bochs, VirtualBox emulators !!!
-	
+
 	; 17/07/2020
 	; Older BIOS (INT 13h, AH = 48h is not available)
 
@@ -124,17 +124,17 @@ L6:
 	;
 	;;and	cl, 3Fh	 ; sectors per track (bits 0-6)
         mov     dl, [drv]
-	mov	bx, 65*4 ; hd0 parameters table (INT 41h)	
+	mov	bx, 65*4 ; hd0 parameters table (INT 41h)
 	cmp	dl, 80h
 	jna	short L7
 	add	bx, 5*4	 ; hd1 parameters table (INT 46h)
-L7:	
+L7:
 	xor	ax, ax
 	mov	ds, ax
         mov     si, [bx]
-        mov     ax, [bx+2] 
+        mov     ax, [bx+2]
 	mov	ds, ax
-        cmp     cl, [si+FDPT_SPT] ; sectors per track 
+        cmp     cl, [si+FDPT_SPT] ; sectors per track
 	;jne	L12 ; invalid FDPT
 	; 14/07/2022
 	je	short L7_8
@@ -175,7 +175,7 @@ L8:
 L9:
 	stosw	; I/O PORT Base Address (1F0h, 170h)
 	add	ax, 206h
-	stosw	; CONTROL PORT Address (3F6h, 376h)	
+	stosw	; CONTROL PORT Address (3F6h, 376h)
 	mov	al, bl  ; bit 4, master/slave disk bit
 	;add	al, 0A0h ; 17/07/2020
 	stosb	; Device/Head Register upper nibble
@@ -218,10 +218,10 @@ L10:
 	pop	cx
 	;pop	dx
 	; 09/08/2022
-	mov	dl, [drv]	
+	mov	dl, [drv]
 	; 06/07/2016 (BugFix for >64K kernel files)
 	; 04/02/2016 (esi -> si)
-	;mov	si, _end ; 30 byte temporary buffer address 	
+	;mov	si, _end ; 30 byte temporary buffer address
 	;		 ; at the '_end' of kernel.
 	;mov	word [si], 30
 	; 06/07/2016
@@ -250,7 +250,7 @@ L10:
 	;mov 	al, [bx]
 	mov	al, [bx]
 	or	al, 80h
-	mov 	[bx], al	
+	mov 	[bx], al
 	sub	bx, hd0_type - 2 ; 15/01/2015
 	;add	bx, drv.status
 	;mov	[bx], al
@@ -263,7 +263,7 @@ L10:
 	;;test	ax, [si+18]
 	;test	ax, di ; 14/07/2020
 	;jz	short L10_A0h ; (!) ; 17/07/2020
-			; 'CHS only' disks on EDD system 
+			; 'CHS only' disks on EDD system
 			;  are reported with ZERO disk size
 			; (if so, we must not overwrite
 			; calculated disk size in 'set_disk_parms')
@@ -293,9 +293,9 @@ L10_A0h:
 	; Note: Virtual CPU will jump here from above (!) test
 	;	while running in QEMU
 
-	; Jump here to fix a ZERO (LBA) disk size problem 
+	; Jump here to fix a ZERO (LBA) disk size problem
 	; for CHS disks (28/02/2015)
-	
+
 	; 30/12/2014
 	mov	di, HD0_DPT
 	mov	al, dl
@@ -321,24 +321,24 @@ L10_A0h:
 	mov	al, [si+12]
 	stosb		 ; physical sectors per track
  	xor	ax, ax
-	;dec	ax	 ; 02/01/2015 
+	;dec	ax	 ; 02/01/2015
 	stosw		 ; precompensation (obsolete)
-	;xor	al, al	 ; 02/01/2015	
+	;xor	al, al	 ; 02/01/2015
 	stosb		 ; reserved
 	mov	al, 8	 ; drive control byte
-		         ; (do not disable retries, 
+		         ; (do not disable retries,
 			 ; more than 8 heads)
 	stosb
 	mov	ax, [si+4]
-	stosw		 ; physical number of cylinders	
+	stosw		 ; physical number of cylinders
 	;push	ax	 ; 02/01/2015
 	mov	al, [si+8]
 	stosb		 ; physical num. of heads (limit 16)
 	sub 	ax, ax
-	;pop	ax	 ; 02/01/2015	
+	;pop	ax	 ; 02/01/2015
 	stosw		 ; landing zone (obsolete)
 	mov	al, cl	 ; logical sectors per track (limit 63)
-	and 	al, 3Fh	
+	and 	al, 3Fh
 	stosb
 	;sub	al, al	 ; checksum
 	;stosb
@@ -358,7 +358,7 @@ L10_A0h:
 	sub	si, cx
 	xor	ah, ah
 	;del	cl
-L11:		
+L11:
 	lodsb
 	add	ah, al
 	loop	L11
@@ -368,7 +368,7 @@ L11:
 	stosb		; put checksum in byte 15 of the tbl
 	;
 	pop	ds ; **	; (BIOS) DPTE segment
-	pop	si ; *	; (BIOS) DPTE offset	
+	pop	si ; *	; (BIOS) DPTE offset
 
 	; 08/08/2022 (TRDOS 386 v2.0.5)
 	; (Recent version of Retro UNIX 386 v1 'diskinit.s' file
@@ -428,7 +428,7 @@ L11d:
 	; 14/07/2020
 	stosw	; I/O PORT Base Address (1F0h, 170h)
 	add	ax, 206h
-	stosw	; CONTROL PORT Address (3F6h, 376h)	
+	stosw	; CONTROL PORT Address (3F6h, 376h)
 	mov	al, bl  ; Master/Slave bit (0 = Master)
 	; 17/07/2020
 	;or	al, 0A0h ; CHS (LBA enable bit = 0)
@@ -453,7 +453,7 @@ L11e:
 	;;mov	cx, 8
 	;mov	cl, 8
 	mov	cx, 8 ; 14/07/2020
-	rep	movsw	
+	rep	movsw
 	;
 	; 23/02/2015
 	; (P)ATA drive and LBA validation
@@ -475,13 +475,13 @@ L11e:
 	;xor	dh, dh ; 0
 	mov	bx, dx
 	;sub	bl, 80h
-	;mov	byte [bx+hd0_type], 0 ; not a valid disk drive !		
+	;mov	byte [bx+hd0_type], 0 ; not a valid disk drive !
         ;or	byte [bx+drv.status+2], 0F0h ; (failure sign)
 	; 29/08/2020
 	mov	byte [bx+hd0_type-80h], 0
 	or	byte [bx+drv.status-7Eh], 0F0h
 	jmp	short L11b
-L11a:	
+L11a:
 	; LBA validation
 	mov	al, [es:bx+4] ; Head register upper nibble
 	test	al, 40h ; LBA bit (bit 6)
@@ -507,7 +507,7 @@ L11b:
 L12:
 	; Restore data registers
 	mov	ax, cs
-	mov	ds, ax	
+	mov	ds, ax
 L13:
 	; 13/12/2014
 	push	cs

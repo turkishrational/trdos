@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/01/2026 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 06/01/2026 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -2694,6 +2694,7 @@ get_last_section:
 ; 21/04/2025 - TRDOS 386 v2.0.10
 
 update_directory_entry:
+	; 06/01/2026
 	; 02/01/2026
 	; 03/05/2025
 	; 29/04/2025
@@ -2705,8 +2706,9 @@ update_directory_entry:
 	; INPUT:
 	;	EBX = System File Number (MSDOS -> SFT entry number)
 	; OUTPUT:
+	;  (if cf = 0)
 	;	EDI = Directory Entry Location
-	;	ESI = Directory Buffer Header address
+	;	ESI = LDRVT Address ; 06/01/2026
 	;
 	; Modified registers:
 	;	eax, edx, ecx, esi, edi, ebp

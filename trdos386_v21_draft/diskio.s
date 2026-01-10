@@ -13,7 +13,7 @@
 ; Derived from 'Retro UNIX 386 Kernel - v0.2.1.0' source code by Erdogan Tan
 ; diskio.inc (22/08/2015)
 ;
-; Derived from 'IBM PC-XT-286' BIOS source code (1986) 
+; Derived from 'IBM PC-XT-286' BIOS source code (1986)
 ; ****************************************************************************
 ; Ref: Retro UNIX 386 v1.1 (Kernel v0.2.1.5) 'diskio' modification: 12/07/2022
 
@@ -72,7 +72,7 @@ WAITCPU_RQM_LOW		EQU	24		;number of loops to check for
 
 %macro 		SIODELAY 0 			; SHORT IODELAY
 		jmp short $+2
-%endmacro		
+%endmacro
 
 %macro		IODELAY  0			; NORMAL IODELAY
 		jmp short $+2
@@ -81,7 +81,7 @@ WAITCPU_RQM_LOW		EQU	24		;number of loops to check for
 
 %macro		NEWIODELAY 0
 		out 0EBh, al
-%endmacro 
+%endmacro
 
 ; (According to) AWARD BIOS 1999 - ATORGS.ASM (dw -> equ, db -> equ)
 ;;; WAIT_FOR_MEM
@@ -91,7 +91,7 @@ WAIT_FDU_INT_LH		equ	83334		; 27/02/2015 (2.5 seconds waiting)
 ;;; WAIT_FOR_PORT
 ;WAIT_FDU_SEND_LO	equ	16667		; .5 secons in 30 us units.
 ;WAIT_FDU_SEND_HI	equ	0
-WAIT_FDU_SEND_LH	equ 	16667		; 27/02/2015	
+WAIT_FDU_SEND_LH	equ 	16667		; 27/02/2015
 ;Time to wait while waiting for each byte of NEC results = .5
 ;seconds.  .5 seconds = 500,000 micros.  500,000/30 = 16,667.
 ;WAIT_FDU_RESULTS_LO	equ	16667		; .5 seconds in 30 micro units.
@@ -238,14 +238,14 @@ DMA_PAGE	EQU	081H		; START OF DMA PAGE REGISTERS
 ;		320/360	1.2M	    0-39
 ;		1.2M	1.2M	    0-79
 ;		720K	720K	    0-79
-;		1.44M	1.44M	    0-79	
+;		1.44M	1.44M	    0-79
 ;	(CL) - 	SECTOR NUMBER (NOT VALUE CHECKED, NOT USED FOR FORMAT)
 ;		MEDIA	DRIVE	SECTOR NUMBER
 ;		320/360	320/360	     1-8/9
 ;		320/360	1.2M	     1-8/9
 ;		1.2M	1.2M	     1-15
 ;		720K	720K	     1-9
-;		1.44M	1.44M	     1-18		
+;		1.44M	1.44M	     1-18
 ;	(AL)	NUMBER OF SECTORS (NOT VALUE CHECKED)
 ;		MEDIA	DRIVE	MAX NUMBER OF SECTORS
 ;		320/360	320/360	     8/9
@@ -266,7 +266,7 @@ DMA_PAGE	EQU	081H		; START OF DMA PAGE REGISTERS
 ;	(AH)= 05H  FORMAT THE DESIRED TRACK
 ;		(ES,BX) MUST POINT TO THE COLLECTION OF DESIRED ADDRESS FIELDS
 ;		FOR THE	TRACK. EACH FIELD IS COMPOSED OF 4 BYTES, (C,H,R,N),
-;		WHERE C = TRACK NUMBER, H=HEAD NUMBER, R = SECTOR NUMBER, 
+;		WHERE C = TRACK NUMBER, H=HEAD NUMBER, R = SECTOR NUMBER,
 ;		N= NUMBER OF BYTES PER SECTOR (00=128,01=256,02=512,03=1024),
 ;		THERE MUST BE ONE ENTRY FOR EVERY SECTOR ON THE TRACK.
 ;		THIS INFORMATION IS USED TO FIND THE REQUESTED SECTOR DURING 
@@ -276,7 +276,7 @@ DMA_PAGE	EQU	081H		; START OF DMA PAGE REGISTERS
 ;		THEN "SET DASD TYPE" (INT 13H, AH = 17H) OR 'SET MEDIA TYPE'
 ;		(INT 13H, AH =  18H) MUST BE CALLED TO SET THE DISKETTE TYPE
 ;		THAT IS TO BE FORMATTED. IF "SET DASD TYPE" OR "SET MEDIA TYPE"
-;		IS NOT CALLED, THE FORMAT ROUTINE WILL ASSUME THE 
+;		IS NOT CALLED, THE FORMAT ROUTINE WILL ASSUME THE
 ;		MEDIA FORMAT TO BE THE MAXIMUM CAPACITY OF THE DRIVE.
 ;
 ;		THESE PARAMETERS OF DISK BASE MUST BE CHANGED IN ORDER TO
@@ -288,14 +288,14 @@ DMA_PAGE	EQU	081H		; START OF DMA PAGE REGISTERS
 ;		: 360K	 : 320K/360K/1.2M :  50H   :   9    :
 ;		: 1.2M	 : 1.2M           :  54H   :  15    :
 ;		: 720K	 : 720K/1.44M     :  50H   :   9    :
-;		: 1.44M	 : 1.44M          :  6CH   :  18    :		  	
+;		: 1.44M	 : 1.44M          :  6CH   :  18    :
 ;		---------------------------------------------
 ;		NOTES: - PARM 1 = GAP LENGTH FOR FORMAT
 ;		       - PARM 2 = EOT (LAST SECTOR ON TRACK)
 ;		       - DISK BASE IS POINTED BY DISK POINTER LOCATED
 ;			 AT ABSOLUTE ADDRESS 0:78.
 ;		       - WHEN FORMAT OPERATIONS ARE COMPLETE, THE PARAMETERS
-;			 SHOULD BE RESTORED TO THEIR RESPECTIVE INITIAL VALUES.			
+;			 SHOULD BE RESTORED TO THEIR RESPECTIVE INITIAL VALUES.
 ;-------------------------------------------------------------------------------
 ;	(AH) = 08H READ DRIVE PARAMETERS
 ;	REGISTERS
@@ -306,8 +306,8 @@ DMA_PAGE	EQU	081H		; START OF DMA PAGE REGISTERS
 ;	  OUTPUT
 ;	    (ES:DI) POINTS TO DRIVE PARAMETER TABLE
 ; 	    *** TRDOS 386 note: floppy disk parameter table (16 bytes)
-;	    will be returned to user in EBX, buffer address *** 27/05/2016 ***		
-;					
+;	    will be returned to user in EBX, buffer address *** 27/05/2016 ***
+;
 ;	    (CH) - LOW ORDER 8 OF 10 BITS MAXIMUM NUMBER OF TRACKS
 ;	    (CL) - BITS 7 & 6 - HIGH ORDER TWO BITS OF MAXIMUM TRACKS
 ;	           BITS 5 THRU 0 - MAXIMUM SECTORS PER TRACK
@@ -319,7 +319,7 @@ DMA_PAGE	EQU	081H		; START OF DMA PAGE REGISTERS
 ;	    (AX) - 0
 ;	 UNDER THE FOLLOWING CIRCUMSTANCES:
 ;	    (1) THE DRIVE NUMBER IS INVALID,
-;	    (2) THE DRIVE TYPE IS UNKNOWN AND CMOS IS NOT PRESENT, 
+;	    (2) THE DRIVE TYPE IS UNKNOWN AND CMOS IS NOT PRESENT,
 ;	    (3) THE DRIVE TYPE IS UNKNOWN AND CMOS IS BAD,
 ;	    (4) OR THE DRIVE TYPE IS UNKNOWN AND THE CMOS DRIVE TYPE IS INVALID
 ;	    THEN ES,AX,BX,CX,DH,DI=0 ; DL=NUMBER OF DRIVES. 
@@ -331,20 +331,20 @@ DMA_PAGE	EQU	081H		; START OF DMA PAGE REGISTERS
 ;	(AH) - ON RETURN IF CARRY FLAG NOT SET, OTHERWISE ERROR	
 ;		00 - DRIVE NOT PRESENT	
 ;		01 - DISKETTE, NO CHANGE LINE AVAILABLE
-;		02 - DISKETTE, CHANGE LINE AVAILABLE	
+;		02 - DISKETTE, CHANGE LINE AVAILABLE
 ;		03 - RESERVED (FIXED DISK)
 ;	(DL) - DRIVE NUMBER (0-1 ALLOWED, VALUE CHECKED)
 ;-------------------------------------------------------------------------------
 ;	(AH)= 16H  DISK CHANGE LINE STATUS
 ;	OUTPUT REGISTERS
-;	(AH) - 00 - DISK CHANGE LINE NOT ACTIVE	
+;	(AH) - 00 - DISK CHANGE LINE NOT ACTIVE
 ;	       06 - DISK CHANGE LINE ACTIVE & CARRY BIT ON
 ;	(DL) - DRIVE NUMBER (0-1 ALLOWED, VALUE CHECKED)
 ;-------------------------------------------------------------------------------
 ;	(AH)= 17H  SET DASD TYPE FOR FORMAT
 ;	INPUT REGISTERS
-;	(AL) -	00 - NOT USED	
-;		01 - DISKETTE 320/360K IN 360K DRIVE	
+;	(AL) -	00 - NOT USED
+;		01 - DISKETTE 320/360K IN 360K DRIVE
 ;		02 - DISKETTE 360K IN 1.2M DRIVE
 ;		03 - DISKETTE 1.2M IN 1.2M DRIVE
 ;		04 - DISKETTE 720K IN 720K DRIVE
@@ -363,12 +363,12 @@ DMA_PAGE	EQU	081H		; START OF DMA PAGE REGISTERS
 ;	(AH) - 00H, CY = 0, TRACK AND SECTORS/TRACK COMBINATION IS SUPPORTED
 ;	     - 01H, CY = 1, FUNCTION IS NOT AVAILABLE
 ;	     - 0CH, CY = 1, TRACK AND SECTORS/TRACK COMBINATION IS NOT SUPPORTED
-;	     - 80H, CY = 1, TIME OUT (DISKETTE NOT PRESENT)		
+;	     - 80H, CY = 1, TIME OUT (DISKETTE NOT PRESENT)
 ;-------------------------------------------------------------------------------
 ;	DISK CHANGE STATUS IS ONLY CHECKED WHEN A MEDIA SPECIFIED IS OTHER
 ;	THAN 360 KB DRIVE. IF THE DISK CHANGE LINE IS FOUND TO BE
 ;	ACTIVE THE FOLLOWING ACTIONS TAKE PLACE:
-;		ATTEMPT TO RESET DISK CHANGE LINE TO INACTIVE STATE. 
+;		ATTEMPT TO RESET DISK CHANGE LINE TO INACTIVE STATE.
 ;		IF ATTEMPT SUCCEEDS SET DASD TYPE FOR FORMAT AND RETURN DISK 
 ;		CHANGE ERROR CODE
 ;		IF ATTEMPT FAILS RETURN TIMEOUT ERROR CODE AND SET DASD TYPE 
@@ -387,10 +387,10 @@ DMA_PAGE	EQU	081H		; START OF DMA PAGE REGISTERS
 ;	CY = 1	FAILED OPERATION (AH HAS ERROR REASON)
 ;	FOR READ/WRITE/VERIFY
 ;		DS,BX,DX,CX PRESERVED
-;	NOTE: IF AN ERROR IS REPORTED BY THE DISKETTE CODE, THE APPROPRIATE 
+;	NOTE: IF AN ERROR IS REPORTED BY THE DISKETTE CODE, THE APPROPRIATE
 ;		ACTION IS TO RESET THE DISKETTE, THEN RETRY THE OPERATION.
-;		ON READ ACCESSES, NO MOTOR START DELAY IS TAKEN, SO THAT 
-;		THREE RETRIES ARE REQUIRED ON READS TO ENSURE THAT THE 
+;		ON READ ACCESSES, NO MOTOR START DELAY IS TAKEN, SO THAT
+;		THREE RETRIES ARE REQUIRED ON READS TO ENSURE THAT THE
 ;		PROBLEM IS NOT DUE TO MOTOR START-UP.
 ;-------------------------------------------------------------------------------
 ;
@@ -493,7 +493,7 @@ DISKETTE_IO_1:
 					; DL/[BP+4] = # DRIVES INSTALLED
 					; DH/[BP+5] = MAX HEAD #
 					; DI/[BP+6] = OFFSET TO DISK BASE
-	;push	es ; 06/02/2015	
+	;push	es ; 06/02/2015
 	;push	ds			; BUFFER SEGMENT PARM OR USER REGISTER
 	;push	esi			; USER REGISTERS
 	;;call	DDS			; SEGMENT OF BIOS DATA AREA TO DS
@@ -514,7 +514,7 @@ DISKETTE_IO_1:
 	;    esi = esp+8
 	;    edi = esp+4
 	;
-	; [esp] = caller's return address (from 'DISK_IO')	
+	; [esp] = caller's return address (from 'DISK_IO')
 	;
 	; cs = KCODE == KDATA
 	; ds = es = ss = KDATA
@@ -550,26 +550,26 @@ OK_DRV:
 	;mov	ebx, FNC_TAB		; LOAD START OF FUNCTION TABLE
 	;add	ebx, ecx		; ADD OFFSET INTO TABLE => ROUTINE
 
-	; 17/07/2022	
+	; 17/07/2022
 	sub	ebx, ebx
-	mov	bl, ah			; BL = FUNCTION	
+	mov	bl, ah			; BL = FUNCTION
 	shl	bl, 2 ; * 4
 	add	ebx, FNC_TAB		; [EBX] = FUNCTION ADDRESS
-	
+
 	mov	ah, dh			; AX = HEAD #,# OF SECTORS OR DASD TYPE
 	;xor	dh, dh			; DX = DRIVE #
 	;mov	si, ax			; SI = HEAD #,# OF SECTORS OR DASD TYPE
 	;mov	di, dx			; DI = DRIVE #
-	
+
 	movzx	esi, ax			; ESI = HEAD #,# OF SECTORS OR DASD TYPE
-	movzx	edi, dl			; EDI = DRIVE # 
+	movzx	edi, dl			; EDI = DRIVE #
 
 	; CH = cylinder number (low 8 bit)
 	; CL = sector number (and high 2 bits of cylinder number)
 
 	; 06/08/2022
 	; 11/12/2014
-        ;mov	[cfd], dl               ; current floppy drive (for 'GET_PARM')        
+        ;mov	[cfd], dl               ; current floppy drive (for 'GET_PARM')
 	; 06/08/2022
 	; EDI = (current) DRIVE #
 	;
@@ -588,9 +588,9 @@ OK_DRV:
 ;		[BP+1]	: TRACK #
 ;		[BP+2]	: BUFFER OFFSET
 ;
-;	ACROSS CALLS TO SUBROUTINES THE CARRY FLAG (CY=1), WHERE INDICATED IN 
-;	SUBROUTINE PROLOGUES, REPRESENTS AN EXCEPTION RETURN (NORMALLY AN ERROR 
-;	CONDITION). IN MOST CASES, WHEN CY = 1, @DSKETTE_STATUS CONTAINS THE 
+;	ACROSS CALLS TO SUBROUTINES THE CARRY FLAG (CY=1), WHERE INDICATED IN
+;	SUBROUTINE PROLOGUES, REPRESENTS AN EXCEPTION RETURN (NORMALLY AN ERROR
+;	CONDITION). IN MOST CASES, WHEN CY = 1, @DSKETTE_STATUS CONTAINS THE
 ;	SPECIFIC ERROR CODE.
 
 	; 17/07/2022
@@ -603,7 +603,7 @@ OK_DRV:
 
 					; (AH) = @DSKETTE_STATUS
 	call	dword [ebx]		; CALL THE REQUESTED FUNCTION
-	
+
 	;pop	esi			; RESTORE ALL REGISTERS
 	;pop	ds
 	;pop	es	; 06/02/2015
@@ -638,7 +638,7 @@ OK_DRV:
 	; AH = error code (if > 0 and cf = 1)
 
 	; 17/07/2022
-	retn	; return to the caller of 'DISK_IO' 
+	retn	; return to the caller of 'DISK_IO'
 
 ;-------------------------------------------------------------------------------
 ; DW --> dd (06/02/2015)
@@ -666,7 +666,7 @@ FNC_TAB	dd	DSK_RESET		; AH = 00H; RESET
 	dd	DSK_TYPE		; AH = 15H; READ DASD TYPE
 	dd	DSK_CHANGE		; AH = 16H; CHANGE STATUS
 	dd	FORMAT_SET		; AH = 17H; SET DASD TYPE
-	dd	SET_MEDIA		; AH = 18H; SET MEDIA TYPE	
+	dd	SET_MEDIA		; AH = 18H; SET MEDIA TYPE
 FNC_TAE EQU     $                       ; END
 
 	; 17/07/2022 - TRDOS 386 v2.0.5
@@ -739,9 +739,9 @@ RESBAC:
 	;call	SETUP_END		; VARIOUS CLEANUPS
 	;;mov	bx, si			; GET SAVED AL TO BL
 	;; 17/07/2022
-	;mov	ebx, esi		
+	;mov	ebx, esi
 	;mov	al, bl			; PUT BACK FOR RETURN
-	;retn		
+	;retn
 
 DR_POP_ERR:
 	;pop	cx			; CLEAR STACK
@@ -770,10 +770,10 @@ SETUP_END_X:	; 06/08/2022
 	; 06/08/2022
 	mov	ebx, esi
 	mov	al, bl
-	retn		
+	retn
 
 ;-------------------------------------------------------------------------------
-; DISK_READ	(AH = 02H)	
+; DISK_READ	(AH = 02H)
 ;	DISKETTE READ.
 ;
 ; ON ENTRY:	DI	: DRIVE #
@@ -841,9 +841,9 @@ RD_WR_VF:
 	; 07/08/2022
 	; 06/08/2022
 	; 11/04/2021 (32 bit push/pop, AX -> EAX)
-	
+
 	push	eax			; SAVE DMA, NEC PARAMETERS
-	
+
 	; 02/12/2023
 	; (diskette change check for 'dir', 28 seconds)
 	mov	al, [TIMER_LOW+1]
@@ -920,7 +920,7 @@ RWV_NXT_MD:
 	add	ebx, 5			; CHECK NEXT DRIVE TYPE
 	;loop	RWV_DR_SEARCH
 	dec	cl
-	jnz	short RWV_DR_SEARCH 
+	jnz	short RWV_DR_SEARCH
 	pop	edi			; RESTORE DRIVE #
 
 ;-----	ASSUME PRIMARY DRIVE IS INSTALLED AS SHIPPED
@@ -933,7 +933,7 @@ RWV_ASSUME:
 	jmp	short RWV_MD_FND1	; GO SPECIFY PARAMTERS
 
 ;-----	CS:BX POINTS TO MEDIA/DRIVE PARAMETER TABLE
-	 			
+
 RWV_MD_FND:
 	mov	ebx, edi		; BX = MEDIA/DRIVE PARAMETER TABLE
 	pop	edi			; RESTORE DRIVE #
@@ -987,7 +987,7 @@ RWV_BAC:				; BAD DMA ERROR ENTRY
 
 ;-------------------------------------------------------------------------------
 ; SETUP_END
-;	RESTORES @MOTOR_COUNT TO PARAMETER PROVIDED IN TABLE 
+;	RESTORES @MOTOR_COUNT TO PARAMETER PROVIDED IN TABLE
 ;	AND LOADS @DSKETTE_STATUS TO AH, AND SETS CY.
 ;
 ; ON EXIT:
@@ -1000,7 +1000,7 @@ SETUP_END:
 	; 11/04/2021
 	push	eax
 	; 06/08/2022
-	mov	al, 2			; GET THE MOTOR WAIT PARAMETER		
+	mov	al, 2			; GET THE MOTOR WAIT PARAMETER
 	call	GET_PARM
 	mov	[MOTOR_COUNT], ah	; STORE UPON RETURN
 	;pop	ax			; RESTORE NUMBER TRANSFERRED
@@ -1012,7 +1012,7 @@ SETUP_END:
 	xor	al, al			; CLEAR NUMBER RETURNED
 	; 06/08/2022
 	stc
-NUN_ERR: 
+NUN_ERR:
 	;cmp	ah, 1			; SET THE CARRY FLAG TO INDICATE
 	;cmc				; SUCCESS OR FAILURE
 	retn
@@ -1111,7 +1111,7 @@ FM_DON:
 
 ;-------------------------------------------------------------------------------
 ; FNC_ERR
-;	INVALID FUNCTION REQUESTED OR INVALID DRIVE: 
+;	INVALID FUNCTION REQUESTED OR INVALID DRIVE:
 ;	SET BAD COMMAND IN STATUS.
 ;
 ; ON EXIT: 	@DSKETTE_STATUS, CY REFLECT STATUS OF OPERATION
@@ -1132,7 +1132,7 @@ FNC_ERR:				; INVALID FUNCTION REQUEST
 ; 28/05/2016
 ; 27/05/2016 - TRDOS 386 (TRDOS v.2.0)
 ;-------------------------------------------------------------------------------
-; DISK_PARMS	(AH = 08H)	
+; DISK_PARMS	(AH = 08H)
 ;	READ DRIVE PARAMETERS.
 ;
 ; ON ENTRY:	DI : DRIVE #
@@ -1147,7 +1147,7 @@ FNC_ERR:				; INVALID FUNCTION REQUEST
 ;		BH/[BP+3] = 0
 ;		DL/[BP+4] = # DRIVES INSTALLED (VALUE CHECKED)
 ;		DH/[BP+5] = MAX HEAD #
-;	     ** 27/05/2016 - TRDOS 386 (TRDOS v2.0) **	
+;	     ** 27/05/2016 - TRDOS 386 (TRDOS v2.0) **
 ;            ** EBX = Buffer address for floppy disk parameters table **
 ;		;DI/[BP+6] = OFFSET TO DISK_BASE
 ;		;ES        = SEGMENT OF DISK_BASE
@@ -1176,15 +1176,15 @@ DSK_PARMS:
 	; INPUT:
 	;   ebp = buffer address
 	;   edi = drive number (0 or 1)
-	
+
 	; OUTPUT:
 	;   ebx = [esp+28] ((BL = cmos type, BH = 0))
 	;   ecx = [esp+24] ((CL = sectors per track, CH = tracks - 1))
 	;   edx = [esp+20] ((DL = floppy drive count, DH = heads - 1))
 	;   user's buffer = FDPT table
-			 
+
 	call	XLAT_NEW		; TRANSLATE STATE TO PRESENT ARCH,
-     	
+
 	;;mov	word [bp+2], 0		; DRIVE TYPE = 0
      	;;mov	ax, [EQUIP_FLAG]	; LOAD EQUIPMENT FLAG FOR # DISKETTES
      	;;and	al, 11000001b		; KEEP DISKETTE DRIVE BITS
@@ -1211,7 +1211,7 @@ STO_DL:
 	jna	short NON_DRV
 	;
 	;;mov	[bp+4], dl		; STORE NUMBER OF DRIVES
-	;mov	[ebp+8], edx ; 20/02/2015	 	
+	;mov	[ebp+8], edx ; 20/02/2015
 
 	; 06/08/2022
 	inc	dh ; number of heads - 1 
@@ -1223,11 +1223,11 @@ STO_DL:
 	;cmp	di, 1			; CHECK FOR VALID DRIVE
 	;;ja	short NON_DRV1		; DRIVE INVALID
 	;ja	NON_DRV1 ; 29/08/2020
-	;	
+	;
 	;;mov	byte [bp+5], 1		; MAXIMUM HEAD NUMBER =	1
 	; 06/08/2022
-	;mov	byte [ebp+9], 1 ; 20/02/2015	
-	
+	;mov	byte [ebp+9], 1 ; 20/02/2015
+
 	call	CMOS_TYPE		; RETURN DRIVE TYPE IN AL
 	;;20/02/2015
 	;;jc	short CHK_EST		; IF CMOS BAD CHECKSUM ESTABLISHED
@@ -1256,7 +1256,7 @@ USE_EST:
         mov	cl, [ebx+MD.SEC_TRK]	; GET SECTOR/TRACK
         mov	ch, [ebx+MD.MAX_TRK]	; GET MAX. TRACK NUMBER
 	test	byte [DSK_STATE+edi], TRK_CAPA ; 80 TRACK ?
-	jz	short STO_CX		; MUST BE 360KB DRIVE 
+	jz	short STO_CX		; MUST BE 360KB DRIVE
 
 ;-----	IT IS 1.44 MB DRIVE
 
@@ -1270,7 +1270,7 @@ STO_CX:
 	; 06/08/2022
 	mov	[esp+24], ecx ; spt (cl), tracks - 1 (ch)
 ES_DI:
-	;mov	[bp+6], bx		; ADDRESS OF MEDIA/DRIVE PARM TABLE 
+	;mov	[bp+6], bx		; ADDRESS OF MEDIA/DRIVE PARM TABLE
 	;mov	[ebp+12], ebx ; 06/02/2015
 	;mov	ax, cs			; SEGMENT MEDIA/DRIVE PARAMETER TABLE
 	;mov	es, ax			; ES IS SEGMENT OF TABLE
@@ -1279,20 +1279,20 @@ ES_DI:
 	; 27/05/2016
 	; return floppy disk parameters table to user
 	; in user's buffer, which is pointed by EBX
-	
+
 	; 09/08/2022
 	;movzx	eax, al
 	sub	ecx, ecx
 	mov	cl, al
 	;;mov	[ebp+4], eax  ; ebx	; drive type (for floppy drives)
 	; 06/08/2022
-	;mov	[esp+28], eax ; drive type	
+	;mov	[esp+28], eax ; drive type
 	; 09/08/2022
 	mov	[esp+28], ecx ; drive type
 
 	; 06/08/2022
 	;push	edi
-	
+
 	;mov	edi, [ebp+4]  		; ebx (input), user's buffer address
 	; 06/08/2022
 	;mov	edi, ebp ; [esp+28] ; user's buffer address
@@ -1323,7 +1323,7 @@ ES_DI:
 	call    transfer_to_user_buffer ; trdosk6.s (16/05/2016)
 no_copy_fdpt:
 	; 06/08/2022
-	;pop	edi	
+	;pop	edi
 DP_OUT:
 	; 06/08/2022
 	;call	XLAT_OLD		; TRANSLATE STATE TO COMPATIBLE MODE
@@ -1345,7 +1345,7 @@ NON_DRV1:
 	jb	short NON_DRV2		; CONTINUE IF NOT REQUEST FALL THROUGH
 
 ;-----	FIXED DISK REQUEST FALL THROUGH ERROR
-	
+
 	; 06/08/2022
 	;call	XLAT_OLD		; ELSE TRANSLATE TO COMPATIBLE MODE
 	;mov	ax, si			; RESTORE AL
@@ -1357,7 +1357,7 @@ NON_DRV1:
 
 NON_DRV2:
 	;xor	ax, ax			; CLEAR PARMS IF NO DRIVES OR CMOS BAD
-	xor	eax, eax	
+	xor	eax, eax
 	;mov	[ebp], ax		; TRACKS, SECTORS/TRACK = 0
 	; 06/08/2022
 	mov	[esp+24], eax ; spt and max. track number is 0
@@ -1366,12 +1366,12 @@ NON_DRV2:
 	; 06/08/2022
 	;mov	[ebp+9], ah ; 06/02/2015
 	; 06/08/2022
-	;mov	[esp+21], ah ; 0	
+	;mov	[esp+21], ah ; 0
 
 	;;mov	[bp+6], ax		; OFFSET TO DISK_BASE = 0
 	; 06/08/2022
 	;mov	[ebp+12], eax
-	
+
 	;;mov	es, ax			; ES IS SEGMENT OF TABLE
 	;jmp	short DP_OUT
 
@@ -1379,9 +1379,9 @@ NON_DRV2:
 	; 30/08/2020
 	;call	XLAT_OLD
 	;;mov	ah, NOT_RDY ; drive not ready
-	mov	ah, INIT_FAIL ; DRIVE PARAMETER ACTIVITY FAILED 
+	mov	ah, INIT_FAIL ; DRIVE PARAMETER ACTIVITY FAILED
 	stc	; cf -> 1, ah = 'drive not ready' error code
-	retn		
+	retn
 
 ;-----	DATA RATE IS EITHER 300 KBS OR 500 KBS, TRY 1.2 MB TABLE FIRST
 
@@ -1392,12 +1392,12 @@ USE_EST2:
         mov     ch, [ebx+MD.MAX_TRK]    ; GET MAX. TRACK NUMBER
 	cmp	ah, RATE_300		; RATE 300 ?
 	jz	short STO_CX		; MUST BE 1.2MB DRIVE
-	jmp	short PARM144		; ELSE, IT IS 1.44MB DRIVE 
+	jmp	short PARM144		; ELSE, IT IS 1.44MB DRIVE
 
 ; 30/08/2020
 
 ;-------------------------------------------------------------------------------
-; DISK_TYPE (AH = 15H)	
+; DISK_TYPE (AH = 15H)
 ;	THIS ROUTINE RETURNS THE TYPE OF MEDIA INSTALLED.
 ;
 ;  ON ENTRY:	DI = DRIVE #
@@ -1429,10 +1429,10 @@ DT_BACK:
 	mov	ebx, esi
 	mov	al, bl			; PUT BACK FOR RETURN
 	retn
-NO_DRV:	
+NO_DRV:
 	;xor	ah, ah			; NO DRIVE PRESENT OR UNKNOWN
 	;jmp	short DT_BACK
-	
+
 	; 06/08/2022
 	; 30/08/2020
 	;call	XLAT_OLD
@@ -1461,7 +1461,7 @@ DSK_CHANGE:
 DC0:
         call    READ_DSKCHNG            ; GO CHECK STATE OF DISK CHANGE LINE
 	jz	short FINIS		; CHANGE LINE NOT ACTIVE
-SETIT:	
+SETIT:
 	mov	byte [DSKETTE_STATUS], MEDIA_CHANGE ; INDICATE MEDIA REMOVED
 
 FINIS:	; 06/08/2022
@@ -1528,7 +1528,7 @@ NOT_320_12:
 	or	byte [DSK_STATE+edi], MED_DET+RATE_500 ; SET STATE VARIABLE
 	jmp	short S0		; RETURN TO CALLER
 
-NOT_12:	
+NOT_12:
 	;dec	si			; CHECK FOR SET DASD TYPE 04
 	; 11/04/2021
 	dec	esi
@@ -1576,7 +1576,7 @@ FS_ERR:
 ;		CY = 0
 ;		ES = SEGMENT OF MEDIA/DRIVE PARAMETER TABLE
 ;		DI/[BP+6] = OFFSET OF MEDIA/DRIVE PARAMETER TABLE
-;	IF ERROR:	
+;	IF ERROR:
 ;		AH = @DSKETTE_STATUS
 ;		CY = 1
 ;-------------------------------------------------------------------------------
@@ -1663,7 +1663,7 @@ SM_RTN:
 ; REGISTERS ALTERED: EBX, AH ; 11/07/2022 			:
 ;----------------------------------------------------------------
 DR_TYPE_CHECK:
-	; 09/08/2022 - TRDOS 386 Kernel v2.0.5 
+	; 09/08/2022 - TRDOS 386 Kernel v2.0.5
 	; 12/07/2022
 	; 11/07/2022
 	; 08/07/2022 - Retro UNIX 386 v1.1 (Kernel v0.2.1.5)
@@ -1703,16 +1703,16 @@ TYPE_RTN:
 	;pop	ecx ; 08/07/2022
 	; 24/12/2021
 	;pop	eax ; 11/07/2022
-	retn	
-		
+	retn
+
 ;----------------------------------------------------------------
 ; SEND_SPEC							:
 ;	SEND THE SPECIFY COMMAND TO CONTROLLER USING DATA FROM	:
 ;	THE DRIVE PARAMETER TABLE POINTED BY @DISK_POINTER	:
 ; ON ENTRY:	@DISK_POINTER = DRIVE PARAMETER TABLE		:
-; ON EXIT:	NONE						:	
+; ON EXIT:	NONE						:
 ; REGISTERS ALTERED: CX, DX					:
-;----------------------------------------------------------------		
+;----------------------------------------------------------------
 SEND_SPEC:
 	; 06/08/2022
 	push	eax			; SAVE AX
@@ -1722,7 +1722,7 @@ SEND_SPEC:
 	call	NEC_OUTPUT		; OUTPUT THE COMMAND
 	;sub	dl, dl			; FIRST SPECIFY BYTE
 	; 06/08/2022
-	sub	al, al ; 0 
+	sub	al, al ; 0
 	call	GET_PARM		; GET PARAMETER TO AH
 	call	NEC_OUTPUT		; OUTPUT THE COMMAND
 	;mov	dl, 1			; SECOND SPECIFY BYTE
@@ -1740,9 +1740,9 @@ SPECBAC:
 ;	SEND THE SPECIFY COMMAND TO CONTROLLER USING DATA FROM	:
 ;	THE MEDIA/DRIVE PARAMETER TABLE POINTED BY (CS:BX)	:
 ; ON ENTRY:	CS:BX = MEDIA/DRIVE PARAMETER TABLE		:
-; ON EXIT:	NONE						:	
+; ON EXIT:	NONE						:
 ; REGISTERS ALTERED: AX						:
-;----------------------------------------------------------------		
+;----------------------------------------------------------------
 SEND_SPEC_MD:
 	push	eax			; SAVE RATE DATA
 	mov	eax, SPEC_ESBAC		; LOAD ERROR ADDRESS
@@ -1759,7 +1759,7 @@ SPEC_ESBAC:
 	retn
 
 ;-------------------------------------------------------------------------------
-; XLAT_NEW  
+; XLAT_NEW
 ;	TRANSLATES DISKETTE STATE LOCATIONS FROM COMPATIBLE
 ;	MODE TO NEW ARCHITECTURE.
 ;
@@ -1772,7 +1772,7 @@ XLAT_NEW:
 	ja	short XN_OUT		; IF INVALID BACK
 	cmp	byte [DSK_STATE+edi], 0	; NO DRIVE ?
 	jz	short DO_DET		; IF NO DRIVE ATTEMPT DETERMINE
-	
+
 	;;mov	cx, di			; CX = DRIVE NUMBER
 	;mov	ecx, edi
 	;or	cl, cl
@@ -1780,7 +1780,7 @@ XLAT_NEW:
 	;shl	cl, 2			; CL = SHIFT COUNT, A=0, B=4
 	;mov	al, [HF_CNTRL]		; DRIVE INFORMATION
 	;ror	al, cl			; TO LOW NIBBLE
-;XN_0:	
+;XN_0:
 	;and	al, DRV_DET+FMT_CAPA+TRK_CAPA ; KEEP DRIVE BITS
         ;and	byte [DSK_STATE+edi], ~(DRV_DET+FMT_CAPA+TRK_CAPA)
 	;or	[DSK_STATE+edi], al	; UPDATE DRIVE STATE
@@ -1947,13 +1947,13 @@ SETUP_STATE:
 	test	byte [DSK_STATE+edi], FMT_CAPA ; MULTI-RATE?
 	jnz	short AX_SET		; JUMP IF YES
         mov     ax, RATE_250*257	; START A END RATE 250 FOR 360 DRIVE
-AX_SET:	
+AX_SET:
 	and	byte [DSK_STATE+edi], ~(RATE_MSK+DBL_STEP) ; TURN OFF THE RATE
 	or	[DSK_STATE+edi], ah	; RATE FIRST TO TRY
 	and	byte [LASTRATE], ~STRT_MSK ; ERASE LAST TO TRY RATE BITS
 	ror	al, 4			; TO OPERATION LAST RATE LOCATION
 	or	[LASTRATE], al		; LAST RATE
-J1C:	
+J1C:
 	retn
 
 ;-------------------------------------------------------------------------------
@@ -1974,13 +1974,13 @@ FMT_INIT:
 	jnz	short N_360		; IF 360 WILL BE 0
 	or	ah, MED_DET+RATE_250	; ESTABLISH MEDIA
 	jmp	short SKP_STATE		; SKIP OTHER STATE PROCESSING
-N_360:	
+N_360:
 	dec	al			; 1.2 M DRIVE
 	jnz	short N_12		; JUMP IF NOT
 F1_RATE:
 	or	ah, MED_DET+RATE_500	; SET FORMAT RATE
 	jmp	short SKP_STATE		; SKIP OTHER STATE PROCESSING
-N_12:	
+N_12:
 	dec	al			; CHECK FOR TYPE 3
 	jnz	short N_720		; JUMP IF NOT
 	test	ah, DRV_DET		; IS DRIVE DETERMINED
@@ -1999,13 +1999,13 @@ SKP_STATE:
 	mov	[DSK_STATE+edi], ah	; STORE AWAY
 F1_OUT:
 	retn
-CL_DRV:	
+CL_DRV:
 	xor	ah, ah			; CLEAR STATE
 	jmp	short SKP_STATE		; SAVE IT
 
 ;-------------------------------------------------------------------------------
-; MED_CHANGE	
-;	CHECKS FOR MEDIA CHANGE, RESETS MEDIA CHANGE, 
+; MED_CHANGE
+;	CHECKS FOR MEDIA CHANGE, RESETS MEDIA CHANGE,
 ;	CHECKS MEDIA CHANGE AGAIN.
 ;
 ; ON EXIT:	CY = 1 MEANS MEDIA CHANGE OR TIMEOUT
@@ -2045,7 +2045,7 @@ OK1:
 	jz	short OK2		; IF ACTIVE, NO DISKETTE, TIMEOUT
 OK4:
 	mov	byte [DSKETTE_STATUS], TIME_OUT ; TIMEOUT IF DRIVE EMPTY
-OK2:		
+OK2:
 	stc				; MEDIA CHANGED, SET CY
 MC_OUT:	; 06/08/2022 (cf = 0)
 	retn
@@ -2230,13 +2230,13 @@ dma_bnd_err:
 ;;      ;JNE	short NOT_VERF		; NO
 ;;      ;xor	AX,AX			; START ADDRESS
 ;;      ;jmp	SHORT J33
-;;;NOT_VERF:	
+;;;NOT_VERF:
 ;;	;mov	AX,ES			; GET THE ES VALUE
 ;;	;ROL	AX,4			; ROTATE LEFT
 ;;	;mov	CH,AL			; GET HIGHEST NIBBLE OF ES TO CH
 ;;	;and	AL,11110000B		; ZERO THE LOW NIBBLE FROM SEGMENT
 ;;	;add	AX,[BP+2]		; TEST FOR CARRY FROM ADDITION
-;;	mov	eax,[ebp+4] ; 06/02/2015	
+;;	mov	eax,[ebp+4] ; 06/02/2015
 ;;	;jnc	short J33
 ;;	;inc	CH			; CARRY MEANS HIGH 4 BITS MUST BE INC
 ;;;J33:
@@ -2303,7 +2303,7 @@ dma_bnd_err:
 
 FMTDMA_SET:
 	; 06/08/2022 - TRDOS 386 v2.0.5
-	;; 20/02/2015 modification	
+	;; 20/02/2015 modification
 	;;mov	edx, [ebp+4] 		; Buffer address
 	; 06/08/2022
 	;mov	edx, ebp ; buffer address
@@ -2318,7 +2318,7 @@ FMTDMA_SET:
 	;push	edx
 	;mov	dl, 4			; SECTORS/TRACK VALUE IN PARM TABLE
 	; 06/08/2022
-	mov	al, 4			; SECTORS/TRACK VALUE IN PARM TABLE				
+	mov	al, 4			; SECTORS/TRACK VALUE IN PARM TABLE
 	call	GET_PARM		; "
 	mov	al, ah			; AL = SECTORS/TRACK VALUE
 	sub	ah, ah			; AX = SECTORS/TRACK VALUE
@@ -2336,9 +2336,9 @@ FMTDMA_SET:
 	; 06/08/2022
 	mov	al, 04Ah
 	;
-	jmp	short NOT_VERF ; 06/08/2022	
+	jmp	short NOT_VERF ; 06/08/2022
 
-;; 06/08/2022	
+;; 06/08/2022
 ;	add	dx, cx			; check for overflow
 ;	jc	short dma_bnd_err
 ;	;
@@ -2533,7 +2533,7 @@ ER_2:
 
 ;-------------------------------------------------------------------------------
 ; NEC_TERM
-;	THIS ROUTINE WAITS FOR THE OPERATION THEN ACCEPTS THE STATUS 
+;	THIS ROUTINE WAITS FOR THE OPERATION THEN ACCEPTS THE STATUS
 ;	FROM THE NEC FOR THE READ/WRITE/VERIFY/FORWAT OPERATION.
 ;
 ; ON EXIT:	@DSKETTE_STATUS, CY REFLECT STATUS OF OPERATION
@@ -2624,7 +2624,7 @@ M_720:
 	and	byte [DSK_STATE+edi], ~FMT_CAPA ; TURN OFF FORMAT CAPABILITY
 	or	byte [DSK_STATE+edi], DRV_DET ; MARK DRIVE DETERMINED
 	jmp	short SETBAC		; BACK
-M_12:	
+M_12:
 	or	byte [DSK_STATE+edi], DRV_DET+FMT_CAPA 
 					; TURN ON DETERMINED & FMT CAPA
 SETBAC:
@@ -2632,7 +2632,7 @@ SETBAC:
 
 ;-------------------------------------------------------------------------------
 ; RETRY	
-;	DETERMINES WHETHER A RETRY IS NECESSARY. 
+;	DETERMINES WHETHER A RETRY IS NECESSARY.
 ;	IF RETRY IS REQUIRED THEN STATE INFORMATION IS UPDATED FOR RETRY.
 ;
 ; ON EXIT:	CY = 1 FOR RETRY, CY = 0 FOR NO RETRY
@@ -2712,7 +2712,7 @@ DIF_HD:
 SAME_TRK:
 	;sub	bl, [ebp]		; SUBTRACT START FROM END
 	; 10/08/2022
-	sub	bl, [esp+28] ; CL = SECTOR #	
+	sub	bl, [esp+28] ; CL = SECTOR #
 	mov	al, bl			; TO AL
 NT_OUT:
 	retn
@@ -2779,7 +2779,7 @@ CNT_OK:
 
 ;-----	FALL THRU, READ ID FAILED FOR ALL TRACKS
 
-SD_ERR:	
+SD_ERR:
 	stc				; SET CARRY FOR ERROR
 	retn				; SETUP_DBL ERROR EXIT
 
@@ -2876,7 +2876,7 @@ GET_PARM:
 	; 08/02/2015 (protected mode modifications, bx -> ebx)
 	;xchg	edx, ebx		; BL = INDEX
 	; 06/08/2022
-	push	ebx			; SAVE EBX	
+	push	ebx			; SAVE EBX
 	;movzx	ebx, dl			; EBX = INDEX
 	movzx	ebx, al ; 06/08/2022
 	;;sub	bh, bh			; BX = INDEX
@@ -2888,7 +2888,7 @@ GET_PARM:
 	; 06/08/2022
 	mov	eax, edi		; EDI = DRIVE #
 	;cmp	al, ah
-	cmp	al, [pfd]	
+	cmp	al, [pfd]
 	je	short gpndc
 	mov	[pfd], al		; current drive -> previous drive
 	push	ebx ; 08/02/2015
@@ -2902,7 +2902,7 @@ GET_PARM:
 	jnz	short gpdtc
 	mov	ebx, MD_TBL6		; 1.44 MB param. tbl. (default)
         jmp     short gpdpu
-gpdtc:	
+gpdtc:
 	call	DR_TYPE_CHECK
 	; cf = 1 -> ebx points to 1.44MB fd parameter table (default)
 gpdpu:
@@ -2965,12 +2965,12 @@ M_WAIT:
 	mov	ah, 8
 
 ;-----	AS CONTAINS NUMBER OF 1/8 SECONDS (125000 MICROSECONDS) TO WAIT
-GP2:	
+GP2:
 ;----- 	FOLLOWING LOOPS REQUIRED WHEN RTC WAIT FUNCTION IS ALREADY IN USE
 J13:					; WAIT FOR 1/8 SECOND PER (AL)
 	;mov	ecx, 8286		; COUNT FOR 1/8 SECOND AT 15.085737 US
 	; 11/04/2021
-	mov	ecx, 4167 ; count of 30 micro seconds * (1/8) 
+	mov	ecx, 4167 ; count of 30 micro seconds * (1/8)
 	call	WAITF			; GO TO FIXED WAIT ROUTINE
 	;dec	al			; DECREMENT TIME VALUE
 	dec	ah
@@ -3096,7 +3096,7 @@ HW_DONE:
 ;	FOR CORRECT DIRECTION AND CONTROLLER READY THIS ROUTINE WILL
 ;	TIME OUT IF THE BYTE IS NOT ACCEPTED WITHIN A REASONABLE AMOUNT
 ;	OF TIME, SETTING THE DISKETTE STATUS ON COMPLETION.
-; 
+;
 ; ON ENTRY: 	AH = BYTE TO BE OUTPUT
 ;
 ; ON EXIT:	CY = 0  SUCCESS
@@ -3107,12 +3107,12 @@ HW_DONE:
 ;		AX,CX,DX DESTROYED
 ;-------------------------------------------------------------------------------
 
-; 09/12/2014 [Erdogan Tan] 
+; 09/12/2014 [Erdogan Tan]
 ;	(from 'PS2 Hardware Interface Tech. Ref. May 88', Page 09-05.)
 ; Diskette Drive Controller Status Register (3F4h)
 ;	This read only register facilitates the transfer of data between
 ;	the system microprocessor and the controller.
-; Bit 7 - When set to 1, the Data register is ready to transfer data 
+; Bit 7 - When set to 1, the Data register is ready to transfer data
 ;	  with the system micrprocessor.
 ; Bit 6 - The direction of data transfer. If this bit is set to 0,
 ;	  the transfer is to the controller.
@@ -3189,7 +3189,7 @@ WFPS_LO:
 	;loop	J23			; CONTINUE TILL CX EXHAUSTED
 	;dec	bl			; DECREMENT COUNTER
 	;jnz	short J23		; REPEAT TILL DELAY FINISHED, CX = 0
-   
+
 	;;27/02/2015
 	;16/12/2014
         ;;cmp	byte [wait_count], 10   ; (10/18.2 seconds)
@@ -3207,7 +3207,7 @@ WFPS_LO:
 
 ;-----	DIRECTION AND STATUS OK; OUTPUT BYTE
 
-J27:	
+J27:
 	mov	al, ah			; GET BYTE TO OUTPUT
 	;inc	dx			; DATA PORT = STATUS PORT + 1
 	; 06/08/2022
@@ -3220,7 +3220,7 @@ J27:
 	; cf = 0, zf = 1
 	;mov	ecx, 3			; 30 TO 45 MICROSECONDS WAIT FOR
 	; 11/04/2021
-	;mov	ecx, 2 
+	;mov	ecx, 2
 	; 06/08/2022
 	sub	ecx, ecx
 	mov	cl, 2
@@ -3403,7 +3403,7 @@ WAIT_INT:
 ;;	mov 	bl, WAIT_FDU_INT_HI
 ;	mov 	bl, WAIT_FDU_INT_HI + 1
 	; 27/02/2015
-	mov 	ecx, WAIT_FDU_INT_LH	; 83334 (2.5 seconds)		
+	mov 	ecx, WAIT_FDU_INT_LH	; 83334 (2.5 seconds)
 WFMS_CHECK_MEM:
 	test	byte [SEEK_STATUS], INT_FLAG
 					; TEST FOR INTERRUPT OCCURRING
@@ -3422,7 +3422,7 @@ WFMS_LO:
 ;;	or	bl, bl			; check outer counter
 ;;	jz	short J36A		; WFMS_TIMEOUT
 ;	dec	bl
-;	jz	short J36A	
+;	jz	short J36A
 ;	jmp	short WFMS_CHECK_MEM
 
 	; 17/12/2014
@@ -3452,7 +3452,7 @@ J37:
 
 ;-------------------------------------------------------------------------------
 ; RESULTS
-;	THIS ROUTINE WILL READ ANYTHING THAT THE NEC CONTROLLER RETURNS 
+;	THIS ROUTINE WILL READ ANYTHING THAT THE NEC CONTROLLER RETURNS
 ;	FOLLOWING AN INTERRUPT.
 ;
 ; ON EXIT:	@DSKETTE_STATUS, CY REFLECT STATUS OF OPERATION.
@@ -3476,7 +3476,7 @@ _R10:
 	;Time to wait while waiting for each byte of NEC results = .5
 	;seconds.  .5 seconds = 500,000 micros.  500,000/30 = 16,667.
 	; 27/02/2015
-	mov 	ecx, WAIT_FDU_RESULTS_LH ; 16667  
+	mov 	ecx, WAIT_FDU_RESULTS_LH ; 16667
 	;mov	cx, WAIT_FDU_RESULTS_LO  ; 16667
 	;mov	bh, WAIT_FDU_RESULTS_HI+1 ; 0+1
 
@@ -3587,8 +3587,8 @@ READ_DSKCHNG:
 	test	al, DSK_CHG		; CHECK FOR DISK CHANGE LINE ACTIVE
 	retn				; RETURN TO CALLER WITH ZERO FLAG SET
 
-fdc_int:  
-	  ; 30/07/2015	
+fdc_int:
+	  ; 30/07/2015
 	  ; 16/02/2015
 ;int_0Eh: ; 11/12/2014
 
@@ -3661,7 +3661,7 @@ DSKETTE_SETUP:
 ;	;inc	di			; POINT TO NEXT DRIVE
 ;	;cmp	di, MAX_DRV		; SEE IF DONE
 ;	;jnz	short SUP0		; REPEAT FOR EACH ORIVE
-;       cmp     byte [fd1_type], 0	
+;       cmp     byte [fd1_type], 0
 ;	jna	short sup1
 ;	or	di, di
 ;	jnz	short sup1
@@ -3682,7 +3682,7 @@ DSKETTE_SETUP:
 ;//////////////////////////////////////////////////////
 ;; END OF DISKETTE I/O ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; 17/04/2021 (TRDOS 386 v2.0.4) 
+; 17/04/2021 (TRDOS 386 v2.0.4)
 
 ; 11/04/2021
 ;int13h: ; 21/02/2015
@@ -3705,15 +3705,15 @@ DSKETTE_SETUP:
 ; DISK ----- 09/25/85 FIXED DISK BIOS
 ; (IBM PC XT Model 286 System BIOS Source Code, 04-21-86)
 ;
-; Modifications: by reference of AWARD BIOS 1999 (D1A0622) 
+; Modifications: by reference of AWARD BIOS 1999 (D1A0622)
 ;		 Source Code - ATORGS.ASM, AHDSK.ASM
 ;
 
 ;The wait for controller to be not busy is 10 seconds.
 ;10,000,000 / 30 = 333,333. 333,333 decimal = 051615h
-;;WAIT_HDU_CTLR_BUSY_LO	equ 1615h		
+;;WAIT_HDU_CTLR_BUSY_LO	equ 1615h
 ;;WAIT_HDU_CTLR_BUSY_HI	equ 05h
-WAIT_HDU_CTRL_BUSY_LH	equ 51615h	; 21/02/2015		
+WAIT_HDU_CTRL_BUSY_LH	equ 51615h	; 21/02/2015
 
 ;The wait for controller to issue completion interrupt is 10 seconds.
 ;10,000,000 / 30 = 333,333.  333,333 decimal = 051615h
@@ -3827,8 +3827,8 @@ SYS1	equ 61h		; PORT_B  (diskette.inc)
 ;									       :
 ;	IF DRIVE PARAMETERS WERE REQUESTED (DL >= 80H), 		       :
 ;	   INPUT:							       :
-;	     (DL) = DRIVE NUMBER					       :	
-;	     ; 27/05/2016 - TRDOS 386 (TRDOS v2.0)						       :	 	
+;	     (DL) = DRIVE NUMBER					       :
+;	     ; 27/05/2016 - TRDOS 386 (TRDOS v2.0)			       :
 ;	     EBX = Buffer address for fixed disk parameters table (32 bytes)   :
 ;	   OUTPUT:							       :
 ;	     (DL) = NUMBER OF CONSECUTIVE ACKNOWLEDGING DRIVES ATTACHED (1-2)  :
@@ -3929,12 +3929,12 @@ BAD_RESET	EQU	05H		; RESET FAILED
 ;--------------------------------------------------------
 
 ;HF_PORT 	EQU	01F0H	; DISK PORT
-;HF1_PORT	equ	0170h	
+;HF1_PORT	equ	0170h
 ;HF_REG_PORT	EQU	03F6H
 ;HF1_REG_PORT	equ	0376h
 
 HDC1_BASEPORT	equ	1F0h
-HDC2_BASEPORT	equ	170h		
+HDC2_BASEPORT	equ	170h
 
 align 2
 
@@ -4163,7 +4163,7 @@ POD_DONE:
 ;;	jnc	short RES_CK		; DRIVE OK
 ;;RES_2: ;call	POD_TCHK		; CHECK TIME OUT
 ;;	cmp	word [wait_count], 6*182 ; waiting time (in timer ticks)
-;;					; (30 seconds)		
+;;					; (30 seconds)
 ;;	;cmc
 ;;	;jnc	short RES_1
 ;;	jb	short RES_1
@@ -4198,7 +4198,7 @@ POD_DONE:
 ;;	JE	short RES_OK
 ;;	;call	POD_TCHK		; CHECK FOR TIME OUT
 ;;	cmp	word [wait_count], 6*182 ; waiting time (in timer ticks)
-;;					; (60 seconds)		
+;;					; (60 seconds)
 ;;	cmc
 ;;	jc	short RES_ER		; FAILED
 ;;	mov	CX,[NEC_STATUS] 	; GET SECTOR ADDRESS, AND CYLINDER
@@ -4304,7 +4304,7 @@ int33h: ; DISK I/O
 
 	; 13/07/2022
 	;pop	dword [user_buffer] ; 01/06/2016
-	mov	[user_buffer], ebx		
+	mov	[user_buffer], ebx
 
 	mov	byte [scount], 0 ; sector count for transfer
 	cmp	ah, 03h ; chs write
@@ -4315,16 +4315,16 @@ int33h: ; DISK I/O
 	jmp	short int33h_4
 int33h_0:
 	;; 17/07/2022 - 64K r/w buffer limit check ?
-	;cmp	al, 80h ; 128	
+	;cmp	al, 80h ; 128
 	;ja	short int33h_8 ; error
 	;; 17/07/2022 - zero r/w count check ?
 	;or	al, al
 	;jz	short int33h_8 ; error
-	
+
 	; 17/07/2022 (buffer limit and zero count check)
 	dec	al
 	js	short int33h_8 ; error
-	inc	al	
+	inc	al
 
 	; transfer user's buffer content to sector buffer
 	push	ecx
@@ -4387,12 +4387,12 @@ int33h_9:
 	; [esp+16] = SS (User)
 	;
 	; 13/07/2022
-int33h_7:	
+int33h_7:
 	cli
 	;;15/01/2017
 	;;mov	byte [ss:intflg], 0 ; 07/01/2017
 	; cf = 0  ; use eflags which is in stack
-	iretd	
+	iretd
 
 	; (*) 29/05/2016 - 'retf 4' intruction causes to stack fault
 	; (OUTER-PRIVILEGE-LEVEL)
@@ -4451,16 +4451,16 @@ int33h_4:
 	mov	byte [scount], al ; <= 128 sectors
 int33h_5:
 	mov	ebx, Cluster_Buffer ; max. 65536 bytes
-				    ; buf. addr: 70000h	
+				    ; buf. addr: 70000h
 	;mov	byte [ClusterBuffer_Valid], 0
 int33h_6:
 	; 13/07/2022
 	;pop	ds
 	;pushfd
 	;push 	cs
-	
+
 	call 	DISK_IO
-	
+
 	;;mov	ebx, [cs:user_buffer] ; 01/06/2016
 	;mov	ebx, [user_buffer] ; 13/07/2022 
 	jc	short int33h_9
@@ -4490,7 +4490,7 @@ int33h_6:
 	;mov	edi, ebx ; user's buffer address
 	mov	edi, [user_buffer] ; 13/07/2022
 	mov	esi, Cluster_Buffer
-	call	transfer_to_user_buffer 
+	call	transfer_to_user_buffer
 		; (ecx and eax will be modified)
 	pop	eax
 
@@ -4510,24 +4510,24 @@ int33h_6:
 	;;;15/01/2017
 	;;;mov	byte [ss:intflg], 0 ; 07/01/2017
 	;; cf = 0  ; use eflags which is in stack
-	;iretd	
+	;iretd
 ;int33h_8:
 	;mov	eax, 0FFh ; Unknown error !?
 	; 13/07/2022
 	;xor	eax, eax
-	;dec	al  ; eax = 0FFh	
+	;dec	al  ; eax = 0FFh
 	;jmp	short int33h_9
 	 
 ;int33h_9:
 	;; cf = 1
 	;
-	;; (*) 29/05/2016	
+	;; (*) 29/05/2016
 	;; (*) retf 4 ; skip eflags on stack
 	;; Note: This 'retf 4' was wrong, -it was causing
 	;;       to stack errors in ring 3-
 	;;	POP sequence of 'retf 4' is as
-	;;       "eip, cs, eflags, esp, ss, +4 bytes" 
-        ;;       it is not as "eip, cs, +4 bytes, esp, ss" ! 
+	;;       "eip, cs, eflags, esp, ss, +4 bytes"
+        ;;       it is not as "eip, cs, +4 bytes, esp, ss" !
 	;
 	;; 29/05/2016 -set carry flag on stack-
 	;or	byte [esp+8], 1  ; set carry bit of eflags register
@@ -4548,7 +4548,7 @@ int13h:
 	; 	as return parameters. So,
 	;	stack order (at the entry of 'DISK_IO')
 	;	must be same with 'int33h:' as above.
-		
+
 	;push	es ; not necessary
 	;push	ds ; not necessary
 	;
@@ -4573,7 +4573,7 @@ int13h:
 	pop	esi
 	pop	edx
 	pop	ecx
-	pop	ebx	
+	pop	ebx
 	;
 	;pop	ds
 	;pop	es
@@ -4595,8 +4595,8 @@ DISK_IO:
 	; 10/08/2022
 	; 17/07/2022
 	; 13/07/2022
-	; Registers are also on stack 
-	; (with same contents) 
+	; Registers are also on stack
+	; (with same contents)
 	; in following order:
 	;
 	;    ebx = esp+20
@@ -4626,19 +4626,19 @@ DISK_IO:
 	jmp	DISKETTE_IO_1
 A1:
 	;sti	 ; 17/07/2022		; ENABLE INTERRUPTS
-	
+
 	;; 04/01/2015
 	;;or	ah, ah
 	;;jnz	short A2
 	;;int	40h			; RESET NEC WHEN AH=0
 	;;sub	ah, ah
-	
+
 	cmp	dl, (80h + S_MAX_FILE - 1)
 	;ja	short RET_2
 	jna	short _A0
-	
+
 	; 13/07/2022
-	; (here, DS is KDATA segment already) 
+	; (here, DS is KDATA segment already)
 	;
 	; 29/05/2016
 	;push	ds
@@ -4648,7 +4648,7 @@ A1:
 	;mov	ds, ax
 	; 11/04/2021
 	;pop	eax
-	
+
 	mov     ah, 0AAh        ; Hard disk drive not ready !
 				; (Programmer's guide to AMIBIOS, 1992)
 	mov     byte [DISK_STATUS1], ah
@@ -4670,7 +4670,7 @@ A2:
 	cmp	ah, 08h			; GET PARAMETERS IS A SPECIAL CASE
 	jne	short A3
         jmp	GET_PARM_N
-A3:	
+A3:
 	; 13/07/2022
 	cmp	ah, 15h			; READ DASD TYPE IS ALSO
 	jne	short A4
@@ -4696,7 +4696,7 @@ int33h_bad_cmd:
 	; (*) retf 4
 	;or	byte [esp+8], 1 ; set carry bit of eflags register
 	;iretd
-	
+
 	; 13/07/2022
 	stc
 	; cf = 1, ah = BAD_CMD
@@ -4709,7 +4709,7 @@ _A4:
 	;cmc
 	;jnc	short A4
 	; 13/07/2022
-	jnb	short int33h_bad_cmd	
+	jnb	short int33h_bad_cmd
 A4:					; SAVE REGISTERS DURING OPERATION
 	enter	8, 0			; SAVE (BP) AND MAKE ROOM FOR @CMD_BLOCK
 	
@@ -4736,7 +4736,7 @@ A4:					; SAVE REGISTERS DURING OPERATION
 	;;or	ah, ah			; CHECK FOR RESET
 	;;jnz	short A5
 	;;mov	dl, 80h			; FORCE DRIVE 80 FOR RESET
-;;A5:	
+;;A5:
 	; 13/07/2022
 	call	DISK_IO_CONT		; PERFORM THE OPERATION
 	;;call	DDS			; ESTABLISH SEGMENT
@@ -4803,7 +4803,7 @@ D1:					; FUNCTION TRANSFER TABLE
 D1L     EQU    $ - D1
 
 	; 02/12/2023
-	; 01/12/2023 - TRDOS 386 v2.0.7 
+	; 01/12/2023 - TRDOS 386 v2.0.7
 	; 07/08/2022
 	; 17/07/2022 - TRDOS 386 v2.0.5
 DISK_IO_CONT:
@@ -4858,8 +4858,8 @@ SU0X:
 	inc	byte [LBAMode] ; 1 
 su1: 	 
 	shr 	al, 4
-	and	al, 1			
-	mov	[hf_m_s], al 
+	and	al, 1
+	mov	[hf_m_s], al
 	;
 	; 03/01/2015
 	;mov	al, [ES:BX+8]		; GET CONTROL BYTE MODIFIER
@@ -4872,14 +4872,14 @@ su1:
 					;  bit 1 - nIEN (1 = disable irq)
 					;  bit 2 - SRST (software RESET)
 					;  bit 3 - use extra heads (8 to 15)
-					;          -always set to 1-	
+					;          -always set to 1-
 					;  (bits 3 to 7 are reserved
 					;          for ATA devices)
 	mov	ah, [CONTROL_BYTE]	; SET EXTRA HEAD OPTION IN
 	and	ah, 0C0h 		; CONTROL BYTE
 	or	ah, al
 	mov	[CONTROL_BYTE], ah
-	
+
 	; 11/04/2021 (32 bit push/pop)
 	; 04/01/2015
 	pop	eax ; ****
@@ -4901,7 +4901,7 @@ su2:
 	;;pop	edx ; * ; 14/02/2015
 	;mov	ax, cx ; Lower word of LBA address (bits 0-15)
 
-	; 01/12/2023 (48 bit LBA rw) 
+	; 01/12/2023 (48 bit LBA rw)
 	jmp	lba_read_write
 
 lbarw1:
@@ -4918,7 +4918,7 @@ lbarw1:
 	mov	dl, [ebx+14]
 	;xor	ah, ah
 	xor	eax, eax
-	;mov	al, [ES:BX+2]	; heads (logical) 	
+	;mov	al, [ES:BX+2]	; heads (logical)
 	mov	al, [ebx+2]
 	dec	al
 	inc	ax		; 0 = 256
@@ -4945,7 +4945,7 @@ lbarw1:
 	push	eax
 	; 13/07/2022
 	sub	eax, eax
-	;mov	al, [ES:BX+14]	; sectors per track (logical)	
+	;mov	al, [ES:BX+14]	; sectors per track (logical)
 	mov	al, [ebx+14]
 	mul	ch
 		; AX = Head * Sectors/Track
@@ -4978,7 +4978,7 @@ lbarw2:
 	and	eax, 0FFFFFFFh
 	shl	ecx, 28 ; 21/02/2015
 	;or	dh, ch
-	or	eax, ecx	
+	or	eax, ecx
 	;;mov	[CMD_BLOCK+2], al ; LBA byte 1 (bits 0 to 7)
 				  ; (Sector Number Register)
 	;;mov	[CMD_BLOCK+3], ah ; LBA byte 2 (bits 8 to 15)
@@ -4992,7 +4992,7 @@ lbarw2:
 	;mov	[CMD_BLOCK+4], dx ; LBA byte 4, LBA & DEV select bits
 	mov	[CMD_BLOCK+2], eax ; 21/02/2015
 	; 14/02/2015
-	;mov	dl, cl ; Drive number (INIT_DRV)		
+	;mov	dl, cl ; Drive number (INIT_DRV)
 	jmp	short su4
 su3:
 	; 07/08/2022
@@ -5002,10 +5002,10 @@ su3:
 	cmp 	ah, 14h
 	jna 	short chsfnc
 invldfnc:
-        ; 14/02/2015  
+        ; 14/02/2015
 	;pop	es ; **
 	; 11/04/2021
-	pop	eax ; *** 
+	pop	eax ; ***
         jmp     short BAD_COMMAND
 chsfnc:	
 	;mov	ax, [ES:BX+5]		; GET WRITE PRE-COMPENSATION CYLINDER
@@ -5022,10 +5022,10 @@ chsfnc:
 	;;pop	edx ; * 
 	;;pop	es  ; **
 	;;mov	ah, [CONTROL_BYTE]	; SET EXTRA HEAD OPTION IN
-	;;and	ah, 0C0h 		; CONTROL BYTE	
+	;;and	ah, 0C0h 		; CONTROL BYTE
 	;;or	ah, al
 	;;mov	[CONTROL_BYTE], ah
-	
+
 	mov	al, cl			; GET SECTOR NUMBER
 	and	al, 3Fh
 	mov	[CMD_BLOCK+2], al
@@ -5033,7 +5033,7 @@ chsfnc:
 	mov	al, cl
 	shr	al, 6
 	mov	[CMD_BLOCK+4], al 	; CYLINDER HIGH ORDER 2 BITS
-	
+
 	;;05/01/2015
 	;;mov	al, dl			; DRIVE NUMBER
 	mov	al, [hf_m_s]
@@ -5071,7 +5071,7 @@ su4:
         xchg	ebx, esi
 	;;;pop	ax			; RESTORE AX
 	;;;pop	bx			; AND DATA ADDRESS
-	
+
 	;;push	cx
 	;;push	ax			; ADJUST ES:BX
 	;mov	cx, bx			; GET 3 HIGH ORDER NIBBLES OF BX
@@ -5084,7 +5084,7 @@ su4:
 	;;pop	cx
 	;;jmp	word [CS:SI+D1]
 	;jmp	word [SI+D1]
-	
+
 	jmp	dword [esi+D1]
 
 	; 07/08/2022
@@ -5120,7 +5120,7 @@ lba_read_write:
 	pop	eax ; ***
 	mov	al, 0
 	retn
-su5:	
+su5:
 	cmp	eax, 0FFFFFFFh ; 28 bit limit
 	jna	short su10
 su6:
@@ -5200,7 +5200,7 @@ su8:
 
 	pop	eax	; ***
 
-	inc	edx	; dx = hd base port + 7 
+	inc	edx	; dx = hd base port + 7
 			;      command/status port
 	;xchg	esi, ebx
 	;mov	edi, ebx
@@ -5220,7 +5220,7 @@ su9:
 	mov	byte [CMD_BLOCK], 0
 	mov	[CMD_BLOCK+1], al ; sector count to r/w
 	mov	[CMD_BLOCK+2], ecx ; LBA disk sector address
-	
+
 	;;;
 	; 23/06/2024
 	mov	byte [LBAMode], 0FFh
@@ -5230,7 +5230,7 @@ su9:
 	;add	al, 40h
 	or	al, 40h	
 	; al = 40h (for master), 50h (for slave)
-	mov	[hf_m_s], al	
+	mov	[hf_m_s], al
 	;;;
 
 	cmp	ah, 1Ch
@@ -5275,7 +5275,7 @@ DISK_RESET:
 	; 14/02/2015
 	;mov	di, dx
 	; 24/12/2021
-	mov	edi, edx	
+	mov	edi, edx
 	; 04/01/2015
 	;xor	di,di
 drst0:
@@ -5286,7 +5286,7 @@ drst0:
 ;	mov	cx, 10			; DELAY COUNT
 ;DRD:	dec	cx
 ;	jnz	short DRD		; WAIT 4.8 MICRO-SEC
-	;mov	cx, 2			; wait for 30 micro seconds	
+	;mov	cx, 2			; wait for 30 micro seconds
         ;mov	ecx, 2 ; 21/02/2015
 	; 10/07/2022
 	sub	ecx, ecx
@@ -5317,7 +5317,7 @@ drst1:
 	; 17/07/2022
 	dec	cl
 	jnz	short drst1
-DRERR:	
+DRERR:
 	mov	byte [DISK_STATUS1], BAD_RESET ; CARD FAILED
 	retn
 drst2:
@@ -5392,7 +5392,7 @@ RETURN_STATUS:
 
 RD_LONG:
 	;mov	@CMD_BLOCK+6, READ_CMD OR ECC_MODE
-	mov     byte [CMD_BLOCK+6], READ_CMD + ECC_MODE 
+	mov     byte [CMD_BLOCK+6], READ_CMD + ECC_MODE
 	jmp	short COMMANDI
 
 	; 16/07/2022 - TRDOS 386 v2.0.5
@@ -5431,7 +5431,7 @@ CMD_I1:
 cmd_i1x:
 	; 18/02/2016
 	;;mov	cx, 256			; SECTOR SIZE IN WORDS
-	;mov	ecx, 256 ; 21/02/2015	
+	;mov	ecx, 256 ; 21/02/2015
 	; 16/07/2022
 	sub	ecx, ecx
 	inc	ch  ; ecx = 256
@@ -5458,7 +5458,7 @@ CMD_I2:
 	mov 	[edi], al ; 21/02/2015	; GO SLOW FOR BOARD
 	inc	edi
 	loop	CMD_I2
-CMD_I3: 
+CMD_I3:
 	; wait for 400 ns
 	add 	dl, 7
 	in	al, dx
@@ -5486,7 +5486,7 @@ WR_LONG:
 	jmp	short COMMANDO
 
 	; 16/07/2022 - TRDOS 386 v2.0.5
-	
+
 ;----------------------------------------
 ;	DISK WRITE ROUTINE   (AH = 03H) :
 ;----------------------------------------
@@ -5507,7 +5507,7 @@ COMMANDO:
 	;	(check 64K boundary is not needed)
 	;call	CHECK_DMA		; CHECK 64K BOUNDARY ERROR
 	;jc	short CMD_ABORT
-CMD_OF: 
+CMD_OF:
 	mov	esi, ebx ; 21/02/2015
 CMD_WX:
 	; 20/06/2024 (48 bit LBA r/w modification)
@@ -5528,7 +5528,7 @@ CMD_O1:
 	cld
 	;rep	outsw
 	; 01/12/2023 - TRDOS 386 v2.0.7
-CMD_01_L:	
+CMD_01_L:
 	outsw
 	jmp	$+2
 	loop	CMD_01_L
@@ -5601,7 +5601,7 @@ DISK_VERF:
 	mov	byte [CMD_BLOCK+6], VERIFY_CMD
 	call	COMMAND
 	jnz	short VERF_EXIT		; CONTROLLER STILL BUSY
-	call	_WAIT			; (Original: CALL WAIT)	
+	call	_WAIT			; (Original: CALL WAIT)
 	jnz	short VERF_EXIT		; TIME OUT
 	call	CHECK_STATUS
 VERF_EXIT:
@@ -5625,9 +5625,9 @@ RETURN_DRIVE_TYPE:
 	;	AH = 00h - No drive present
 	;	   = 03h - Hard disk drive
 	;	CF = 0 - No error
-	;	   = 1 - Error  	 
+	;	   = 1 - Error
 	;   TRDOS 386 v2.0.5 Feature:
-	;	AL = 00h - LBA not ready !	
+	;	AL = 00h - LBA not ready !
 	;	   = 01h - LBA ready 
 	;		(28 bit or 48 bit LBA r/w depending
 	;		on disk size in CX:DX)
@@ -5639,14 +5639,14 @@ RETURN_DRIVE_TYPE:
 READ_DASD_TYPE:
 READ_D_T:				; GET DRIVE PARAMETERS
 	;push	ds			; SAVE REGISTERS
-	
+
 	;;push	es
 	; 18/04/2021
 	;push	ebx
 	;;call	DDS			; ESTABLISH ADDRESSING
 	;;push	cs
 	;;pop	ds
-        
+
 	; 18/04/2021
 	;mov	bx, KDATA
 	;mov	ds, bx
@@ -5656,10 +5656,10 @@ READ_D_T:				; GET DRIVE PARAMETERS
 	;and	dl, 7Fh			; GET DRIVE NUMBER
 	;cmp	bl, dl
 	;jbe	short RDT_NOT_PRESENT 	; RETURN DRIVE NOT PRESENT
-	
+
 	;mov	ax, KDATA
 	;mov	ds, ax
-	
+
 	mov	byte [DISK_STATUS1], 0
 	mov	cl, [HF_NUM]
 	and	dl, 7Fh
@@ -5667,7 +5667,7 @@ READ_D_T:				; GET DRIVE PARAMETERS
 	jbe	short RDT_NOT_PRESENT
 
 	; 18/04/2021 - TRDOS 386 v2.0.4
-	
+
 	;call	GET_VEC 		; GET DISK PARAMETER ADDRESS
 	;
 	;;mov	al, [ES:BX+2]		; HEADS
@@ -5683,7 +5683,7 @@ READ_D_T:				; GET DRIVE PARAMETERS
 	;; ** leave the last cylinder as reserved for diagnostics **
 	;; (Also in Award BIOS - 1999, AHDSK.ASM, FUN15 -> sub ax, 1)
 	;dec	cx			; LEAVE ONE FOR DIAGNOSTICS
-	;;imul	cx			; NUMBER OF SECTORS	 	
+	;;imul	cx			; NUMBER OF SECTORS
 	;; 17/04/2021
 	;mul	ah
 	;; ax = spt*heads
@@ -5700,10 +5700,10 @@ READ_D_T:				; GET DRIVE PARAMETERS
 	; 13/07/2022
 	movzx	edx, dl
 	mov	bl, [edx+drv.status]
-	and	bl, 1 ; LBA ready bit (bit 0) 
+	and	bl, 1 ; LBA ready bit (bit 0)
 
 	shl	dl, cl ; * 4
-	
+
 	;mov	eax, [edx+drv.size]
 	;mov	dx, ax
 	;shr	eax, 16
@@ -5738,10 +5738,10 @@ RDT1:
 	mov	ah, 03h			; INDICATE FIXED DISK
 	mov	al, bl
 	; al = 1 -> LBA r/w ready/applicable
-	;    = 0 -> LBA r/w not ready/applicable	 
+	;    = 0 -> LBA r/w not ready/applicable
 	; cf = 0
 RDT2:
-	mov	[esp+16], ecx	
+	mov	[esp+16], ecx
 ;RDT2:
 	; 13/07/2022
 	; 18/04/2021
@@ -5759,8 +5759,8 @@ RDT2:
 	; [DISK_STATUS1] = 0
 	; ah = 3
 	; al = 0 or 1 (LBA ready)
-	; cf = 0	
-	
+	; cf = 0
+
 	retn
 
 RDT_NOT_PRESENT:
@@ -5775,7 +5775,7 @@ RDT_NOT_PRESENT:
 	; 13/07/2022
 	sub	ecx, ecx
 	mov	cl, al ; if AL = 0FFh, disk size will be in ECX
-		       ; if not, disk size will be in CX:DX 
+		       ; if not, disk size will be in CX:DX
 	sub	eax, eax
 	inc	cl ; 0FFh -> 0
 	cmp	cl, 1
@@ -5785,7 +5785,7 @@ RDT_NOT_PRESENT:
 	; ecx = 0
 	mov	[esp+12], eax ; edx = 0
 	stc
-	jmp	short RDT2 ; cf = 1, eax = 0	
+	jmp	short RDT2 ; cf = 1, eax = 0
 
 ; 10/08/2022
 ; 07/08/2022
@@ -5802,24 +5802,24 @@ GET_PARM_N:
 	; 10/08/2022
 	; 13/07/2022
 	; (if ebx = 0, HDPT will not be returned to user)
-	;	
+	;
 ;GET_PARM:				; GET DRIVE PARAMETERS
 	;push	ds			; SAVE REGISTERS
 	;push	es
-	
+
 	;push	ebx
-	mov	edi, ebx ; 13/07/2022 	
+	mov	edi, ebx ; 13/07/2022
 
 	; 13/07/2022
 	; ((IBM PC XT-286 ROM BIOS source code remainders))
 	;;mov	ax, ABS0 		; ESTABLISH ADDRESSING
 	;;mov	ds, ax
-	
+
 	;;test	dl, 1			; CHECK FOR DRIVE 1
 	;;jz	short G0
 	;;les	bx, @HF1_TBL_VEC
 	;;jmp	short G1
-;;G0:	
+;;G0:
 	;les	bx, @HF_TBL_VEC
 ;;G1:
 	;;call	DDS			; ESTABLISH SEGMENT
@@ -5845,14 +5845,14 @@ GET_PARM_N:
 	;sub	ecx, ecx
 	; 22/12/2014
 	mov	bl, dl
-	;xor	bh, bh  
+	;xor	bh, bh
 	shl	bl, 2			; convert index to offset
 	;add	bx, HF_TBL_VEC
 	add	ebx, HF_TBL_VEC
 	;mov	ax, [bx+2]
 	;mov	es, ax			; dpt segment
 	;mov	bx, [bx]		; dpt offset
-	mov	ebx, [ebx] ; 32 bit offset	
+	mov	ebx, [ebx] ; 32 bit offset
 	; 18/04/2021
 	sub	edx, edx
  	mov	[DISK_STATUS1], dl ; 0
@@ -5900,7 +5900,7 @@ GET_PARM_N:
 	or	edi, edi ; (edi = [ebp+24] = ebx)
 	jnz	short G3 ; yes
 
-	sub	eax, eax	
+	sub	eax, eax
 
 	; [DISK_STATUS1] = 0
 	; eax = 0
@@ -5937,17 +5937,17 @@ G2:
 	;;jmp	short G5
 	;jmp	short _G6
 
-G3:	
+G3:
 	; 27/05/2016
 	; return fixed disk parameters table to user
 	; in user's buffer, which is pointed by EBX
-	
+
 	;xchg	edi, [esp]		; ebx (input)-> edi, edi -> [esp]
 	; 13/07/2022
 	;pop	edi
 	; edi = user's buffer address
 	;push	esi
-	mov	esi, ebx		; hard disk parameter table (32 bytes)	
+	mov	esi, ebx		; hard disk parameter table (32 bytes)
 	;mov	ebx, edi		; ebx = user's buffer address
 	push	ecx
 	;push	eax
@@ -5967,7 +5967,7 @@ G3:
 	; [DISK_STATUS1] = 0
 	; ah = 0, al = 0FFh
 	; cf = 1
-	
+
 	retn
 ;_G6:
 	;or	byte [esp+16], 1 ; set carry bit of eflags register
@@ -6051,12 +6051,12 @@ idrv0:
 	add	ebx, eax
 	;; 05/01/2015
 	mov	ah, [hf_m_s] ; drive number (0= master, 1= slave)
-	;;and 	ah, 1 
+	;;and 	ah, 1
 	shl	ah, 4
-	or	ah, 0A0h  ; Drive/Head register - 10100000b (A0h)	
+	or	ah, 0A0h  ; Drive/Head register - 10100000b (A0h)
 	;mov	al, [es:bx]
 	mov	al, [ebx] ; 21/02/2015
-	dec	al	 ; last head number 
+	dec	al	 ; last head number
 	;and	al, 0Fh
 	or	al, ah	 ; lower 4 bits for head number
 	;
@@ -6151,7 +6151,7 @@ tst_48bit_rdy:
 	call	CHECK_ST		; CHECK STATUS ONLY
 	jnz	short TR_EX
 	mov	byte [DISK_STATUS1], 0 	; WIPE OUT DATA CORRECTED ERROR
-TR_EX:	
+TR_EX:
 	retn
 
 ;----------------------------------------
@@ -6272,10 +6272,10 @@ COMMAND2:
 	;xor	edi, edi		; INDEX THE COMMAND TABLE
 	; 10/07/2022
 	xor	ecx, ecx
-	
+
 	;mov	dx, HF_PORT+1		; DISK ADDRESS
 	mov	dx, [HF_PORT]
-	inc	dl	
+	inc	dl
 
 	; 20/06/2024
 	;mov	al, [CMD_BLOCK+6]
@@ -6299,7 +6299,7 @@ COMMAND2:
 	jb	short COMMAND3
 	cmp	al, 40h
 	ja	short COMMAND3
-	or	byte [CMD_BLOCK+6], NO_RETRIES 
+	or	byte [CMD_BLOCK+6], NO_RETRIES
 					; VALID OPERATION FOR RETRY SUPPRESS
 COMMAND3:
 	;mov	al, [CMD_BLOCK+edi]	; GET THE COMMAND STRING BYTE
@@ -6311,7 +6311,7 @@ COMMAND3:
 	; 10/07/2022
 	inc	ecx
 	;inc	dx			; NEXT DISK ADAPTER REGISTER
-	inc	edx   ; 10/07/2022	
+	inc	edx   ; 10/07/2022
 	;cmp	di, 7 ; 01/01/2015	; ALL DONE?
 	;jne	short COMMAND3		; NO--GO DO NEXT ONE
 	cmp	cl, 7 ; 10/07/2022
@@ -6399,7 +6399,7 @@ _WAIT:
 					; (AWARD BIOS -> WAIT_FOR_MEM)
 ;-----	WAIT LOOP
 
-WT1:	
+WT1:
 	;test	byte [HF_INT_FLAG], 80h	; TEST FOR INTERRUPT
 	test 	byte [HF_INT_FLAG], 0C0h
 	;loopz	WT1
@@ -6412,17 +6412,17 @@ WT1_hi:
 	test	al, 10h			; transition on memory
 	jnz	short WT1_hi		; refresh.
 WT1_lo:
-	in	al, SYS1 		; 061h (PORT_B)	
-	test	al, 10h			
+	in	al, SYS1 		; 061h (PORT_B)
+	test	al, 10h
 	jz	short WT1_lo
 	loop	WT1
 	;;or	bl, bl
-	;;jz	short WT2	
+	;;jz	short WT2
 	;;dec	bl
 	;;jmp	short WT1
 	;dec	bl
-	;jnz	short WT1	
-WT2:	
+	;jnz	short WT1
+WT2:
 	; 10/07/2022
 	;mov	byte [DISK_STATUS1], TIME_OUT ; REPORT TIME OUT ERROR
 	mov	al, TIME_OUT
@@ -6433,7 +6433,7 @@ WT3:
 	sub	al, al ; 0
 	mov	byte [HF_INT_FLAG], al
 WT4:
-NB2:	
+NB2:
 	mov	byte [DISK_STATUS1], al
 
 	;cmp	byte [DISK_STATUS1], 0 	; SET CONDITION CODE FOR CALLER
@@ -6461,7 +6461,7 @@ NOT_BUSY:
 	mov	ecx, WAIT_HDU_INT_LH  ; 21/02/2015
 	;
 	;;mov	byte [wait_count], 0    ; Reset wait counter
-NB1:	
+NB1:
 	in	al, dx			; CHECK STATUS
 	;test	al, ST_BUSY
 	and	al, ST_BUSY
@@ -6470,11 +6470,11 @@ NB1:
 	;dec	bl			
 	;jnz	short NB1		; KEEP TRYING FOR A WHILE
 
-NB1_hi: 
+NB1_hi:
 	in	al, SYS1		; wait for hi to lo
 	test	al, 010h		; transition on memory
 	jnz	short NB1_hi		; refresh.
-NB1_lo: 
+NB1_lo:
 	in	al, SYS1
 	test	al, 010h
 	jz	short NB1_lo
@@ -6488,7 +6488,7 @@ NB1_lo:
 	;mov	byte [DISK_STATUS1], TIME_OUT ; REPORT TIME OUT ERROR
 	;jmp	short NB3
 	mov	al, TIME_OUT
-;NB2:	
+;NB2:
 	jmp	short NB2 ; 10/07/2022
 
 ;	;mov	byte [DISK_STATUS1], 0
@@ -6518,11 +6518,11 @@ WQ_1:
 	test	al, ST_DRQ		; WAIT FOR DRQ
 	jnz	short WQ_OK
 	;loop	WQ_1			; KEEP TRYING FOR A SHORT WHILE
-WQ_hi:	
+WQ_hi:
 	in	al, SYS1		; wait for hi to lo
 	test	al, 010h		; transition on memory
 	jnz	short WQ_hi		; refresh.
-WQ_lo:  
+WQ_lo:
 	in	al, SYS1
 	test	al, 010h
 	jz	short WQ_lo
@@ -6545,7 +6545,7 @@ CHECK_ST:
 	;mov	dx, HF_PORT+7		; GET THE STATUS
 	mov	dx, [HF_PORT]
 	add	dl, 7
-	
+
 	; 17/02/2016
 	;(http://wiki.osdev.org/ATA_PIO_Mode)
 	;"delay 400ns to allow drive to set new values of BSY and DRQ"
@@ -6601,19 +6601,19 @@ CHECK_ER:
 	sub	ecx, ecx
 	;mov	ecx, 8			; TEST ALL 8 BITS
 	mov	cl, 8
-CK1:	
+CK1:
 	shl	al, 1			; MOVE NEXT ERROR BIT TO CARRY
 	jc	short CK2		; FOUND THE ERROR
 	loop	CK1			; KEEP TRYING
 CK2:
 	;mov	ebx, ERR_TBL		; COMPUTE ADDRESS OF
 	;add	ebx, ecx		; ERROR CODE
-	add	ecx, ERR_TBL ; 16/07/2022	
+	add	ecx, ERR_TBL ; 16/07/2022
 
 	;;;mov	ah, byte [cs:bx]	; GET ERROR CODE
 	;;mov	ah, [bx]
 	;mov	ah, [ebx] ; 21/02/2015
-	mov	ah, [ecx]	
+	mov	ah, [ecx]
 CKEX:
 	mov	[DISK_STATUS1], ah	; SAVE ERROR CODE
 	; 16/07/2022
@@ -6650,7 +6650,7 @@ CKEX:
 ;	cmp	al, bl			; CHECK OFFSET ON MAX SECTORS
 ;	;jb	short CKDERR		; ERROR
 ;	jnb	short CKDOK ; 16/07/2022
-;;CKDOK:	
+;;CKDOK:
 ;	;clc				; CLEAR CARRY
 ;	;pop	eax
 ;	;retn				; NORMAL RETURN
@@ -6664,7 +6664,7 @@ CKEX:
 ;----------------------------------------
 ;	SET UP EBX-> DISK PARMS		:
 ;----------------------------------------
-					
+
 ; INPUT -> DL = 0 based drive number
 ; OUTPUT -> EBX = disk parameter table address
 
@@ -6691,7 +6691,7 @@ GET_VEC:
 	;push	word [bx+2]		; dpt segment
 	;pop	es
 	;mov	bx, [bx]		; dpt offset
-	mov	ebx, [ebx]		
+	mov	ebx, [ebx]
 ;GV_EXIT:
 	retn
 
@@ -6771,7 +6771,7 @@ HD1_INT:
 	mov 	ds, ax
 	;
 	;;mov	@HF_INT_FLAG,0FFH	; ALL DONE
-        ;or	byte [CS:HF_INT_FLAG],0C0h 
+        ;or	byte [CS:HF_INT_FLAG],0C0h
 	or	byte [HF_INT_FLAG], 0C0h
 	;
 	push	edx

@@ -20,7 +20,7 @@
 
 ; ///////// MEMORY MANAGEMENT FUNCTIONS (PROCEDURES) ///////////////
 
-;;04/11/2014 (unix386.s)	
+;;04/11/2014 (unix386.s)
 ;PDE_A_PRESENT	equ	1		; Present flag for PDE
 ;PDE_A_WRITE	equ 	2		; Writable (write permission) flag
 ;PDE_A_USER	equ	4		; User (non-system/kernel) page flag
@@ -50,10 +50,10 @@ SWP_SECTOR_NOT_PRESENT_ERR equ 42
 SWP_NO_FREE_SPACE_ERR      equ 43
 SWP_DISK_WRITE_ERR         equ 44
 SWP_NO_PAGE_TO_SWAP_ERR    equ 45
-PTE_A_ACCESS_BIT equ 5  ; Bit 5 (accessed flag)        
+PTE_A_ACCESS_BIT equ 5  ; Bit 5 (accessed flag)
 SECTOR_SHIFT     equ 3  ; sector shift (to convert page block number)
 ; 12/07/2016
-PTE_SHARED	 equ 400h		; AVL bit 1, direct memory access bit	
+PTE_SHARED	 equ 400h		; AVL bit 1, direct memory access bit
 					; (Indicates that the page is not allocated
 					; for the process, it is a shared or system
                                         ; page, it must not be deallocated!)
@@ -61,7 +61,7 @@ PTE_SHARED	 equ 400h		; AVL bit 1, direct memory access bit
 ; (Linear Frame Buffer - video memory mark : AVL bit 1, outside M.A.T.)
 PDE_EXTERNAL	equ 400h	; Page directory entry for external memory blocks
 PTE_EXTERNAL	equ 400h	; Allocated kernel pages for Linear Frame Buffer
-				; (Out of memory allocation table)	
+				; (Out of memory allocation table)
 
 ;
 ;; Retro Unix 386 v1 - paging method/principles
@@ -82,16 +82,16 @@ PTE_EXTERNAL	equ 400h	; Allocated kernel pages for Linear Frame Buffer
 ;;	in use by a user process. (In system/kernel mode
 ;;	kernel can access all memory pages even if they are
 ;;	reserved/allocated for user processes. Swap out/in would
-;;	cause conflicts.) 
+;;	cause conflicts.)
 ;;	
 ;;	As result of these conditions,
-;;	all kernel pages must be initialized as equal to 
-;;	physical layout for preventing page faults. 
+;;	all kernel pages must be initialized as equal to
+;;	physical layout for preventing page faults.
 ;;	Also, calling "allocate page" procedure after
 ;;	a page fault can cause another page fault (double fault)
 ;;	if all kernel page tables would not be initialized.
 ;;
-;;	[first_page] = Beginning of users space, as offset to 
+;;	[first_page] = Beginning of users space, as offset to
 ;;	memory allocation table. (double word aligned)
 ;;
 ;;	[next_page] = first/next free space to be searched
@@ -109,7 +109,7 @@ PTE_EXTERNAL	equ 400h	; Allocated kernel pages for Linear Frame Buffer
 ;;		 if it causes R/W page fault.)
 ;;
 ;;	Every user process has own (different)
-;;	page directory and page tables.	
+;;	page directory and page tables.
 ;;
 ;;	Code starts at virtual address 0, always.
 ;;	(Initial value of EIP is 0 in user mode.)
@@ -117,13 +117,13 @@ PTE_EXTERNAL	equ 400h	; Allocated kernel pages for Linear Frame Buffer
 ;;	 flat memory programs.)
 ;;
 ;; MEMORY ALLOCATION STRATEGY:
-;;	Memory page will be allocated by kernel only 
+;;	Memory page will be allocated by kernel only
 ;;		(in kernel/system mode only).
 ;;	* After a
 ;;	  - 'not present' page fault
-;;	  - 'writing attempt on read only page' page fault 	 	
+;;	  - 'writing attempt on read only page' page fault
 ;;	* For loading (opening, reading) a file or disk/drive
-;;	* As responce to 'allocate additional memory blocks' 
+;;	* As responce to 'allocate additional memory blocks'
 ;;	  request by running process.
 ;;	* While creating a process, allocating a new buffer,
 ;;	  new page tables etc.
@@ -131,7 +131,7 @@ PTE_EXTERNAL	equ 400h	; Allocated kernel pages for Linear Frame Buffer
 ;;	At first,
 ;;	- 'allocate page' procedure will be called;
 ;,	   if it will return with a valid (>0) physical address
-;;	   (that means the relevant M.A.T. bit has been RESET)	
+;;	   (that means the relevant M.A.T. bit has been RESET)
 ;;	   relevant memory page/block will be cleared (zeroed).
 ;;	- 'allocate page' will be called for allocating page
 ;;	   directory, page table and running space (data/code).
@@ -142,11 +142,11 @@ PTE_EXTERNAL	equ 400h	; Allocated kernel pages for Linear Frame Buffer
 ;;	- swapping out and swapping in (if it is not a new page)
 ;;	  procedures will be called as responce to 'out of memory'
 ;;	  error except errors caused by attribute conflicts.
-;;	 (swapper functions)	 
-;;					
+;;	 (swapper functions)
+;;
 ;;	At second,
 ;;	- page directory entry will be updated then page table
-;;	  entry will be updated.		
+;;	  entry will be updated.
 ;;
 ;; MEMORY ALLOCATION TABLE FORMAT:
 ;;	- M.A.T. has a size according to available memory as
@@ -157,29 +157,29 @@ PTE_EXTERNAL	equ 400h	; Allocated kernel pages for Linear Frame Buffer
 ;,	- 'free_pages' pointer holds count of free pages
 ;;	  depending on M.A.T.
 ;;		(NOTE: Free page count will not be checked
-;;		again -on M.A.T.- after initialization. 
+;;		again -on M.A.T.- after initialization.
 ;;		Kernel will trust on initial count.)
 ;,	- 'free_pages' count will be decreased by allocation
 ;;	  and it will be increased by deallocation procedures.
-;;	
+;;
 ;;	- Available memory will be calculated during
 ;;	  the kernel's initialization stage (in real mode).
-;;	  Memory allocation table and kernel page tables 
+;;	  Memory allocation table and kernel page tables
 ;;	  will be formatted/sized as result of available
 ;;	  memory calculation before paging is enabled.
 ;;
 ;; For 4GB Available/Present Memory: (max. possible memory size)
 ;;	- Memory Allocation Table size will be 128 KB.
-;;	- Memory allocation for kernel page directory size 
+;;	- Memory allocation for kernel page directory size
 ;;	  is always 4 KB. (in addition to total allocation size
 ;;	  for page tables)
 ;;	- Memory allocation for kernel page tables (1024 tables)
 ;;	  is 4 MB (1024*4*1024 bytes).
-;;	- User (available) space will be started 
+;;	- User (available) space will be started
 ;;	  at 6th MB of the memory (after 1MB+4MB).
 ;;	- The first 640 KB is for kernel's itself plus
 ;;	  memory allocation table and kernel's page directory
-;;	  (D0000h-EFFFFh may be used as kernel space...)	
+;;	  (D0000h-EFFFFh may be used as kernel space...)
 ;;	- B0000h to B7FFFh address space (32 KB) will be used
 ;; 	  for buffers.
 ;;	- ROMBIOS, VIDEO BUFFER and VIDEO ROM space are reserved.
@@ -188,7 +188,7 @@ PTE_EXTERNAL	equ 400h	; Allocated kernel pages for Linear Frame Buffer
 ;;
 ;; For 1GB Available Memory:
 ;;	- Memory Allocation Table size will be 32 KB.
-;;	- Memory allocation for kernel page directory size 
+;;	- Memory allocation for kernel page directory size
 ;;	  is always 4 KB. (in addition to total allocation size
 ;;	  for page tables)
 ;;	- Memory allocation for kernel page tables (256 tables)
@@ -197,12 +197,12 @@ PTE_EXTERNAL	equ 400h	; Allocated kernel pages for Linear Frame Buffer
 ;;	  at 3th MB of the memory (after 1MB+1MB).
 ;;	- The first 640 KB is for kernel's itself plus
 ;;	  memory allocation table and kernel's page directory
-;;	  (D0000h-EFFFFh may be used as kernel space...)	
+;;	  (D0000h-EFFFFh may be used as kernel space...)
 ;;	- B0000h to B7FFFh address space (32 KB) will be used
 ;; 	  for buffers.
 ;;	- ROMBIOS, VIDEO BUFFER and VIDEO ROM space are reserved.
 ;,	  (A0000h-AFFFFh, C0000h-CFFFFh, F0000h-FFFFFh)
-;;	- Kernel page tables start at 100000h (2nd MB).	
+;;	- Kernel page tables start at 100000h (2nd MB).
 ;;
 ;;
 
@@ -212,8 +212,8 @@ PTE_EXTERNAL	equ 400h	; Allocated kernel pages for Linear Frame Buffer
 ;; RETRO UNIX 386 v1 - Paging (Method for Copy On Write paging principle)
 ;; DEMAND PAGING - PARENT&CHILD PAGE TABLE DUPLICATION PRINCIPLES (23/04/2015)
 
-;; Main factor: "sys fork" system call 
-;;	
+;; Main factor: "sys fork" system call
+;;
 ;; 		FORK
 ;;                      |----> parent - duplicated PTEs, read only pages
 ;;  writable pages ---->|
@@ -226,84 +226,84 @@ PTE_EXTERNAL	equ 400h	; Allocated kernel pages for Linear Frame Buffer
 ;;       -while R/W bit is 0-. 
 ;; 
 ;; Duplicate page tables with writable pages (the 1st sys fork in the process):
-;; # Parent's Page Table Entries are updated to point same pages as read only, 
+;; # Parent's Page Table Entries are updated to point same pages as read only,
 ;;   as duplicated PTE bit  -AVL bit 0, PTE bit 9- are reset/clear.
 ;; # Then Parent's Page Table is copied to Child's Page Table.
 ;; # Child's Page Table Entries are updated as duplicated child bit
-;;   -AVL bit 0, PTE bit 9- is set.	  
-;; 
+;;   -AVL bit 0, PTE bit 9- is set.
+;;
 ;; Duplicate page tables with read only pages (several sys fork system calls):
-;; # Parent's read only pages are copied to new child pages. 
+;; # Parent's read only pages are copied to new child pages.
 ;;   Parent's PTE attributes are not changed.
 ;;   (Because, there is another parent-child fork before this fork! We must not
 ;;    destroy/mix previous fork result).
-;; # Child's Page Table Entries (which are corresponding to Parent's 
-;;   read only pages) are set as writable (while duplicated PTE bit is clear). 
-;; # Parent's PTEs with writable page attribute are updated to point same pages 
+;; # Child's Page Table Entries (which are corresponding to Parent's
+;;   read only pages) are set as writable (while duplicated PTE bit is clear).
+;; # Parent's PTEs with writable page attribute are updated to point same pages
 ;;   as read only, (while) duplicated PTE bit is reset (clear).
-;; # Parent's Page Table Entries (with writable page attribute) are duplicated 
+;; # Parent's Page Table Entries (with writable page attribute) are duplicated
 ;;   as Child's Page Table Entries without copying actual page.
-;; # Child 's Page Table Entries (which are corresponding to Parent's writable 
+;; # Child 's Page Table Entries (which are corresponding to Parent's writable
 ;;   pages) are updated as duplicated PTE bit (AVL bit 0, PTE bit 9- is set.
-;; 
+;;
 ;; !? WHAT FOR (duplication after duplication):
 ;; In UNIX method for sys fork (a typical 'fork' application in /etc/init)
-;; program/executable code continues from specified location as child process, 
-;; returns back previous code location as parent process, every child after 
+;; program/executable code continues from specified location as child process,
+;; returns back previous code location as parent process, every child after
 ;; every sys fork uses last image of code and data just prior the fork.
-;; Even if the parent code changes data, the child will not see the changed data 
+;; Even if the parent code changes data, the child will not see the changed data
 ;; after the fork. In Retro UNIX 8086 v1, parent's process segment (32KB)
 ;; was copied to child's process segment (all of code and data) according to
-;; original UNIX v1 which copies all of parent process code and data -core- 
+;; original UNIX v1 which copies all of parent process code and data -core-
 ;; to child space -core- but swaps that core image -of child- on to disk.
 ;; If I (Erdogan Tan) would use a method of to copy parent's core
-;; (complete running image of parent process) to the child process; 
-;; for big sizes, i would force Retro UNIX 386 v1 to spend many memory pages 
+;; (complete running image of parent process) to the child process;
+;; for big sizes, i would force Retro UNIX 386 v1 to spend many memory pages
 ;; and times only for a sys fork. (It would excessive reservation for sys fork,
 ;; because sys fork usually is prior to sys exec; sys exec always establishes
-;; a new/fresh core -running space-, by clearing all code/data content). 
+;; a new/fresh core -running space-, by clearing all code/data content).
 ;; 'Read Only' page flag ensures page fault handler is needed only for a few write
-;; attempts between sys fork and sys exec, not more... (I say so by thinking 
+;; attempts between sys fork and sys exec, not more... (I say so by thinking
 ;; of "/etc/init" content, specially.) sys exec will clear page tables and
 ;; new/fresh pages will be used to load and run new executable/program.
 ;; That is what for i have preferred "copy on write", "duplication" method
 ;; for sharing same read only pages between parent and child processes.
-;; That is a pitty i have to use new private flag (AVL bit 0, "duplicated PTE 
-;; belongs to child" sign) for cooperation on duplicated pages between a parent 
+;; That is a pitty i have to use new private flag (AVL bit 0, "duplicated PTE
+;; belongs to child" sign) for cooperation on duplicated pages between a parent
 ;; and it's child processes; otherwise parent process would destroy data belongs
-;; to its child or vice versa; or some pages would remain unclaimed 
+;; to its child or vice versa; or some pages would remain unclaimed
 ;; -deallocation problem-.
-;; Note: to prevent conflicts, read only pages must not be swapped out... 
+;; Note: to prevent conflicts, read only pages must not be swapped out...
 ;; 
 ;; WHEN PARENT TRIES TO WRITE IT'S READ ONLY (DUPLICATED) PAGE:
 ;; # Page fault handler will do those:
 ;;   - 'Duplicated PTE' flag (PTE bit 9) is checked (on the failed PTE).
 ;;   - If it is reset/clear, there is a child uses same page.
-;;   - Parent's read only page -previous page- is copied to a new writable page. 
+;;   - Parent's read only page -previous page- is copied to a new writable page.
 ;;   - Parent's PTE is updated as writable page, as unique page (AVL=0)
 ;;   - (Page fault handler whill check this PTE later, if child process causes to
-;;     page fault due to write attempt on read only page. Of course, the previous 
+;;     page fault due to write attempt on read only page. Of course, the previous
 ;;     read only page will be converted to writable and unique page which belongs
-;;     to child process.)	
+;;     to child process.)
 ;; WHEN CHILD TRIES TO WRITE IT'S READ ONLY (DUPLICATED) PAGE:
 ;; # Page fault handler will do those:
 ;;   - 'Duplicated PTE' flag (PTE bit 9) is checked (on the failed PTE).
 ;;   - If it is set, there is a parent uses -or was using- same page.
 ;;   - Same PTE address within parent's page table is checked if it has same page
-;;     address or not. 
+;;     address or not.
 ;;   - If parent's PTE has same address, child will continue with a new writable page.
-;;     Parent's PTE will point to same (previous) page as writable, unique (AVL=0).	
-;;   - If parent's PTE has different address, child will continue with it's 
+;;     Parent's PTE will point to same (previous) page as writable, unique (AVL=0).
+;;   - If parent's PTE has different address, child will continue with it's
 ;;     own/same page but read only flag (0) will be changed to writable flag (1) and
-;;     'duplicated PTE (belongs to child)' flag/sign will be cleared/reset. 	  	
-;; 
+;;     'duplicated PTE (belongs to child)' flag/sign will be cleared/reset.
+;;
 ;; NOTE: When a child process is terminated, read only flags of parent's page tables
-;;       will be set as writable (and unique) in case of child process was using 
+;;       will be set as writable (and unique) in case of child process was using
 ;;       same pages with duplicated child PTE sign... Depending on sys fork and 
 ;;       duplication method details, it is not possible multiple child processes
 ;;       were using same page with duplicated PTEs.
-;; 
-;;************************************************************************************   
+;;
+;;************************************************************************************
 
 ;; 08/10/2014
 ;; 11/09/2014 - Retro UNIX 386 v1 PAGING (further) draft
@@ -331,7 +331,7 @@ allocate_page:
 	;	(corresponding MEMORY ALLOCATION TABLE bit is RESET)
 	;
 	;	CF = 1 and EAX = 0 
-	; 		   if there is not a free page to be allocated	
+	; 		   if there is not a free page to be allocated
 	;
 	; Modified Registers -> none (except EAX)
 	;
@@ -347,9 +347,9 @@ allocate_page:
  				     ; NOTE: 32 (first_page) is initial
 				     ; value of [next_page].
 				     ; It points to the first available
-				     ; page block for users (ring 3) ...	
-				     ; (MAT offset 32 = 1024/32)	
-				     ; (at the of the first 4 MB)		
+				     ; page block for users (ring 3) ...
+				     ; (MAT offset 32 = 1024/32)
+				     ; (at the of the first 4 MB)
 	add	ebx, [next_page] ; Free page searching starts from here
 				 ; next_free_page >> 5
 	add	ecx, [last_page] ; Free page searching ends here
@@ -366,12 +366,12 @@ al_p_scan:
 	; BSF - Bit Scan Forward
 	;
 	;   Searches the value in a register or a memory location
-	;   (second operand) for the least-significant set bit. 
+	;   (second operand) for the least-significant set bit.
 	;   If a set bit is found, the instruction clears the zero flag (ZF)
 	;   and stores the index of the least-significant set bit in a destination
-	;   register (first operand). If the second operand contains 0, 
-	;   the instruction sets ZF to 1 and does not change the contents of the 
-	;   destination register. The bit index is an unsigned offset from bit 0 
+	;   register (first operand). If the second operand contains 0,
+	;   the instruction sets ZF to 1 and does not change the contents of the
+	;   destination register. The bit index is an unsigned offset from bit 0
 	;   of the searched value
 	;
 	bsf	eax, [ebx] ; Scans source operand for first bit set (1).
@@ -381,9 +381,9 @@ al_p_scan:
 			   ; Sets ZF to 1 if no bits are found set.
 	jnz	short al_p_found ; ZF = 0 -> a free page has been found
 			 ;
-			 ; NOTE: a Memory Allocation Table bit 
+			 ; NOTE: a Memory Allocation Table bit
 			 ;	 with value of 1 means 
-			 ;	 the corresponding page is free 
+			 ;	 the corresponding page is free
 			 ;	 (Retro UNIX 386 v1 feature only!)
 	add	ebx, 4
 			 ; We return back for searching next page block
@@ -393,7 +393,7 @@ al_p_scan:
 	;
 al_p_notfound:
 	sub	ecx, MEM_ALLOC_TBL
-	mov	[next_page], ecx ; next/first free page = last page 
+	mov	[next_page], ecx ; next/first free page = last page
 				 ; (deallocate_page procedure will change it)
 	xor	eax, eax
 	mov	[free_pages], eax ; 0
@@ -416,15 +416,15 @@ al_p_found:
 	sub	ecx, MEM_ALLOC_TBL
 	mov	[next_page], ecx ; Set first free page searching start
 				 ; address/offset (to the next)
-        dec     dword [free_pages] ; 1 page has been allocated (X = X-1) 
+        dec     dword [free_pages] ; 1 page has been allocated (X = X-1)
 	;
 	btr	[ebx], eax	 ; The destination bit indexed by the source value
 				 ; is copied into the Carry Flag and then cleared
 				 ; in the destination.
 				 ;
-				 ; Reset the bit which is corresponding to the 
+				 ; Reset the bit which is corresponding to the
 				 ; (just) allocated page.
-	; 01/07/2015 (4*8 = 32, 1 allocation byte = 8 pages)	
+	; 01/07/2015 (4*8 = 32, 1 allocation byte = 8 pages)
 	shl	ecx, 3		 ; (page block offset * 32) + page index
 	add	eax, ecx	 ; = page number
 	shl	eax, 12		 ; physical address of the page (flat/real value)
@@ -496,7 +496,7 @@ make_page_table:
 	;	EBX = virtual (linear) address
 	;	ECX = page table attributes (lower 12 bits)
 	;	      (higher 20 bits must be ZERO)
-	;	      (bit 0 must be 1)	 
+	;	      (bit 0 must be 1)
 	;	u.pgdir = page directory (physical) address
 	; OUTPUT ->
 	;	EDX = Page directory entry address
@@ -519,7 +519,7 @@ make_page:
 	;	EBX = virtual (linear) address
 	;	ECX = page attributes (lower 12 bits)
 	;	      (higher 20 bits must be ZERO)
-	;	      (bit 0 must be 1)	 
+	;	      (bit 0 must be 1)
 	;	u.pgdir = page directory (physical) address
 	; OUTPUT ->
 	;	EBX = Virtual address
@@ -550,7 +550,7 @@ set_pde:	; Set page directory entry (PDE)
 	;	EBX = virtual (linear) address
 	;	ECX = page table attributes (lower 12 bits)
 	;	      (higher 20 bits must be ZERO)
-	;	      (bit 0 must be 1)	 
+	;	      (bit 0 must be 1)
 	;	u.pgdir = page directory (physical) address
 	; OUTPUT ->
 	;	EDX = PDE address
@@ -594,7 +594,7 @@ set_pte:	; Set page table entry (PTE)
 	;	EBX = virtual (linear) address
 	;	ECX = page attributes (lower 12 bits)
 	;	      (higher 20 bits must be ZERO)
-	;	      (bit 0 must be 1)	 
+	;	      (bit 0 must be 1)
 	;	u.pgdir = page directory (physical) address
 	; OUTPUT ->
 	;	EAX = physical page address
@@ -615,7 +615,7 @@ set_pte:	; Set page table entry (PTE)
 	;
 	push	ebx ; 24/07/2015
 	and	ax, PDE_A_CLEAR ; 0F000h ; clear lower 12 bits
-			    ; EDX = PT address (physical)	
+			    ; EDX = PT address (physical)
 	shr	ebx, PAGE_SHIFT ; 12
 	and	ebx, PTE_MASK	; 03FFh
 			 ; clear higher 10 bits (PD bits)
@@ -629,7 +629,7 @@ set_pte:	; Set page table entry (PTE)
 	jnz	short spte_1
 	and	ax, PTE_A_CLEAR ; 0F000h ; clear lower 12 bits
 	mov	edx, eax
-	jmp	short spte_2	
+	jmp	short spte_2
 spte_0:
 	; If this PTE contains a swap (disk) address,
 	; it can be updated by using 'swap_in' procedure
@@ -642,7 +642,7 @@ spte_0:
 spte_err:
 	stc
 	retn
-spte_1: 
+spte_1:
 	mov	eax, edx
 spte_2:
 	or	edx, ecx
@@ -664,7 +664,7 @@ get_pde:	; Get present value of the relevant PDE
 	; OUTPUT ->
 	;	EDX = Page directory entry address
 	;	EAX = Page directory entry value
-	;	CF = 1 -> PDE not present or invalid ? 
+	;	CF = 1 -> PDE not present or invalid ?
 	; Modified Registers -> EDX, EAX
 	;
 	mov	edx, ebx
@@ -675,7 +675,7 @@ get_pde:	; Get present value of the relevant PDE
 	test	al, PDE_A_PRESENT ; page table is present or not !
 	jnz	short gpte_retn
 	stc
-gpde_retn:	
+gpde_retn:
 	retn
 
 get_pte:
@@ -694,7 +694,7 @@ get_pte:
 	;	      Page directory entry address (if CF=1)
 	;            (Bit 0 value is 0 if PT is not present)
 	;	EAX = Page table entry value (page address)
-	;	CF = 1 -> PDE not present or invalid ? 
+	;	CF = 1 -> PDE not present or invalid ?
 	; Modified Registers -> EAX, EDX
 	;
 	call 	get_pde
@@ -736,7 +736,7 @@ deallocate_page_dir:
 	push	esi
 	push	ecx
 	push	eax
-	mov	esi, eax 
+	mov	esi, eax
 	xor	ecx, ecx
 	; The 1st PDE points to Kernel Page Table 0 (the 1st 4MB),
 	; it must not be deallocated
@@ -746,7 +746,7 @@ dapd_0:
 	test	al, PDE_A_PRESENT ; bit 0, present flag (must be 1)
 	jz	short dapd_1	
 	and	ax, PDE_A_CLEAR ; 0F000h ; clear lower 12 (attribute) bits
-	call	deallocate_page_table			
+	call	deallocate_page_table
 dapd_1:
 	inc	ecx ; page directory entry index
 	cmp	ecx, PAGE_SIZE / 4 ; 1024
@@ -787,7 +787,7 @@ deallocate_page_table:
 	push	edi
 	push	edx
 	push	eax ; *
-	mov	esi, eax 
+	mov	esi, eax
 	xor	edi, edi ; 0
 dapt_0:
 	lodsd
@@ -801,7 +801,7 @@ dapt_0:
         test    ax, PTE_DUPLICATED ; Was this page duplicated 
 				   ; as child's page ?
 	jz	short dapt_4 ; Clear PTE but don't deallocate the page!
-	; check the parent's PTE value is read only & same page or not.. 
+	; check the parent's PTE value is read only & same page or not..
 	; ECX = page directory entry index (0-1023)
 	push	ebx
 	push	ecx
@@ -814,7 +814,7 @@ dapt_0:
 	jz	short dapt_2	; parent process does not use this page
 	and	cx, PDE_A_CLEAR ; 0F000h ; Clear attribute bits
 	; EDI = page table entry index (0-1023)
-	mov	edx, edi 
+	mov	edx, edi
 	;shl	dx, 2 ; *4
 	; 29/08/2023
 	shl	edx, 2
@@ -869,7 +869,7 @@ dapt_5:
 	;
 	pop	eax ; *
 	pop	edx
-	pop	edi	
+	pop	edi
 	pop	esi
 	;
 	;call	deallocate_page	; deallocate the page table's itself
@@ -888,14 +888,14 @@ deallocate_page:
 	;	[free_pages] is increased
 	;	(corresponding MEMORY ALLOCATION TABLE bit is SET)
 	;	CF = 1 if the page is already deallocated
-	; 	       (or not allocated) before.  
+	; 	       (or not allocated) before.
 	;
 	; Modified Registers -> EAX
 	;
 	push	ebx
 	push	edx
 	;
-	shr	eax, PAGE_SHIFT      ; shift physical address to 
+	shr	eax, PAGE_SHIFT      ; shift physical address to
 				     ; 12 bits right
 				     ; to get page number
 	mov	edx, eax
@@ -904,25 +904,25 @@ deallocate_page:
 				     ; (1 allocation bit = 1 page)
 				     ; (1 allocation bytes = 8 pages)
 	and	dl, 0FCh 	     ; clear lower 2 bits
-				     ; (to get 32 bit position)			
+				     ; (to get 32 bit position)
 	;
 	mov	ebx, MEM_ALLOC_TBL   ; Memory Allocation Table address
 	add	ebx, edx
 	and	eax, 1Fh	     ; lower 5 bits only
-				     ; (allocation bit position)	 
+				     ; (allocation bit position)
 	cmp 	edx, [next_page]     ; is the new free page address lower
 				     ; than the address in 'next_page' ?
-				     ; (next/first free page value)		
-	jnb	short dap_1	     ; no	
+				     ; (next/first free page value)
+	jnb	short dap_1	     ; no
 	mov	[next_page], edx     ; yes
 dap_1:
 	bts	[ebx], eax	     ; unlink/release/deallocate page
 				     ; set relevant bit to 1.
-				     ; set CF to the previous bit value	
-	;cmc			     ; complement carry flag	
+				     ; set CF to the previous bit value
+	;cmc			     ; complement carry flag
 	;jc	short dap_2	     ; do not increase free_pages count
 				     ; if the page is already deallocated
-				     ; before.	
+				     ; before.
         inc     dword [free_pages]
 dap_2:
 	pop	edx
@@ -1023,7 +1023,7 @@ duplicate_page_dir:
 	push	eax ; save child's page directory address
 	; 31/08/2015
 	; copy PDE 0 from the parent's page dir to the child's page dir
-	; (use same system space for all user page tables) 
+	; (use same system space for all user page tables)
 	movsd
 	mov	ebp, 1024*4096 ; pass the 1st 4MB (system space)
 	mov	ecx, (PAGE_SIZE / 4) - 1 ; 1023
@@ -1033,7 +1033,7 @@ dpd_0:
         ;jnz     short dpd_1
 	test	al, PDE_A_PRESENT ;  bit 0 =  1
 	jnz	short dpd_1
- 	; 20/07/2015 (virtual address at the end of the page table)	
+ 	; 20/07/2015 (virtual address at the end of the page table)
 	add	ebp, 1024*4096 ; page size * PTE count
 	jmp	short dpd_2
 dpd_1:	
@@ -1062,11 +1062,11 @@ dpd_err:
 dpd_p_err:
 	; release the allocated pages missing (recover free space)
 	pop	eax  ; the new page directory address (physical)
-	mov	ebx, [u.pgdir] ; parent's page directory address 
+	mov	ebx, [u.pgdir] ; parent's page directory address
 	call 	deallocate_page_dir
 	sub	eax, eax ; 0
 	stc
-	jmp	short dpd_3	
+	jmp	short dpd_3
 
 duplicate_page_table:
 	; 17/04/2021 - TRDOS 386 v2.0.4
@@ -1081,17 +1081,17 @@ duplicate_page_table:
 	; 18/10/2014
 	; 16/10/2014 (Retro UNIX 386 v1 - beginning)
 	;
-	; INPUT -> 
+	; INPUT ->
 	;	EBX = PHYSICAL (real/flat) ADDRESS of the parent's page table.
-	;       20/02/2017		 
+	;       20/02/2017
 	;	EBP = Linear address of the page (from 'duplicate_page_dir')
-	;	      (Linear address = CORE + user's virtual address) 	
+	;	      (Linear address = CORE + user's virtual address)
 	; OUTPUT ->
 	;	EAX = PHYSICAL (real/flat) ADDRESS of the child's page table.
 	;	      (with 'read only' attribute of page table entries)
 	;	20/02/2017
 	;	EBP = Next linear page address (for 'duplicate_page_dir')
-	;	
+	;
 	;	CF = 1 -> error 
 	;
 	; Modified Registers -> EBP (except EAX)
@@ -1108,7 +1108,7 @@ duplicate_page_table:
 	mov	esi, ebx
 	mov	edi, eax
 	mov	edx, eax
-	add	edx, PAGE_SIZE 	
+	add	edx, PAGE_SIZE
 dpt_0:
 	lodsd
 	and	eax, eax
@@ -1159,17 +1159,17 @@ dpt_1:
 ;	pop	ebx
 
 	; 21/09/2015
-	or	al, PTE_A_USER+PTE_A_WRITE+PTE_A_PRESENT 
+	or	al, PTE_A_USER+PTE_A_WRITE+PTE_A_PRESENT
 		; user + writable + present page
 	jmp	short dpt_3
 dpt_2:
-	;or	ax, PTE_A_USER+PTE_A_PRESENT 
-	or	al, PTE_A_USER+PTE_A_PRESENT 
+	;or	ax, PTE_A_USER+PTE_A_PRESENT
+	or	al, PTE_A_USER+PTE_A_PRESENT
 		    ; (read only page!)
 	mov	[esi-4], eax ; update parent's PTE
 	or      ax, PTE_DUPLICATED  ; (read only page & duplicated PTE!)
 dpt_3:
-	stosd  ; EDI points to child's PTE  	 
+	stosd  ; EDI points to child's PTE
 	;
 	add	ebp, 4096 ; 20/07/2015 (next page)
 	;
@@ -1203,7 +1203,7 @@ page_fault_handler:	; CPU EXCEPTION 0Eh (14) : Page Fault !
 	; 10/09/2014 (Retro UNIX 386 v1 - beginning)
 	;
 	; Note: This is not an interrupt/exception handler.
-	;	This is a 'page fault remedy' subroutine 
+	;	This is a 'page fault remedy' subroutine
 	;	which will be called by standard/uniform
 	;	exception handler.
 	;
@@ -1219,7 +1219,7 @@ page_fault_handler:	; CPU EXCEPTION 0Eh (14) : Page Fault !
 	;	EAX > 0 -> error code in EAX (also CF = 1)
 	;
 	; Modified Registers -> none (except EAX)
-	;	
+	;
         ;
         ; ERROR CODE:
 	;	 31  .....	4   3	2   1	0
@@ -1227,14 +1227,14 @@ page_fault_handler:	; CPU EXCEPTION 0Eh (14) : Page Fault !
 	;	|   Reserved  | I | R | U | W | P |
 	;	+---+-- --+---+---+---+---+---+---+
 	;
-	; P : PRESENT -	When set, the page fault was caused by 
+	; P : PRESENT -	When set, the page fault was caused by
     	;		a page-protection violation. When not set,
 	;		it was caused by a non-present page.
 	; W : WRITE   -	When set, the page fault was caused by
 	;		a page write. When not set, it was caused
 	;		by a page read.
-	; U : USER    -	When set, the page fault was caused 
-	;		while CPL = 3. 
+	; U : USER    -	When set, the page fault was caused
+	;		while CPL = 3.
 	;		This does not necessarily mean that
 	;		the page fault was a privilege violation.
 	; R : RESERVD -	When set, the page fault was caused by
@@ -1258,7 +1258,7 @@ page_fault_handler:	; CPU EXCEPTION 0Eh (14) : Page Fault !
    	; +---------------------------------------+-------------+---+-----+
 	;
 	;	PWT    - WRITE THROUGH
-	;	PCD    - CACHE DISABLE		
+	;	PCD    - CACHE DISABLE
 	;
 	;
 	;; x86 PAGE DIRECTORY ENTRY (4 KByte Page)
@@ -1273,8 +1273,8 @@ page_fault_handler:	; CPU EXCEPTION 0Eh (14) : Page Fault !
         ;       R/W    - READ/WRITE
         ;       U/S    - USER/SUPERVISOR
 	;	PWT    - WRITE THROUGH
-	;	PCD    - CACHE DISABLE	
-	;	A      - ACCESSED	
+	;	PCD    - CACHE DISABLE
+	;	A      - ACCESSED
         ;       D      - DIRTY (IGNORED)
 	;	PAT    - PAGE ATTRIBUTE TABLE INDEX (CACHE BEHAVIOR)
 	;	G      - GLOBAL	(IGNORED) 
@@ -1293,11 +1293,11 @@ page_fault_handler:	; CPU EXCEPTION 0Eh (14) : Page Fault !
         ;       R/W    - READ/WRITE
         ;       U/S    - USER/SUPERVISOR
 	;	PWT    - WRITE THROUGH
-	;	PCD    - CACHE DISABLE	
-	;	A      - ACCESSED	
+	;	PCD    - CACHE DISABLE
+	;	A      - ACCESSED
         ;       D      - DIRTY
 	;	PAT    - PAGE ATTRIBUTE TABLE INDEX (CACHE BEHAVIOR)
-	;	G      - GLOBAL	 
+	;	G      - GLOBAL
         ;       AVL    - AVAILABLE FOR SYSTEMS PROGRAMMER USE
 	;
 	;
@@ -1333,7 +1333,7 @@ page_fault_handler:	; CPU EXCEPTION 0Eh (14) : Page Fault !
 	;
 	; 21/09/2015 (debugging)
 	inc	dword [u.pfcount] ; page fault count for running process
-	inc	dword [PF_Count] ; total page fault count	
+	inc	dword [PF_Count]  ; total page fault count
 	; 28/06/2015
 	;mov	edx, [error_code] ; Lower 5 bits are valid
 	mov	dl, [error_code]
@@ -1343,25 +1343,25 @@ page_fault_handler:	; CPU EXCEPTION 0Eh (14) : Page Fault !
 	jz	short pfh_alloc_np
 	; 
 	; If it is not a 'write on read only page' type page fault
-	; major page fault error with minor reason must be returned without 
+	; major page fault error with minor reason must be returned without
 	; fixing the problem. 'sys_exit with error' will be needed
 	; after return here!
 	; Page fault will be remedied, by copying page contents
 	; to newly allocated page with write permission;
-	; sys_fork -> sys_exec -> copy on write, demand paging method is 
-	; used for working with minimum possible memory usage. 
-	; sys_fork will duplicate page directory and tables of parent  
+	; sys_fork -> sys_exec -> copy on write, demand paging method is
+	; used for working with minimum possible memory usage.
+	; sys_fork will duplicate page directory and tables of parent
 	; process with 'read only' flag. If the child process attempts to
 	; write on these read only pages, page fault will be directed here
-	; for allocating a new page with same data/content. 
+	; for allocating a new page with same data/content.
 	;
 	; IMPORTANT : Retro UNIX 386 v1 (and SINGLIX and TR-DOS)
-	; will not force to separate CODE and DATA space 
-	; in a process/program... 
+	; will not force to separate CODE and DATA space
+	; in a process/program...
 	; CODE segment/section may contain DATA!
-	; It is flat, smoth and simplest programming method already as in 
+	; It is flat, smoth and simplest programming method already as in
 	; Retro UNIX 8086 v1 and MS-DOS programs.
-	;	
+	;
 	test	dl, 2	; page fault was caused by a page write
 			; sign
         jz      short pfh_p_err
@@ -1373,7 +1373,7 @@ page_fault_handler:	; CPU EXCEPTION 0Eh (14) : Page Fault !
 	; make a new page and copy the parent's page content
 	; as the child's new page content
 	;
-	mov	ebx, cr2 ; CR2 contains the linear address 
+	mov	ebx, cr2 ; CR2 contains the linear address
 			 ; which has caused to page fault
 	call 	copy_page
         jc	short pfh_im_err ; insufficient memory
@@ -1406,7 +1406,7 @@ pfh_chk_cpl:
 		;	the address is on a page boundary)
 	and	dl, 4	; CPL = 3 ?
 	jnz	short pfh_um
-			; Page fault handler for kernel/system mode (CPL=0)		
+			; Page fault handler for kernel/system mode (CPL=0)
 	mov	ebx, cr3 ; CR3 (Control Register 3) contains physical address
 			 ; of the current/active page directory
 			 ; (Always kernel/system mode page directory, here!)
@@ -1419,20 +1419,20 @@ pfh_um:			; Page fault handler for user/appl. mode (CPL=3)
 			; Note: Lower 12 bits are 0. (page boundary)
 pfh_get_pde:
 	or	dl, 3	; USER + WRITE + PRESENT or SYSTEM + WRITE + PRESENT
-	mov	ecx, cr2 ; CR2 contains the virtual address 
+	mov	ecx, cr2 ; CR2 contains the virtual address
 			 ; which has been caused to page fault
 			 ;
 	shr	ecx, 20	 ; shift 20 bits right
-	and	cl, 0FCh ; mask lower 2 bits to get PDE offset		
+	and	cl, 0FCh ; mask lower 2 bits to get PDE offset
 	;
-	add	ebx, ecx ; now, EBX points to the relevant page dir entry 
-	mov	ecx, [ebx] ; physical (base) address of the page table 	
+	add	ebx, ecx ; now, EBX points to the relevant page dir entry
+	mov	ecx, [ebx] ; physical (base) address of the page table
 	test	cl, 1	 ; check bit 0 is set (1) or not (0).
 	jz	short pfh_set_pde ; Page directory entry is not valid,
 			  	  ; set/validate page directory entry
 	and	cx, PDE_A_CLEAR ; 0F000h ; Clear attribute bits
 	mov	ebx, ecx ; Physical address of the page table
-	mov	ecx, eax ; new page address (physical) 	
+	mov	ecx, eax ; new page address (physical)
 	jmp	short pfh_get_pte
 pfh_set_pde:
 	;; NOTE: Page directories and page tables never be swapped out!
@@ -1452,11 +1452,11 @@ pfh_get_pte:
 	mov	eax, cr2 ; virtual address
 			 ; which has been caused to page fault
 	mov	edi, eax ; 20/07/2015
-	shr	eax, 12	 ; shift 12 bit right to get 
-			 ; higher 20 bits of the page fault address 
+	shr	eax, 12	 ; shift 12 bit right to get
+			 ; higher 20 bits of the page fault address
 	and	eax, 3FFh ; mask PDE# bits, the result is PTE# (0 to 1023)
 	shl	eax, 2	; shift 2 bits left to get PTE offset
-	add	ebx, eax ; now, EBX points to the relevant page table entry 
+	add	ebx, eax ; now, EBX points to the relevant page table entry
 ; 17/04/2021 temporary
 ;	mov	eax, [ebx] ; get previous value of pte
 ;		; bit 0 of EAX is always 0 (otherwise we would not be here)
@@ -1491,10 +1491,10 @@ pfh_cpp_ok:
 ;	mov	ebx, cr2
 ;	call 	add_to_swap_queue
 	;
-	; The new PTE (which contains the new page) will be added to 
-	; the swap queue, here. 
-	; (Later, if memory will become insufficient, 
-	; one page will be swapped out which is at the head of 
+	; The new PTE (which contains the new page) will be added to
+	; the swap queue, here.
+	; (Later, if memory will become insufficient,
+	; one page will be swapped out which is at the head of
 	; the swap queue by using FIFO and access check methods.)
 	;
 	xor	eax, eax  ; 0
@@ -1503,8 +1503,8 @@ pfh_err_retn:
 	pop	ecx
 	pop	edx
 	pop	ebx
-	retn 
-	
+	retn
+
 copy_page:
 	; 29/08/2023 (TRDOS 386 v2.0.6)
 	; 22/09/2015
@@ -1520,7 +1520,7 @@ copy_page:
 	; 30/10/2014
 	; 18/10/2014 (Retro UNIX 386 v1 - beginning)
 	;
-	; INPUT -> 
+	; INPUT ->
 	;	EBX = Virtual (linear) address of source page
 	;	     (Page fault address)
 	; OUTPUT ->
@@ -1529,7 +1529,7 @@ copy_page:
 	;	EAX = 0 (CF = 1) 
 	;		if there is not a free page to be allocated
 	;	(page content of the source page will be copied
-	;	onto the target/new page) 	
+	;	onto the target/new page)
 	;
 	; Modified Registers -> ecx, ebx (except EAX)
 	;	
@@ -1541,20 +1541,20 @@ copy_page:
 	shr	ebx, 12 ; shift 12 bits right to get PDE & PTE numbers
 	mov	ecx, ebx ; save page fault address (as 12 bit shifted)
 	shr	ebx, 8	 ; shift 8 bits right and then
-	and	bl, 0FCh ; mask lower 2 bits to get PDE offset	
+	and	bl, 0FCh ; mask lower 2 bits to get PDE offset
 	mov 	edi, ebx ; save it for the parent of current process
-	add	ebx, [u.pgdir] ; EBX points to the relevant page dir entry 
+	add	ebx, [u.pgdir] ; EBX points to the relevant page dir entry
 	mov	eax, [ebx] ; physical (base) address of the page table
-	and	ax, PTE_A_CLEAR ; 0F000h ; clear attribute bits 	
+	and	ax, PTE_A_CLEAR ; 0F000h ; clear attribute bits
 	mov	ebx, ecx   ; (restore higher 20 bits of page fault address)
 	and	ebx, 3FFh  ; mask PDE# bits, the result is PTE# (0 to 1023)
 	;shl	bx, 2	   ; shift 2 bits left to get PTE offset
 	; 29/08/2023
 	shl	ebx, 2
-	add	ebx, eax   ; EBX points to the relevant page table entry 
+	add	ebx, eax   ; EBX points to the relevant page table entry
 	; 07/09/2015
         test    word [ebx], PTE_DUPLICATED ; (Does current process share this
-				     ; read only page as a child process?)	
+				     ; read only page as a child process?)
 	jnz	short cpp_0 ; yes
 	mov	ecx, [ebx] ; PTE value
 	and	cx, PTE_A_CLEAR ; 0F000h  ; clear page attributes
@@ -1564,30 +1564,30 @@ cpp_0:
 	add	esi, [u.ppgdir] ; the parent's page directory entry
 	mov	eax, [esi] ; physical (base) address of the page table
 	and	ax, PTE_A_CLEAR ; 0F000h ; clear attribute bits
-	mov	esi, ecx   ; (restore higher 20 bits of page fault address)	
+	mov	esi, ecx   ; (restore higher 20 bits of page fault address)
 	and	esi, 3FFh  ; mask PDE# bits, the result is PTE# (0 to 1023)
 	;shl	si, 2	   ; shift 2 bits left to get PTE offset
 	; 29/08/2023
 	shl	esi, 2
-	add	esi, eax   ; EDX points to the relevant page table entry  	
+	add	esi, eax   ; EDX points to the relevant page table entry
 	mov	ecx, [esi] ; PTE value of the parent process
 	; 21/09/2015
 	mov	eax, [ebx] ; PTE value of the child process
-	and	ax, PTE_A_CLEAR ; 0F000h ; clear page attributes	
+	and	ax, PTE_A_CLEAR ; 0F000h ; clear page attributes
 	;
 	test	cl, PTE_A_PRESENT ; is it a present/valid page ?
-	jz	short cpp_3 ; the parent's page is not same page  	
+	jz	short cpp_3 ; the parent's page is not same page
 	;
 	and	cx, PTE_A_CLEAR ; 0F000h ; clear page attributes
 	cmp	eax, ecx   ; Same page?	
-	jne	short cpp_3 ; Parent page and child page are not same 
+	jne	short cpp_3 ; Parent page and child page are not same
 			    ; Convert child's page to writable page
 cpp_1:
 	call	allocate_page
 	jc	short cpp_4 ; 'insufficient memory' error
 	and	esi, esi    ; check ESI is valid or not
 	jz	short cpp_2
-		; Convert read only page to writable page 
+		; Convert read only page to writable page
 		;(for the parent of the current process)
 	;and	word [esi], PTE_A_CLEAR ; 0F000h
 	; 22/09/2015
@@ -1600,7 +1600,7 @@ cpp_2:
 	mov	esi, ecx ; the page address of the parent process
 	mov	ecx, PAGE_SIZE / 4
 	rep	movsd ; 31/08/2015
-cpp_3:		
+cpp_3:
 	or	al, PTE_A_PRESENT + PTE_A_WRITE + PTE_A_USER ; 1+2+4 = 7
 	mov	[ebx], eax ; Update PTE
 	sub	al, al ; clear attributes
@@ -1616,10 +1616,10 @@ cpp_4:
 ;; 21/10/2014 (Retro UNIX 386 v1 - beginning)
 ;; SWAP_PAGE_QUEUE (4096 bytes)
 ;;
-;;   0000   0001   0002   0003   ....   1020   1021   1022   1023	
+;;   0000   0001   0002   0003   ....   1020   1021   1022   1023
 ;; +------+------+------+------+-    -+------+------+------+------+
 ;; |  pg1 |  pg2 |  pg3 |  pg4 | .... |pg1021|pg1022|pg1023|pg1024|
-;; +------+------+------+------+-    -+------+------+------+------+    
+;; +------+------+------+------+-    -+------+------+------+------+
 ;;
 ;; [swpq_last] = 0 to 4096 (step 4) -> the last position on the queue
 ;;
@@ -1632,23 +1632,23 @@ cpp_4:
 ;;	is checked for 'accessed' flag. If the 1st page on the queue
 ;;	is 'accessed' or 'read only', it is dropped from the list;
 ;;	other pages from the 2nd to the last (in [swpq_last]) shifted
-;; 	to head then the 2nd page becomes the 1st and '[swpq_last]' 
+;; 	to head then the 2nd page becomes the 1st and '[swpq_last]'
 ;;	offset value becomes it's previous offset value - 4.
-;;	If the 1st page of the swap page queue is not 'accessed'	
+;;	If the 1st page of the swap page queue is not 'accessed'
 ;;	the queue/list is not shifted.
 ;;	After the queue/list shift, newly allocated page is added
 ;;	to the tail of the queue at the [swpq_count*4] position.
 ;;	But, if [swpq_count] > 1023, the newly allocated page
-;;	will not be added to the tail of swap page queue.  		 
-;;	
+;;	will not be added to the tail of swap page queue.
+;;
 ;;	During 'swap_out' procedure, swap page queue is checked for
-;;	the first non-accessed, writable page in the list, 
-;;	from the head to the tail. The list is shifted to left 
+;;	the first non-accessed, writable page in the list,
+;;	from the head to the tail. The list is shifted to left
 ;;	(to the head) till a non-accessed page will be found in the list.
 ;;	Then, this page	is swapped out (to disk) and then it is dropped
 ;;	from the list by a final swap queue shift. [swpq_count] value
-;;	is changed. If all pages on the queue' are 'accessed', 
-;;	'insufficient memory' error will be returned ('swap_out' 
+;;	is changed. If all pages on the queue' are 'accessed',
+;;	'insufficient memory' error will be returned ('swap_out'
 ;;	procedure will be failed)...
 ;;
 ;;	Note: If the 1st page of the queue is an 'accessed' page,
@@ -1656,16 +1656,16 @@ cpp_4:
 ;;	(PTE) will be added to the tail of the queue after
 ;;	the check, if [swpq_count] < 1023. If [swpq_count] = 1024
 ;;	the queue will be rotated and the PTE in the head will be
-;;	added to the tail after resetting 'accessed' bit. 
+;;	added to the tail after resetting 'accessed' bit.
 ;;
 ;;
-;;	
+;;
 ;; SWAP DISK/FILE (with 4096 bytes swapped page blocks)
 ;;
 ;;  00000000  00000004  00000008  0000000C   ...   size-8    size-4
 ;; +---------+---------+---------+---------+-- --+---------+---------+
 ;; |descriptr| page(1) | page(2) | page(3) | ... |page(n-1)| page(n) |
-;; +---------+---------+---------+---------+-- --+---------+---------+    
+;; +---------+---------+---------+---------+-- --+---------+---------+
 ;;
 ;; [swpd_next] = the first free block address in swapped page records
 ;;    		 for next free block search by 'swap_out' procedure.
@@ -1678,7 +1678,7 @@ cpp_4:
 ;;		  0 for file, or beginning sector of the swap partition
 ;; [swp_drv] = logical drive description table addr. of swap disk/file
 ;;
-;; 					
+;;
 ;; Method:
 ;;	When the memory (ram) becomes insufficient, page allocation
 ;;	procedure swaps out a page from memory to the swap disk 
@@ -1689,16 +1689,16 @@ cpp_4:
 ;;	(4096 bytes). Swapping address (in sectors) is recorded
 ;;	into relevant page file entry as 31 bit physical (logical)
 ;;	offset address as 1 bit shifted to left for present flag (0).
-;;	Swapped page address is between 1 and swap disk/file size - 4.	  
-;;	Absolute physical (logical) address of the swapped page is 
-;;	calculated by adding offset value to the swap partition's 
-;;	start address. If the swap device (disk) is a virtual disk 
-;;	or it is a file, start address of the swap disk/volume is 0, 
+;;	Swapped page address is between 1 and swap disk/file size - 4.
+;;	Absolute physical (logical) address of the swapped page is
+;;	calculated by adding offset value to the swap partition's
+;;	start address. If the swap device (disk) is a virtual disk
+;;	or it is a file, start address of the swap disk/volume is 0,
 ;;	and offset value is equal to absolute (physical or logical)
-;;	address/position. (It has not to be ZERO if the swap partition 
+;;	address/position. (It has not to be ZERO if the swap partition
 ;;	is in a partitioned virtual hard disk.) 
 ;;
-;;	Note: Swap addresses are always specified/declared in sectors, 
+;;	Note: Swap addresses are always specified/declared in sectors,
 ;;	not in bytes or	in blocks/zones/clusters (4096 bytes) as unit.
 ;;
 ;;	Swap disk/file allocation is mapped via 'Swap Allocation Table'
@@ -1708,12 +1708,12 @@ cpp_4:
 ;;	(equal to page size) respectively. Bit 0 of the S.A.T. byte 0
 ;;	is reserved for swap disk/file block 0 as descriptor block
 ;;	(also for compatibility with PTE). If bit value is ZERO,
-;;	it means relevant (respective) block is in use, and, 
+;;	it means relevant (respective) block is in use, and,
 ;;	of course, if bit value is 1, it means relevant (respective)
 ;;      swap disk/file block is free.
-;;	For example: bit 1 of the byte 128 repsesents block 1025 
+;;	For example: bit 1 of the byte 128 repsesents block 1025
 ;;	(128*8+1) or sector (offset) 8200 on the swap disk or
-;;	byte (offset/position) 4198400 in the swap file. 
+;;	byte (offset/position) 4198400 in the swap file.
 ;;	4GB swap space is represented via 128KB Swap Allocation Table.
 ;;	Initial layout of Swap Allocation Table is as follows:
 ;;	------------------------------------------------------------
@@ -1726,7 +1726,7 @@ cpp_4:
 ;;
 ;;	'swap_out' procedure checks 'free_swap_blocks' count at first,
 ;;	then it searches Swap Allocation Table if free count is not
-;;	zero. From begining the [swpd_next] dword value, the first bit 
+;;	zero. From begining the [swpd_next] dword value, the first bit
 ;;	position with value of 1 on the table is converted to swap
 ;;	disk/file offset address, in sectors (not 4096 bytes block).
 ;;	'ldrv_write' procedure is called with ldrv (logical drive
@@ -1734,26 +1734,26 @@ cpp_4:
 ;;	number, sector offset (not absolute sector -LBA- number),
 ;;	and sector count (8, 512*8 = 4096) and buffer adress
 ;;	(memory page). That will be a direct disk write procedure.
-;;	(for preventing late memory allocation, significant waiting). 
-;;	If disk write procedure returns with error or free count of 
+;;	(for preventing late memory allocation, significant waiting).
+;;	If disk write procedure returns with error or free count of
 ;;	swap blocks is ZERO, 'swap_out' procedure will return with
-;;	'insufficient memory error' (cf=1). 
+;;	'insufficient memory error' (cf=1).
 ;;
 ;;	(Note: Even if free swap disk/file blocks was not zero,
 ;;	any disk write error will not be fixed by 'swap_out' procedure,
 ;;	in other words, 'swap_out' will not check the table for other
-;;	free blocks after a disk write error. It will return to 
-;;	the caller with error (CF=1) which means swapping is failed. 
+;;	free blocks after a disk write error. It will return to
+;;	the caller with error (CF=1) which means swapping is failed.
 ;;
 ;;	After writing the page on to swap disk/file address/sector,
 ;;	'swap_out' procesure returns with that swap (offset) sector
-;;	address (cf=0). 
+;;	address (cf=0).
 ;;
 ;;	..............................................................
 ;;
 ;;	'swap_in' procedure loads addressed (relevant) swap disk or
 ;;	file sectors at specified memory page. Then page allocation
-;;	procedure updates relevant page table entry with 'present' 
+;;	procedure updates relevant page table entry with 'present'
 ;;	attribute. If swap disk or file reading fails there is nothing
 ;;	to do, except to terminate the process which is the owner of
 ;;	the swapped page.
@@ -1762,14 +1762,14 @@ cpp_4:
 ;;	in the Swap Allocation Table (as free block). 'swap_in' also
 ;;	updates [swpd_first] pointer if it is required.
 ;;
-;;	..............................................................	 
+;;	..............................................................
 ;;
 ;;	Note: If [swap_enabled] value is ZERO, that means there is not
 ;;	a swap disk or swap file in use... 'swap_in' and 'swap_out'
 ;;	procedures ans 'swap page que' procedures will not be active...
 ;;	'Insufficient memory' error will be returned by 'swap_out'
 ;;	and 'general protection fault' will be returned by 'swap_in'
-;;	procedure, if it is called mistakenly (a wrong value in a PTE).		
+;;	procedure, if it is called mistakenly (a wrong value in a PTE).
 ;;
 
 ; 17/04/2021
@@ -1782,7 +1782,7 @@ swap_in:
 	; 18/04/2015
 	; 24/10/2014 (Retro UNIX 386 v1 - beginning)
 	;
-	; INPUT -> 
+	; INPUT ->
 	;	EBX = PHYSICAL (real/flat) ADDRESS OF THE MEMORY PAGE
 	;	EBP = VIRTUAL (LINEAR) ADDRESS (page fault address)
 	;	EAX = Offset Address for the swapped page on the
@@ -1794,9 +1794,9 @@ swap_in:
 	;	CF = 1 -> swap disk reading error (disk/file not present
 	;		  or sector not present or drive not ready
 	;	     EAX = Error code
-	;	     [u.error] = EAX 
+	;	     [u.error] = EAX
 	;		       = The last error code for the process
-	;		         (will be reset after returning to user)	  
+	;		         (will be reset after returning to user)
 	;
 	; Modified Registers -> EAX
 	;
@@ -1810,13 +1810,13 @@ swap_in:
 ;	push	esi
 ;	push	ebx
 ;	push	ecx
-;	mov	esi, [swp_drv]	
+;	mov	esi, [swp_drv]
 ;	mov	ecx, PAGE_SIZE / LOGIC_SECT_SIZE  ; 8 !
-;		; Note: Even if corresponding physical disk's sector 
+;		; Note: Even if corresponding physical disk's sector
 ;		; size different than 512 bytes, logical disk sector
 ;		; size is 512 bytes and disk reading procedure
 ;		; will be performed for reading 4096 bytes
-;		; (2*2048, 8*512). 
+;		; (2*2048, 8*512).
 ;	; ESI = Logical disk description table address
 ;	; EBX = Memory page (buffer) address (physical!)
 ;	; EAX = Sector adress (offset address, logical sector number)
@@ -1832,7 +1832,7 @@ swap_in:
 ;	;
 ;swpin_read_ok:
 ;	; EAX = Offset address (logical sector number)
-;	call	unlink_swap_block  ; Deallocate swap block	
+;	call	unlink_swap_block  ; Deallocate swap block
 ;	;
 ;	; EBX = Memory page (buffer) address (physical!)
 ;	; 20/07/2015
@@ -1871,7 +1871,7 @@ swap_out:
 	; 19/05/2016 - TRDOS 386 (TRDOS v2.0)
 	; 24/10/2014 - 31/08/2015 (Retro UNIX 386 v1)
 	;
-	; INPUT -> 
+	; INPUT ->
 	;	none
 	;
 	; OUTPUT ->
@@ -1880,9 +1880,9 @@ swap_out:
 	;	CF = 1 -> swap disk writing error (disk/file not present
 	;		  or sector not present or drive not ready
 	;	     EAX = Error code
-	;	     [u.error] = EAX 
+	;	     [u.error] = EAX
 	;		       = The last error code for the process
-	;		         (will be reset after returning to user)	  
+	;		         (will be reset after returning to user)
 	;
 	; Modified Registers -> none (except EAX)
 	;
@@ -1916,7 +1916,7 @@ swap_out:
 ;	push	edx ; **
 ;
 ;	; 07/06/2016
-;	cmp	byte [timer_events], 0 
+;	cmp	byte [timer_events], 0
 ;	jna	short swpout_2
 ;	;
 ;	mov	dl, [timer_events]
@@ -1955,39 +1955,39 @@ swap_out:
 ;	dec	dl
 ;	jz	short swpout_timer_page_4
 ;swpout_timer_page_3:
-;	;cmp	ebx, timer_set + 240 ; last timer event (15*16) 
+;	;cmp	ebx, timer_set + 240 ; last timer event (15*16)
 ;	;jnb	short swpout_timer_page_4
 ;	add	ebx, 16
-;	jmp	short swpout_timer_page_1	
+;	jmp	short swpout_timer_page_1
 ;
 ;swpout_timer_page_4:
 ;	pop	ebx ; ****
 ;	pop	ecx ; ***
 ;swpout_2:
-;	mov	edx, ebx	       ; Page table entry address	
-;	mov	ebx, eax	       ; Buffer (Page) Address				
+;	mov	edx, ebx	       ; Page table entry address
+;	mov	ebx, eax	       ; Buffer (Page) Address
 ;	;
 ;	call	link_swap_block
-;	jnc	short swpout_3	       ; It may not be needed here	
+;	jnc	short swpout_3	       ; It may not be needed here
 ;				       ; because [swpd_free] value
-;				       ; was checked at the beginging. 	
+;				       ; was checked at the beginging.
 ;	pop	edx ; **
 ;	pop	ebx ; *
-;	jmp	short swpout_nfspc_err 
+;	jmp	short swpout_nfspc_err
 ;swpout_3:
 ;	test	eax, 80000000h ; test bit 31 (this may not be needed!)
 ;	jnz	short swpout_nfspc_err  ; 10/06/2016 (bit 31 = 1 !)
-;	;	
+;	;
 ;	push	esi ; **
 ;	push	ecx ; ***
 ;	push	eax ; sector address ; (31 bit !, bit 31 = 0)
-;	mov	esi, [swp_drv]	
+;	mov	esi, [swp_drv]
 ;	mov	ecx, PAGE_SIZE / LOGIC_SECT_SIZE  ; 8 !
-;		; Note: Even if corresponding physical disk's sector 
+;		; Note: Even if corresponding physical disk's sector
 ;		; size different than 512 bytes, logical disk sector
 ;		; size is 512 bytes and disk writing procedure
 ;		; will be performed for writing 4096 bytes
-;		; (2*2048, 8*512). 
+;		; (2*2048, 8*512).
 ;	; ESI = Logical disk description table address
 ;	; EBX = Buffer (Page) address
 ;	; EAX = Sector adress (offset address, logical sector number)
@@ -1995,7 +1995,7 @@ swap_out:
 ;	; edx = PTE address
 ;	call	logical_disk_write
 ;	; edx = PTE address
-;	pop	ecx ; sector address	
+;	pop	ecx ; sector address
 ;	jnc	short swpout_write_ok
 ;	;
 ;	;; call	unlink_swap_block ; this block must be left as 'in use'
@@ -2008,8 +2008,8 @@ swap_out:
 ;	; EBX = Buffer (page) address
 ;	; EDX = Page Table Entry address
 ;	; ECX = Swap disk sector (file block) address (31 bit)
-;	shl 	ecx, 1  ; 31 bit sector address from bit 1 to bit 31 
-;	mov 	[edx], ecx 
+;	shl 	ecx, 1  ; 31 bit sector address from bit 1 to bit 31
+;	mov 	[edx], ecx
 ;		; bit 0 = 0 (swapped page)
 ;	mov	eax, ebx
 ;swpout_retn:
@@ -2045,10 +2045,10 @@ swap_queue_shift:
 	; 23/10/2014 - 20/07/2015 (Retro UNIX 386 v1)
 	;
 	; INPUT ->
-	;	EBX = Virtual (linear) address (bit 12 to 31) 
+	;	EBX = Virtual (linear) address (bit 12 to 31)
 	;	      and process number combination (bit 0 to 11)
 	;	EBX = 0 -> shift/drop from the head (offset 0)
-	;	
+	;
 	; OUTPUT ->
 	;	If EBX input > 0 
 	;	   the queue will be shifted 4 bytes (dword),
@@ -2058,7 +2058,7 @@ swap_queue_shift:
 	;	   (The entry -with EBX value- will be removed
 	;	   from the queue if it is found.)
 	;
-	;	   EAX = 0		
+	;	   EAX = 0
 	;
 	;	If EBX input = 0
 	;	   the queue will be shifted 4 bytes (dword),
@@ -2067,8 +2067,8 @@ swap_queue_shift:
 	;	   as "accessed" or it is marked as "non present".
 	;	   (If "accessed" flag of the PTE -which is pointed
 	;	   in the head- is set -to 1-, it will be reset
-	;	   -to 0- and then, the queue will be rotated 
-	;	   -without dropping pointer of the PTE from 
+	;	   -to 0- and then, the queue will be rotated
+	;	   -without dropping pointer of the PTE from
 	;	   the queue- for 4 bytes on head to tail direction.
 	;	   Pointer in the head will be moved into the tail,
 	;	   other PTEs will be shifted on head direction.)
@@ -2085,7 +2085,7 @@ swap_queue_shift:
 	;	         which is (it's pointer -virtual address-)
 	;		 dropped (removed) from swap queue.
 	;
-	;	   EAX = 0 -> empty swap queue ! 
+	;	   EAX = 0 -> empty swap queue !
 	;
 	; Modified Registers -> EAX, EBX
 	;
@@ -2124,14 +2124,14 @@ swap_queue_shift:
 ;	pop	esi
 ;	pop	edi
 ;swpqs_retn:
-;	retn		
+;	retn
 ;swpqs_7:
 ;	mov	edi, esi ; head
 ;	lodsd
 ;	; 20/07/2015
 ;	mov	ebx, eax
-;	and	ebx, ~PAGE_OFF ; ~0FFFh 
-;		      ; ebx = virtual address (at page boundary)	
+;	and	ebx, ~PAGE_OFF ; ~0FFFh
+;		      ; ebx = virtual address (at page boundary)
 ;	and	eax, PAGE_OFF ; 0FFFh
 ;		      ; ax = process number (1 to 4095)
 ;	cmp	al, [u.uno]
@@ -2144,7 +2144,7 @@ swap_queue_shift:
 ;	cmp	byte [eax+p.stat-1], 0
 ;	jna	short swpqs_3     ; free (or terminated) process
 ;	cmp	byte [eax+p.stat-1], 2 ; waiting
-;	ja	short swpqs_3 	  ; zombie (3) or undefined ?	
+;	ja	short swpqs_3 	  ; zombie (3) or undefined ?
 ;
 ;	;shl	ax, 2
 ;	shl	al, 2
@@ -2172,7 +2172,7 @@ swap_queue_shift:
 ;			        ; from the queue (head)
 ;	test	al, PTE_A_WRITE	; bit 1 = 0 (read only)
 ;	jz	short swpqs_13  ; Drop read only page
-;			        ; from the queue (head) 	
+;			        ; from the queue (head)
 ;	;test	al, PTE_A_ACCESS ; bit 5 = 1 (Accessed)
 ;	;jnz	short swpqs_11  ; present
 ;			        ; accessed page
@@ -2192,7 +2192,7 @@ swap_queue_shift:
 ;swpqs_11:
 ;	mov	[ebx], eax     ; save changed attribute
 ;	; Rotation (head -> tail)
-;	dec	ecx     ; entry count -> last entry number		
+;	dec	ecx     ; entry count -> last entry number
 ;	jz	short swpqs_10
 ;		; esi = head + 4
 ;		; edi = head
@@ -2222,7 +2222,7 @@ add_to_swap_queue:
 	;
 	; Adds new page to swap queue
 	; (page directories and page tables must not be added
-	; to swap queue)	
+	; to swap queue)
 	;
 	; INPUT ->
 	;	EBX = Linear (Virtual) addr for current process
@@ -2275,7 +2275,7 @@ unlink_swap_block:
 	; 18/04/2015
 	; 24/10/2014 (Retro UNIX 386 v1 - beginning)
 	;
-	; INPUT -> 
+	; INPUT ->
 	;	EAX = swap disk/file offset address
 	;	      (bit 1 to bit 31)
 	; OUTPUT ->
@@ -2287,7 +2287,7 @@ unlink_swap_block:
 ;	push	ebx
 ;	push	edx
 ;	;
-;	shr	eax, SECTOR_SHIFT+1  ;3+1 ; shift sector address to 
+;	shr	eax, SECTOR_SHIFT+1  ;3+1 ; shift sector address to
 ;				     ; 3 bits right
 ;				     ; to get swap block/page number
 ;	mov	edx, eax
@@ -2296,22 +2296,22 @@ unlink_swap_block:
 ;				     ; (1 allocation bit = 1 page)
 ;				     ; (1 allocation bytes = 8 pages)
 ;	and	dl, 0FCh 	     ; clear lower 2 bits
-;				     ; (to get 32 bit position)			
+;				     ; (to get 32 bit position)
 ;	;
 ;	mov	ebx, swap_alloc_table ; Swap Allocation Table address
 ;	add	ebx, edx
 ;	and	eax, 1Fh	     ; lower 5 bits only
-;				     ; (allocation bit position)	 
+;				     ; (allocation bit position)
 ;	cmp 	eax, [swpd_next]     ; is the new free block addr. lower
 ;				     ; than the address in 'swpd_next' ?
-;				     ; (next/first free block value)		
-;	jnb	short uswpbl_1	     ; no	
-;	mov	[swpd_next], eax     ; yes	
+;				     ; (next/first free block value)
+;	jnb	short uswpbl_1	     ; no
+;	mov	[swpd_next], eax     ; yes
 ;uswpbl_1:
 ;	bts	[ebx], eax	     ; unlink/release/deallocate block
 ;				     ; set relevant bit to 1.
-;				     ; set CF to the previous bit value	
-;	cmc			     ; complement carry flag	
+;				     ; set CF to the previous bit value
+;	cmc			     ; complement carry flag
 ;	jc	short uswpbl_2	     ; do not increase swfd_free count
 ;				     ; if the block is already deallocated
 ;				     ; before.	
@@ -2337,7 +2337,7 @@ link_swap_block:
 	;	      SWAP DISK ALLOCATION TABLE bit is RESET)
 	;
 	;	CF = 1 and EAX = 0 
-	; 		   if there is not a free block to be allocated	
+	; 		   if there is not a free block to be allocated
 	;
 	; Modified Registers -> none (except EAX)
 	;
@@ -2360,26 +2360,26 @@ link_swap_block:
 ;	ja	short lswbl_notfound
 ;	;
 ;	bsf	eax, [ebx] ; Scans source operand for first bit set (1).
-;			   ; Clears ZF if a bit is found set (1) and 
+;			   ; Clears ZF if a bit is found set (1) and
 ;			   ; loads the destination with an index to
 ;			   ; first set bit. (0 -> 31) 
 ;			   ; Sets ZF to 1 if no bits are found set.
 ;	; 01/07/2015
 ;	jnz	short lswbl_found ; ZF = 0 -> a free block has been found
 ;			 ;
-;			 ; NOTE:  a Swap Disk Allocation Table bit 
-;			 ;	  with value of 1 means 
-;			 ;	  the corresponding page is free 
+;			 ; NOTE:  a Swap Disk Allocation Table bit
+;			 ;	  with value of 1 means
+;			 ;	  the corresponding page is free
 ;			 ;	  (Retro UNIX 386 v1 feaure only!)
 ;	add	ebx, 4
 ;			 ; We return back for searching next page block
-;			 ; NOTE: [swpd_free] is not ZERO; so, 
+;			 ; NOTE: [swpd_free] is not ZERO; so,
 ;			 ;	 we always will find at least 1 free block here.
 ;	jmp    	short lswbl_scan
 ;	;
-;lswbl_notfound:	
+;lswbl_notfound:
 ;	sub	ecx, swap_alloc_table
-;	mov	[swpd_next], ecx ; next/first free page = last page 
+;	mov	[swpd_next], ecx ; next/first free page = last page
 ;				 ; (unlink_swap_block procedure will change it)
 ;	xor	eax, eax
 ;	mov	[swpd_free], eax
@@ -2398,13 +2398,13 @@ link_swap_block:
 ;	sub	ecx, swap_alloc_table
 ;	mov	[swpd_next], ecx ; Set first free block searching start
 ;				 ; address/offset (to the next)
-;       dec     dword [swpd_free] ; 1 block has been allocated (X = X-1) 
+;       dec     dword [swpd_free] ; 1 block has been allocated (X = X-1)
 ;	;
 ;	btr	[ebx], eax	 ; The destination bit indexed by the source value
 ;				 ; is copied into the Carry Flag and then cleared
 ;				 ; in the destination.
 ;				 ;
-;				 ; Reset the bit which is corresponding to the 
+;				 ; Reset the bit which is corresponding to the
 ;				 ; (just) allocated block.
 ;	shl	ecx, 5		 ; (block offset * 32) + block index
 ;	add	eax, ecx	 ; = block number
@@ -2466,7 +2466,7 @@ get_physical_addr:
 	; Get physical address
 	;     (allocates a new page for user if it is not present)
 	;	
-	; (This subroutine is needed for mapping user's virtual 
+	; (This subroutine is needed for mapping user's virtual
 	; (buffer) address to physical address (of the buffer).)
 	; ('sys write', 'sys read' system calls...)
 	;
@@ -2475,8 +2475,8 @@ get_physical_addr:
 	;	u.pgdir = page directory (physical) address
 	;
 	; OUTPUT ->
-	;	EAX = physical address 
-	;	EBX = linear address	
+	;	EAX = physical address
+	;	EBX = linear address
 	;	EDX = physical address of the page frame
 	;	      (with attribute bits)
 	;	ECX = byte count within the page frame
@@ -2491,7 +2491,7 @@ get_physical_addr_x: ; 27/05/2016
 	        ;       Page directory entry address (if CF=1)
 		;       (Bit 0 value is 0 if PT is not present)
 		; EAX = Page table entry value (page address)
-		;	CF = 1 -> PDE not present or invalid ? 
+		;	CF = 1 -> PDE not present or invalid ?
 	jnc	short gpa_1
 	;
 	call	allocate_page
@@ -2501,9 +2501,9 @@ gpa_0:
 	; EAX = Physical (base) address of the allocated (new) page
 	or	al, PDE_A_PRESENT + PDE_A_WRITE + PDE_A_USER ; 4+2+1 = 7
 			   ; lower 3 bits are used as U/S, R/W, P flags
-			   ; (user, writable, present page)	
+			   ; (user, writable, present page)
 	mov	[edx], eax ; Let's put the new page directory entry here !
-	mov	eax, [u.pgdir]	
+	mov	eax, [u.pgdir]
 	call	get_pte
 	jc	short gpa_im_err ; 'insufficient memory' error
 gpa_1:
@@ -2530,7 +2530,7 @@ gpa_2:
 	; If a page will contain a Signal Response Byte
 	; it must not be swapped out, because
 	; timer service or irq callback service
-	; will write a signal return/response byte 
+	; will write a signal return/response byte
 	; directly by using physical address of Signal
 	; Response Byte.(Even if process is not running,
 	; or it is running with swapped out pages.)
@@ -2543,7 +2543,7 @@ gpa_2:
 	; this page must not be swapped out
 	; but 'no_page_swap' must be reset here
 	; immediately for other callers (*)
-	; (otherwise, swap queue would not be long enough) 
+	; (otherwise, swap queue would not be long enough)
 	call	gpa_8 ; 26/03/2017
 	jmp	short gpa_5
 gpa_3: 
@@ -2553,9 +2553,9 @@ gpa_3:
 	call	gpa_8
 	jmp	short gpa_6
 
-gpa_im_err:	
+gpa_im_err:
 	mov	eax, ERR_MINOR_IM ; Insufficient memory (minor) error!
-				  ; Major error = 0 (No protection fault)	
+				  ; Major error = 0 (No protection fault)
 	retn
 gpa_4:
 ; 17/04/2021 (TRDOS 386 v2.0.4)
@@ -2565,7 +2565,7 @@ gpa_4:
 	; 20/05/2015
 	; add this page to swap queue
 ;	push	eax 
-;	; EBX = Linear (CORE+virtual) address ; 20/02/2017 
+;	; EBX = Linear (CORE+virtual) address ; 20/02/2017
 ;	call 	add_to_swap_queue
 ;	pop	eax
 gpa_5:
@@ -2574,7 +2574,7 @@ gpa_5:
 	; EAX = memory page address
 	or	al, PTE_A_PRESENT + PTE_A_USER + PTE_A_WRITE
 				  ; present flag, bit 0 = 1
-				  ; user flag, bit 2 = 1	
+				  ; user flag, bit 2 = 1
 				  ; writable flag, bit 1 = 1
 	mov	[edx], eax  ; Update PTE value
 gpa_6:
@@ -2623,10 +2623,10 @@ reload_page:
 	;
 	; Reload (Restore) swapped page at memory
 	;
-	; INPUT -> 
+	; INPUT ->
 	;	EBP = Virtual (linear) memory address
 	;	EAX = PTE value (swap disk sector address)
-	;	(Swap disk sector address = bit 1 to bit 31 of EAX)	
+	;	(Swap disk sector address = bit 1 to bit 31 of EAX)
 	; OUTPUT ->
 	;	EAX = PHYSICAL (real/flat) ADDRESS OF RELOADED PAGE
 	;
@@ -2634,25 +2634,25 @@ reload_page:
 	;
 	; Modified Registers -> none (except EAX)
 	;
-;	shr	eax, 1   ; Convert PTE value to swap disk address 
+;	shr	eax, 1   ; Convert PTE value to swap disk address
 ;	push	ebx      ;
-;	mov	ebx, eax ; Swap disk (offset) address	
+;	mov	ebx, eax ; Swap disk (offset) address
 ;	call	allocate_page
 ;	jc	short rlp_im_err
-;	xchg 	eax, ebx	
+;	xchg 	eax, ebx
 ;	; EBX = Physical memory (page) address
 ;	; EAX = Swap disk (offset) address
 ;	; EBP = Virtual (linear) memory address
 ;	call	swap_in
 ;	jc	short rlp_swp_err  ; (swap disk/file read error)
-;	mov	eax, ebx	
+;	mov	eax, ebx
 ;rlp_retn:
 ;	pop	ebx
 ;	retn
 ;	
-;rlp_im_err:	
+;rlp_im_err:
 ;	mov	eax, ERR_MINOR_IM ; Insufficient memory (minor) error!
-;				  ; Major error = 0 (No protection fault)	
+;				  ; Major error = 0 (No protection fault)
 ;	jmp	short rlp_retn
 ;
 ;rlp_swp_err:
@@ -2665,7 +2665,7 @@ copy_page_dir:
 	; temporary - 07/09/2015
 	; 07/09/2015 (Retro UNIX 386 v1 - beginning)
 	;
-	; INPUT -> 
+	; INPUT ->
 	;	[u.pgdir] = PHYSICAL (real/flat) ADDRESS of the parent's
 	;		    page directory.
 	; OUTPUT ->
@@ -2690,20 +2690,20 @@ copy_page_dir:
 	mov	edi, eax
 	push	eax ; save child's page directory address
 	; copy PDE 0 from the parent's page dir to the child's page dir
-	; (use same system space for all user page tables) 
+	; (use same system space for all user page tables)
 	movsd
 	mov	ebp, 1024*4096 ; pass the 1st 4MB (system space)
 	mov	ecx, (PAGE_SIZE / 4) - 1 ; 1023
-cpd_0:	
+cpd_0:
 	lodsd
 	;or	eax, eax
         ;jnz     short cpd_1
 	test	al, PDE_A_PRESENT ;  bit 0 =  1
 	jnz	short cpd_1
- 	; (virtual address at the end of the page table)	
+ 	; (virtual address at the end of the page table)
 	add	ebp, 1024*4096 ; page size * PTE count
 	jmp	short cpd_2
-cpd_1:	
+cpd_1:
 	and	ax, PDE_A_CLEAR ; 0F000h ; clear attribute bits
 	mov	ebx, eax
 	; EBX = Parent's page table address
@@ -2729,11 +2729,11 @@ cpd_err:
 cpd_p_err:
 	; release the allocated pages missing (recover free space)
 	pop	eax  ; the new page directory address (physical)
-	mov	ebx, [u.pgdir] ; parent's page directory address 
+	mov	ebx, [u.pgdir] ; parent's page directory address
 	call 	deallocate_page_dir
 	sub	eax, eax ; 0
 	stc
-	jmp	short cpd_3	
+	jmp	short cpd_3
 
 copy_page_table:
 	; 17/04/2021 (temporary modifications)
@@ -2741,12 +2741,12 @@ copy_page_table:
 	; temporary - 07/09/2015
 	; 07/09/2015 (Retro UNIX 386 v1 - beginning)
 	;
-	; INPUT -> 
+	; INPUT ->
 	;	EBX = PHYSICAL (real/flat) ADDRESS of the parent's page table.
 	;	EBP = page table entry index (from 'copy_page_dir')
 	; OUTPUT ->
 	;	EAX = PHYSICAL (real/flat) ADDRESS of the child's page table.
-	;	EBP = (recent) page table index (for 'add_to_swap_queue')	
+	;	EBP = (recent) page table index (for 'add_to_swap_queue')
 	;	CF = 1 -> error 
 	;
 	; Modified Registers -> EBP (except EAX)
@@ -2764,7 +2764,7 @@ copy_page_table:
 	mov	esi, ebx
 	mov	edi, eax
 	mov	edx, eax
-	add	edx, PAGE_SIZE 	
+	add	edx, PAGE_SIZE
 cpt_0:
 	lodsd
 	test	al, PTE_A_PRESENT ;  bit 0 = 1
@@ -2772,7 +2772,7 @@ cpt_0:
 	; 17/04/2021 (temporary (*)
 	;and	eax, eax (*)
 	jz	short cpt_2  ; 17/04/2021
-	
+
 ; 17/04/2021
 ; ('reload_page' procedure call is disabled as temporary)
 ;
@@ -2796,7 +2796,7 @@ cpt_1:
 	; 
 
 ; 17/04/2021
-; ('add_to_swap_queue' procedure call is disabled as temporary)	
+; ('add_to_swap_queue' procedure call is disabled as temporary)
 ;
 ;	push	ebx
 ;	push	eax
@@ -2806,10 +2806,10 @@ cpt_1:
 ;	pop	eax
 ;	pop	ebx
 	;
-	;or	ax, PTE_A_USER+PTE_A_PRESENT 
-	or	al, PTE_A_USER+PTE_A_WRITE+PTE_A_PRESENT 
+	;or	ax, PTE_A_USER+PTE_A_PRESENT
+	or	al, PTE_A_USER+PTE_A_WRITE+PTE_A_PRESENT
 cpt_2:
-	stosd  ; EDI points to child's PTE  	 
+	stosd  ; EDI points to child's PTE
 	;
 	add	ebp, 4096 ; 20/07/2015 (next page)
 	;
@@ -2834,26 +2834,26 @@ allocate_memory_block:
 	; 12/03/2016 (TRDOS 386 = TRDOS v2.0)
 	; Allocating contiguous memory pages (in the kernel's memory space)
 	;
-	; INPUT -> 
+	; INPUT ->
 	;	EAX = Beginning address (physical)
-	;	EAX = 0 -> Allocate memory block from the first proper aperture	
+	;	EAX = 0 -> Allocate memory block from the first proper aperture
 	;	ECX = Number of bytes to be allocated
 	;
 	; OUTPUT ->
 	; 	1) cf = 0 -> successful
 	;	EAX = Beginning (physical) address of the allocated memory block
-	;	ECX = Number of allocated bytes (rounded up to page borders) 
+	;	ECX = Number of allocated bytes (rounded up to page borders)
 	;	2) cf = 1 -> unsuccessful
-	;	 2.1) If EAX > 0 -> 
+	;	 2.1) If EAX > 0 ->
 	;	      (Number of requested pages is more than # of free pages
-	;	       but contiguous free pages -the aperture- is not enough!)	   	
+	;	       but contiguous free pages -the aperture- is not enough!)
 	;	      EAX = Beginning address of available aperture
-	;		    (one of all aperture with max. aperture size/length)		
+	;		    (one of all aperture with max. aperture size/length)
 	;	      ECX = Size of available aperture (memory block) in bytes
-	;	 2.2) If EAX = 0 -> Out of memory error 
+	;	 2.2) If EAX = 0 -> Out of memory error
 	;	            (number of free pages is less than requested number)
-	;	      ECX = Total number of free bytes (free pages * 4096) 
-	;		    (It is not number of contiguous free bytes)	
+	;	      ECX = Total number of free bytes (free pages * 4096)
+	;		    (It is not number of contiguous free bytes)
 	;
 	; (Modified Registers -> EAX, ECX)
 	;
@@ -2863,7 +2863,7 @@ allocate_memory_block:
 	; If EAX has zero, ECX contains total number of free bytes.
 	; If requested block has been successfully allocated (by rounding up to
 	; the last page border), it must be deallocated later by using
-	; 'deallocate_memory_block' procedure.    
+	; 'deallocate_memory_block' procedure.
 
 	push	edx ; *
 	mov	edx, PAGE_SIZE - 1   ; 4095
@@ -2888,7 +2888,7 @@ allocate_memory_block:
 				     ; (1 allocation bit = 1 page)
 				     ; (1 allocation bytes = 8 pages)
 	and	dl, 0FCh 	     ; clear lower 2 bits
-				     ; (to get 32 bit position)	
+				     ; (to get 32 bit position)
 	push	ebx ; **
 amb_0:
 	mov	[mem_ipg_count], ecx ; initial (reset) value of page count
@@ -2896,16 +2896,16 @@ amb_0:
 	xor	ecx, ecx ; 0
 	mov	[mem_aperture], ecx ; 0
 	mov	[mem_max_aperture], ecx ; 0
-	
+
 	mov	ebx, MEM_ALLOC_TBL   ; Memory Allocation Table address.
 	cmp	edx, [next_page]     ; Is the beginning page address lower
 				     ; than the address in 'next_page' ?
-				     ; (the first/next free page of user space)		
+				     ; (the first/next free page of user space)
 	jb	short amb_1
 	cmp 	edx, [last_page]     ; is the beginning page address higher
 				     ; than the address in 'last_page' ?
-				     ; (end of the memory)		
-	jna	short amb_2	     ; no	
+				     ; (end of the memory)
+	jna	short amb_2	     ; no
 amb_1:
 	mov	edx, [next_page]     ; M.A.T. offset (1 M.A.T. byte = 8 pages)
 amb_2:
@@ -2915,14 +2915,14 @@ amb_2:
 	;xor	ecx, ecx
 	bsf	ecx, [ebx]	     ; 0 to 31
 	mov	eax, edx
-	shl	eax, 3		     ; *8	
+	shl	eax, 3		     ; *8
 	add	eax, ecx	     ; beginning page number
 
 	mov	[mem_pg_pos], eax    ; beginning page no (for curr. mem. aperture)
  	mov	[mem_max_pg_pos], eax ; beginning page no for max. mem. aperture
 
 	and	eax, 1Fh	     ; lower 5 bits only (0 to 31)
-				     ; (allocation bit position)	 
+				     ; (allocation bit position)
 	jnz	short amb_4	     ; 0
 	mov	cl, 32
 	jmp	short amb_10
@@ -2933,7 +2933,7 @@ amb_3:	; out_of_memory
 	shl	ecx, PAGE_SHIFT
 	pop	edx ; *
 	stc
-	retn	
+	retn
 amb_4:
 	mov	edx, [ebx]
 	mov	cl, al ; 1 to 31
@@ -2976,7 +2976,7 @@ amb_10:
 	jmp	short amb_5
 amb_11:
 	call	amb_26 ; set maximum memory aperture (free memory block size)
-	jmp	short amb_9	
+	jmp	short amb_9
 amb_12:
 	cmp	[mem_pg_count], ecx ; 32
 	jnb	short amb_13
@@ -2988,7 +2988,7 @@ amb_13:
 	jmp	short amb_9 ; 01/05/2017
 amb_14:
 	call	amb_26 ; 28/04/2017
-	mov	eax, [mem_max_pg_pos] ; begin address of max. mem aperture	
+	mov	eax, [mem_max_pg_pos] ; begin address of max. mem aperture
 	mov	ecx, [mem_max_aperture] ; max. (largest) memory aperture
 	stc
         jmp     amb_25
@@ -3029,29 +3029,29 @@ amb_17:
 	sub	ecx, edx
 	push	ecx ; ***
 	mov	ecx, edx
-amb_18:		
+amb_18:
 	btr	[ebx], eax	 ; The destination bit indexed by the source value
 				 ; is copied into the Carry Flag and then cleared
 				 ; in the destination.
 	; 20/10/2023
-	; (for LFB page allocation.. 
+	; (for LFB page allocation..
 	;  -here, to prevent using LFB pages for another allocation later-
 	;  /// the destination bit must be 0 -already- ..
 	;  so, following 'jnc' is not necessary but i am not removing it
-	;  for understanding why free page count is decreased here.) 
+	;  for understanding why free page count is decreased here.)
 	;   
-	;jnc	short amb_28 ; requested page is already allocated 
+	;jnc	short amb_28 ; requested page is already allocated
 
-	dec     dword [free_pages] ; 1 page has been allocated (X = X-1) 
+	dec     dword [free_pages] ; 1 page has been allocated (X = X-1)
 ;amb_28:	; 20/10/2023
 	dec	ecx
 	jz	short amb_19
 	inc	al
 	jmp	short amb_18
-amb_19:	
+amb_19:
 	pop	ecx ; ***
 	;and	ecx, ecx ; 0 ?
-	;jz	short amb_22	
+	;jz	short amb_22
 	; 28/11/2023
 	jecxz	amb_22
 	; 01/04/2016
@@ -3079,7 +3079,7 @@ amb_22:
 				     ; (1 allocation bit = 1 page)
 				     ; (1 allocation bytes = 8 pages)
 	and	dl, 0FCh 	     ; clear lower 2 bits
-				     ; (to get 32 bit position)	
+				     ; (to get 32 bit position)
 	cmp	edx, [next_page] ; first free page pointer offset
 	ja	short amb_25
 	mov	ebx, MEM_ALLOC_TBL
@@ -3107,10 +3107,10 @@ amb_25:
 	pop	edx ; *
 	retn
 
-amb_26:	; set maximum free memory aperture (free memory block size) 
+amb_26:	; set maximum free memory aperture (free memory block size)
 	mov	edx, ebx ; current address
 	sub	edx, MEM_ALLOC_TBL ; MAT beginning address
-	; 02/04/2016 
+	; 02/04/2016
 	shl	edx, 3 ; MAT byte offset * 8 = page number base
 	add	edx, ecx ; current page number (ecx = 0 to 32)
 	;
@@ -3138,7 +3138,7 @@ amb_27:
 deallocate_memory_block_x:
 	; 26/11/2023 - TRDOS 386 v2.0.7
 	; deallocate pages after rounding up
-	; ((audio buffer size etc. may not be rounded up to page boundary)) 
+	; ((audio buffer size etc. may not be rounded up to page boundary))
 	add	ecx, PAGE_SIZE - 1   ; 4095
 %endif
 
@@ -3147,7 +3147,7 @@ deallocate_memory_block:
 	; 14/03/2016 (TRDOS 386 = TRDOS v2.0)
 	; Deallocating contiguous memory pages (in the kernel's memory space)
 	;
-	; INPUT -> 
+	; INPUT ->
 	;	EAX = Beginning address (physical)
 	;	ECX = Number of bytes to be deallocated
 	;
@@ -3157,7 +3157,7 @@ deallocate_memory_block:
 	;
 	; (Modified Registers -> EAX, ECX)
 	;
-	; PURPOSE: Unloading/Freeing a file -or an allocated memory block- 
+	; PURPOSE: Unloading/Freeing a file -or an allocated memory block-
 	; at memory after copying, running, saving, reading, writing etc.
 	;
 
@@ -3176,7 +3176,7 @@ damb_0:
 				     ; (1 allocation bit = 1 page)
 				     ; (1 allocation bytes = 8 pages)
 	and	dl, 0FCh 	     ; clear lower 2 bits
-				     ; (to get 32 bit position)	
+				     ; (to get 32 bit position)
 	cmp	edx, [next_page] ; next free page
 	jnb	short damb_1
 	mov	[next_page], edx
@@ -3198,8 +3198,8 @@ damb_2:
 damb_3:		
 	bts	[ebx], eax	     ; unlink/release/deallocate page
 				     ; set relevant bit to 1.
-				     ; set CF to the previous bit value	
-	inc     dword [free_pages]   ; 1 page has been deallocated (X = X+1) 
+				     ; set CF to the previous bit value
+	inc     dword [free_pages]   ; 1 page has been deallocated (X = X+1)
 	dec	ecx
 	jz	short damb_4
 	inc	al
@@ -3239,23 +3239,23 @@ direct_memory_access:
 	; user's (ring 3) page tables to access phsical
 	; (flat/linear) memory addresses, directly (without
 	;  kernel's data transfer functions).
-	; 
+	;
 	; Purpose: Video memory access and shared memory access.
 	;
-	; INPUT -> 
+	; INPUT ->
 	;	EAX = Beginning address (physical).
 	;	EBX = User's buffer address ; 12/05/2017
 	;	ECX = Number of contiguous pages to be mapped.
 	; OUTPUT ->
 	;	User's page directory and pages tables
 	;	will be updated.
-	;	
-	;	If an old page table entry has valid page address, 
+	;
+	;	If an old page table entry has valid page address,
 	;	that page will be deallocated just before PTE will
 	;	be changed for direct (1 to 1) memory page access.
 	;
 	;	If old PTE value points to a swapped page,
-        ;       that page (block) will be unlinked on swap disk. 
+        ;       that page (block) will be unlinked on swap disk.
 	;
 	;	Newly allocated pages (except page tables) will not
 	;	be applied to Memory Allocation Table.
@@ -3265,12 +3265,12 @@ direct_memory_access:
 	;	process termination. (Memory Allocation Table and
 	;	free memory count will not be affected.
 	;	(Except deallocating page table's itself.)
-	;	
+	;
 	;      CF = 1 -> error (EAX = error code)
 	;      CF = 0 -> success (EAX = beginning address)
 	;
 	;; (Modified Registers -> none)
-	; Modified registers: ebp, edx, ecx, ebx, esi, edi	
+	; Modified registers: ebp, edx, ecx, ebx, esi, edi
 	;
 
 	;push	ebp
@@ -3283,7 +3283,7 @@ direct_memory_access:
 	;jz	dmem_acc_7  ; 'insufficient memory' error
 	mov	ebp, eax
 	add	ebx, CORE ; 12/05/2017
-dmem_acc_0: 
+dmem_acc_0:
 	mov	[base_addr], ebx ; 12/05/2017
 	mov	eax, [u.pgdir] ; page dir address (physical)
 	call	get_pte
@@ -3291,7 +3291,7 @@ dmem_acc_0:
 	        ;       Page directory entry address (if CF=1)
 		;       (Bit 0 value is 0 if PT is not present)
 		; EAX = Page table entry value (page address)
-		;	CF = 1 -> PDE not present or invalid ? 	
+		;	CF = 1 -> PDE not present or invalid ?
 	jnc	short dmem_acc_1
 	; 20/10/2023
 	; Allocate a page as a new page table
@@ -3304,9 +3304,9 @@ dmem_acc_0:
 	; EAX = Physical (base) address of the allocated (new) page
 	or	al, PDE_A_PRESENT + PDE_A_WRITE + PDE_A_USER ; 4+2+1 = 7
 			   ; lower 3 bits are used as U/S, R/W, P flags
-			   ; (user, writable, present page)	
+			   ; (user, writable, present page)
 	mov	[edx], eax ; Let's put the new page directory entry here !
-	mov	eax, [u.pgdir]	
+	mov	eax, [u.pgdir]
 	call	get_pte
         ;jc	dmem_acc_7 ; 'insufficient memory' error
 	; 17/04/2021
@@ -3318,7 +3318,7 @@ dmem_acc_1:
 	test 	al, PTE_A_PRESENT
 	;jnz	short dmem_acc_2   ; 17/04/2021 (*)
 	; 17/04/2021 (temporary)
-	jz	short short dmem_acc_6  ; ! temporary ! (*)	
+	jz	short short dmem_acc_6  ; ! temporary ! (*)
 	; 20/10/2023
 	; If the page table entry is zero or invalid -not present-
 	; it will be directy allocated for the physical memory section
@@ -3344,7 +3344,7 @@ dmem_acc_2:
 				  ; (must be 1)
 	jnz	short dmem_acc_4
 	; Read only -duplicated- page (belongs to a parent or a child)
-        test    ax, PTE_DUPLICATED ; Was this page duplicated 
+        test    ax, PTE_DUPLICATED ; Was this page duplicated
 				   ; as child's page ?
 	jz	short dmem_acc_5 ; Change PTE but don't deallocate the page!
 
@@ -3355,12 +3355,12 @@ dmem_acc_2:
 	;push	ebx
 	mov	ebx, [u.ppgdir] ; parent's page dir address (physical)
 	
-	; check the parent's PTE value is read only & same page or not.. 
+	; check the parent's PTE value is read only & same page or not..
 	mov	edi, ebp
 	shr	edi, PAGE_D_SHIFT ; 22
 	; EDI = page directory entry index (0-1023)
 	mov	esi, ebp
-	shr	esi, PAGE_SHIFT ; 12	
+	shr	esi, PAGE_SHIFT ; 12
 	and	esi, PTE_MASK
 	; ESI = page table entry index (0-1023)
 
@@ -3370,7 +3370,7 @@ dmem_acc_2:
 	test	cl, PDE_A_PRESENT ; present (valid) or not ?
 	jz	short dmem_acc_3	; parent process does not use this page
 	and	cx, PDE_A_CLEAR ; 0F000h ; Clear attribute bits
-	shl	si, 2 ; *4 
+	shl	si, 2 ; *4
 	add	esi, ecx ; PTE offset (for the parent)
 	mov	ebx, [esi]
 	test	bl, PTE_A_PRESENT ; present or not ?
@@ -3387,7 +3387,7 @@ dmem_acc_2:
 dmem_acc_3:
 	;pop	ebx
 	pop	ecx
-dmem_acc_4:	
+dmem_acc_4:
 	test	ax, PTE_SHARED ; shared or direct memory access indicator
 	jnz	short dmem_acc_5   ; AVL bit 1 = 1, do not deallocate this page!
 	;
@@ -3402,7 +3402,7 @@ dmem_acc_6:
 	; EDX = PTE entry address (physical)
 	or	ax, PTE_A_PRESENT+PTE_A_USER+PTE_A_WRITE+PTE_SHARED
 			; present flag, bit 0 = 1
-			; user flag, bit 2 = 1	
+			; user flag, bit 2 = 1
 			; writable flag, bit 1 = 1
 			; direct memory access flag, bit 10 = 1
 			; (This page must not be deallocated!)
@@ -3419,7 +3419,7 @@ dmem_acc_6:
 dmem_acc_7:  ; ERROR ! 
 	mov	dword [esp], ERR_MINOR_IM 
 		; Insufficient memory (minor) error!
-		; Major error = 0 (No protection fault)	
+		; Major error = 0 (No protection fault)
 	; cf = 1
 dmem_acc_8:
 	pop	eax
@@ -3445,14 +3445,14 @@ deallocate_user_pages:
 	;	[u.ppdir] = parent's page directory
 	;
 	; OUTPUT ->
-	;    If CF = 0 	
+	;    If CF = 0
 	;	EAX = Deallocated memory bytes
 	;	  (Even if shared or read only pages will not be
 	;	   deallocated on M.A.T., this byte count will be
 	;	   returned as virtually deallocated bytes; in fact
-	;	   virtually deallocated user pages * 4096.) 
+	;	   virtually deallocated user pages * 4096.)
 	;	EBX = Virtual address (as rounded up)
-	;    If CF = 1    	
+	;    If CF = 1
 	;	EAX = 0 (there is not any deallocated pages)
 	;
 	; Note: Empty page tables will not be deallocated!!!
@@ -3463,7 +3463,7 @@ deallocate_user_pages:
 	mov	esi, ebx
 	mov	edi, esi
 	add	edi, ecx
-	add	esi, PAGE_SIZE - 1  ; 4095 (round up)	
+	add	esi, PAGE_SIZE - 1  ; 4095 (round up)
 	shr	esi, PAGE_SHIFT
 	shr	edi, PAGE_SHIFT
 	mov	eax, edi ; end page
@@ -3476,7 +3476,7 @@ deallocate_user_pages:
 	shl	eax, PAGE_SHIFT ; byte count as adjusted
 	push	eax ; **
 	mov	ebx, [u.pgdir] ; physical addr of user's page dir
- 	add	esi, CORE/PAGE_SIZE 
+ 	add	esi, CORE/PAGE_SIZE
 	mov	edi, esi
 	and	edi, PTE_MASK ; PTE entry in the page table
 	push	edi ; *** ; PTE index (of page directory)
@@ -3492,7 +3492,7 @@ da_u_pd_1:
 	; EBP = next PDE address
 	;
 	test	al, PDE_A_PRESENT ; bit 0, present flag (must be 1)
-	jz	da_u_pd_3 ; 20/05/2017	
+	jz	da_u_pd_3 ; 20/05/2017
 	and	ax, PDE_A_CLEAR ; 0F000h ; clear lower 12 (attribute) bits
 	; EAX = PHYSICAL (flat) ADDRESS OF THE PAGE TABLE
 	mov	edi, [esp] ; ***
@@ -3514,7 +3514,7 @@ da_u_pt_0:
 				   ; as child's page ?
 	jz	short da_u_pt_4 ; Clear PTE but don't deallocate the page!
 	;
-	; check the parent's PTE value is read only & same page or not.. 
+	; check the parent's PTE value is read only & same page or not..
 	; EDX = page directory entry index (0-1023)
 	push	edx ; ****
 	; EDI = page table entry offset (0-4092)
@@ -3530,7 +3530,7 @@ da_u_pt_0:
 	mov	ebx, [edi]
 	test	bl, PTE_A_PRESENT ; present or not ?
 	jz	short da_u_pt_2	; parent process does not use this page
-	and	ax, PTE_A_CLEAR ; 0F000h ; Clear attribute bits 
+	and	ax, PTE_A_CLEAR ; 0F000h ; Clear attribute bits
 	and	bx, PTE_A_CLEAR ; 0F000h ; Clear attribute bits
 	cmp	eax, ebx	; parent's and child's pages are same ?
 	jne	short da_u_pt_2	; not same page
@@ -3599,7 +3599,7 @@ da_u_pd_4:
 
 da_u_pd_err:
 	xor	eax, eax
-	stc	
+	stc
 	retn
 
 allocate_user_pages:
@@ -3620,7 +3620,7 @@ allocate_user_pages:
 	;	EBX = VIRTUAL ADDRESS (beginning address)
 	;	ECX = byte count (>=4096)
 	;	[u.pgdir] = user's page directory
-	;	
+	;
 	;	Note: All addresses are (must be) already adjusted
 	;	to page	borders, otherwise, lower 12bits of addresses
 	;	and byte count would be truncated.
@@ -3630,8 +3630,8 @@ allocate_user_pages:
 	;
 	;	CF = 1 -> insufficient memory error
 	;
-	; Note: All pages will be allocated in physical page order 
-	;	from the beginning page address. 
+	; Note: All pages will be allocated in physical page order
+	;	from the beginning page address.
 	;	* A new page table will be added to the page dir
 	;	  when the requested PDE is invalid.
 	;	* Those pages will not be added to swap queue
@@ -3642,24 +3642,24 @@ allocate_user_pages:
 	;	  (should be) deallocated before entering this
 	;	  procedure. So, new page table entries (PTEs)
 	;	  directly will be written without checking
-	;	  their previous content.	
+	;	  their previous content.
 	;	* Only solution to increase free memory by removing
 	;	  that non-swappable memory block is to terminate
-	;	  the process or to wait until the process will 
+	;	  the process or to wait until the process will
 	;	  deallocate that memory block as itself. ('sysdalloc')
 	;	  (No problem, if the process does not grab all of
 	;	  -very big amount of- free memory by using
 	;	  'sysalloc' system call!?)
-	;	  (Even if the process has grabbed all of free memory, 
-	;	  no problem if the process is not running in 
+	;	  (Even if the process has grabbed all of free memory,
+	;	  no problem if the process is not running in
 	;	  multitasking mode. No problem in multitasking
 	;	  mode if there is not another process which is running
 	;	  or waiting or sleeping for an event as it's pages
 	;	  are swapped-out. But a new process can not start to
 	;	  run if all of free memory has beeen allocated 
-	;	  by running processes. Deallocation -'sysdalloc'- 
+	;	  by running processes. Deallocation -'sysdalloc'-
 	;	  or terminate a running process is needed 
-	;	  in order to run a new process.) 
+	;	  in order to run a new process.)
 	;
 	; Modified Registers -> EAX, EDX, ESI, EDI, EBX, ECX, EBP
 	;
@@ -3679,7 +3679,7 @@ allocate_user_pages:
 	jb	short a_u_im_retn
 	mov	edx, ebx
 	add	edx, CORE
-	jc	short a_u_im_retn	
+	jc	short a_u_im_retn
 	add	edx, ecx
 	jc	short a_u_im_retn
 	cmp	ebp, edx
@@ -3687,7 +3687,7 @@ allocate_user_pages:
 	;
 	mov	ebp, eax ; physical address
 	mov	esi, ebx
-	add	esi, CORE ; start of user's memory (4M) 
+	add	esi, CORE ; start of user's memory (4M)
 	shr	esi, PAGE_SHIFT ; higher 20 bits of the linear address
 	;shr	ecx, PAGE_SHIFT ; page count
 	mov	ebx, [u.pgdir] ; physical addr of user's page dir
@@ -3695,7 +3695,7 @@ allocate_user_pages:
 	and	edi, PTE_MASK ; PTE entry index in the page table
 	push	edi  ; * ; PTE index (in page directory)
 	shr	esi, PAGE_D_SHIFT - PAGE_SHIFT ; 22-12=10
-	mov	edx, esi 
+	mov	edx, esi
 	; EDX = PDE index
 	shl	esi, 2 ; convert PDE index to dword offset
 	add	esi, ebx ; add page directory address
@@ -3729,7 +3729,7 @@ a_u_pd_2:
 	; EAX = PHYSICAL (flat) ADDRESS OF THE PAGE TABLE
 	mov	edi, [esp] ; *
 	; EDI = PTE index (of page directory)
-	;and	edi, PTE_MASK ; PTE entry index in the page table	
+	;and	edi, PTE_MASK ; PTE entry index in the page table
 	; EBX = next PDE address
 	mov	esi, edi ; PTE index in page table (0-1023)
 	shl	edi, 2 ; convert PTE index to dword offset
@@ -3745,18 +3745,18 @@ a_u_pt_0:
 				  ; (must be 1)
 	jnz	short a_u_pt_3
 	; Read only -duplicated- page (belongs to a parent or a child)
-        test    ax, PTE_DUPLICATED ; Was this page duplicated 
+        test    ax, PTE_DUPLICATED ; Was this page duplicated
 				   ; as child's page ?
 	jz	short a_u_pt_4	; Clear PTE but don't deallocate the page!
 	;
-	; check the parent's PTE value is read only & same page or not.. 
+	; check the parent's PTE value is read only & same page or not..
 	; EDX = page directory entry index (0-1023)
 	push	edx ; **
 	push	ebx ; ***
 	; ESI = page table entry index (0-1023)
 	;push	esi ; **** ; 20/05/2017
 	mov	ebx, [u.ppgdir] ; page directory of the parent process
-	shl	dx, 2 ; *4 
+	shl	dx, 2 ; *4
 	add	ebx, edx ; PTE address,0 (for the parent)
 	mov	edx, [ebx] ; page table address
 	test	dl, PDE_A_PRESENT ; present (valid) or not ?
@@ -3768,7 +3768,7 @@ a_u_pt_0:
 	mov	ebx, [esi]
 	test	bl, PTE_A_PRESENT ; present or not ?
 	jz	short a_u_pt_2	; parent process does not use this page
-	and	ax, PTE_A_CLEAR ; 0F000h ; Clear attribute bits 
+	and	ax, PTE_A_CLEAR ; 0F000h ; Clear attribute bits
 	and	bx, PTE_A_CLEAR ; 0F000h ; Clear attribute bits
 	cmp	eax, ebx	; parent's and child's pages are same ?
 	jne	short a_u_pt_2	; not same page
@@ -3842,7 +3842,7 @@ allocate_lfb_pages_for_kernel:
 	;  recognized screen resolution. For example: 1024*768*4 bytes)
 	; 15/12/2020
 	; 14/12/2020 - TRDOS 386 v2.0.3
-	; Set kernel page tables for linear frame buffer 
+	; Set kernel page tables for linear frame buffer
 	;
 	; Input:
 	;	;[LFB_ADDR] = linear frame buffer base address
@@ -3862,12 +3862,12 @@ allocate_lfb_pages_for_kernel:
 
 
 ; 02/12/2023 ; (!**!)
-; ('memory size' -for M.A.T.- is always <= LFB stat/base address) 
+; ('memory size' -for M.A.T.- is always <= LFB stat/base address)
 %if 0
 
 	; 29/11/2023
 	; allocate LFB blocks which < memory size at first
-	
+
 	;mov	eax, edx
 	;shl	eax, 12
 	;add	eax, esi
@@ -3883,7 +3883,7 @@ allocate_lfb_pages_for_kernel:
 	; ebx = LFB start/base page number 
 
 	sub	ecx, ebx
-	jna	short a_lfb_k_2 ; skip M.A.T. bit allocation 
+	jna	short a_lfb_k_2 ; skip M.A.T. bit allocation
 	cmp	ecx, edx
 	jna	short a_lfb_k_0
 	mov	ecx, edx
@@ -3891,7 +3891,7 @@ a_lfb_k_0:
 	sub	edx, ecx
 	jna	short a_lfb_k_1
 
-	; edx = remain count of LFB pages which are out of the M.A.T. 
+	; edx = remain count of LFB pages which are out of the M.A.T.
 	; ebx = LFB start/base page number
 	; ecx = page allocation count in the M.A.T.
 
@@ -3901,16 +3901,16 @@ a_lfb_k_0:
 	shl	eax, 12 ; * 4096
 
 	add	esi, eax
-	; esi = LFB address just after the main memory if there is	
+	; esi = LFB address just after the main memory if there is
 a_lfb_k_1:
 	mov	eax, ebx ; LFB start/base page number
 	call	allocate_lfb_memory_block
 
-	; here if there is, remain (the 2nd) part of the LFB 
+	; here if there is, remain (the 2nd) part of the LFB
 	; will be allocated by using new kernel page table(s)
-	; (but M.A.T. bits will not be cleared because 
-	;  the 2nd LFB part is out of the M.A.T.)	
-	
+	; (but M.A.T. bits will not be cleared because
+	;  the 2nd LFB part is out of the M.A.T.)
+
 	and	edx, edx
 	jz	short a_lfb_k_6  ; all LFB pages have been allocated
 
@@ -3927,7 +3927,7 @@ a_lfb_k_2:
 	; edx = count of kernel page tables to be added
 	; (edx = 1 or edx = 2)
 	; ((1024*768*4 = 3145728 bytes, 768 PTEs, 1 page table))
-	; ((1920*1080*4 = 8294400 bytes, 2025 PTEs, 2 page tables)) 
+	; ((1920*1080*4 = 8294400 bytes, 2025 PTEs, 2 page tables))
 	call	allocate_page
 	;jc	short a_lfb_k__err
 	; (mem alloc error is not expected at this startup stage)
@@ -3963,7 +3963,7 @@ a_lfb_k_3:
 	; set new PTEs
 	;
 	; ebp = count of pages (PTEs) to be allocated
-	pop	edi ; +	 ; 1st page table address	
+	pop	edi ; +	 ; 1st page table address
 	; 29/11/2023
 	mov	ecx, 1024	; number of PTEs in a page table
 	mov	eax, esi	; LFB base/start page number
@@ -4003,10 +4003,10 @@ allocate_lfb_pages_for_kernel:
 	; 20/10/2023 - TRDOS 386 v2.0.7
 	; (only the overlapped main memory pages will be allocated)
 	; ((if LFB base/start address is greater than -or equal to-
-	;      main memory size, this procedure is not called/used)) 
+	;      main memory size, this procedure is not called/used))
 	; 15/12/2020
 	; 14/12/2020 - TRDOS 386 v2.0.3
-	; Set kernel page tables for linear frame buffer 
+	; Set kernel page tables for linear frame buffer
 	;
 	; Input:
 	;	;[LFB_ADDR] = linear frame buffer base address
@@ -4030,9 +4030,9 @@ allocate_lfb_pages_for_kernel:
 	; 20/10/2023
 	mov	edi, eax ; LFB base/start page number
 	;mov	ecx, [memory_size]
-	sub	ecx, eax	
+	sub	ecx, eax
 
-	; ecx = number of pages to be set as (already) allocated 
+	; ecx = number of pages to be set as (already) allocated
 	;;;
 
 	; 20/10/2023
@@ -4049,17 +4049,17 @@ allocate_lfb_pages_for_kernel:
 	; 20/10/2023
 	;;add	edx, 4095
 	;shr	edx, 12	; convert LFB size to LFB page count
-	
+
 	;mov	ecx, edx ; * ; LFB page count
 	; 20/10/2023
 	mov	edx, ecx ; *
 			; 20/10/2023
 			; edx = page count (to be set as allocated)
 			; 	from the LFB start page
-			; (it may be <= linear frame buffer size) 
+			; (it may be <= linear frame buffer size)
 
 	add	ecx, 1023 ; page count + 1023
-	shr	ecx, 10 ; convert to page directory entry count	
+	shr	ecx, 10 ; convert to page directory entry count
 			; (page table count)
 	push	ecx ; **
 	shl	ecx, 12 ; convert to byte count
@@ -4067,17 +4067,17 @@ allocate_lfb_pages_for_kernel:
 	; 20/10/2023
 	; (absolute allocation is needed instead of the first fit)
 	;xor	eax, eax ; first available pages
-	
+
 	; 20/10/2023
 	;mov	esi, [LFB_ADDR]
-	mov	eax, esi ; linear frame buffer's base/start address	
+	mov	eax, esi ; linear frame buffer's base/start address
 
 	; allocate contiguous memory block for these kernel pages
-	
+
 	;call	allocate_memory_block
 	; 20/10/2023 
 	; (short way to set LFB page bits on the 'M.A.T.)
-	call	allocate_lfb_memory_block ; in 'allocate_memory_block'	
+	call	allocate_lfb_memory_block ; in 'allocate_memory_block'
 
 	; eax = start address of (contiguous) memory block
 	pop	ecx ; ** ; PDE count
@@ -4088,42 +4088,42 @@ a_lfb_k_1:
 	; Allocate (new) page tables in kernel's page directory
 	push	ecx ; PDE (page table) count
 	push	eax ; start address of contiguous memory pages
-		    ; (at page boundary)	
+		    ; (at page boundary)
 	; edi = 1st page directory entry offset
 	add	edi, [k_page_dir] ; Kernel's Page Dir Address
 a_lfb_k_2:
 	or	ax, PDE_A_PRESENT + PDE_A_WRITE + PDE_EXTERNAL
-				; supervisor + read&write + present 	
+				; supervisor + read&write + present
 				; + external memory block (LFB)
 	stosd
 	add	eax, 4096
 	loop	a_lfb_k_2
-	
+
 	pop	edi ; start addr of contiguous memory pages
 	pop	ecx ; page table (PDE) count
 
 	; Allocate pages in (new) kernel page tables
-	
+
 	; (Note: page tables are contiguous in pyhsical memory)
 	shl	ecx, 10 ; * 1024, convert to (total) PTE count 
-	
+
 	mov	eax, [LFB_ADDR]
 	; edx = LFB page count
 	;and	ax, ~4095  ; lw of LFB address is 0
-a_lfb_k_3:	
+a_lfb_k_3:
 	or	ax, PTE_A_PRESENT + PTE_A_WRITE + PTE_EXTERNAL
-				; supervisor + read&write + present 	
+				; supervisor + read&write + present
 				; + external memory block (LFB)
 	stosd
 	dec	edx
 	jz	short a_lfb_k_4 ; LFB size has been completed (!?)
-	add	eax, 4096	
+	add	eax, 4096
 	loop	a_lfb_k_3
 
 	retn
-	
+
 a_lfb_k_4:
-	; clear PTEs for empty/free pages 
+	; clear PTEs for empty/free pages
 	; 	(if there are after LFB !?)
 	xor	eax, eax ; clear page table entry (empty)
 	rep	stosd
@@ -4135,7 +4135,7 @@ a_lfb_k_4:
 	; 15/12/2020
 	; 14/12/2020 - TRDOS 386 v2.0.3
 	; Reset/Release kernel page tables
-	;	 which are used for linear frame buffer 
+	;	 which are used for linear frame buffer
 	; (this procedure will be called by kernel only)
 	;
 	; Input:
@@ -4153,13 +4153,13 @@ a_lfb_k_4:
 	;		; and then convert it to PDE entry offset
 	;		; (1 PDE is for 4MB, 22 bit shift)
 	;
-	;shl	di, 2	; * 4 for offset 
+	;shl	di, 2	; * 4 for offset
 	;
 	;;add	ecx, 4095
-	;shr	ecx, 12	; convert LFB size to page count  
+	;shr	ecx, 12	; convert LFB size to page count
 	;
 	;add	ecx, 1023 ; page count + 1023
-	;shr	ecx, 10 ; convert to page directory entry count	
+	;shr	ecx, 10 ; convert to page directory entry count
 	;		; (page table count)
 	;push	ecx ; *
 	;shl	ecx, 12 ; convert to byte count
@@ -4187,7 +4187,7 @@ a_lfb_k_4:
 ; 09/03/2015
 ;swpq_count: dw 0 ; count of pages on the swap que
 ;swp_drv:    dd 0 ; logical drive description table address of the swap drive/disk
-;swpd_size:  dd 0 ; size of swap drive/disk (volume) in sectors (512 bytes). 		  				
+;swpd_size:  dd 0 ; size of swap drive/disk (volume) in sectors (512 bytes).
 ;swpd_free:  dd 0 ; free page blocks (4096 bytes) on swap disk/drive (logical)
 ;swpd_next:  dd 0 ; next free page block
 ;swpd_last:  dd 0 ; last swap page block

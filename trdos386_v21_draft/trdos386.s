@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.10 (v2.1.0 pre-work)
 ; ----------------------------------------------------------------------------
-; Last Update: 04/01/2026 (Previous: 28/01/2025)
+; Last Update: 10/01/2026 (Previous: 28/01/2025)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -45,17 +45,17 @@ CMOS_SECONDS	EQU	00H		; SECONDS (BCD)
 CMOS_SEC_ALARM	EQU	01H		; SECONDS ALARM (BCD)
 CMOS_MINUTES	EQU	02H		; MINUTES (BCD)
 CMOS_MIN_ALARM	EQU	03H		; MINUTES ALARM (BCD)
-CMOS_HOURS	EQU	04H		; HOURS (BCD
-CMOS_HR_ALARM	EQU	05H		; HOURS ALARM   (BCD)
+CMOS_HOURS	EQU	04H		; HOURS (BCD)
+CMOS_HR_ALARM	EQU	05H		; HOURS ALARM (BCD)
 CMOS_DAY_WEEK	EQU	06H		; DAY OF THE WEEK  (BCD)
 CMOS_DAY_MONTH	EQU	07H		; DAY OF THE MONTH (BCD)
 CMOS_MONTH	EQU	08H		; MONTH (BCD)
 CMOS_YEAR	EQU	09H		; YEAR (TWO DIGITS) (BCD)
 CMOS_CENTURY	EQU	32H		; DATE CENTURY BYTE (BCD)
 CMOS_REG_A	EQU	0AH		; STATUS REGISTER A
-CMOS_REG_B	EQU	0BH		; STATUS REGISTER B  ALARM
-CMOS_REG_C	EQU	0CH		; STATUS REGISTER C  FLAGS
-CMOS_REG_D	EQU	0DH		; STATUS REGISTER D  BATTERY
+CMOS_REG_B	EQU	0BH		; STATUS REGISTER B ALARM
+CMOS_REG_C	EQU	0CH		; STATUS REGISTER C FLAGS
+CMOS_REG_D	EQU	0DH		; STATUS REGISTER D BATTERY
 CMOS_SHUT_DOWN	EQU	0FH		; SHUTDOWN STATUS COMMAND BYTE
 ;----------------------------------------
 ;	CMOS EQUATES FOR THIS SYSTEM	;
@@ -157,14 +157,14 @@ FDPT_SPT	equ 14 ; 1 byte, sectors per track
 ; 01/02/2016
 Logical_DOSDisks equ 90000h + 100h ; 26*256 = 6656 bytes
 Directory_Buffer equ 80000h ; max = 64K Bytes
-FAT_Buffer	 equ 91C00h ; 1536 bytes (3 sectors)
+FAT_Buffer	equ 91C00h ; 1536 bytes (3 sectors)
 ; 15/02/2016
-Cluster_Buffer	 equ 70000h ; max = 64K Bytes ; buffer for file read & write
+Cluster_Buffer	equ 70000h ; max = 64K Bytes ; buffer for file read & write
 ; 11/04/2016
-Env_Page:	 equ 93000h ; 512 bytes (4096 bytes)
-Env_Page_Size	 equ 512    ; (4096 bytes)
+Env_Page	equ 93000h ; 512 bytes (4096 bytes)
+Env_Page_Size	equ 512    ; (4096 bytes)
 ; 30/07/2016
-Video_Pg_Backup	 equ 98000h ; Mode 3h, video page backup (32K, 8 pages)
+Video_Pg_Backup	equ 98000h ; Mode 3h, video page backup (32K, 8 pages)
 
 ; 29/11/2020
 ; Free/Reserved memory blocks (in 1st 1MB): 93200h to 96000h (available)
@@ -242,7 +242,7 @@ chk_ms:
 	;jnb	short L0
 	jnb	short V0 ; 14/11/2020
 		 ; insufficient memory_error
-		 ; Minimum 2 MB memory is needed... 
+		 ; Minimum 2 MB memory is needed...
 	; 05/11/2014
 	; (real mode error printing)
 	sti
@@ -284,12 +284,12 @@ V0:
 	rep	movsw
 	push	cs
 	pop	ds
-	
+
 	; 24/11/2023
 	; 15/12/2020
 	;mov	si, [mem_16m_64k]
 	;mov	[real_mem_16m_64k], si
-	
+
 	; 15/11/2020
 	; 14/11/2020 (TRDOS 386 v2.0.3)
 	; check VESA (VBE) VIDEO BIOS version
@@ -309,7 +309,7 @@ V0:
 	;;jmp	short V1
 	
 	; 15/11/2020
-	mov	bx, VBE3INFOSEG  ; 97E0h for current version 
+	mov	bx, VBE3INFOSEG  ; 97E0h for current version
 	mov	es, bx
 	xor	di, di
 	mov	dword [es:di], 'VBE2' ; request VESA VBE3 info
@@ -418,7 +418,7 @@ V0:
 	;mov	word [mem_16m_64k], 0DF00h ; 3584 MB - 16MB
 V1:
 	push	ds
-	pop	es ; restore extra data segment	
+	pop	es ; restore extra data segment
 L0:
 
 %include 'diskinit.s' ; 07/03/2015
@@ -557,7 +557,7 @@ memory_init:
 ;	xor	eax, eax
 ;	xor 	ecx, ecx
 	mov	cl, 8
-	mov	edi, MEM_ALLOC_TBL	
+	mov	edi, MEM_ALLOC_TBL
 	rep	stosd		   ; clear Memory Allocation Table
 				   ; for the first 1 MB memory
 	;
@@ -671,7 +671,7 @@ mi_5:
 	jnc	short mi_6
 	dec	ax		  ; eax = 0000FFFFh
 	stosd
-	inc	ax		  ; 0		
+	inc	ax		  ; 0
 mi_6:
 	cmp	edi, ebx	  ; check if EDI points to
 	jnb	short mi_7	  ; end of memory allocation table
@@ -958,7 +958,7 @@ sidt_OK:
 	mov	[gdt_tss1], al
 	mov	[gdt_tss2], ah
 	mov	word [tss.IOPB], tss_end - task_state_segment
-		; 
+		;
 		; IO Map Base address (When this address points
 		; to end of the TSS, CPU does not use IO port
 		; permission bit map for RING 3 IO permissions,
@@ -966,7 +966,7 @@ sidt_OK:
  		;
 	;mov	[tss.esp0], esp ; TSS offset 4
 	;mov	word [tss.ss0], KDATA ; TSS offset 8 (SS)
-   	mov	ax, TSS  ; It is needed when an interrupt 
+   	mov	ax, TSS  ; It is needed when an interrupt
 			 ; occurs (or a system call -software INT- is requested)
 			 ; while cpu running in ring 3 (in user mode).
 			 ; (Kernel stack pointer and segment will be loaded
@@ -1011,7 +1011,7 @@ esp0_set1:
 %endif
 
 esp0_set_ok:
-	; 30/07/2015 (**tss.esp0**) 
+	; 30/07/2015 (**tss.esp0**)
 	mov	[tss.esp0], esp	; 90000h ; 29/11/2023
 				; <-- 97000h ; 04/12/2023 (max. 3072 bytes)
         mov     word [tss.ss0], KDATA
@@ -1024,10 +1024,10 @@ esp0_set_ok:
 	xor	al, al		; Enable all hardware interrupts!
 	out	21h, al		; (IBM PC-AT compatibility)
 	jmp 	$+2		; (All conventional PC-AT hardware
-	out	0A1h, al	;  interrupts will be in use.)	
+	out	0A1h, al	;  interrupts will be in use.)
 				; (Even if related hardware component
 				;  does not exist!)
-	; Enable NMI 
+	; Enable NMI
 	mov	al, 7Fh		; Clear bit 7 to enable NMI (again)
 	out  	70h, al
 	; 23/02/2015
@@ -1302,7 +1302,7 @@ vbe3pminit:
 		 ; ecx = 1536/4 = 384 double words
 	;xor	eax, eax
 	xor	al, al
-	rep	stosd	
+	rep	stosd
 
 	; Filling PMInfoBlock selector fields
 	mov	edi, [pmid_addr]
@@ -1409,7 +1409,7 @@ _VBE3PMI_fcall:
 	;dd	1020
 	;dw	VBE3SS
 
-	align 2	
+	align 2
 
 pminit_return_addr16:
 	; 02/12/2020
@@ -1522,7 +1522,7 @@ di5:
 	;
 	inc	byte [vbe3]  ; [vbe3] = 2 -> 3
 			; will be decreased to 2 again if 'PMID'
-			; signature will not be found. 	
+			; signature will not be found.
 	jmp	vbe3_pmid_chk ; check for ATI Video BIOS
 
 di0:
@@ -1625,7 +1625,7 @@ check_boch_plex86_vbe:
 
 	; save VESA VBE2 bios (bochs/qemu) signature
 	; for enabling VBE2 functions in TRDOS 386 v2 kernel
-	mov	[vbe2bios], al ; 0C4h or 0C5h (for BOCHS) 
+	mov	[vbe2bios], al ; 0C4h or 0C5h (for BOCHS)
 			       ; (0C0h-0C5h for QEMU)
 	; 20/10/2023
 	;mov	byte [vbe_vnumber], "2"
@@ -2095,7 +2095,7 @@ timer_int_return: ; 23/05/2016 - jump from 'rtc_int' ('rtc_int_2')
 rtc_int_3:
 	inc	byte [sysflg] 	; now, we are in system space
 	;
-        jmp     sysrelease ; change running process immediatelly 
+        jmp     sysrelease ; change running process immediatelly
 
 T8:
 	; 13/01/2017 (eax -> ebx)
@@ -2113,7 +2113,7 @@ T8:
 	; 13/01/2017 - Timer Lock (T_LOCK)
 	inc	byte [u.t_lock]
 	mov	cl, [sysflg]
-	mov	[u.t_mode], cl 
+	mov	[u.t_mode], cl
 
 	mov	ebp, [tss.esp0] ; kernel stack address (for ring 0)
 	sub	ebp, 20		; eip, cs, eflags, esp, ss
@@ -2224,7 +2224,7 @@ set_callback_addr:
 	;	    int 40h ; TRDOS 386 system call (interrupt)
 	;
 	;
-	;; Note(*): User's callback service code must preserve cpu 
+	;; Note(*): User's callback service code must preserve cpu
 	;;	flags if it has any instructions which changes
 	;;	flags in the service code. (25/12/2016)
 	;;
@@ -2236,7 +2236,7 @@ set_callback_addr:
   	;;	    inc	dword [time_counter]
 	;;	    popf ; restore flags
 	;;	    retn ; return to normal user code
-	;;		  (which is interrupted by the 
+	;;		  (which is interrupted by the
 	;;		   timer interput)
 	;;
 
@@ -2681,7 +2681,7 @@ b2d1:
 	cmp	eax, ecx
 	jnb	short b2d1
 	mov	edi, EIPstr ; EIP value
-			    ; points to instruction which faults	
+			    ; points to instruction which faults
 	; 28/08/2015
 	mov	edx, eax
 b2d2:
@@ -2732,7 +2732,7 @@ b2d3:
 	inc	eax
 	; eax = 1
 	jmp	sysexit ; terminate process !!!
-	
+
 	; 22/01/2017
 	; 18/04/2016
 	; 28/08/2015
@@ -2794,14 +2794,14 @@ time_of_day:
         jc      short time_of_day_retn ; 23/05/2016
 	mov	al, CMOS_SECONDS
 	call	CMOS_READ
-	mov	[time_seconds], al 
+	mov	[time_seconds], al
 	mov	al, CMOS_MINUTES
 	call	CMOS_READ
-	mov	[time_minutes], al 
+	mov	[time_minutes], al
 	mov	al, CMOS_HOURS
 	call	CMOS_READ
         mov     [time_hours], al
-	mov	al, CMOS_DAY_WEEK 
+	mov	al, CMOS_DAY_WEEK
 	call	CMOS_READ
 	mov	[date_wday], al
  	mov	al, CMOS_DAY_MONTH
@@ -2844,7 +2844,7 @@ rtc_p0:
 	; 25/08/2014 - 07/09/2014
 	; Retro UNIX 386 v1:
  	; Print Real Time Clock content
-	
+
 	; 15/01/2017
 	mov	byte [priority], cl ; 0 or 1 (not 2)
 	mov	ch, [timer_events]
@@ -2965,7 +2965,7 @@ bcd_to_ascii:
 				; AL = AL MOD 10h
 	or	ax, '00'	; Make it ASCII based
 
-        xchg	ah, al 
+        xchg	ah, al
 
 	retn
 
@@ -2977,7 +2977,7 @@ real_mem_16m_64k:
 			; because if system memory is larger than
 			; 3 GB and if a VESA VBE video bios
 			; is detected, 'mem_16m_64K' may be
-			; decreased to reserve LFB space 
+			; decreased to reserve LFB space
 			; at the end of system memory.)
 			; Upper memory space from LFB base address
 			; to 4GB will not be included by M.A.T.
@@ -3350,8 +3350,8 @@ gdt_end:
 		;	 = 100000h * 1000h (G=1) = 4GB
 		;; Limit = FFBFFh (=> FFBFFh+1= FFC00h) // bits 0-15, 48-51 //
 		;	 = FFC00h * 1000h (G=1) = 4GB - 4MB
-		; G= Granularity (1= 4KB), B= Big (32 bit), 
-		; AVL= Available to programmers	
+		; G= Granularity (1= 4KB), B= Big (32 bit),
+		; AVL= Available to programmers
 
 gdtd:
         dw gdt_end - gdt - 1    ; Limit (size)
@@ -3761,6 +3761,11 @@ lfb_addr_str: ; 8 (hex) digits
 panic_msg:
 	db 0Dh, 0Ah, 07h
 	db 'ERROR: Kernel Panic !'
+
+; 08/01/2026 - temporary (test) for bugfix
+db 20h
+panicnum: db '0'
+
 	db 0Dh, 0Ah, 0
 
 ;msgl_drv_not_ready: 
@@ -3777,7 +3782,7 @@ starting_msg:
 	;;;db "Turkish Rational DOS v2.0 [29/12/2024] ...", 0
 	;;db "Turkish Rational DOS v2.0 [28/01/2025] ...", 0
 	;db "Turkish Rational DOS v2.0 [24/04/2025] ...", 0
-	db "Turkish Rational DOS v2.1 [04/01/2026] ...", 0
+	db "Turkish Rational DOS v2.1 [10/01/2026] ...", 0
 
 NextLine:
 	db 0Dh, 0Ah, 0
@@ -3842,7 +3847,7 @@ kernel_version_msg: ; 17/04/2021
 ;;;db	"TRDOS (386) Kernel v2.0.8 by Erdogan Tan" ; 16/05/2024
 ;;db	"TRDOS (386) Kernel v2.0.9 by Erdogan Tan" ; 20/08/2024
 ;db	"TRDOS (386) Kernel v2.0.10 by Erdogan Tan" ; 11/01/2025
-db	"TRDOS (386) Kernel v2.1.0 by Erdogan Tan" ; 04/01/2026
+db	"TRDOS (386) Kernel v2.1.0 by Erdogan Tan" ; 10/01/2026
 db	0
 
 ; 20/02/2017
@@ -3856,7 +3861,7 @@ alignb 8 ; 25/12/2016
 
 	; 15/04/2016
 	; TRDOS 386 (TRDOS v2.0)
-	; 	80 interrupts 	
+	; 	80 interrupts
 	; 11/03/2015
 	; Interrupt Descriptor Table (20/08/2014)
 idt:
@@ -4048,11 +4053,11 @@ alignb 4
 
 ; 10/07/2015
 ; 28/08/2014
-error_code:	resd 1
+error_code:  resd 1
 ; 29/08/2014
-FaultOffset: 	resd 1
+FaultOffset: resd 1
 ; 21/09/2015
-PF_Count:	resd 1	; total page fault count
+PF_Count:    resd 1	; total page fault count
 		       	; (for debugging - page fault analyze)
 		 	; 'page_fault_handler' (memory.inc)
 			; 'sysgeterr' (u9.s)
@@ -4060,7 +4065,7 @@ PF_Count:	resd 1	; total page fault count
 ; 29/04/2016 (TRDOS 386 = TRDOS v2.0)
 ; 22/08/2015 (Retro UNIX 386 v1)
 ; 08/12/2025 - TRDOS 386 v2.0.10 (v2.1)
-;buffer: 
+;buffer:
 ;	resb	8
 ;readi_buffer:
 ;	resb 	512
@@ -4080,7 +4085,7 @@ rw_buffer:
 ; 17/01/2021
 edid_info:	resb 128 ; VESA EDID (monitor capabilities) info
 ; 28/11/2020
-pmi32:		resb 1	; (>0) use VESA VBE3 protected mode calls 
+pmi32:		resb 1	; (>0) use VESA VBE3 protected mode calls
 vbe_mode_x:	resb 1  ; VESA VBE3 video bios mode set options
 video_mode:	resw 1	; VESA VBE3 video mode (with option flags)
 ; 30/11/2020
@@ -4092,7 +4097,7 @@ pmid_addr:	resd 1	; PMInfoBlock ('PMID') linear address
 ;vbe3stbufsize: resw 1	; video regs/dac/bios state buffer size
 ;			; block size in bytes
 ; 16/01/2021
-vbe3stbsflags: resw 1	; video regs/dac/bios state buffer size
+vbe3stbsflags:	resw 1	; video regs/dac/bios state buffer size
 ;			; pointer flags for buffer state options
 %endif
 

@@ -13,12 +13,12 @@
 ; Derived from 'Retro UNIX 386 Kernel - v0.2.1.0' source code by Erdogan Tan
 ; diskdata.inc (11/03/2015)
 ;
-; Derived from 'IBM PC-XT-286' BIOS source code (1986) 
+; Derived from 'IBM PC-XT-286' BIOS source code (1986)
 ; ****************************************************************************
 
 ; Retro UNIX 386 v1 Kernel - DISKDATA.INC
 ; Last Modification: 11/03/2015
-;	(Initialized Disk Parameters Data section for 'DISKIO.INC') 
+;	(Initialized Disk Parameters Data section for 'DISKIO.INC')
 ;
 
 ;----------------------------------------
@@ -136,7 +136,7 @@ DR_CNT		equ	(DR_TYPE_E-DR_TYPE)/5
 ;--------------------------------------------------------
 ;	360 KB MEDIA IN 360 KB DRIVE			:
 ;--------------------------------------------------------
-MD_TBL1:        
+MD_TBL1:
 	DB	11011111B	; SRT=D, HD UNLOAD=0F - 1ST SPECIFY BYTE
 	DB	2		; HD LOAD=1, MODE=DMA - 2ND SPECIFY BYTE
 	DB	MOTOR_WAIT	; WAIT TIME AFTER OPERATION TILL MOTOR OFF
@@ -153,7 +153,7 @@ MD_TBL1:
 ;--------------------------------------------------------
 ;	360 KB MEDIA IN 1.2 MB DRIVE			:
 ;--------------------------------------------------------
-MD_TBL2:        
+MD_TBL2:
 	DB	11011111B	; SRT=D, HD UNLOAD=0F - 1ST SPECIFY BYTE
 	DB	2		; HD LOAD=1, MODE=DMA - 2ND SPECIFY BYTE
 	DB	MOTOR_WAIT	; WAIT TIME AFTER OPERATION TILL MOTOR OFF
@@ -300,7 +300,7 @@ HF_PORT:	dw 	1F0h  ; Default = 1F0h
 			      ; (170h)
 HF_REG_PORT:	dw	3F6h  ; HF_PORT + 206h
 
-; 05/01/2015 
+; 05/01/2015
 hf_m_s:         db      0     ; (0 = Master, 1 = Slave)
 
 ; *****************************************************************************
