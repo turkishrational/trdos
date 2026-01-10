@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 27/12/2025  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 10/01/2026  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -677,6 +677,7 @@ sysexit_@:	; 22/08/2024
 	mov	bl, 0FFh ;  exit code ; -1
 
 sysexit: ; <terminate process>
+	; 08/01/2026 - TRDOS 386 v2.0.10
 	; 22/08/2024
 	; 20/08/2024
 	; 18/08/2024 - TRDOS 386 v2.0.9 
@@ -739,6 +740,7 @@ sysexit: ; <terminate process>
 	; 18/08/2024 - exit code (in EBX, BL)
 	mov	[u.exit], bl
 sysexit_0:
+	; 08/01/2026 (BugFix)
 	; 30/07/2022
 	; 23/01/2017
 	; 02/01/2017
@@ -780,6 +782,8 @@ sysexit_7:
 sysexit_8:
 	dec	cl
 	jz	short sysexit_11
+	; 08/01/2026 (BugFix) 
+	mov	al, 0
 sysexit_9:
 	dec	ah
 	jz	short sysexit_12
@@ -787,8 +791,9 @@ sysexit_9:
 	jmp	short sysexit_7
 
 sysexit_10:
-	;mov	byte [esi], 0
-	mov	word [esi], 0
+	; set timer event as free
+	mov	byte [esi], 0 ; 08/01/2026
+	;mov	word [esi], 0
 	;mov	dword [esi+12], 0
 	;
 	dec	byte [timer_events] ; 02/01/2017
@@ -801,7 +806,10 @@ sysexit_11:
 	sub	eax, eax ; 0
 sysexit_12:
 	; 26/02/2017 (Unlink IRQ callbacks belong to the user)
-	cmp	byte [u.irqc], 0 ; Count of IRQ callbacks
+	;cmp	byte [u.irqc], 0 ; Count of IRQ callbacks
+	; 08/01/2026
+	; eax = 0
+	cmp	byte [u.irqc], al ; 0 ?
 	jng	short sysexit_16 ; zero or invalid
 	; 28/02/2017
 	; clear IRQ callback flags (for 'sysrele' and 'sysret')
@@ -13414,6 +13422,7 @@ glerr_3:
 	jmp	short glerr_1
 
 load_and_run_file:
+	; 10/01/2026
 	; 07/07/2025 - TRDOS 386 Kernel v2.0.10
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 18/11/2017
@@ -13489,9 +13498,26 @@ load_and_run_file:
 	xor 	esi, esi
 cnpm_1: ; search p.stat table for unused process number
 	inc	esi
-	cmp	byte [esi+p.stat-1], 0 ; SFREE
+	; 10/01/2026
+	mov	al, [esi+p.stat-1]
+	cmp	al, 0
+	;cmp	byte [esi+p.stat-1], 0 ; SFREE
 				; is process active, unused, dead
 	jna	short cnpm_2	; it's unused so branch
+	;;;;
+	; 10/01/2026 - TRDOS 386 v2.0.10 (BugFix)
+	; (if the parent proc's number = 1, the child's status = 3)
+	cmp	al, 3 ; zombie ?
+	jne	short cnpm_3 ; al = 1
+	shl 	esi, 1
+	mov	ax, [esi+p.ppid-2] ; parent process's id
+	shr	esi, 1
+	cmp	ax, [p.pid] ; compare with process 1's process id
+	jne	short cnpm_3 ; not MainProg (!?)
+	mov	byte [esi+p.stat-1], 0
+	jmp	short cnpm_2
+cnpm_3:
+	;;;;
 	cmp	si, nproc 	; all processes checked
 	jb	short cnpm_1    ; no, branch back
 cnpm_panic:

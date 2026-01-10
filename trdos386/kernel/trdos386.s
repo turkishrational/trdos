@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.10
 ; ----------------------------------------------------------------------------
-; Last Update: 28/12/2025 (Previous: 11/08/2025)
+; Last Update: 10/01/2026 (Previous: 28/12/2025)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -161,7 +161,7 @@ FAT_Buffer	 equ 91C00h ; 1536 bytes (3 sectors)
 ; 15/02/2016
 Cluster_Buffer	 equ 70000h ; max = 64K Bytes ; buffer for file read & write
 ; 11/04/2016
-Env_Page:	 equ 93000h ; 512 bytes (4096 bytes)
+Env_Page	 equ 93000h ; 512 bytes (4096 bytes)
 Env_Page_Size	 equ 512    ; (4096 bytes)
 ; 30/07/2016
 Video_Pg_Backup	 equ 98000h ; Mode 3h, video page backup (32K, 8 pages)
@@ -3770,14 +3770,15 @@ panic_msg:
 ;       db 0Dh, 0Ah, 0
 
 starting_msg:
-	;;;;;;;db "Turkish Rational DOS v2.0 [18/04/2021] ...", 0
-	;;;;;;db "Turkish Rational DOS v2.0 [11/08/2022] ...", 0
-	;;;;;db "Turkish Rational DOS v2.0 [30/08/2023] ...", 0
-	;;;;db "Turkish Rational DOS v2.0 [07/12/2023] ...", 0
-	;;;db "Turkish Rational DOS v2.0 [23/06/2024] ...", 0
-	;;db "Turkish Rational DOS v2.0 [29/12/2024] ...", 0
-	;db "Turkish Rational DOS v2.0 [28/01/2025] ...", 0
-	db "Turkish Rational DOS v2.0 [28/12/2025] ...", 0
+	;;;;;;;;db "Turkish Rational DOS v2.0 [18/04/2021] ...", 0
+	;;;;;;;db "Turkish Rational DOS v2.0 [11/08/2022] ...", 0
+	;;;;;;db "Turkish Rational DOS v2.0 [30/08/2023] ...", 0
+	;;;;;db "Turkish Rational DOS v2.0 [07/12/2023] ...", 0
+	;;;;db "Turkish Rational DOS v2.0 [23/06/2024] ...", 0
+	;;;db "Turkish Rational DOS v2.0 [29/12/2024] ...", 0
+	;;db "Turkish Rational DOS v2.0 [28/01/2025] ...", 0
+	;db "Turkish Rational DOS v2.0 [28/12/2025] ...", 0
+	db "Turkish Rational DOS v2.0 [10/01/2026] ...", 0
 
 NextLine:
 	db 0Dh, 0Ah, 0

@@ -38,18 +38,18 @@ Sectors       equ 13h
 Media         equ 15h
 FATSecs       equ 16h
 SecPerTrack   equ 18h
-Heads         equ 1Ah 
+Heads         equ 1Ah
 Hidden1       equ 1Ch
 Hidden2       equ 1Eh
 HugeSec1      equ 20h
 HugeSec2      equ 22h
 DriveNumber   equ 24h
 Reserved1     equ 25h
-bootsignature equ 26h                 
+bootsignature equ 26h
 VolumeID      equ 27h
 VolumeLabel   equ 2Bh
-FileSysType   equ 36h          
-Reserved2     equ 3Eh                           ; Starting cluster of P2000
+FileSysType   equ 36h
+Reserved2     equ 3Eh		; Starting cluster of P2000
 
 ; FAT32 BPB Structure
 FAT32_FAT_Size equ 36
@@ -88,7 +88,7 @@ DAP_LBA_Address equ 18h ; LBA=(C1*H0+H1)*S0+S1-1
                         ; S1= Selected Sector Number
                         ; QUAD WORD
 ; DAP_Flat_Destination equ 20h ; 64 bit address, if value in 4h is FFFF:FFFFh
-                             ; QUAD WORD (Also, value in 0h must be 18h) 
+                             ; QUAD WORD (Also, value in 0h must be 18h)
                              ; TR-DOS will not use 64 bit Flat Address
 
 ; INT 13h Function 48h "Get Enhanced Disk Drive Parameters"
@@ -182,7 +182,7 @@ FAT16EOC equ 0FFFFh
 FAT12BADC equ 0FF7h
 FAT16BADC equ 0FFF7h
 ;FAT32BADC equ 0FFFFFF7h ; It is not direct usable for 8086 code
-; MS-DOS FAT16 FS (Maximum Possible) Last Cluster Number= 0FFF6h 
+; MS-DOS FAT16 FS (Maximum Possible) Last Cluster Number= 0FFF6h
 
 ; TRFS
 
@@ -194,7 +194,7 @@ bs_FS_MediaAttrib equ 8 ; db 3
 bs_FS_PartitionID equ 9 ; db 0A1h
 bs_FS_VersionMaj equ 10 ; db 01h
 bs_FS_VersionMin equ 11 ; db 0
-bs_FS_BeginSector equ 12   ; dd 0 
+bs_FS_BeginSector equ 12   ; dd 0
 bs_FS_VolumeSize equ 16 ; dd 2880
 bs_FS_StartupFD equ 20 ; dd 0
 bs_FS_MATLocation equ 24 ; dd 1
