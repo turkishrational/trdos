@@ -3763,8 +3763,8 @@ panic_msg:
 	db 'ERROR: Kernel Panic !'
 
 ; 08/01/2026 - temporary (test) for bugfix
-db 20h
-panicnum: db '0'
+;db 20h
+;panicnum: db '0'
 
 	db 0Dh, 0Ah, 0
 

@@ -13816,7 +13816,7 @@ cnpm_1: ; search p.stat table for unused process number
 	mov	ax, [esi+p.ppid-2] ; parent process's id
 	shr	esi, 1
 	cmp	ax, [p.pid] ; compare with process 1's process id
-	jbe	short cnpm_3 ; not MainProg (!?)
+	jne	short cnpm_3 ; not MainProg (!?)
 	mov	byte [esi+p.stat-1], 0
 	jmp	short cnpm_2
 cnpm_3:
