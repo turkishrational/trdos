@@ -5,7 +5,7 @@
 ;
 ; 24/06/2017
 ;
-; [ Last Modification: 27/12/2024 ] ; modplayv.s (this file)
+; [ Last Modification: 13/01/2026 ] ; modplayv.s (this file)
 ;                                   ; modified from modplayk.s (27/12/2024)
 ;
 ; Derived from source code of 'PLAY.EXE' (TINYPLAY) by Carlos Hasan (1993)
@@ -20,7 +20,7 @@
 ;			                     (23/06/2017)
 ;
 ; Derived from source code of 'TINYPLAY.COM' ('TINYPLAY.ASM') by Erdogan Tan
-;				      (04/03/2017) 
+;				      (04/03/2017)
 ; Assembler: NASM 2.15
 ; ----------------------------------------------------------------------------
 ;	   nasm  modplay.s -l modplay.txt -o MODPLAY.PRG
@@ -30,10 +30,9 @@
 ; 27/11/2024 (ref: vgaplay2.s, 27/12/2024)
 ; modplayv.s - display/graphics : VESA VBE Mode 101h, 640*480, 256 colors
 
-; 01/03/2017
-; 16/10/2016
-; 29/04/2016
-; TRDOS 386 system calls (temporary list!)
+; 14/07/2020
+; 31/12/2017
+; TRDOS 386 (v2.0) system calls
 _ver 	equ 0
 _exit 	equ 1
 _fork 	equ 2
@@ -42,61 +41,62 @@ _write	equ 4
 _open	equ 5
 _close 	equ 6
 _wait 	equ 7
-_creat 	equ 8
-_link 	equ 9
-_unlink	equ 10
+_create	equ 8
+_rename	equ 9
+_delete	equ 10
 _exec	equ 11
 _chdir	equ 12
 _time 	equ 13
 _mkdir 	equ 14
 _chmod	equ 15
-_chown	equ 16
+_rmdir	equ 16
 _break	equ 17
-_stat	equ 18
+_drive	equ 18
 _seek	equ 19
 _tell 	equ 20
-_mount	equ 21
-_umount	equ 22
-_setuid	equ 23
-_getuid	equ 24
+_memory	equ 21
+_prompt	equ 22
+_path	equ 23
+_env	equ 24
 _stime	equ 25
-_quit	equ 26	
+_quit	equ 26
 _intr	equ 27
-_fstat	equ 28
+_dir	equ 28
 _emt 	equ 29
-_mdate 	equ 30
+_ldrvt 	equ 30
 _video 	equ 31
 _audio	equ 32
 _timer	equ 33
 _sleep	equ 34
 _msg    equ 35
 _geterr	equ 36
-_fpsave	equ 37
+_fpstat	equ 37
 _pri	equ 38
 _rele	equ 39
 _fff	equ 40
 _fnf	equ 41
 _alloc	equ 42
 _dalloc equ 43
-_calbac equ 44		
+_calbac equ 44
+_dma	equ 45
 
 %macro sys 1-4
-    ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
-    ; 03/09/2015	
+    ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)
+    ; 03/09/2015
     ; 13/04/2015
-    ; Retro UNIX 386 v1 system call.	
-    %if %0 >= 2   
+    ; Retro UNIX 386 v1 system call.
+    %if %0 >= 2
         mov ebx, %2
-        %if %0 >= 3    
+        %if %0 >= 3
             mov ecx, %3
             %if %0 = 4
-               mov edx, %4   
+               mov edx, %4
             %endif
         %endif
     %endif
     mov eax, %1
     ;int 30h
-    int 40h ; TRDOS 386 (TRDOS v2.0)	   
+    int 40h ; TRDOS 386 (TRDOS v2.0)
 %endmacro
 
 ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
@@ -110,7 +110,7 @@ BUFFERSIZE equ 32768
 ;	July 14th, 1993.
 
 ;=============================================================================
-;  
+;
 ;=============================================================================
 
 [BITS 32]
@@ -134,10 +134,10 @@ _dev_not_ready:
 	sys	_msg, noDevMsg, 255, 0Fh
         jmp     Exit
 
-GetFileName:  
+GetFileName:
 	mov	esi, esp
 	lodsd
-	cmp	eax, 2 ; two arguments 
+	cmp	eax, 2 ; two arguments
 		; (program file name & mod file name)
 	jb	pmsg_2017 ; nothing to do
 
@@ -145,7 +145,7 @@ GetFileName:
 	lodsd ; mod file name address (file to be read)
 	mov	esi, eax
 	mov	edi, mod_file_name
-ScanName:       
+ScanName:
 	lodsb
 	test	al, al
 	je	pmsg_2017
@@ -153,13 +153,13 @@ ScanName:
 	je	short ScanName	; scan start of name.
 	stosb
 	mov	ah, 0FFh
-a_0:	
+a_0:
 	inc	ah
 a_1:
 	lodsb
 	stosb
 	cmp	al, '.'
-	je	short a_0	
+	je	short a_0
 	and	al, al
 	jnz	short a_1
 
@@ -169,7 +169,7 @@ SetExt:
 	dec	edi
 	mov	dword [edi], '.MOD'
 	mov	byte [edi+4], 0
-PrintMesg:      
+PrintMesg:
 	; Prints the Credits Text.
 	sys	_msg, Credits, 255, 0Fh
 _1:
@@ -179,14 +179,14 @@ _1:
 	jc	error_exit
 _2:
 	; Initialize Audio Device
-	sys	_audio, 0301h, 0, ac97_int_handler 
+	sys	_audio, 0301h, 0, ac97_int_handler
 	jc	error_exit
 
 	; 27/12/2024
 	; Set Master Volume Level (to 0)
 	;sys	_audio, 0B00h, 0
 
-LoadMod:  
+LoadMod:
 	mov	edi, mod_file_name
 	call    LoadModule		; Load the MODule...
 	; 08/10/2017
@@ -204,10 +204,10 @@ _3:
 	jc	error_exit
 
 	;cmp	ah, 2 ; AC'97 (Intel ICH) Audio Controller
-	;jne	_dev_not_ready	
+	;jne	_dev_not_ready
 
 	; EAX = IRQ Number in AL
-	;	Audio Device Number in AH 
+	;	Audio Device Number in AH
 	; EBX = DEV/VENDOR ID
 	;       (DDDDDDDDDDDDDDDDVVVVVVVVVVVVVVVV)
 	; ECX = BUS/DEV/FN 
@@ -223,9 +223,9 @@ _3:
 	;mov	[ac97_NamBar], dx
 	;shr	dx, 16
 	;mov	[ac97_NabmBar], dx
-	mov	[ac97_NamBar], edx	
-  
-	call	write_audio_dev_info 
+	mov	[ac97_NamBar], edx
+
+	call	write_audio_dev_info
 
 PlayNow: 
 	call    StartPlaying
@@ -273,7 +273,11 @@ _@:
 	;;;;
 	; 27/12/2024
 	; Set Video Mode to 101h ; 640x480, 256 colors
-	sys	_video, 08FFh, 101h
+	;sys	_video, 08FFh, 101h
+	; 13/01/2026
+	; (edx = LFBINFO buffer address)
+	; (edx = 0 -> do not return LFBINFO)
+	sys	_video, 08FFh, 101h, 0
 	or	eax, eax
 	jnz	short set_vesa_mode_101h_ok
 
@@ -304,7 +308,7 @@ _a3:
 	;mov	edx, 320*(100-64) ; addressing.
 	; 27/12/2024
 	mov	edx, 640*(240-128)
-MakeOfs:        
+MakeOfs:
 	;mov	[RowOfs+ebx], dx
 	;mov	[RowOfs+ebx+2], dx
 	; 27/12/2024
@@ -325,7 +329,7 @@ MakeOfs:
 	add	eax, 640
 	loop	MakeOfs
 %endif
-	
+
 	; Start	to play
 	mov	al, [bps]
 	shr	al, 4 ; 8 -> 0, 16 -> 1
@@ -334,15 +338,15 @@ MakeOfs:
 	dec	bl
 	or	bl, al
 	mov	cx, [MixSpeed] ; [Sample_Rate] ; Hz 
-	mov	bh, 4 ; start to play	
+	mov	bh, 4 ; start to play
 	sys	_audio
-    
+
 	;; SETUP SIGNAL RESPONSE BYTE
 	;; 06/03/2017
 	;mov	bl, [ac97_int_ln_reg] ; IRQ number
 	;mov	bh, 1 ; Link IRQ to user for Signal Response Byte
-	;mov	edx, srb  ; Signal Response/Return Byte address  
-	;mov	ecx, 0FFh ; Signal Response/Return Byte value  
+	;mov	edx, srb  ; Signal Response/Return Byte address
+	;mov	ecx, 0FFh ; Signal Response/Return Byte value
 	;sys	_calbac
 	;jc	short error_exit
 
@@ -383,10 +387,10 @@ _s_exit:
 
 	; 27/12/2024
 	call	set_text_mode
-Exit:           
-	;call    FreeModule	; Free MODule core.
-	
-	sys 	_exit	; Bye !
+Exit:
+	;call	FreeModule	; Free MODule core.
+
+	sys	_exit	; Bye !
 here:
 	jmp	short here
 
@@ -397,7 +401,7 @@ pmsg_2017:
 	; 27/12/2024
 set_text_mode:
 	mov	ax, 0003h	; Set Text Mode 80x25x16
-	int     31h
+	int	31h
 	retn
 
 DetectICH:
@@ -418,12 +422,12 @@ ac97_int_handler:
 	sys	_exit
 
 ;=============================================================================
-;      
+;
 ;=============================================================================
 
 	; 27/12/2024
 PlayMod:
-	; 23/06/2017   
+	; 23/06/2017
 	; 21/06/2017
 	; 19/06/2017
 
@@ -581,7 +585,7 @@ DrawLoop:
 	inc     ecx
 	;cmp	cx, 320		; 320 pixels drawed?
 	; 27/12/2024
-	cmp	ecx, 640 	; 640 pixels drawn?	
+	cmp	ecx, 640 	; 640 pixels drawn?
 	jb      short DrawLoop
 	jmp	p_loop
 
@@ -633,7 +637,7 @@ endstruc
 struc ModInfoRec
 .OrderLen:	resb 1
 .ReStart:	resb 1
-.Order:	resb 128
+.Order:		resb 128
 .Patterns:	resd 1
 .SampOfs:	resw 31
 .SampSeg:	resw 31
@@ -652,11 +656,11 @@ LoadModule:
 	; edi = file name address
 
 	pushad
-	
+
 	;call    ClearModInfo ; 07/10/2017 (not necessary.)
-OpenFile:       
+OpenFile:
 	; ebx = ASCIIZ file name address
-	; ecx = open mode (0 = open for read)	
+	; ecx = open mode (0 = open for read)
 	sys	_open, edi, 0 ; open for reading
 	jc	Failed
 	mov     [FileHandle], eax
@@ -666,7 +670,7 @@ ReadHeader:
 	; edx = Byte count
 	sys	_read, [FileHandle], Header, ModHeader.size
 	jc      CloseFile
-CheckMK:        
+CheckMK:
 	cmp     dword [Header+ModHeader.mhSign], 'M.K.'
 	je      short IsModFile
 CheckFLT4:
@@ -776,11 +780,11 @@ NextSample:
 	add     si, 2
 	cmp     si, 2*31
 	jb      short AllocSamples
-CloseFile:      
+CloseFile:
 	pushf
 	sys	_close, [FileHandle]
 	popf
-Failed:         
+Failed:
 	popad
 
 	retn
@@ -818,20 +822,20 @@ MixBufSize      equ 4096
 struc TrackInfo
 .Samples:	resd 1
 .Position:	resd 1
-.Len:	resw 1
+.Len:		resw 1
 .Repeat:	resw 1
 .RepLen:	resw 1
 .Volume: 	resb 1
-.Error:	resb 1
+.Error:		resb 1
 .Period:	resw 1
-.Pitch:	resw 1
+.Pitch:		resw 1
 .Effect:	resw 1
 .PortTo:	resw 1
 .PortParm:	resb 1
 .VibPos:	resb 1
 .VibParm:	resb 1
 .OldSampOfs:	resb 1
-.Arp:	resw 3
+.Arp:		resw 3
 .ArpIndex:	resw 1
 .size:
 endstruc
@@ -866,7 +870,7 @@ BeatTrack:
 	je      VibSlide
 	cmp     dh, 0Ah
 	je      VolSlide
-None:           
+None:
 	retn
 Arpeggio:
 	movzx   ebx, word [edi+TrackInfo.ArpIndex]
@@ -899,7 +903,8 @@ PortDown:
 	cmp     bx, 856
 	jle     short NotBig
 	mov     bx, 856
-NotBig:         mov     [edi+TrackInfo.Period], bx
+NotBig:
+	mov     [edi+TrackInfo.Period], bx
 	add     bx, bx
 	mov     ax, [PitchTable+bx]
 	mov     [edi+TrackInfo.Pitch], ax
@@ -911,23 +916,23 @@ TonePort:
 	cmp     bx, ax
 	je      short NoPort
 	jg      short PortToUp
-PortToDown:     
+PortToDown:
 	add     bx, dx
 	cmp     bx, ax
 	jle     short SetPort
-FixPort:        
+FixPort:
 	mov     bx, ax
 	jmp     short SetPort
 PortToUp:
 	sub     bx, dx
 	cmp     bx, ax
 	jl      short FixPort
-SetPort:        
+SetPort:
 	mov     [edi+TrackInfo.Period], bx
 	add     bx, bx
 	mov     ax, [PitchTable+bx]
 	mov     [edi+TrackInfo.Pitch], ax
-NoPort:         
+NoPort:
 	retn
 Vibrato:
 	mov     dh, dl
@@ -947,17 +952,17 @@ Vibrato:
 	test    dh, dh
 	jns     short VibUp
 	neg     ax
-VibUp:          
+VibUp:
 	add     ax, [edi+TrackInfo.Period]
 	mov     bx, ax
 	cmp     bx, 113
 	jge     short NoLoVib
 	mov     bx, 113
-NoLoVib:        
+NoLoVib:
 	cmp     bx, 856
 	jle     short NoHiVib
 	mov     bx, 856
-NoHiVib:        
+NoHiVib:
 	add     bx, bx
 	mov     ax, [PitchTable+bx]
 	mov     [edi+TrackInfo.Pitch], ax
@@ -978,12 +983,12 @@ VolSlide:
 	sub     al, dl
 	jge     short NoLoVol
 	xor     al, al
-NoLoVol:        
+NoLoVol:
 	add     al, dh
 	cmp     al, 64
 	jbe     short NoHiVol
 	mov     al, 64
-NoHiVol:        
+NoHiVol:
 	mov     [edi+TrackInfo.Volume], al
 	retn
 
@@ -1032,7 +1037,7 @@ SetSample:
 	mov     [edi+TrackInfo.Repeat], ax
 	mov     ax, [ModInfo.SampRepLen+ebx]
 	mov     [edi+TrackInfo.RepLen], ax
-SetPeriod:      
+SetPeriod:
 	test    cx, cx
 	jz      short SetEffect
 
@@ -1071,7 +1076,7 @@ InitTonePort:
 	test    dl, dl
 	jnz     short SetPortParm
 	mov     dl, [edi+TrackInfo.PortParm]
-SetPortParm:    
+SetPortParm:
 	mov     [edi+TrackInfo.PortParm], dl
 	mov     [edi+TrackInfo.Effect], dx
 	retn
@@ -1083,19 +1088,19 @@ InitVibrato:
 	test    dl, 0Fh
 	jne     short OkDepth
 	or      dl, al
-OkDepth:        
+OkDepth:
 	test    dl, 0F0h
 	jnz     short OkRate
 	or      dl, ah
-OkRate:         
+OkRate:
 	mov     [edi+TrackInfo.VibParm], dl
 	mov     [edi+TrackInfo.Effect], dx
 	test    cx, cx
 	jz      short OkPos
 	mov     byte [edi+TrackInfo.VibPos], 0
-OkPos:          
+OkPos:
 	retn
-SampleOfs:      
+SampleOfs:
 	test    dl, dl
 	jnz     short SetSampleOfs
 	mov     dl, [edi+TrackInfo.OldSampOfs]
@@ -1146,7 +1151,7 @@ SetBpm:
 	xor     dx, dx
 	div     bx
 	mov     [BpmSamples], ax
-Skip:           
+Skip:
 	retn
 InitArpeggio:
 	mov     dh, dl
@@ -1160,7 +1165,7 @@ gt_ScanPeriod:
 	jae     short SetArp
 	add     bx, 2
 	loop    gt_ScanPeriod
-SetArp:         
+SetArp:
 	add     dx, dx
 	add     dh, bl
 	add     dl, bl
@@ -1194,7 +1199,7 @@ UpdateTracks:
 	mov	ecx, NumTracks
 	mov	edi, Tracks
 BeatTracks:
-	call	BeatTrack	
+	call	BeatTrack
 	add	edi, TrackInfo.size
 	loop	BeatTracks
 	retn
@@ -1278,7 +1283,7 @@ MixNonLooped:
 	mov     dl, dh
 	;xor	dh, dh
 	and	edx, 0FFh
-nlMixSamp:      
+nlMixSamp:
 	cmp     esi, ebp
 	jae     short nlMixBye
 	mov     bl, [esi]
@@ -1288,7 +1293,7 @@ nlMixSamp:
 	add     ah, al
 	adc     esi, edx
 	loop    nlMixSamp
-nlMixBye:       
+nlMixBye:
 	mov     ebx, esi
 	pop     esi
 	pop     edx
@@ -1317,11 +1322,11 @@ MixLooped:
 	mov     dl, dh
 	;xor	dh, dh
 	and	edx, 0FFh
-lpMixSamp:      
+lpMixSamp:
 	cmp     esi, ebp
 	jb      short lpMixNow
 	sub     esi, [BufRep]
-lpMixNow:       
+lpMixNow:
 	mov     bl, [esi]
 	mov     bl, [VolTable+bx]
 	add     [edi], bl
@@ -1329,7 +1334,7 @@ lpMixNow:
 	add     ah, al
 	adc	esi, edx
 	loop    lpMixSamp
-lpMixBye:       
+lpMixBye:
 ;	mov     ebx, esi
 ;	pop     esi
 ;	pop     edx
@@ -1353,13 +1358,13 @@ GetSamples:
 	pushad
 
 	;cld
-NextChunk:      
+NextChunk:
 	cmp     word [BufLen], 0
 	jne     short CopyChunk
 
 	push    ebx
 	push    edi
-MixChunk:       
+MixChunk:
 	mov	edi, MixBuffer
 	movzx	ecx, word [BpmSamples]
 	mov     [BufPtr], edi
@@ -1377,13 +1382,13 @@ GetSamples_next:
 	mov	edi, [BufPtr]
 	call	MixTrack
 	pop	ecx
-	loop	GetSamples_next	
+	loop	GetSamples_next
 
 	call    UpdateTracks
 
 	pop     edi
 	pop     ebx
-CopyChunk:      
+CopyChunk:
 	;mov	cx, [BufLen]
 	movzx	ecx, word [BufLen]
 	cmp	ecx, ebx
@@ -1411,7 +1416,7 @@ MoveChunk:
 
 StartPlaying:
 	pushad
-SetModParms:    
+SetModParms:
 	mov     byte [OrderPos], 0
 	mov     byte [Tempo], DefTempo
 	mov     byte [TempoWait], DefTempo
@@ -1423,7 +1428,7 @@ SetModParms:
 	mov     bx, 24*DefBpm/60
 	div     bx
 	mov     [BpmSamples], ax
-ClearTracks:    
+ClearTracks:
 	mov     edi, Tracks
 	mov     ecx, NumTracks*TrackInfo.size
 	xor     eax, eax
@@ -1444,19 +1449,19 @@ MakePitch:
 	mov     cx, 857
 	xor     ebx, ebx
 	mov     edi, PitchTable
-PitchLoop:      
+PitchLoop:
 	push    eax
 	push    edx
 	cmp     dx, bx
 	jae     short NoDiv
 	div     bx
-NoDiv:          
+NoDiv:
 	stosw
 	pop     edx
 	pop     eax
 	inc     ebx
 	loop    PitchLoop
-MakeVolume:     
+MakeVolume:
 	mov     cx, 16640
 	mov     ebx, ecx
 VolLoop:
@@ -1511,13 +1516,13 @@ c_smpl_2:
 	sub	al, 80h	
 	mov	ah, al
 	sub	al, al
-c_smpl_3:	
+c_smpl_3:
 	mov	dx, ax
 	shl	eax, 16
 	mov	ax, dx
 	stosd	; save 16 bit stereo sample
 	loop 	c_smpl_1
-	
+
 	retn
 
 ;=============================================================================
@@ -1525,7 +1530,7 @@ c_smpl_3:
 ;=============================================================================
 
 ;dword2str:
-;	; 13/11/2016 - Erdogan Tan 
+;	; 13/11/2016 - Erdogan Tan
 ;	; eax = dword value
 ;	;
 ;	call	dwordtohex
@@ -1547,11 +1552,11 @@ c_smpl_3:
 ;	push	ebx
 ;	movzx	ebx, al
 ;	shr	bl, 4
-;	mov	bl, [ebx+hex_chars] 	 	
+;	mov	bl, [ebx+hex_chars]
 ;	xchg	bl, al
 ;	and	bl, 0Fh
-;	mov	ah, [ebx+hex_chars] 
-;	pop	ebx	
+;	mov	ah, [ebx+hex_chars]
+;	pop	ebx
 ;	retn
 
 ;wordtohex:
@@ -1566,7 +1571,7 @@ c_smpl_3:
 ;	push	eax
 ;	mov	bl, ah
 ;	shr	bl, 4
-;	mov	al, [ebx+hex_chars] 	 	
+;	mov	al, [ebx+hex_chars]
 ;	mov	bl, ah
 ;	and	bl, 0Fh
 ;	mov	ah, [ebx+hex_chars]
@@ -1724,7 +1729,7 @@ _w_ac97imsg_:
 	; EBX = Message address
 	; ECX = Max. message length (or stop on ZERO character)
 	;	(1 to 255)
-	; DL  = Message color (07h = light gray, 0Fh = white) 
+	; DL  = Message color (07h = light gray, 0Fh = white)
      	sys 	_msg, msgAC97Info, 255, 07h
         retn
 
@@ -1738,13 +1743,15 @@ _w_ac97imsg_:
 
 msg_2017:
 	db	'Tiny MOD Player for TRDOS 386 by Erdogan Tan. '
-	;;db	'October 2017.',10,13
-	;db	'June 2024.',10,13
-	db	'December 2024',10,13
+	;;;db	'October 2017.',10,13
+	;;db	'June 2024.',10,13
+	;db	'December 2024',10,13
+	db	'January 2026',10,13
 	db	'usage: modplay filename.mod', 10,13,0
 	db	'08/10/2017',10,13,0
-	;db	'02/06/2024',10,13,0
-	db	'27/12/2024',10/13,0
+	;;db	'02/06/2024',10,13,0
+	;db	'27/12/2024',10,13,0
+	db	'13/01/2026',10,13,0
 
 Credits:	db	'Tiny MOD Player v0.1b by Carlos Hasan. July 1993.'
 		db	10,13,0
@@ -1775,19 +1782,19 @@ PeriodTable:	dw	856,808,762,720,678,640,604,570,538,508,480,453
 ;               PLAYER.ASM - DATA
 ;=============================================================================
 
-stmo:		db 1 ; stereo (2) or mono (1)  
+stmo:		db 1 ; stereo (2) or mono (1)
 bps:		db 8 ; bits per sample (8 or 16)
 Sample_Rate:
 MixSpeed:	;dw 22050 ; Hz
 		; 02/06/2024
-		dw 48000  ; Hz	
+		dw 48000  ; Hz
 
 ; 13/11/2016
 hex_chars:	db "0123456789ABCDEF", 0
 ;
 msgAC97Info:	
 		db 0Dh, 0Ah
-		db "AC97 Audio Controller & Codec Info", 0Dh, 0Ah 
+		db "AC97 Audio Controller & Codec Info", 0Dh, 0Ah
 		db "Vendor ID: "
 msgVendorId:	db "0000h Device ID: "
 msgDevId:	db "0000h", 0Dh, 0Ah
@@ -1873,7 +1880,7 @@ alignb 16
 
 ; PLAY.ASM
 Scope:		;resw 320
-		resd 640 ; 27/12/2024	
+		resd 640 ; 27/12/2024
 RowOfs:		;resw 256
 		resd 256 ; 27/12/2024
 
