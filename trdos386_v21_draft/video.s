@@ -497,7 +497,7 @@ VBE_bios_return:
 	;cmp	esi, [k_page_dir]
 	;je	short VBE_bios_return_x
 	mov	cr3, esi
-;VBE_bios_return_x:	
+;VBE_bios_return_x:
 	pop	esi ; ****
 	pop	ebp ; *** ; 27/11/2020
 	pop	es  ; **

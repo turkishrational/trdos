@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 10/01/2026  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 13/01/2026  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1535,6 +1535,7 @@ sysfork_5: ; 2:
 		; br sysret1
 
 syscreat: ; < create file >
+	; 13/01/2026
 	; 03/01/2026
 	; 06/08/2025
 	; 05/08/2025 - TRDOS 386 v2.0.10
@@ -1861,11 +1862,11 @@ skip_truncate:
 	call	update_fat32_fsinfo
 	; ignore any errors
 
-syscreat_4:
+;syscreat_4:
 	; now... open file for write
-	;xor	eax, eax ; file size = 0
-	mov	edi, FindFile_DirEntry
-	mov	dl, 1 ; open file for writing
+	;;xor	eax, eax ; file size = 0
+	;mov	edi, FindFile_DirEntry
+	;mov	dl, 1 ; open file for writing
 
 	; 03/01/2026
 	; set parameters for sysopen
@@ -1874,11 +1875,14 @@ syscreat_4:
 	;mov	al, [Current_Drv]
 	;mov	[FindFile_Drv], al ; OF_DRIVE
 
-	mov	eax, [createfile_entrypos] ; dir entry position
-	shr	eax, 5 ; /32 ; directory entry sequence number
-	mov	[FindFile_DirEntryNumber], al ; OF_DIRPOS
-	mov	eax, [createfile_dirsector]
-	mov	[FindFile_DirSector], eax ; OF_DIRSECTOR
+	; 13/01/2026
+	; [FindFile_DirEntryNumber] = dir entry seq. number
+	; [FindFile_DirSector] = dir entry sector
+
+syscreat_4:
+	; 13/01/2026
+	mov	edi, FindFile_DirEntry
+	mov	dl, 1 ; open file for writing
 
 	xor	eax, eax ; file size = 0
 
@@ -1915,9 +1919,10 @@ syscreat_1:
 syscreat_2:
 	mov	esi, FindFile_Name
 	;xor	edx, edx
-	xor	eax, eax ; File Size = 0
-	xor	ebx, ebx
-	dec 	ebx ; FFFFFFFFh -> create empty file
+	; 13/01/2026
+	;xor	eax, eax ; File Size = 0
+	;xor	ebx, ebx
+	;dec 	ebx ; FFFFFFFFh -> create empty file
 	            ;              (only for FAT fs)
 	; CL = File Attributes
 	call	create_file
@@ -1932,6 +1937,9 @@ syscreat_2:
 		; ECX = Directory Entry Index/Number (<2048)
 		;      (in directory cluster, not in directory)
 		; EDX = Directory Cluster Number (of the file)
+		; 13/01/2026
+		; [createfile_entrypos] = dir entry offset
+		; [createfile_dirsector] = dir entry sector
 
 	; 06/08/2025
 	; ESI = Logical Dos Drv Descr. Table Addr.
@@ -1972,6 +1980,13 @@ syscreat_2:
 	; EAX = File Size (= 0)
 	jmp	short sysopen_2
 %else
+	; 13/01/2026
+	mov	eax, [createfile_entrypos] ; dir entry position
+	shr	eax, 5 ; /32 ; directory entry sequence number
+	mov	[FindFile_DirEntryNumber], al ; OF_DIRPOS
+	mov	eax, [createfile_dirsector]
+	mov	[FindFile_DirSector], eax ; OF_DIRSECTOR
+
 	; 06/08/2025
 	jmp	short syscreat_4
 %endif

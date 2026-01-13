@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 01/01/2026  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 13/01/2026  (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -3061,6 +3061,7 @@ rediv_tfs_hex:
 	jmp	print_msg
 
 find_first_file:
+	; 13/01/2026
 	; 16/06/2025
 	; 10/06/2025
 	; 02/06/2025
@@ -3115,9 +3116,10 @@ find_first_file:
 	rep	stosd	; 44 bytes
 	;stosw		; +2 bytes
 
+	; 13/01/2026
 	; 16/06/2025
 	; 10/06/2025
-	;mov	[FindFile_MatchCounter], ax ; 0
+	mov	[FindFile_MatchCounter], ax ; 0
 
 	mov	edi, FindFile_Name ; FFF structure, offset 105 ; 15/05/2025
 	cmp	esi, edi
