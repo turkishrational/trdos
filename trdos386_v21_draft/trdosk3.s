@@ -74,7 +74,7 @@ loc_ccdrv_dos_drive_name_check_ok:
 	ja	short loc_gmcs_init_drv_hd
 
 loc_gmcs_init_drv_fd:
-	or	ah, ah 
+	or	ah, ah
 	; AH = 1 is initialization sign (invalid_fd_parameter)
 	jnz	short loc_ccdrv_call_fd_init
 
@@ -124,7 +124,7 @@ loc_ccdrv_get_FAT_volume_name_0:
 	or	al, al
 	jz	short loc_change_current_drv2
 
-	push	esi 
+	push	esi
 	cmp	al, 2
 	ja	short loc_ccdrv_get_FAT32_vol_name
 
@@ -1018,7 +1018,7 @@ write_backspace:
 	mov	bx, 7 ; bl = attribute/color
 		      ; bh = video page = 0
 	call	_write_tty
-	mov	al, 20h ; BLANK/SPACE char 
+	mov	al, 20h ; BLANK/SPACE char
 	;mov	bx, 7 ; attribute/color
 	;call	_write_c_current
 	;retn
@@ -2331,7 +2331,7 @@ c_8:
 
 cmp_cmd_longname:
 	mov	edi, Cmd_LongName
-	call	cmp_cmd	
+	call	cmp_cmd
 	;jnc	get_and_print_longname
 	; 26/07/2022
 	jc	short cmp_cmd_external
@@ -3210,6 +3210,7 @@ loc_fff_fnf_chk_mc:
 	mov	[FindFile_DirFirstCluster], eax
 
 loc_fff_fnf_inc_mc:
+
 	mov	eax, [DirBuff_Cluster]
 	mov	[FindFile_DirCluster], eax
 
@@ -3508,7 +3509,7 @@ get_longname_option_4:
 	jmp	loc_print_shortname
 
 loc_find_longname:
-	; check Singlix FS 
+	; check Singlix FS
 	;cmp	byte [edx+LD_FSType], 0A1h
 	cmp	dl, 0A1h
 	je	short loc_find_fs_longname
@@ -3562,7 +3563,7 @@ loc_find_fs_longname:
 loc_print_longname:
 	;mov	esi, LongFileName ; (max. 130 bytes)
 	mov	edi, TextBuffer ; (max. space: 256 bytes)
-	push	edi 
+	push	edi
 	; 04/06/2025
 	; 20/05/2025
 	; TRDOS 386 v2.0.10 limit for FAT/FAT32 long name
@@ -5756,7 +5757,7 @@ loc_attr_file_change_attributes:
 	; 28/07/2022
 	jnc	short loc_print_attr_changed_message
 loc_sfa_5:
-	jmp	loc_file_rw_cmd_failed 
+	jmp	loc_file_rw_cmd_failed
 
 loc_attr_file_fs_check:
 	sub	eax, eax
@@ -6139,7 +6140,7 @@ loc_rename_df_process_q_df:
 	;mov	cl, 12
 	;mov	esi, DestinationFile_Name
 	; 25/07/2025
-	;mov	esi, FindFile_Name 
+	;mov	esi, FindFile_Name
 
 	mov	edi, Rename_NewName
 rename_df_process_q_nml_1_df:
@@ -6162,7 +6163,7 @@ loc_rename_confirmation_question:
 
 rename_confirmation_question_file:
 	mov	esi, Rename_File
-	call	print_msg 
+	call	print_msg
 	jmp	short rename_confirmation_question_as
 
 rename_confirmation_question_dir:
@@ -6282,7 +6283,7 @@ move_scan_destination_2:
 	mov	[DestinationFilePath], esi
 
 move_scan_destination_3:
-	inc	esi  
+	inc	esi
 	cmp	byte [esi], 20h
 	ja	short move_scan_destination_3
 	mov	byte [esi], 0
@@ -6454,7 +6455,7 @@ get_copy_source_fchar:
 	mov	[SourceFilePath], esi
 
 copy_scan_source_file:
-	inc	esi  
+	inc	esi
 	cmp	byte [esi], 20h
 	je	short copy_scan_destination_1
 	;;jb	short loc_copy_nofilename_retn
@@ -6472,7 +6473,7 @@ copy_scan_destination_1:
 	mov	byte [esi], 0
 
 copy_scan_destination_2:
-	inc	esi  
+	inc	esi
 	cmp	byte [esi], 20h
 	je	short copy_scan_destination_2
 	;;jb	short loc_copy_nofilename_retn
@@ -7653,7 +7654,7 @@ set_env_change_variable_calc21:
 
 	mov	eax, ecx ; old variable's address (after '=')
 
-	mov	ecx, esi 
+	mov	ecx, esi
 	sub	ecx, edi ; count of bytes to move backward
 
 	mov	esi, edi ; next variable's address
@@ -7822,7 +7823,7 @@ loc_move_mainprog_cfg_nl2:
 	cmp	al, 20h
  	ja	short loc_end_of_mainprog_cfg_line
 	inc	esi
-	jmp	short loc_move_mainprog_cfg_nl2	
+	jmp	short loc_move_mainprog_cfg_nl2
 
 	; 25/07/2022
 mcfg_deallocate_mem:
@@ -7830,7 +7831,7 @@ mcfg_deallocate_mem:
 	;mov	ecx, [csftdf_sf_mem_bsize] ; block size
 	; 14/10/2025
 	mov	eax, [MainProgCfg_mem_addr] ; start address
-	mov	ecx, [MainProgCfg_mem_bsize] ; block size	
+	mov	ecx, [MainProgCfg_mem_bsize] ; block size
 
 	;call	deallocate_memory_block
 	;retn

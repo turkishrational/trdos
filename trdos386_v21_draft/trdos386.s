@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.10 (v2.1.0 pre-work)
 ; ----------------------------------------------------------------------------
-; Last Update: 13/01/2026 (Previous: 28/01/2025)
+; Last Update: 15/01/2026 (Previous: 28/01/2025)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -21,7 +21,7 @@
 ; nasm trdos386.s -l trdos386.txt -o TRDOS386.SYS
 
 KLOAD	equ 10000h ; Kernel loading address
-	; NOTE: Retro UNIX 8086 v1 boot code loads kernel at 1000h:0000h 
+	; NOTE: Retro UNIX 8086 v1 boot code loads kernel at 1000h:0000h
 KCODE	equ 08h	; Code segment descriptor (ring 0)
 KDATA	equ 10h	; Data segment descriptor (ring 0)
 ; 19/03/2015
@@ -30,7 +30,7 @@ UDATA	equ 23h ; 20h + 3h  (ring 3)
 ; 24/03/2015
 TSS	equ 28h	; Task state segment descriptor (ring 0)
 ; 19/03/2015
-CORE	equ 400000h  ; Start of USER's virtual/linear address space 
+CORE	equ 400000h  ; Start of USER's virtual/linear address space
 		     ; (at the end of the 1st 4MB)
 ECORE	equ 0FFC00000h ; End of USER's virtual address space (4GB - 4MB)
 		     ; ULIMIT = (ECORE/4096) - 1 = 0FFBFFh (in GDT)
@@ -201,7 +201,7 @@ struc PMInfo  ;  VESA VBE3 PMInfoBlock ('PMID' block)
  .size:
 
 endstruc
- 
+
 [BITS 16]       ; We need 16-bit intructions for Real mode
 
 [ORG 0]
@@ -212,12 +212,12 @@ endstruc
 	; Determine installed memory
 	; 31/10/2014
 	;
-	mov	ax, 0E801h ; Get memory size 
+	mov	ax, 0E801h ; Get memory size
 	int	15h	   ; for large configurations
 	jnc	short chk_ms
 	mov	ah, 88h    ; Get extended memory size 
 	int	15h
-	;	   
+	;
 	;mov	al, 17h	; Extended memory (1K blocks) low byte
 	;out	70h, al ; select CMOS register
 	;in	al, 71h ; read data (1 byte)
@@ -307,7 +307,7 @@ V0:
 
 	;mov	ah, 3
 	;;jmp	short V1
-	
+
 	; 15/11/2020
 	mov	bx, VBE3INFOSEG  ; 97E0h for current version
 	mov	es, bx
@@ -376,7 +376,7 @@ V0:
 	mov	si, [es:di+MODEINFO.PhysBasePtr] ; hw of LFB addr
 	mov	[def_LFB_addr], si ; k_LFB_size = 3145728 bytes
 	sub	si, 256
-	
+
 	; 15/12/2020
 	; check memory and decrease it to 3.5 GB if it is 4GB
 	; (reserve upper memory for LFB)
@@ -392,7 +392,7 @@ V0:
 	; VESA VBE3 video hardware
 	; (example: NVIDIA GEFORCE FX550, 256 MB)
 	; uses upper memory from 0D0000000h to 0DFFFFFFFh
-	
+
 	;;cmp	di, 0CF00h ; 3328 MB - 16MB
 	;jna	short V1  ; <= 3328 MB memory, it is not required
 			  ; decrease
@@ -515,7 +515,7 @@ L19:
 ; 20/02/2017
 
 
-[BITS 32] 
+[BITS 32]
 
 StartPM:
 	; Kernel Base Address = 0 ; 30/12/2013
@@ -730,7 +730,7 @@ mi_10:
 	shr	ebx, 3		 ; convert to alloc. byte offset
 	and	bl, 0FCh	 ; clear bit 0 and bit 1
 				 ;   to align on dword boundary
-	and	eax, 31		 ; set allocation bit position 
+	and	eax, 31		 ; set allocation bit position
 				 ;  (bit 0 to bit 31)
 	;
 	add	ebx, edx	 ; offset in M.A.T. + M.A.T. address
@@ -803,7 +803,7 @@ mi_14:
 	mov	[first_page], eax
 	mov	[next_page], eax ; The first free page pointer
 				 ; for user programs
-				 ; (Offset in Mem. Alloc. Tbl.)	
+				 ; (Offset in Mem. Alloc. Tbl.)
 	;
 	; Linear/FLAT (1 to 1) memory paging for the kernel is OK, here.
 	;
@@ -915,7 +915,7 @@ rp_sidt1:
 	mov	bx, ax
 	mov	eax, ebx	; /* selector = 0x0008 = cs */
        			        ; /* interrupt gate - dpl=0, present */
-	stosd	; selector & offset bits 0-15 	
+	stosd	; selector & offset bits 0-15
 	mov	eax, edx
 	stosd	; attributes & offset bits 16-23
 	loop	rp_sidt1
@@ -1564,7 +1564,7 @@ drv_init:
 	;
 setup_error:
 	mov 	esi, setup_error_msg
-psem:	
+psem:
 	lodsb
 	or	al, al
 	;jz	short haltx ; 22/02/2015
@@ -1910,7 +1910,7 @@ vbe3:	db 0  ; VESA VBE version (must be 03h)
 vbe2bios:
 	db 0B0h ;
 ;pmid_addr:
-	;dw 0  ; > 0 if 'PMID' sign is found 
+	;dw 0  ; > 0 if 'PMID' sign is found
 	;     ;	('pmid' offset addr in VGA bios seg, 0C000h)
 	;; 02/12/2020
 	;dw 0	; 32 bit address in pmid_addr
@@ -1930,7 +1930,7 @@ vbe2bios:
 ; 14/05/2015 (multi tasking -time sharing- 'clock', x_timer)
 ; 17/02/2015
 ; 06/02/2015 (unix386.s)
-; 11/12/2014 - 22/12/2014 (dsectrm2.s) 
+; 11/12/2014 - 22/12/2014 (dsectrm2.s)
 ;
 ; IBM PC-XT Model 286 Source Code - BIOS2.ASM (06/10/85)
 ;
@@ -2021,7 +2021,7 @@ T5:
 					;	1 = normal operation
 					;	0 = reset
 					; bit 0, 1 = drive select
-					; bit 4-7 = motor running bits 
+					; bit 4-7 = motor running bits
 	MOV	DX,03F2H		; FDC CTL PORT
 	OUT	DX,AL			; TURN OFF THE MOTOR
 T6:
@@ -2301,7 +2301,7 @@ rtc_int_0:
 rtc_int_1:
 	; Timer event (kernel) functions must be performed with
 	; 1 second intervals - TRDOS 386 (TRDOS v2.0) feature ! -
- 	;	
+ 	;
 	; 25/08/2014
 	call	rtc_p  ; 19/05/2016 - major modification 
 
@@ -2312,7 +2312,7 @@ rtc_int_return: ; 19/05/2016
 	; 22/02/2015 - dsectpm.s
 	; [ source: http://wiki.osdev.org/RTC ]
 	; read status register C to complete procedure
-	;(it is needed to get a next IRQ 8) 
+	;(it is needed to get a next IRQ 8)
 	mov	al, 0Ch ; 
 	out	70h, al ; select register C
 	nop
@@ -2657,7 +2657,7 @@ h1ok:
 	cmp	ah, 9
 	jna	short h2ok
 	add	ah, 'A'-':'
-h2ok:	
+h2ok:
 	xchg 	ah, al
 	add	ax, '00'
 	mov	[excnstr], ax
@@ -2769,7 +2769,7 @@ piemsg:
 	; 22/08/2014
 	mov	al, 20h ; END OF INTERRUPT COMMAND TO 8259
 	out	20h, al	; 8259 PORT
-iiretp: 
+iiretp:
 	; 22/01/2017
 	; 01/09/2015
 	; 28/08/2015
@@ -2833,7 +2833,7 @@ time_of_day_retn:
 rtc_p:
 	mov	cl, 1 ; 15/01/2017
 	jmp	short rtc_p0
-u_timer: 
+u_timer:
 	; Timer Events with 18.2 Hz Timer Ticks
 	; (and also timer events with RTC seconds)
 	sub	cl, cl ; mov cl, 0 ; 15/01/2017
@@ -2863,7 +2863,7 @@ rtc_p1:
 	; 15/01/2017
 	; cl = interrupt source
 	;       1 = RTC, 0 = PIT
-	cmp	al, cl 
+	cmp	al, cl
 	jne	short rtc_p2 ; not as requested or undefined !
 	cmp	al, 1 ; 1 ; RTC interrupt ?
 	je	short rtc_p5 ; yes, check for response
@@ -2970,7 +2970,7 @@ bcd_to_ascii:
 	retn
 
 ; 15/12/2020
-real_mem_16m_64k: 
+real_mem_16m_64k:
 	dw	0	; Real size of system memory (if > 16MB)
 			; as number of 64K blocks - 256
 			; (This is for saving real system memory
@@ -3096,7 +3096,7 @@ default_lfb_info:
 ; Convert binary number to hexadecimal string
 ; 10/05/2015  
 ; dsectpm.s (28/02/2015)
-; Retro UNIX 386 v1 - Kernel v0.2.0.6  
+; Retro UNIX 386 v1 - Kernel v0.2.0.6
 ; 01/12/2014
 ; 25/11/2014
 ;
@@ -3723,7 +3723,7 @@ dskx:
 
 setup_error_msg:
 	db	0Dh, 0Ah
-	db	'Disk Setup Error !' 
+	db	'Disk Setup Error !'
 	db	0Dh, 0Ah,0
 
 next2line: ; 08/02/2016
@@ -3748,7 +3748,7 @@ lfb_addr_str: ; 8 (hex) digits
 ;	db 0Dh, 0Ah
 ;	db 07h
 ;	db 'Kernel initialization ERROR !'
-;	db 0Dh, 0Ah, 0 
+;	db 0Dh, 0Ah, 0
 
 ;welcome_msg:
 ;	db 0Dh, 0Ah
@@ -3768,7 +3768,7 @@ panic_msg:
 
 	db 0Dh, 0Ah, 0
 
-;msgl_drv_not_ready: 
+;msgl_drv_not_ready:
 ;	db 07h, 0Dh, 0Ah
 ;       db 'Drive not ready or read error !'
 ;       db 0Dh, 0Ah, 0
@@ -3782,7 +3782,7 @@ starting_msg:
 	;;;db "Turkish Rational DOS v2.0 [29/12/2024] ...", 0
 	;;db "Turkish Rational DOS v2.0 [28/01/2025] ...", 0
 	;db "Turkish Rational DOS v2.0 [24/04/2025] ...", 0
-	db "Turkish Rational DOS v2.1 [13/01/2026] ...", 0
+	db "Turkish Rational DOS v2.1 [15/01/2026] ...", 0
 
 NextLine:
 	db 0Dh, 0Ah, 0
@@ -3847,7 +3847,7 @@ kernel_version_msg: ; 17/04/2021
 ;;;db	"TRDOS (386) Kernel v2.0.8 by Erdogan Tan" ; 16/05/2024
 ;;db	"TRDOS (386) Kernel v2.0.9 by Erdogan Tan" ; 20/08/2024
 ;db	"TRDOS (386) Kernel v2.0.10 by Erdogan Tan" ; 11/01/2025
-db	"TRDOS (386) Kernel v2.1.0 by Erdogan Tan" ; 13/01/2026
+db	"TRDOS (386) Kernel v2.1.0 by Erdogan Tan" ; 15/01/2026
 db	0
 
 ; 20/02/2017
@@ -3877,7 +3877,7 @@ task_state_segment:
 	; 24/03/2015
 tss.link:   resw 1
 	    resw 1
-; tss offset 4	
+; tss offset 4
 tss.esp0:   resd 1
 tss.ss0:    resw 1
 	    resw 1

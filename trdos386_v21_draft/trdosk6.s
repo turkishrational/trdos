@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 13/01/2026  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 15/01/2026  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1535,6 +1535,7 @@ sysfork_5: ; 2:
 		; br sysret1
 
 syscreat: ; < create file >
+	; 15/01/2026
 	; 13/01/2026
 	; 03/01/2026
 	; 06/08/2025
@@ -1972,7 +1973,7 @@ syscreat_2:
 	; If "syscreat" will return with that error,
 	; (the file has been created but it could not be opened)
 	; the user must retry to open this file again
-	; or must close another file before using 
+	; or must close another file before using
 	; "sysopen" system call.
 
 	mov	dl, 1 ; open file for writing
@@ -1986,6 +1987,10 @@ syscreat_2:
 	mov	[FindFile_DirEntryNumber], al ; OF_DIRPOS
 	mov	eax, [createfile_dirsector]
 	mov	[FindFile_DirSector], eax ; OF_DIRSECTOR
+
+	; 15/01/2026
+	mov	dl, [Current_Drv]
+	mov	[FindFile_Drv], dl
 
 	; 06/08/2025
 	jmp	short syscreat_4
@@ -2640,6 +2645,7 @@ seektell_err:	; 01/01/2026
 	jmp	error
 
 sysread: ; < read from file >
+	; 14/01/2026
 	; 02/01/2026
 	; 01/01/2026
 	; 08/12/2025 - TRDOS 386 v2.0.10 (v2.1)
@@ -2717,15 +2723,9 @@ sysread: ; < read from file >
 	jz	short file_access_error
 
 	call	rw1	; 03/09/2024 (major modification)
-	jnc	short sysread_0
-
-sysrw_err:	; 03/09/2024
-device_rw_error: ; 03/05/2025
-	; 01/01/2026
-	mov	[u.error], eax
-	;
-	mov	[u.r0], eax ; error code
-	jmp	error
+	;jnc	short sysread_0
+	; 14/01/2026
+	jc	short sysrw_err
 
 sysread_0:
 	; 02/01/2026
@@ -2735,8 +2735,22 @@ sysread_0:
 
 	call	readi
 	; 08/12/2025
-	jc	short sysrw_err ; eax = error code
-	jmp	short rw0
+	;jc	short sysrw_err ; eax = error code
+	;jmp	short rw0
+	; 14/01/2026
+	jnc	short rw0
+
+	; 14/01/2026
+	
+
+	; 14/01/2026
+sysrw_err:	; 03/09/2024
+device_rw_error: ; 03/05/2025
+	; 01/01/2026
+	mov	[u.error], eax
+	;
+	mov	[u.r0], eax ; error code
+	jmp	error
 
 syswrite: ; < write to file >
 	; 02/01/2026
@@ -2830,7 +2844,7 @@ syswrite: ; < write to file >
 syswrite_0:
 	; 02/01/2026
 	; same removable drive check
-	call 	check_openfile_volumeid
+	call	check_openfile_volumeid
 	jc	short sysrw_err ; eax = ERR_DRV_NOT_SAME
 
 	; 01/01/2026
@@ -13917,6 +13931,7 @@ cnpm_2:
 ;	retn ; * 'sysret' ; byte [sysflg] -> 0FFh
 
 readi:
+	; 14/01/2026
 	; 09/12/2025
 	; 08/12/2025 - TRDOS 386 v2.0.10 (v2.1)
 	; 09/08/2022
@@ -13968,6 +13983,7 @@ dskr_0:
 	;jna	short dskr_4
 	ja	short dskr_@
 	jz	short dskr_4
+
 	mov	eax, ERR_FILE_EOF ; end of file
 	; cf = 1
 	retn
@@ -14344,7 +14360,7 @@ passc_2:
 	;pop	eax
 	jmp	error
 
-sioreg: 
+sioreg:
 	; 29/04/2016 - TRDOS 386 (TRDOS v2.0)
 	; 19/05/2015 - 25/07/2015 (Retro UNIX 386 v1)
 	; 12/03/2013 - 22/07/2013 (Retro UNIX 8086 v1)
@@ -14364,8 +14380,8 @@ sioreg:
         ;
 	; ((Modified registers:  EDX))
 
-        mov     esi, [u.fofp]
-        mov     edi, [esi]
+        mov	esi, [u.fofp]
+        mov	edi, [esi]
 	mov	ecx, edi
 	or	ecx, 0FFFFFE00h
 	and	edi, 1FFh
@@ -14377,9 +14393,9 @@ sioreg:
 sioreg_0:
 	cmp	byte [u.kcall], 0
 	jna	short sioreg_1
-	 ; the caller is 'mkdir' or 'namei'
+	; the caller is 'mkdir' or 'namei'
 	mov	eax, [u.base]
-	mov 	[u.pbase], eax ; physical address = virtual address
+	mov	[u.pbase], eax ; physical address = virtual address
 	mov	word [u.pcount], cx ; remain bytes in buffer (1 sector)
 	jmp	short sioreg_2
 sioreg_1:
@@ -14387,12 +14403,12 @@ sioreg_1:
 	cmp	ecx, edx
 	ja	short sioreg_4 ; transfer count > [u.pcount]
 sioreg_2: ; 2:
-	xor 	eax, eax
+	xor	eax, eax
 sioreg_3:
-	add 	[u.nread], ecx
-	sub 	[u.count], ecx
-	add 	[u.base], ecx
-        add 	[esi], ecx 
+	add	[u.nread], ecx
+	sub	[u.count], ecx
+	add	[u.base], ecx
+        add	[esi], ecx
 	mov	esi, [u.pbase]
 	sub	[u.pcount], cx
 	add	[u.pbase], ecx
