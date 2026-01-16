@@ -5974,8 +5974,8 @@ loc_rename_sf_found:
 
 loc_rename_attrb_ok:
 	; 25/07/2025
-        mov     esi, FindFile_Drv
-        mov     edi, SourceFile_Drv
+	mov     esi, FindFile_Drv
+	mov     edi, SourceFile_Drv
 	;;mov	ecx, 32
 	;mov	ecx, 184/4
 	mov	ecx, (FindFile.size+3)/4
@@ -6113,7 +6113,7 @@ rename_df_move_find_struct_to_dest:
 	; FindFile_DirEntryName = new name
 	;	in dos directory entry format
 	mov	ecx, 12
-	mov	esi, FindFile_Name ; capitalized 
+	mov	esi, FindFile_Name ; capitalized
 ; 25/07/2025
 %if 0
 	mov	edi, DestinationFile_Name

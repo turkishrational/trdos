@@ -2681,7 +2681,7 @@ sysread: ; < read from file >
 	; Calling sequence:
 	;	sysread; buffer; nchars
 	; Arguments:
-	;	buffer - location of contiguous bytes where 
+	;	buffer - location of contiguous bytes where
 	;		 input will be placed.
 	;	nchars - number of bytes or characters to be read.
 	; Inputs: *u.r0 - file descriptor (& arguments)
@@ -2695,7 +2695,7 @@ sysread: ; < read from file >
 	;	* 3rd argument, number of bytes is in DX register
 	;
 	;	AX register (will be restored via 'u.r0') will return
-	;	to the user with number of bytes read. 
+	;	to the user with number of bytes read.
 	;
 	; TRDOS 386 (05/10/2016)
 	;
@@ -2739,9 +2739,6 @@ sysread_0:
 	;jmp	short rw0
 	; 14/01/2026
 	jnc	short rw0
-
-	; 14/01/2026
-	
 
 	; 14/01/2026
 sysrw_err:	; 03/09/2024

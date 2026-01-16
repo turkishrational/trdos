@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/01/2026 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 16/01/2026 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -430,22 +430,23 @@ DestinationFilePath: resd 1
 ; FILE.ASM (09/10/2011)
 ;Source File Structure (same with 'Find File' Structure)
 SourceFile_Drv:		  resb 1
+; 16/01/2026
 ; 18/10/2025
-;SourceFile_Directory:	  resb 104 ; 7*13 + 12 + zero
+SourceFile_Directory:	  resb 104 ; 7*13 + 12 + zero
 SourceFile_Name:	  resb 13
-;SourceFile_AttributesMask: resw 1
+SourceFile_AttributesMask: resw 1
 SourceFile_DirEntry:	  resb 32
 SourceFile_DirFirstCluster: resd 1
-;SourceFile_DirCluster:	  resd 1
-;SourceFile_DirSector:	  resd 1
+SourceFile_DirCluster:	  resd 1
+SourceFile_DirSector:	  resd 1
 SourceFile_DirEntryNumber: resb 1
-;SourceFile_DirSectorCount: resb 1
-;SourceFile_MatchCounter:  resw 1
-;;SourceFile_Reserved1:	  resw 1
+SourceFile_DirSectorCount: resb 1
+SourceFile_MatchCounter:  resw 1
+;SourceFile_Reserved1:	  resw 1
 SourceFile_LastEntryNumber: resw 1
 SourceFile_LongNameEntryLength:
 SourceFile_LongNameYes:	  resb 1 ; Sign for longname procedures
-;SourceFile_DirEntryName:  resb 13
+SourceFile_DirEntryName:  resb 13
 ; 184 bytes
 ;SourceFile_LongName:	  resb 129 ; ASCIIZ (max. 128+NUL)
 ; 01/07/2025
