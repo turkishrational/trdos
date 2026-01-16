@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 15/01/2026  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 16/01/2026  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1997,6 +1997,7 @@ syscreat_2:
 %endif
 
 sysopen: ;<open file>
+	; 16/01/2026
 	; 02/01/2026
 	; 05/08/2025
 	; 07/07/2025
@@ -2248,6 +2249,10 @@ sysopen_8:
 	mov	[edi+OF_FCLUSTER], eax ; First cluster
 	;mov	[edi+OF_CCLUSTER], eax ; Current cluster
 
+	; 16/01/2026
+	mov	eax, [ebx+DirEntry_WrtTime]
+	mov	[edi+OF_DATETIME], eax ; lw = time, hw = date
+
 	xor	ebx, ebx
 	mov	[edi+OF_POINTER], ebx ; offset pointer (0)
 	; 02/01/2026
@@ -2302,8 +2307,11 @@ sysopen_7:
 	; 02/01/2026
 	; 23/07/2022
 	;shr	edi, 1
-	mov	byte [edi+OF_OPENCOUNT], dl ; 0
-	mov	byte [edi+OF_STATUS], dl ; 0
+	mov	[edi+OF_OPENCOUNT], dl ; 0
+	mov	[edi+OF_STATUS], dl ; 0
+
+	; 16/01/2026
+	mov	[edi+OF_OPENCOUNT], dl ; 0
 
 	mov	ebx, edi
 	inc	bl
@@ -12727,6 +12735,7 @@ sysfstat:
 %endif
 
 fclose:
+	; 16/01/2026
 	; 02/01/2026
 	; 24/04/2025
 	; 21/04/2025 - TRDOS 386 Kernel v2.0.10 (v2.1 pre-work)
@@ -12742,7 +12751,7 @@ fclose:
 	; 'fclose' first gets the i-number of the file via 'getf'.
 	; If i-node is active (i-number > 0) the entry in
 	; u.fp list is cleared. If all the processes that opened
-	; that file close it, then fsp etry is freed and the file
+	; that file close it, then fsp entry is freed and the file
 	; is closed. If not a return is taken.
 	; If the file has been deleted while open, 'anyi' is called
 	; to see anyone else has it open, i.e., see if it is appears
@@ -12797,6 +12806,12 @@ fclose_1:
 	; 24/04/2025
 	jb	short fclose_0	      ; 1 = read, 2 = write
 
+	; 16/01/2026
+	dec	byte [ebx+OF_OPENCOUNT] ; decrement the number of processes
+			                ; that have opened the file
+	jns	short fclose_3 ; jump if not negative (jump if bit 7 is 0)
+			; if all processes haven't closed the file, return
+
 	; 24/04/2025
 	;; 18/09/2024 (EMPTY FILE BugFix)
 	;;cmp	eax, 1 ; is the first cluster number > 0
@@ -12819,20 +12834,23 @@ fclose_1:
 	mov	[ebx+OF_DATETIME+2], dx
 	shr	ebx, 2
 
-fclose_4:
+;fclose_4:
 	; 21/04/2025 - TRDOS 386 v2.0.10
 	; ebx = System File Number (MSDOS -> SFT entry number)
 	call	update_directory_entry
+
+	; 16/01/2026
+fclose_4:
 	; 24/04/2025
 	pushf
 	; if cf = 1 -> eax = error code
 
-; ****
-	dec	byte [ebx+OF_OPENCOUNT] ; decrement the number of processes
-			                ; that have opened the file
-	jns	short fclose_2 ; jump if not negative (jump if bit 7 is 0)
-			; if all processes haven't closed the file, return
-	;
+	; 16/01/2026
+	;dec	byte [ebx+OF_OPENCOUNT] ; decrement the number of processes
+	;		                ; that have opened the file
+	;jns	short fclose_2 ; jump if not negative (jump if bit 7 is 0)
+	;		; if all processes haven't closed the file, return
+
 	; 24/04/2025 (ecx)
 	; 23/07/2022 (eax)
 	xor	ecx, ecx ; 0
@@ -13986,7 +14004,7 @@ dskr_0:
 	retn
 dskr_@:
 	push	eax ; 01/05/2016
-	cmp     edx, [u.count]
+	cmp	edx, [u.count]
 	jnb	short dskr_1
 	mov	[u.count], edx
 dskr_1:

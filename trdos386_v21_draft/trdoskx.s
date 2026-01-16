@@ -418,7 +418,7 @@ LCDE_Cluster: 	 resd 1
 
 LCDE_ByteOffset: resd 1
 
-;alignb4
+;alignb 4
 ; 06/03/2016 (word -> dword)
 ; CMD_INTR.ASM (01/08/2010)
 SourceFilePath:	     resd 1

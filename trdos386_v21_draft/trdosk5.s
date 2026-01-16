@@ -2998,7 +2998,7 @@ getb_9:
 	call	BUFWRITE	; write out the dirty buffer
 	;jc	short getb_11
 	; 05/06/2025
-	jc	short getb_12	; eax = ERR_DRV_WRITE  
+	jc	short getb_12	; eax = ERR_DRV_WRITE
 
 	mov	eax, ebp	; restore sector number
 getb_10:
