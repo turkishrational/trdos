@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 16/01/2026  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 17/01/2026  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1997,6 +1997,7 @@ syscreat_2:
 %endif
 
 sysopen: ;<open file>
+	; 17/01/2026
 	; 16/01/2026
 	; 02/01/2026
 	; 05/08/2025
@@ -2189,13 +2190,19 @@ sysopen_4:
 sysopen_5:
 	; 19/08/2024
 	;;;
-	push	eax ; size
-	mov	ax, [ebx+DirEntry_FstClusHI]
-	shl	eax, 16
-	mov	ax, [ebx+DirEntry_FstClusLO]
-	pop	ebx ; size
-	; eax = First Cluster
-	; ebx = File Size
+	; 17/01/2025
+	;push	eax ; size
+	;mov	ax, [ebx+DirEntry_FstClusHI]
+	;shl	eax, 16
+	;mov	ax, [ebx+DirEntry_FstClusLO]
+	mov	cx, [ebx+DirEntry_FstClusHI]
+	shl	ecx, 16
+	mov	cx, [ebx+DirEntry_FstClusLO]
+	; 17/01/2026
+	;pop	ebx ; size
+	; ecx = First Cluster
+	; eax = File Size
+	; ebx = Directory Entry Address
 	cmp	dl, 1 ; is open mode = open for write ?
 	jne	short sysopen_8
 	; check if the file is already open for write
@@ -2208,7 +2215,9 @@ sysopen_5_@:
 	cmp	dl, [edi+OF_DRIVE]
 	jne	short sysopen_5_@@@
 	shl	edi, 2
-	cmp	eax, [edi+OF_FCLUSTER]
+	;cmp	eax, [edi+OF_FCLUSTER]
+	; 17/01/2026
+	cmp	ecx, [edi+OF_FCLUSTER]
 	jne	short sysopen_5_@@
 	pop	edi
 	jmp	short sysopen_access_err
@@ -2236,9 +2245,11 @@ sysopen_8:
 	; 23/07/2022
 	shl	edi, 2
 
+	; 17/01/2026
 	; 19/08/2024
-	;mov	[edi+OF_SIZE], eax ; File size in bytes
-	mov	[edi+OF_SIZE], ebx ; File size in bytes
+	mov	[edi+OF_SIZE], eax ; File size in bytes
+	;mov	[edi+OF_SIZE], ebx ; File size in bytes
+
 
 	; 19/08/2024
 	; eax = Fist Cluster
@@ -2246,9 +2257,12 @@ sysopen_8:
 	;shl	eax, 16
 	;mov	ax, [ebx+DirEntry_FstClusLO]
 
-	mov	[edi+OF_FCLUSTER], eax ; First cluster
-	;mov	[edi+OF_CCLUSTER], eax ; Current cluster
+	;mov	[edi+OF_FCLUSTER], eax ; First cluster
+	;;mov	[edi+OF_CCLUSTER], eax ; Current cluster
+	; 17/01/2026
+	mov	[edi+OF_FCLUSTER], ecx ; First cluster
 
+	; 17/01/2026
 	; 16/01/2026
 	mov	eax, [ebx+DirEntry_WrtTime]
 	mov	[edi+OF_DATETIME], eax ; lw = time, hw = date
