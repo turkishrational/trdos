@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 17/01/2026  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 18/01/2026  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -14060,6 +14060,7 @@ dskr_5:		; 23/07/2022
 	retn
 
 mget_r:
+	; 18/01/2026
 	; 01/01/2026
 	; 09/12/2025
 	; 08/12/2025
@@ -14281,8 +14282,10 @@ mget_r_9:
 	jnc	short mget_r_10
 %else
 	; 08/12/2025
-	mov	cl, [readi.drv]
 	mov	edx, esi
+	;mov	cl, [readi.drv]
+	; 18/01/2026
+	mov	cl, [edx+LD_PhyDrvNo]
 	call	GETBUFFER
 	jc	short mget_r_err ; eax = error code
 	; esi = buffer header address
@@ -16102,6 +16105,7 @@ find_next_fs_file:
 	retn
 
 writei:
+	; 18/01/2026
 	; 03/01/2026
 	; 02/01/2026
 	; 01/01/2026
@@ -16154,6 +16158,7 @@ dskw:
 	mov	[writei.ofn], bl ; Open file number
 	mov	[setfmod], cl ; 0 ; reset 'update lm date&time' sign
 dskw_0:
+	; 18/01/2026
 	; 01/01/2026 - TRDOS 386 v2.0.10 (v2.1)
 	; 26/10/2016
 	; 22/10/2016, 23/10/2016, 25/10/2016
@@ -16167,7 +16172,9 @@ dskw_0:
 
 	; 01/01/2026
 	mov	edx, esi ; LDRVT address
-	mov	cl, [writei.drv]
+	;mov	cl, [writei.drv]
+	; 18/01/2026
+	mov	cl, [edx+LD_PhyDrvNo]
 
 	;mov	ebx, [u.fofp]
 	;mov	edx, [ebx]

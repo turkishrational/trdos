@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - File System Procs : trdosk5s
 ; ----------------------------------------------------------------------------
-; Last Update: 06/01/2026 (Previous: 31/08/2024, v2.0.9)
+; Last Update: 18/01/2026 (Previous: 31/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -5195,7 +5195,7 @@ ADD_NEW_CLUSTER:
 	;;;;		is set if file was null
 	;
 	;  If cf = 1 and eax = 39 ; ERR_DISK_SPACE (disk full)
-	;     ecx = max. no. of clusters that could be added to file
+	;;;;  ecx = max. no. of clusters that could be added to file
 	;
 	; Modified registers:
 	;	eax, ecx, ebx, esi, edi, ebp
@@ -5310,6 +5310,8 @@ adc_11:
 	;call	PACK	; set special "temporary" mark
 	;jc	short adc_10
 
+; 18/01/2026
+%if 0
 	cmp	byte [edx+LD_FATType], 2
 	jna	short adc_12 ; not FAT32
 
@@ -5321,21 +5323,21 @@ adc_12:
 	; FAT16 or FAT12 fs
 	lea	ebx, [edx+LD_BPB+FAT_FreeClusters]
 adc_13:
-; 21/11/2025
-%if 0	
-	mov	eax, [ebx]
-	inc	eax
-	;jz	short NO_ALLOC ; Free count not valid
-	jz	short adc_14
-	dec	eax
-
-	dec	eax
-	; Reduce free count by 1
-	mov	[ebx], eax
-	movzx	eax, byte [edx+LD_BPB+SecPerClust]
-	; 17/07/2025
-	sub	[edx+LD_FreeSectors], eax
-%else
+;; 21/11/2025
+;%if 0	
+;	mov	eax, [ebx]
+;	inc	eax
+;	;jz	short NO_ALLOC ; Free count not valid
+;	jz	short adc_14
+;	dec	eax
+;
+;	dec	eax
+;	; Reduce free count by 1
+;	mov	[ebx], eax
+;	movzx	eax, byte [edx+LD_BPB+SecPerClust]
+;	; 17/07/2025
+;	sub	[edx+LD_FreeSectors], eax
+;%else
 	; 21/11/2025
 	mov	ecx, [ebx]
 	inc	ecx
@@ -5347,7 +5349,7 @@ adc_13:
 	mov	[ebx], ecx
 	movzx	ecx, byte [edx+LD_BPB+SecPerClust]
 	sub	[edx+LD_FreeSectors], ecx
-%endif
+;%endif
 
 adc_14: ; (MSDOS -> NO_ALLOC)
 	; 19/11/2025
@@ -5362,6 +5364,9 @@ adc_14: ; (MSDOS -> NO_ALLOC)
 	;mov	eax, [FREECLUSTER]
 	;mov	[NEXTCLUSTER], eax
 	;jmp	short adc_8
+
+; 18/01/2026
+%endif
 
 ; We've successfully extended the file. Clean up and exit
 
@@ -5396,11 +5401,48 @@ adc_15:
 	stc
 	retn
 adc_18:
+	; 18/01/2026
+	;;;;
+	cmp	byte [edx+LD_FATType], 2
+	jna	short adc_12 ; not FAT32
+
+	; FAT32 fs
+	lea	ebx, [edx+LD_BPB+FAT32_FreeClusters]
+	; 18/01/2026
+	lea	esi, [edx+LD_BPB+FAT32_FirstFreeClust]
+	jmp	short adc_13
+
+adc_12:
+	; FAT16 or FAT12 fs
+	lea	ebx, [edx+LD_BPB+FAT_FreeClusters]
+	; 18/01/2026
+	lea	esi, [edx+LD_BPB+FAT_FirstFreeClust]
+adc_13:
+	mov	ecx, [ebx]
+	inc	ecx
+	jz	short adc_14 ; Free count not valid
+	dec	ecx
+
+	dec	ecx
+	; Reduce free count by 1
+	mov	[ebx], ecx
+	movzx	ecx, byte [edx+LD_BPB+SecPerClust]
+	sub	[edx+LD_FreeSectors], ecx
+adc_14:
+	;;;;
+
 	mov	ebx, [LASTCLUSTER]
 	;mov	eax, [NEXTCLUSTER]
 	; 19/11/2025
 	mov	eax, [FREECLUSTER]
 		; EAX = first cluster allocated
+
+	; 18/01/2026
+	; set first free cluster to just after the added cluster
+	; (because this clust was the first free clust already)
+	mov	[esi], eax
+	inc	dword [esi]
+
 ; 14/07/2025
 %if 0
 	or 	ebx, ebx
@@ -5486,6 +5528,7 @@ RELEASE:
 RELEASE_nc:	; 21/07/2025
        	xor	ebx, ebx
 RELBLKS:
+	; 18/01/2026
 	; 01/01/2026
 	; 16/12/2025
 	; 13/12/2025
@@ -5519,6 +5562,9 @@ RELBLKS:
 	pop	ecx
 	pop	ebx
         jbe	short rblks_4 ; jna short rblks_4
+
+	; 18/01/2026
+	mov	[FREECLUSTER], ecx
 
 	mov	[NEXTCLUSTER], eax
 
@@ -5580,9 +5626,13 @@ rblks_5:
 	inc	eax ; -1 -> 0
 	jz	short rblks_6 ; First free cluster not valid
 
-	cmp	eax, [NEXTCLUSTER]
+	;cmp	eax, [NEXTCLUSTER]
+	; 18/01/2026
+	cmp	eax, [FREECLUSTER]
 	jna	short rblks_6
-	mov	ecx, [NEXTCLUSTER]
+	;mov	ecx, [NEXTCLUSTER]
+	; 18/01/2026
+	mov	ecx, [FREECLUSTER]
 	mov	[esi], ecx
 	jmp	short rblks_7
 rblks_6:
