@@ -1,0 +1,1132 @@
+     1                                  ; ****************************************************************************
+     2                                  ; flames.s (TRDOS 386, TRDOS v2.0 - sample binary file, 'flames.prg')
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; FLAMES.PRG ! TEST program !  TRDOS 386 VGA Functionality test !
+     5                                  ;
+     6                                  ; 15/08/2016
+     7                                  ;
+     8                                  ; [ Last Modification: 17/08/2016 ]
+     9                                  ;
+    10                                  ; Derived from disassembly of 'flames.com' file (15099 bytes)
+    11                                  ;
+    12                                  ; Assembler: NASM 2.11
+    13                                  
+    14                                  ; Original code disassembler: IDA Pro Free (MASM syntax)
+    15                                  ; 
+    16                                  ; (Original -msdos- code has been modifed for TRDOS 386 system calls and
+    17                                  ; other protected mode (TRDOS 386) interrupts.)
+    18                                  ; ****************************************************************************
+    19                                  
+    20                                  ; NOTE: Assembly source code of FLAMES.COM (by IDA, in MASM syntax)
+    21                                  ; has been modified to NASM syntax (for 386 protected mode & for TRDOS 386)
+    22                                  ; by Erdogan Tan. (14/08/2016)
+    23                                  
+    24                                  ; 19/05/2016
+    25                                  ; 29/04/2016
+    26                                  ; TRDOS 386 system calls (temporary list!)
+    27                                  _ver 	equ 0
+    28                                  _exit 	equ 1
+    29                                  _fork 	equ 2
+    30                                  _read 	equ 3
+    31                                  _write	equ 4
+    32                                  _open	equ 5
+    33                                  _close 	equ 6
+    34                                  _wait 	equ 7
+    35                                  _creat 	equ 8
+    36                                  _link 	equ 9
+    37                                  _unlink	equ 10
+    38                                  _exec	equ 11
+    39                                  _chdir	equ 12
+    40                                  _time 	equ 13
+    41                                  _mkdir 	equ 14
+    42                                  _chmod	equ 15
+    43                                  _chown	equ 16
+    44                                  _break	equ 17
+    45                                  _stat	equ 18
+    46                                  _seek	equ 19
+    47                                  _tell 	equ 20
+    48                                  _mount	equ 21
+    49                                  _umount	equ 22
+    50                                  _setuid	equ 23
+    51                                  _getuid	equ 24
+    52                                  _stime	equ 25
+    53                                  _quit	equ 26	
+    54                                  _intr	equ 27
+    55                                  _fstat	equ 28
+    56                                  _emt 	equ 29
+    57                                  _mdate 	equ 30
+    58                                  _video	equ 31
+    59                                  _audio	equ 32
+    60                                  _ilgins	equ 33
+    61                                  _sleep	equ 34
+    62                                  _msg    equ 35
+    63                                  _geterr equ 36
+    64                                  _rsrvd1	equ 37
+    65                                  _pri	equ 38
+    66                                  _rele 	equ 39
+    67                                  
+    68                                  %macro sys 1-4
+    69                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    70                                      ; 03/09/2015	
+    71                                      ; 13/04/2015
+    72                                      ; Retro UNIX 386 v1 system call.	
+    73                                      %if %0 >= 2   
+    74                                          mov ebx, %2
+    75                                          %if %0 >= 3    
+    76                                              mov ecx, %3
+    77                                              %if %0 = 4
+    78                                                 mov edx, %4   
+    79                                              %endif
+    80                                          %endif
+    81                                      %endif
+    82                                      mov eax, %1
+    83                                      ;int 30h
+    84                                      int 40h ; TRDOS 386 (TRDOS v2.0)	   
+    85                                  %endmacro
+    86                                  
+    87                                  ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
+    88                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    89                                  
+    90                                  [BITS 32] ; 80386 Protected Mode (32 bit) intructions
+    91                                  
+    92                                  [ORG 0] 
+    93                                  
+    94                                  start:
+    95                                  		; DIRECT VGA MEMORY ACCESS
+    96                                  		;xor	ebx, ebx
+    97 00000000 B705                    		mov	bh, 5 ; Direct access/map to VGA memory (0A0000h)
+    98                                  		;mov	eax, _video ; 1Fh
+    99 00000002 B01F                    		mov	al, 1Fh ; sys _video ; TRDOS 386 Video functions
+   100 00000004 CD40                    		int	40h   ; TRDOS 386 system call
+   101                                  
+   102                                  		; eax = 0A0000h
+   103 00000006 21C0                    		and	eax, eax
+   104 00000008 0F8425010000            		jz      terminate ; error (eax = 0)
+   105                                  		
+   106                                  		; ah = 0
+   107 0000000E B013                    		mov	al, 13h		; set video mode to 13h 
+   108                                  		;int	10h		; - VIDEO - SET	VIDEO MODE
+   109 00000010 CD31                    		int	31h  	; TRDOS 386 - VIDEO Interrupt
+   110                                  
+   111                                  		;mov	dx, 3C4h
+   112                                  		;mov	ax, 604h
+   113                                  		;out	dx, ax		; EGA: sequencer address reg
+   114                                  					; unknown register
+   115                                  
+   116                                  		; TRDOS 386 - IOCTL Interrupt (for ring 3)
+   117 00000012 66BB0406                		mov	bx, 604h
+   118 00000016 B403                    		mov	ah, 3 ; out (word)
+   119 00000018 66BAC403                		mov	dx, 3C4h
+   120                                  		; bx = data word
+   121                                  		; dx = port number
+   122 0000001C CD34                    		int	34h ; TRDOS 386 - IOCTL interrupt
+   123                                  
+   124                                  		;mov	dx, 3C4h
+   125                                  		;mov	ax, 0F02h
+   126                                  		;out	dx, ax		; EGA: sequencer address reg
+   127                                  					; unknown register
+   128 0000001E 66BB020F                		mov	bx, 0F02h
+   129 00000022 B403                    		mov	ah, 3 ; out (word)
+   130                                  		;mov	dx, 3C4h
+   131                                  		; bx = data word
+   132                                  		; dx = port number
+   133 00000024 CD34                    		int	34h ; TRDOS 386 - IOCTL interrupt
+   134                                  
+   135 00000026 BF00000A00              		mov	edi, 0A0000h
+   136 0000002B 31C0                    		xor	eax, eax
+   137 0000002D B900800000              		mov	ecx, 8000h
+   138 00000032 FC                      		cld
+   139 00000033 F366AB                  		rep stosw
+   140                                  
+   141                                  		;mov	dx, 3D4h
+   142                                  		;mov	ax, 14h
+   143                                  		;out	dx, ax		; Video: CRT cntrlr addr
+   144                                  					; underline location.  Bits 0-5	are scan line number.
+   145 00000036 66BAD403                		mov	dx, 3D4h
+   146 0000003A 66BB1400                		mov	bx, 14h
+   147 0000003E B403                    		mov	ah, 3 ; out (word)
+   148                                  		; bx = data word
+   149                                  		; dx = port number
+   150 00000040 CD34                    		int	34h ; TRDOS 386 - IOCTL interrupt
+   151                                  
+   152                                  		;mov	ax, 0E317h
+   153                                  		;out	dx, ax		; Video: CRT cntrlr addr
+   154                                  					;
+   155 00000042 66BB17E3                		mov	bx, 0E317h
+   156 00000046 B403                    		mov	ah, 3 ; out (word)
+   157                                  		; bx = data word
+   158                                  		; dx = port number
+   159 00000048 CD34                    		int	34h ; TRDOS 386 - IOCTL interrupt
+   160                                  
+   161                                  		;mov	ax, 409h
+   162                                  		;out	dx, ax		; Video: CRT cntrlr addr
+   163                                  					;
+   164 0000004A 66BB0904                		mov	bx, 409h
+   165 0000004E B403                    		mov	ah, 3 ; out (word)
+   166                                  		; bx = data word
+   167                                  		; dx = port number
+   168 00000050 CD34                    		int	34h ; TRDOS 386 - IOCTL interrupt
+   169                                  
+   170 00000052 E8E5000000              		call	sub_101DF
+   171                                  
+   172                                  		;lea	si, [unk_138FB]
+   173                                  		;mov	cx, 300h
+   174 00000057 66BAC803                		mov	dx, 3C8h
+   175 0000005B 30C0                    		xor	al, al
+   176                                  		;out	dx, al
+   177 0000005D B401                    		mov	ah, 1 ; out (byte)
+   178 0000005F CD34                    		int	34h ; TRDOS 386 - IOCTL interrupt
+   179 00000061 6642                    		inc	dx  ; 3C9h
+   180                                  		;cld
+   181                                  		;rep outsb
+   182                                  
+   183 00000063 66B90003                		mov	cx, 300h		
+   184 00000067 668D35[65010000]        		lea	si, [unk_138FB]
+   185                                  outsb_1:
+   186 0000006E AC                      		lodsb
+   187                                  		;mov	ah, 1 ; out (byte)
+   188                                  		; al = data byte
+   189                                  		; dx = port number
+   190 0000006F CD34                    		int	34h ; TRDOS 386 - IOCTL interrupt
+   191                                  		
+   192 00000071 6649                    		dec	cx
+   193 00000073 75F9                    		jnz	short outsb_1
+   194                                  
+   195                                  
+   196                                  		;lea	di, [unk_101F9]
+   197                                  		;mov	cx, 1B80h
+   198                                  		;xor	ax, ax
+   199                                  		;rep stosw
+   200                                  
+   201 00000075 66BB0400                		mov	bx, 4
+   202                                  		;xor	ebp, ebp
+   203                                  loc_1015E:				; CODE XREF: start+D0j	start+D6j
+   204 00000079 E8BE000000              		call	sub_101DF
+   205 0000007E 668D35[66040000]        		lea	si, [unk_101F9]
+   206 00000085 BF00000A00              		mov	edi, 0A0000h
+   207 0000008A 66B9800C                		mov	cx, 0C80h
+   208                                  
+   209                                  loc_1016A:				; CODE XREF: start+73j
+   210 0000008E 66AD                    		lodsw
+   211 00000090 88C2                    		mov	dl, al
+   212 00000092 66AD                    		lodsw
+   213 00000094 88C6                    		mov	dh, al
+   214 00000096 6689D0                  		mov	ax, dx
+   215 00000099 66AB                    		stosw
+   216 0000009B E2F1                    		loop	loc_1016A
+   217 0000009D 66B9E01A                		mov	cx, 1AE0h
+   218 000000A1 668D35[06050000]        		lea	si, [unk_10299]
+   219                                  
+   220                                  loc_1017C:				; CODE XREF: start+98j
+   221 000000A8 66678B44FE              		mov	ax, [si-2]
+   222 000000AD 66670304                		add	ax, [si]
+   223 000000B1 6667034402              		add	ax, [si+2]
+   224 000000B6 66670384A000            		add	ax, [si+0A0h]
+   225 000000BC 6629D8                  		sub	ax, bx
+   226 000000BF 66C1F802                		sar	ax, 2
+   227 000000C3 7D03                    		jge	short loc_10191
+   228 000000C5 6631C0                  		xor	ax, ax
+   229                                  
+   230                                  loc_10191:				; CODE XREF: start+8Dj
+   231 000000C8 6667898460FF            		mov	[si-0A0h], ax
+   232 000000CE 6683C602                		add	si, 2
+   233 000000D2 E2D4                    		loop	loc_1017C
+   234 000000D4 668D35[263A0000]        		lea	si, [unk_137B9]
+   235 000000DB 66B95000                		mov	cx, 50h
+   236 000000DF 6631D2                  		xor	dx, dx
+   237                                  
+   238                                  loc_101A3:				; CODE XREF: start+BBj
+   239 000000E2 E868000000              		call	sub_101ED
+   240 000000E7 6685C0                  		test	ax, ax
+   241 000000EA 780A                    		js	short loc_101B2
+   242 000000EC E85E000000              		call	sub_101ED
+   243 000000F1 88C2                    		mov	dl, al
+   244 000000F3 80E27F                  		and	dl, 7Fh
+   245                                  
+   246                                  loc_101B2:				; CODE XREF: start+A8j
+   247 000000F6 66678914                		mov	[si], dx
+   248 000000FA 66678994A000            		mov	[si+0A0h], dx
+   249 00000100 6683C602                		add	si, 2
+   250 00000104 E2DC                    		loop	loc_101A3
+   251 00000106 B401                    		mov	ah, 1
+   252                                  		;int	16h		; KEYBOARD - CHECK BUFFER, DO NOT CLEAR
+   253                                  					; Return: ZF clear if character	in buffer
+   254                                  					; AH = scan code, AL = character
+   255                                  					; ZF set if no character in buffer
+   256 00000108 CD32                    		int	32h	; TRDOS 386 - KEYBOARD Interrupt
+   257 0000010A 740A                    		jz	short loc_101CC
+   258 0000010C B400                    		mov	ah, 0
+   259                                  		;int	16h		; KEYBOARD - READ CHAR FROM BUFFER, WAIT IF EMPTY
+   260                                  					; Return: AH = scan code, AL = character
+   261 0000010E CD32                    		int	32h	; TRDOS 386 - KEYBOARD Interrupt
+   262                                  
+   263 00000110 66BDAC0D                		mov	bp, 0DACh
+   264 00000114 EB0B                    		jmp	short loc_101D2
+   265                                  
+   266                                  ; ---------------------------------------------------------------------------
+   267                                  
+   268                                  loc_101CC:				; CODE XREF: start+C1j
+   269 00000116 6681FDAC0D              		cmp	bp, 0DACh
+   270 0000011B 0F8258FFFFFF            		jb	loc_1015E
+   271                                  
+   272                                  loc_101D2:				; CODE XREF: start+CAj
+   273 00000121 6643                    		inc	bx
+   274 00000123 6683FB64                		cmp	bx, 64h
+   275 00000127 0F864CFFFFFF            		jbe	loc_1015E
+   276 0000012D 66B80300                		mov	ax, 3
+   277                                  		;int	10h		; - VIDEO - SET	VIDEO MODE
+   278                                  					; AL = mode
+   279                                  		;int	20h		; DOS -	PROGRAM	TERMINATION
+   280                                  
+   281 00000131 CD31                    		int	31h  	; TRDOS 386 - VIDEO Interrupt	
+   282                                  
+   283                                  terminate:
+   284                                  		sys 	_exit   ; INT 40h
+   284                              <1> 
+   284                              <1> 
+   284                              <1> 
+   284                              <1> 
+   284                              <1>  %if %0 >= 2
+   284                              <1>  mov ebx, %2
+   284                              <1>  %if %0 >= 3
+   284                              <1>  mov ecx, %3
+   284                              <1>  %if %0 = 4
+   284                              <1>  mov edx, %4
+   284                              <1>  %endif
+   284                              <1>  %endif
+   284                              <1>  %endif
+   284 00000133 B801000000          <1>  mov eax, %1
+   284                              <1> 
+   284 00000138 CD40                <1>  int 40h
+   285                                  here:
+   286 0000013A EBFE                    		jmp	short here
+   287                                  
+   288                                  ; --------------- S U B	R O U T	I N E ---------------------------------------
+   289                                  
+   290                                  sub_101DF:				; CODE XREF: start+31p
+   291                                  					; start:loc_1015Ep
+   292 0000013C 66BADA03                		mov	dx, 3DAh
+   293 00000140 B400                    		mov	ah, 0 ; in (byte)
+   294                                  
+   295                                  loc_101E2:				; CODE XREF: sub_101DF+6j
+   296                                  		;in	al, dx		; Video	status bits:
+   297                                  					; 0: retrace.  1=display is in vert or horiz retrace.
+   298                                  					; 1: 1=light pen is triggered; 0=armed
+   299                                  					; 2: 1=light pen switch	is open; 0=closed
+   300                                  					; 3: 1=vertical	sync pulse is occurring.
+   301                                  		; al = data byte
+   302                                  		; dx = port number
+   303 00000142 CD34                    		int	34h ; TRDOS 386 - IOCTL interrupt
+   304                                  
+   305 00000144 A808                    		test	al, 8
+   306 00000146 74FA                    		jz	short loc_101E2
+   307                                  
+   308                                  loc_101E7:				; CODE XREF: sub_101DF+Bj
+   309                                  		;in	al, dx		; Video	status bits:
+   310                                  					; 0: retrace.  1=display is in vert or horiz retrace.
+   311                                  					; 1: 1=light pen is triggered; 0=armed
+   312                                  					; 2: 1=light pen switch	is open; 0=closed
+   313                                  					; 3: 1=vertical	sync pulse is occurring.
+   314                                  
+   315 00000148 CD34                    		int	34h ; TRDOS 386 - IOCTL interrupt
+   316                                  
+   317 0000014A A808                    		test	al, 8
+   318 0000014C 75FA                    		jnz	short loc_101E7
+   319 0000014E C3                      		retn
+   320                                  
+   321                                  ; --------------- S U B	R O U T	I N E ---------------------------------------
+   322                                  
+   323                                  sub_101ED:				; CODE XREF: start:loc_101A3p
+   324                                  					; start+AAp
+   325 0000014F 66A1[63010000]          		mov	ax, [word_138F9]
+   326 00000155 6669C00589              		imul	ax, 8905h
+   327 0000015A 6640                    		inc	ax
+   328 0000015C 66A3[63010000]          		mov	[word_138F9], ax
+   329 00000162 C3                      		retn
+   330                                  
+   331                                  ; ---------------- DATA -----------------------------------------------------
+   332                                  
+   333 00000163 3412                    word_138F9:	dw 1234h		; DATA XREF: sub_101EDr sub_101ED+8w
+   334 00000165 00                      unk_138FB:	db    0			; DATA XREF: start+34o
+   335 00000166 00                      		db    0
+   336 00000167 00                      		db    0
+   337 00000168 00                      		db    0
+   338 00000169 00                      		db    0
+   339 0000016A 02                      		db    2
+   340 0000016B 00                      		db    0
+   341 0000016C 00                      		db    0
+   342 0000016D 04                      		db    4
+   343 0000016E 00                      		db    0
+   344 0000016F 00                      		db    0
+   345 00000170 06                      		db    6
+   346 00000171 00                      		db    0
+   347 00000172 00                      		db    0
+   348 00000173 08                      		db    8
+   349 00000174 00                      		db    0
+   350 00000175 00                      		db    0
+   351 00000176 0A                      		db  0Ah
+   352 00000177 00                      		db    0
+   353 00000178 00                      		db    0
+   354 00000179 0C                      		db  0Ch
+   355 0000017A 00                      		db    0
+   356 0000017B 00                      		db    0
+   357 0000017C 0E                      		db  0Eh
+   358 0000017D 00                      		db    0
+   359 0000017E 00                      		db    0
+   360 0000017F 10                      		db  10h
+   361 00000180 02                      		db    2
+   362 00000181 00                      		db    0
+   363 00000182 0E                      		db  0Eh
+   364 00000183 04                      		db    4
+   365 00000184 00                      		db    0
+   366 00000185 0C                      		db  0Ch
+   367 00000186 06                      		db    6
+   368 00000187 00                      		db    0
+   369 00000188 0A                      		db  0Ah
+   370 00000189 08                      		db    8
+   371 0000018A 00                      		db    0
+   372 0000018B 08                      		db    8
+   373 0000018C 0A                      		db  0Ah
+   374 0000018D 00                      		db    0
+   375 0000018E 06                      		db    6
+   376 0000018F 0C                      		db  0Ch
+   377 00000190 00                      		db    0
+   378 00000191 04                      		db    4
+   379 00000192 0E                      		db  0Eh
+   380 00000193 00                      		db    0
+   381 00000194 02                      		db    2
+   382 00000195 10                      		db  10h
+   383 00000196 00                      		db    0
+   384 00000197 00                      		db    0
+   385 00000198 11                      		db  11h
+   386 00000199 00                      		db    0
+   387 0000019A 00                      		db    0
+   388 0000019B 13                      		db  13h
+   389 0000019C 00                      		db    0
+   390 0000019D 00                      		db    0
+   391 0000019E 15                      		db  15h
+   392 0000019F 00                      		db    0
+   393 000001A0 00                      		db    0
+   394 000001A1 17                      		db  17h
+   395 000001A2 00                      		db    0
+   396 000001A3 00                      		db    0
+   397 000001A4 19                      		db  19h
+   398 000001A5 00                      		db    0
+   399 000001A6 00                      		db    0
+   400 000001A7 1B                      		db  1Bh
+   401 000001A8 00                      		db    0
+   402 000001A9 00                      		db    0
+   403 000001AA 1D                      		db  1Dh
+   404 000001AB 00                      		db    0
+   405 000001AC 00                      		db    0
+   406 000001AD 1F                      		db  1Fh
+   407 000001AE 00                      		db    0
+   408 000001AF 00                      		db    0
+   409 000001B0 21                      		db  21h	; !
+   410 000001B1 00                      		db    0
+   411 000001B2 00                      		db    0
+   412 000001B3 23                      		db  23h	; #
+   413 000001B4 00                      		db    0
+   414 000001B5 00                      		db    0
+   415 000001B6 25                      		db  25h	; %
+   416 000001B7 00                      		db    0
+   417 000001B8 00                      		db    0
+   418 000001B9 27                      		db  27h	; '
+   419 000001BA 00                      		db    0
+   420 000001BB 00                      		db    0
+   421 000001BC 29                      		db  29h	; )
+   422 000001BD 00                      		db    0
+   423 000001BE 00                      		db    0
+   424 000001BF 2B                      		db  2Bh	; +
+   425 000001C0 00                      		db    0
+   426 000001C1 00                      		db    0
+   427 000001C2 2D                      		db  2Dh	; -
+   428 000001C3 00                      		db    0
+   429 000001C4 00                      		db    0
+   430 000001C5 2F                      		db  2Fh	; /
+   431 000001C6 00                      		db    0
+   432 000001C7 00                      		db    0
+   433 000001C8 31                      		db  31h	; 1
+   434 000001C9 00                      		db    0
+   435 000001CA 00                      		db    0
+   436 000001CB 33                      		db  33h	; 3
+   437 000001CC 00                      		db    0
+   438 000001CD 00                      		db    0
+   439 000001CE 35                      		db  35h	; 5
+   440 000001CF 00                      		db    0
+   441 000001D0 00                      		db    0
+   442 000001D1 37                      		db  37h	; 7
+   443 000001D2 00                      		db    0
+   444 000001D3 00                      		db    0
+   445 000001D4 39                      		db  39h	; 9
+   446 000001D5 00                      		db    0
+   447 000001D6 00                      		db    0
+   448 000001D7 3B                      		db  3Bh	; ;
+   449 000001D8 00                      		db    0
+   450 000001D9 00                      		db    0
+   451 000001DA 3D                      		db  3Dh	; =
+   452 000001DB 00                      		db    0
+   453 000001DC 00                      		db    0
+   454 000001DD 3F                      		db  3Fh	; ?
+   455 000001DE 00                      		db    0
+   456 000001DF 00                      		db    0
+   457 000001E0 3F                      		db  3Fh	; ?
+   458 000001E1 01                      		db    1
+   459 000001E2 00                      		db    0
+   460 000001E3 3F                      		db  3Fh	; ?
+   461 000001E4 03                      		db    3
+   462 000001E5 00                      		db    0
+   463 000001E6 3F                      		db  3Fh	; ?
+   464 000001E7 05                      		db    5
+   465 000001E8 00                      		db    0
+   466 000001E9 3F                      		db  3Fh	; ?
+   467 000001EA 07                      		db    7
+   468 000001EB 00                      		db    0
+   469 000001EC 3F                      		db  3Fh	; ?
+   470 000001ED 09                      		db    9
+   471 000001EE 00                      		db    0
+   472 000001EF 3F                      		db  3Fh	; ?
+   473 000001F0 0B                      		db  0Bh
+   474 000001F1 00                      		db    0
+   475 000001F2 3F                      		db  3Fh	; ?
+   476 000001F3 0D                      		db  0Dh
+   477 000001F4 00                      		db    0
+   478 000001F5 3F                      		db  3Fh	; ?
+   479 000001F6 0F                      		db  0Fh
+   480 000001F7 00                      		db    0
+   481 000001F8 3F                      		db  3Fh	; ?
+   482 000001F9 11                      		db  11h
+   483 000001FA 00                      		db    0
+   484 000001FB 3F                      		db  3Fh	; ?
+   485 000001FC 13                      		db  13h
+   486 000001FD 00                      		db    0
+   487 000001FE 3F                      		db  3Fh	; ?
+   488 000001FF 15                      		db  15h
+   489 00000200 00                      		db    0
+   490 00000201 3F                      		db  3Fh	; ?
+   491 00000202 17                      		db  17h
+   492 00000203 00                      		db    0
+   493 00000204 3F                      		db  3Fh	; ?
+   494 00000205 19                      		db  19h
+   495 00000206 00                      		db    0
+   496 00000207 3F                      		db  3Fh	; ?
+   497 00000208 1B                      		db  1Bh
+   498 00000209 00                      		db    0
+   499 0000020A 3F                      		db  3Fh	; ?
+   500 0000020B 1D                      		db  1Dh
+   501 0000020C 00                      		db    0
+   502 0000020D 3F                      		db  3Fh	; ?
+   503 0000020E 1F                      		db  1Fh
+   504 0000020F 00                      		db    0
+   505 00000210 3F                      		db  3Fh	; ?
+   506 00000211 20                      		db  20h
+   507 00000212 00                      		db    0
+   508 00000213 3F                      		db  3Fh	; ?
+   509 00000214 22                      		db  22h	; "
+   510 00000215 00                      		db    0
+   511 00000216 3F                      		db  3Fh	; ?
+   512 00000217 24                      		db  24h	; $
+   513 00000218 00                      		db    0
+   514 00000219 3F                      		db  3Fh	; ?
+   515 0000021A 26                      		db  26h	; &
+   516 0000021B 00                      		db    0
+   517 0000021C 3F                      		db  3Fh	; ?
+   518 0000021D 28                      		db  28h	; (
+   519 0000021E 00                      		db    0
+   520 0000021F 3F                      		db  3Fh	; ?
+   521 00000220 2A                      		db  2Ah	; *
+   522 00000221 00                      		db    0
+   523 00000222 3F                      		db  3Fh	; ?
+   524 00000223 2C                      		db  2Ch	; ,
+   525 00000224 00                      		db    0
+   526 00000225 3F                      		db  3Fh	; ?
+   527 00000226 2E                      		db  2Eh	; .
+   528 00000227 00                      		db    0
+   529 00000228 3F                      		db  3Fh	; ?
+   530 00000229 30                      		db  30h	; 0
+   531 0000022A 00                      		db    0
+   532 0000022B 3F                      		db  3Fh	; ?
+   533 0000022C 32                      		db  32h	; 2
+   534 0000022D 00                      		db    0
+   535 0000022E 3F                      		db  3Fh	; ?
+   536 0000022F 34                      		db  34h	; 4
+   537 00000230 00                      		db    0
+   538 00000231 3F                      		db  3Fh	; ?
+   539 00000232 36                      		db  36h	; 6
+   540 00000233 00                      		db    0
+   541 00000234 3F                      		db  3Fh	; ?
+   542 00000235 38                      		db  38h	; 8
+   543 00000236 00                      		db    0
+   544 00000237 3F                      		db  3Fh	; ?
+   545 00000238 3A                      		db  3Ah	; :
+   546 00000239 00                      		db    0
+   547 0000023A 3F                      		db  3Fh	; ?
+   548 0000023B 3C                      		db  3Ch	; <
+   549 0000023C 00                      		db    0
+   550 0000023D 3F                      		db  3Fh	; ?
+   551 0000023E 3F                      		db  3Fh	; ?
+   552 0000023F 00                      		db    0
+   553 00000240 3F                      		db  3Fh	; ?
+   554 00000241 3F                      		db  3Fh	; ?
+   555 00000242 02                      		db    2
+   556 00000243 3F                      		db  3Fh	; ?
+   557 00000244 3F                      		db  3Fh	; ?
+   558 00000245 05                      		db    5
+   559 00000246 3F                      		db  3Fh	; ?
+   560 00000247 3F                      		db  3Fh	; ?
+   561 00000248 07                      		db    7
+   562 00000249 3F                      		db  3Fh	; ?
+   563 0000024A 3F                      		db  3Fh	; ?
+   564 0000024B 0A                      		db  0Ah
+   565 0000024C 3F                      		db  3Fh	; ?
+   566 0000024D 3F                      		db  3Fh	; ?
+   567 0000024E 0D                      		db  0Dh
+   568 0000024F 3F                      		db  3Fh	; ?
+   569 00000250 3F                      		db  3Fh	; ?
+   570 00000251 0F                      		db  0Fh
+   571 00000252 3F                      		db  3Fh	; ?
+   572 00000253 3F                      		db  3Fh	; ?
+   573 00000254 12                      		db  12h
+   574 00000255 3F                      		db  3Fh	; ?
+   575 00000256 3F                      		db  3Fh	; ?
+   576 00000257 15                      		db  15h
+   577 00000258 3F                      		db  3Fh	; ?
+   578 00000259 3F                      		db  3Fh	; ?
+   579 0000025A 17                      		db  17h
+   580 0000025B 3F                      		db  3Fh	; ?
+   581 0000025C 3F                      		db  3Fh	; ?
+   582 0000025D 1A                      		db  1Ah
+   583 0000025E 3F                      		db  3Fh	; ?
+   584 0000025F 3F                      		db  3Fh	; ?
+   585 00000260 1C                      		db  1Ch
+   586 00000261 3F                      		db  3Fh	; ?
+   587 00000262 3F                      		db  3Fh	; ?
+   588 00000263 1F                      		db  1Fh
+   589 00000264 3F                      		db  3Fh	; ?
+   590 00000265 3F                      		db  3Fh	; ?
+   591 00000266 22                      		db  22h	; "
+   592 00000267 3F                      		db  3Fh	; ?
+   593 00000268 3F                      		db  3Fh	; ?
+   594 00000269 24                      		db  24h	; $
+   595 0000026A 3F                      		db  3Fh	; ?
+   596 0000026B 3F                      		db  3Fh	; ?
+   597 0000026C 27                      		db  27h	; '
+   598 0000026D 3F                      		db  3Fh	; ?
+   599 0000026E 3F                      		db  3Fh	; ?
+   600 0000026F 2A                      		db  2Ah	; *
+   601 00000270 3F                      		db  3Fh	; ?
+   602 00000271 3F                      		db  3Fh	; ?
+   603 00000272 2C                      		db  2Ch	; ,
+   604 00000273 3F                      		db  3Fh	; ?
+   605 00000274 3F                      		db  3Fh	; ?
+   606 00000275 2F                      		db  2Fh	; /
+   607 00000276 3F                      		db  3Fh	; ?
+   608 00000277 3F                      		db  3Fh	; ?
+   609 00000278 31                      		db  31h	; 1
+   610 00000279 3F                      		db  3Fh	; ?
+   611 0000027A 3F                      		db  3Fh	; ?
+   612 0000027B 34                      		db  34h	; 4
+   613 0000027C 3F                      		db  3Fh	; ?
+   614 0000027D 3F                      		db  3Fh	; ?
+   615 0000027E 37                      		db  37h	; 7
+   616 0000027F 3F                      		db  3Fh	; ?
+   617 00000280 3F                      		db  3Fh	; ?
+   618 00000281 39                      		db  39h	; 9
+   619 00000282 3F                      		db  3Fh	; ?
+   620 00000283 3F                      		db  3Fh	; ?
+   621 00000284 3C                      		db  3Ch	; <
+   622 00000285 3F                      		db  3Fh	; ?
+   623 00000286 3F                      		db  3Fh	; ?
+   624 00000287 3F                      		db  3Fh	; ?
+   625 00000288 3F                      		db  3Fh	; ?
+   626 00000289 3F                      		db  3Fh	; ?
+   627 0000028A 3F                      		db  3Fh	; ?
+   628 0000028B 3F                      		db  3Fh	; ?
+   629 0000028C 3F                      		db  3Fh	; ?
+   630 0000028D 3F                      		db  3Fh	; ?
+   631 0000028E 3F                      		db  3Fh	; ?
+   632 0000028F 3F                      		db  3Fh	; ?
+   633 00000290 3F                      		db  3Fh	; ?
+   634 00000291 3F                      		db  3Fh	; ?
+   635 00000292 3F                      		db  3Fh	; ?
+   636 00000293 3F                      		db  3Fh	; ?
+   637 00000294 3F                      		db  3Fh	; ?
+   638 00000295 3F                      		db  3Fh	; ?
+   639 00000296 3F                      		db  3Fh	; ?
+   640 00000297 3F                      		db  3Fh	; ?
+   641 00000298 3F                      		db  3Fh	; ?
+   642 00000299 3F                      		db  3Fh	; ?
+   643 0000029A 3F                      		db  3Fh	; ?
+   644 0000029B 3F                      		db  3Fh	; ?
+   645 0000029C 3F                      		db  3Fh	; ?
+   646 0000029D 3F                      		db  3Fh	; ?
+   647 0000029E 3F                      		db  3Fh	; ?
+   648 0000029F 3F                      		db  3Fh	; ?
+   649 000002A0 3F                      		db  3Fh	; ?
+   650 000002A1 3F                      		db  3Fh	; ?
+   651 000002A2 3F                      		db  3Fh	; ?
+   652 000002A3 3F                      		db  3Fh	; ?
+   653 000002A4 3F                      		db  3Fh	; ?
+   654 000002A5 3F                      		db  3Fh	; ?
+   655 000002A6 3F                      		db  3Fh	; ?
+   656 000002A7 3F                      		db  3Fh	; ?
+   657 000002A8 3F                      		db  3Fh	; ?
+   658 000002A9 3F                      		db  3Fh	; ?
+   659 000002AA 3F                      		db  3Fh	; ?
+   660 000002AB 3F                      		db  3Fh	; ?
+   661 000002AC 3F                      		db  3Fh	; ?
+   662 000002AD 3F                      		db  3Fh	; ?
+   663 000002AE 3F                      		db  3Fh	; ?
+   664 000002AF 3F                      		db  3Fh	; ?
+   665 000002B0 3F                      		db  3Fh	; ?
+   666 000002B1 3F                      		db  3Fh	; ?
+   667 000002B2 3F                      		db  3Fh	; ?
+   668 000002B3 3F                      		db  3Fh	; ?
+   669 000002B4 3F                      		db  3Fh	; ?
+   670 000002B5 3F                      		db  3Fh	; ?
+   671 000002B6 3F                      		db  3Fh	; ?
+   672 000002B7 3F                      		db  3Fh	; ?
+   673 000002B8 3F                      		db  3Fh	; ?
+   674 000002B9 3F                      		db  3Fh	; ?
+   675 000002BA 3F                      		db  3Fh	; ?
+   676 000002BB 3F                      		db  3Fh	; ?
+   677 000002BC 3F                      		db  3Fh	; ?
+   678 000002BD 3F                      		db  3Fh	; ?
+   679 000002BE 3F                      		db  3Fh	; ?
+   680 000002BF 3F                      		db  3Fh	; ?
+   681 000002C0 3F                      		db  3Fh	; ?
+   682 000002C1 3F                      		db  3Fh	; ?
+   683 000002C2 3F                      		db  3Fh	; ?
+   684 000002C3 3F                      		db  3Fh	; ?
+   685 000002C4 3F                      		db  3Fh	; ?
+   686 000002C5 3F                      		db  3Fh	; ?
+   687 000002C6 3F                      		db  3Fh	; ?
+   688 000002C7 3F                      		db  3Fh	; ?
+   689 000002C8 3F                      		db  3Fh	; ?
+   690 000002C9 3F                      		db  3Fh	; ?
+   691 000002CA 3F                      		db  3Fh	; ?
+   692 000002CB 3F                      		db  3Fh	; ?
+   693 000002CC 3F                      		db  3Fh	; ?
+   694 000002CD 3F                      		db  3Fh	; ?
+   695 000002CE 3F                      		db  3Fh	; ?
+   696 000002CF 3F                      		db  3Fh	; ?
+   697 000002D0 3F                      		db  3Fh	; ?
+   698 000002D1 3F                      		db  3Fh	; ?
+   699 000002D2 3F                      		db  3Fh	; ?
+   700 000002D3 3F                      		db  3Fh	; ?
+   701 000002D4 3F                      		db  3Fh	; ?
+   702 000002D5 3F                      		db  3Fh	; ?
+   703 000002D6 3F                      		db  3Fh	; ?
+   704 000002D7 3F                      		db  3Fh	; ?
+   705 000002D8 3F                      		db  3Fh	; ?
+   706 000002D9 3F                      		db  3Fh	; ?
+   707 000002DA 3F                      		db  3Fh	; ?
+   708 000002DB 3F                      		db  3Fh	; ?
+   709 000002DC 3F                      		db  3Fh	; ?
+   710 000002DD 3F                      		db  3Fh	; ?
+   711 000002DE 3F                      		db  3Fh	; ?
+   712 000002DF 3F                      		db  3Fh	; ?
+   713 000002E0 3F                      		db  3Fh	; ?
+   714 000002E1 3F                      		db  3Fh	; ?
+   715 000002E2 3F                      		db  3Fh	; ?
+   716 000002E3 3F                      		db  3Fh	; ?
+   717 000002E4 3F                      		db  3Fh	; ?
+   718 000002E5 3F                      		db  3Fh	; ?
+   719 000002E6 3F                      		db  3Fh	; ?
+   720 000002E7 3F                      		db  3Fh	; ?
+   721 000002E8 3F                      		db  3Fh	; ?
+   722 000002E9 3F                      		db  3Fh	; ?
+   723 000002EA 3F                      		db  3Fh	; ?
+   724 000002EB 3F                      		db  3Fh	; ?
+   725 000002EC 3F                      		db  3Fh	; ?
+   726 000002ED 3F                      		db  3Fh	; ?
+   727 000002EE 3F                      		db  3Fh	; ?
+   728 000002EF 3F                      		db  3Fh	; ?
+   729 000002F0 3F                      		db  3Fh	; ?
+   730 000002F1 3F                      		db  3Fh	; ?
+   731 000002F2 3F                      		db  3Fh	; ?
+   732 000002F3 3F                      		db  3Fh	; ?
+   733 000002F4 3F                      		db  3Fh	; ?
+   734 000002F5 3F                      		db  3Fh	; ?
+   735 000002F6 3F                      		db  3Fh	; ?
+   736 000002F7 3F                      		db  3Fh	; ?
+   737 000002F8 3F                      		db  3Fh	; ?
+   738 000002F9 3F                      		db  3Fh	; ?
+   739 000002FA 3F                      		db  3Fh	; ?
+   740 000002FB 3F                      		db  3Fh	; ?
+   741 000002FC 3F                      		db  3Fh	; ?
+   742 000002FD 3F                      		db  3Fh	; ?
+   743 000002FE 3F                      		db  3Fh	; ?
+   744 000002FF 3F                      		db  3Fh	; ?
+   745 00000300 3F                      		db  3Fh	; ?
+   746 00000301 3F                      		db  3Fh	; ?
+   747 00000302 3F                      		db  3Fh	; ?
+   748 00000303 3F                      		db  3Fh	; ?
+   749 00000304 3F                      		db  3Fh	; ?
+   750 00000305 3F                      		db  3Fh	; ?
+   751 00000306 3F                      		db  3Fh	; ?
+   752 00000307 3F                      		db  3Fh	; ?
+   753 00000308 3F                      		db  3Fh	; ?
+   754 00000309 3F                      		db  3Fh	; ?
+   755 0000030A 3F                      		db  3Fh	; ?
+   756 0000030B 3F                      		db  3Fh	; ?
+   757 0000030C 3F                      		db  3Fh	; ?
+   758 0000030D 3F                      		db  3Fh	; ?
+   759 0000030E 3F                      		db  3Fh	; ?
+   760 0000030F 3F                      		db  3Fh	; ?
+   761 00000310 3F                      		db  3Fh	; ?
+   762 00000311 3F                      		db  3Fh	; ?
+   763 00000312 3F                      		db  3Fh	; ?
+   764 00000313 3F                      		db  3Fh	; ?
+   765 00000314 3F                      		db  3Fh	; ?
+   766 00000315 3F                      		db  3Fh	; ?
+   767 00000316 3F                      		db  3Fh	; ?
+   768 00000317 3F                      		db  3Fh	; ?
+   769 00000318 3F                      		db  3Fh	; ?
+   770 00000319 3F                      		db  3Fh	; ?
+   771 0000031A 3F                      		db  3Fh	; ?
+   772 0000031B 3F                      		db  3Fh	; ?
+   773 0000031C 3F                      		db  3Fh	; ?
+   774 0000031D 3F                      		db  3Fh	; ?
+   775 0000031E 3F                      		db  3Fh	; ?
+   776 0000031F 3F                      		db  3Fh	; ?
+   777 00000320 3F                      		db  3Fh	; ?
+   778 00000321 3F                      		db  3Fh	; ?
+   779 00000322 3F                      		db  3Fh	; ?
+   780 00000323 3F                      		db  3Fh	; ?
+   781 00000324 3F                      		db  3Fh	; ?
+   782 00000325 3F                      		db  3Fh	; ?
+   783 00000326 3F                      		db  3Fh	; ?
+   784 00000327 3F                      		db  3Fh	; ?
+   785 00000328 3F                      		db  3Fh	; ?
+   786 00000329 3F                      		db  3Fh	; ?
+   787 0000032A 3F                      		db  3Fh	; ?
+   788 0000032B 3F                      		db  3Fh	; ?
+   789 0000032C 3F                      		db  3Fh	; ?
+   790 0000032D 3F                      		db  3Fh	; ?
+   791 0000032E 3F                      		db  3Fh	; ?
+   792 0000032F 3F                      		db  3Fh	; ?
+   793 00000330 3F                      		db  3Fh	; ?
+   794 00000331 3F                      		db  3Fh	; ?
+   795 00000332 3F                      		db  3Fh	; ?
+   796 00000333 3F                      		db  3Fh	; ?
+   797 00000334 3F                      		db  3Fh	; ?
+   798 00000335 3F                      		db  3Fh	; ?
+   799 00000336 3F                      		db  3Fh	; ?
+   800 00000337 3F                      		db  3Fh	; ?
+   801 00000338 3F                      		db  3Fh	; ?
+   802 00000339 3F                      		db  3Fh	; ?
+   803 0000033A 3F                      		db  3Fh	; ?
+   804 0000033B 3F                      		db  3Fh	; ?
+   805 0000033C 3F                      		db  3Fh	; ?
+   806 0000033D 3F                      		db  3Fh	; ?
+   807 0000033E 3F                      		db  3Fh	; ?
+   808 0000033F 3F                      		db  3Fh	; ?
+   809 00000340 3F                      		db  3Fh	; ?
+   810 00000341 3F                      		db  3Fh	; ?
+   811 00000342 3F                      		db  3Fh	; ?
+   812 00000343 3F                      		db  3Fh	; ?
+   813 00000344 3F                      		db  3Fh	; ?
+   814 00000345 3F                      		db  3Fh	; ?
+   815 00000346 3F                      		db  3Fh	; ?
+   816 00000347 3F                      		db  3Fh	; ?
+   817 00000348 3F                      		db  3Fh	; ?
+   818 00000349 3F                      		db  3Fh	; ?
+   819 0000034A 3F                      		db  3Fh	; ?
+   820 0000034B 3F                      		db  3Fh	; ?
+   821 0000034C 3F                      		db  3Fh	; ?
+   822 0000034D 3F                      		db  3Fh	; ?
+   823 0000034E 3F                      		db  3Fh	; ?
+   824 0000034F 3F                      		db  3Fh	; ?
+   825 00000350 3F                      		db  3Fh	; ?
+   826 00000351 3F                      		db  3Fh	; ?
+   827 00000352 3F                      		db  3Fh	; ?
+   828 00000353 3F                      		db  3Fh	; ?
+   829 00000354 3F                      		db  3Fh	; ?
+   830 00000355 3F                      		db  3Fh	; ?
+   831 00000356 3F                      		db  3Fh	; ?
+   832 00000357 3F                      		db  3Fh	; ?
+   833 00000358 3F                      		db  3Fh	; ?
+   834 00000359 3F                      		db  3Fh	; ?
+   835 0000035A 3F                      		db  3Fh	; ?
+   836 0000035B 3F                      		db  3Fh	; ?
+   837 0000035C 3F                      		db  3Fh	; ?
+   838 0000035D 3F                      		db  3Fh	; ?
+   839 0000035E 3F                      		db  3Fh	; ?
+   840 0000035F 3F                      		db  3Fh	; ?
+   841 00000360 3F                      		db  3Fh	; ?
+   842 00000361 3F                      		db  3Fh	; ?
+   843 00000362 3F                      		db  3Fh	; ?
+   844 00000363 3F                      		db  3Fh	; ?
+   845 00000364 3F                      		db  3Fh	; ?
+   846 00000365 3F                      		db  3Fh	; ?
+   847 00000366 3F                      		db  3Fh	; ?
+   848 00000367 3F                      		db  3Fh	; ?
+   849 00000368 3F                      		db  3Fh	; ?
+   850 00000369 3F                      		db  3Fh	; ?
+   851 0000036A 3F                      		db  3Fh	; ?
+   852 0000036B 3F                      		db  3Fh	; ?
+   853 0000036C 3F                      		db  3Fh	; ?
+   854 0000036D 3F                      		db  3Fh	; ?
+   855 0000036E 3F                      		db  3Fh	; ?
+   856 0000036F 3F                      		db  3Fh	; ?
+   857 00000370 3F                      		db  3Fh	; ?
+   858 00000371 3F                      		db  3Fh	; ?
+   859 00000372 3F                      		db  3Fh	; ?
+   860 00000373 3F                      		db  3Fh	; ?
+   861 00000374 3F                      		db  3Fh	; ?
+   862 00000375 3F                      		db  3Fh	; ?
+   863 00000376 3F                      		db  3Fh	; ?
+   864 00000377 3F                      		db  3Fh	; ?
+   865 00000378 3F                      		db  3Fh	; ?
+   866 00000379 3F                      		db  3Fh	; ?
+   867 0000037A 3F                      		db  3Fh	; ?
+   868 0000037B 3F                      		db  3Fh	; ?
+   869 0000037C 3F                      		db  3Fh	; ?
+   870 0000037D 3F                      		db  3Fh	; ?
+   871 0000037E 3F                      		db  3Fh	; ?
+   872 0000037F 3F                      		db  3Fh	; ?
+   873 00000380 3F                      		db  3Fh	; ?
+   874 00000381 3F                      		db  3Fh	; ?
+   875 00000382 3F                      		db  3Fh	; ?
+   876 00000383 3F                      		db  3Fh	; ?
+   877 00000384 3F                      		db  3Fh	; ?
+   878 00000385 3F                      		db  3Fh	; ?
+   879 00000386 3F                      		db  3Fh	; ?
+   880 00000387 3F                      		db  3Fh	; ?
+   881 00000388 3F                      		db  3Fh	; ?
+   882 00000389 3F                      		db  3Fh	; ?
+   883 0000038A 3F                      		db  3Fh	; ?
+   884 0000038B 3F                      		db  3Fh	; ?
+   885 0000038C 3F                      		db  3Fh	; ?
+   886 0000038D 3F                      		db  3Fh	; ?
+   887 0000038E 3F                      		db  3Fh	; ?
+   888 0000038F 3F                      		db  3Fh	; ?
+   889 00000390 3F                      		db  3Fh	; ?
+   890 00000391 3F                      		db  3Fh	; ?
+   891 00000392 3F                      		db  3Fh	; ?
+   892 00000393 3F                      		db  3Fh	; ?
+   893 00000394 3F                      		db  3Fh	; ?
+   894 00000395 3F                      		db  3Fh	; ?
+   895 00000396 3F                      		db  3Fh	; ?
+   896 00000397 3F                      		db  3Fh	; ?
+   897 00000398 3F                      		db  3Fh	; ?
+   898 00000399 3F                      		db  3Fh	; ?
+   899 0000039A 3F                      		db  3Fh	; ?
+   900 0000039B 3F                      		db  3Fh	; ?
+   901 0000039C 3F                      		db  3Fh	; ?
+   902 0000039D 3F                      		db  3Fh	; ?
+   903 0000039E 3F                      		db  3Fh	; ?
+   904 0000039F 3F                      		db  3Fh	; ?
+   905 000003A0 3F                      		db  3Fh	; ?
+   906 000003A1 3F                      		db  3Fh	; ?
+   907 000003A2 3F                      		db  3Fh	; ?
+   908 000003A3 3F                      		db  3Fh	; ?
+   909 000003A4 3F                      		db  3Fh	; ?
+   910 000003A5 3F                      		db  3Fh	; ?
+   911 000003A6 3F                      		db  3Fh	; ?
+   912 000003A7 3F                      		db  3Fh	; ?
+   913 000003A8 3F                      		db  3Fh	; ?
+   914 000003A9 3F                      		db  3Fh	; ?
+   915 000003AA 3F                      		db  3Fh	; ?
+   916 000003AB 3F                      		db  3Fh	; ?
+   917 000003AC 3F                      		db  3Fh	; ?
+   918 000003AD 3F                      		db  3Fh	; ?
+   919 000003AE 3F                      		db  3Fh	; ?
+   920 000003AF 3F                      		db  3Fh	; ?
+   921 000003B0 3F                      		db  3Fh	; ?
+   922 000003B1 3F                      		db  3Fh	; ?
+   923 000003B2 3F                      		db  3Fh	; ?
+   924 000003B3 3F                      		db  3Fh	; ?
+   925 000003B4 3F                      		db  3Fh	; ?
+   926 000003B5 3F                      		db  3Fh	; ?
+   927 000003B6 3F                      		db  3Fh	; ?
+   928 000003B7 3F                      		db  3Fh	; ?
+   929 000003B8 3F                      		db  3Fh	; ?
+   930 000003B9 3F                      		db  3Fh	; ?
+   931 000003BA 3F                      		db  3Fh	; ?
+   932 000003BB 3F                      		db  3Fh	; ?
+   933 000003BC 3F                      		db  3Fh	; ?
+   934 000003BD 3F                      		db  3Fh	; ?
+   935 000003BE 3F                      		db  3Fh	; ?
+   936 000003BF 3F                      		db  3Fh	; ?
+   937 000003C0 3F                      		db  3Fh	; ?
+   938 000003C1 3F                      		db  3Fh	; ?
+   939 000003C2 3F                      		db  3Fh	; ?
+   940 000003C3 3F                      		db  3Fh	; ?
+   941 000003C4 3F                      		db  3Fh	; ?
+   942 000003C5 3F                      		db  3Fh	; ?
+   943 000003C6 3F                      		db  3Fh	; ?
+   944 000003C7 3F                      		db  3Fh	; ?
+   945 000003C8 3F                      		db  3Fh	; ?
+   946 000003C9 3F                      		db  3Fh	; ?
+   947 000003CA 3F                      		db  3Fh	; ?
+   948 000003CB 3F                      		db  3Fh	; ?
+   949 000003CC 3F                      		db  3Fh	; ?
+   950 000003CD 3F                      		db  3Fh	; ?
+   951 000003CE 3F                      		db  3Fh	; ?
+   952 000003CF 3F                      		db  3Fh	; ?
+   953 000003D0 3F                      		db  3Fh	; ?
+   954 000003D1 3F                      		db  3Fh	; ?
+   955 000003D2 3F                      		db  3Fh	; ?
+   956 000003D3 3F                      		db  3Fh	; ?
+   957 000003D4 3F                      		db  3Fh	; ?
+   958 000003D5 3F                      		db  3Fh	; ?
+   959 000003D6 3F                      		db  3Fh	; ?
+   960 000003D7 3F                      		db  3Fh	; ?
+   961 000003D8 3F                      		db  3Fh	; ?
+   962 000003D9 3F                      		db  3Fh	; ?
+   963 000003DA 3F                      		db  3Fh	; ?
+   964 000003DB 3F                      		db  3Fh	; ?
+   965 000003DC 3F                      		db  3Fh	; ?
+   966 000003DD 3F                      		db  3Fh	; ?
+   967 000003DE 3F                      		db  3Fh	; ?
+   968 000003DF 3F                      		db  3Fh	; ?
+   969 000003E0 3F                      		db  3Fh	; ?
+   970 000003E1 3F                      		db  3Fh	; ?
+   971 000003E2 3F                      		db  3Fh	; ?
+   972 000003E3 3F                      		db  3Fh	; ?
+   973 000003E4 3F                      		db  3Fh	; ?
+   974 000003E5 3F                      		db  3Fh	; ?
+   975 000003E6 3F                      		db  3Fh	; ?
+   976 000003E7 3F                      		db  3Fh	; ?
+   977 000003E8 3F                      		db  3Fh	; ?
+   978 000003E9 3F                      		db  3Fh	; ?
+   979 000003EA 3F                      		db  3Fh	; ?
+   980 000003EB 3F                      		db  3Fh	; ?
+   981 000003EC 3F                      		db  3Fh	; ?
+   982 000003ED 3F                      		db  3Fh	; ?
+   983 000003EE 3F                      		db  3Fh	; ?
+   984 000003EF 3F                      		db  3Fh	; ?
+   985 000003F0 3F                      		db  3Fh	; ?
+   986 000003F1 3F                      		db  3Fh	; ?
+   987 000003F2 3F                      		db  3Fh	; ?
+   988 000003F3 3F                      		db  3Fh	; ?
+   989 000003F4 3F                      		db  3Fh	; ?
+   990 000003F5 3F                      		db  3Fh	; ?
+   991 000003F6 3F                      		db  3Fh	; ?
+   992 000003F7 3F                      		db  3Fh	; ?
+   993 000003F8 3F                      		db  3Fh	; ?
+   994 000003F9 3F                      		db  3Fh	; ?
+   995 000003FA 3F                      		db  3Fh	; ?
+   996 000003FB 3F                      		db  3Fh	; ?
+   997 000003FC 3F                      		db  3Fh	; ?
+   998 000003FD 3F                      		db  3Fh	; ?
+   999 000003FE 3F                      		db  3Fh	; ?
+  1000 000003FF 3F                      		db  3Fh	; ?
+  1001 00000400 3F                      		db  3Fh	; ?
+  1002 00000401 3F                      		db  3Fh	; ?
+  1003 00000402 3F                      		db  3Fh	; ?
+  1004 00000403 3F                      		db  3Fh	; ?
+  1005 00000404 3F                      		db  3Fh	; ?
+  1006 00000405 3F                      		db  3Fh	; ?
+  1007 00000406 3F                      		db  3Fh	; ?
+  1008 00000407 3F                      		db  3Fh	; ?
+  1009 00000408 3F                      		db  3Fh	; ?
+  1010 00000409 3F                      		db  3Fh	; ?
+  1011 0000040A 3F                      		db  3Fh	; ?
+  1012 0000040B 3F                      		db  3Fh	; ?
+  1013 0000040C 3F                      		db  3Fh	; ?
+  1014 0000040D 3F                      		db  3Fh	; ?
+  1015 0000040E 3F                      		db  3Fh	; ?
+  1016 0000040F 3F                      		db  3Fh	; ?
+  1017 00000410 3F                      		db  3Fh	; ?
+  1018 00000411 3F                      		db  3Fh	; ?
+  1019 00000412 3F                      		db  3Fh	; ?
+  1020 00000413 3F                      		db  3Fh	; ?
+  1021 00000414 3F                      		db  3Fh	; ?
+  1022 00000415 3F                      		db  3Fh	; ?
+  1023 00000416 3F                      		db  3Fh	; ?
+  1024 00000417 3F                      		db  3Fh	; ?
+  1025 00000418 3F                      		db  3Fh	; ?
+  1026 00000419 3F                      		db  3Fh	; ?
+  1027 0000041A 3F                      		db  3Fh	; ?
+  1028 0000041B 3F                      		db  3Fh	; ?
+  1029 0000041C 3F                      		db  3Fh	; ?
+  1030 0000041D 3F                      		db  3Fh	; ?
+  1031 0000041E 3F                      		db  3Fh	; ?
+  1032 0000041F 3F                      		db  3Fh	; ?
+  1033 00000420 3F                      		db  3Fh	; ?
+  1034 00000421 3F                      		db  3Fh	; ?
+  1035 00000422 3F                      		db  3Fh	; ?
+  1036 00000423 3F                      		db  3Fh	; ?
+  1037 00000424 3F                      		db  3Fh	; ?
+  1038 00000425 3F                      		db  3Fh	; ?
+  1039 00000426 3F                      		db  3Fh	; ?
+  1040 00000427 3F                      		db  3Fh	; ?
+  1041 00000428 3F                      		db  3Fh	; ?
+  1042 00000429 3F                      		db  3Fh	; ?
+  1043 0000042A 3F                      		db  3Fh	; ?
+  1044 0000042B 3F                      		db  3Fh	; ?
+  1045 0000042C 3F                      		db  3Fh	; ?
+  1046 0000042D 3F                      		db  3Fh	; ?
+  1047 0000042E 3F                      		db  3Fh	; ?
+  1048 0000042F 3F                      		db  3Fh	; ?
+  1049 00000430 3F                      		db  3Fh	; ?
+  1050 00000431 3F                      		db  3Fh	; ?
+  1051 00000432 3F                      		db  3Fh	; ?
+  1052 00000433 3F                      		db  3Fh	; ?
+  1053 00000434 3F                      		db  3Fh	; ?
+  1054 00000435 3F                      		db  3Fh	; ?
+  1055 00000436 3F                      		db  3Fh	; ?
+  1056 00000437 3F                      		db  3Fh	; ?
+  1057 00000438 3F                      		db  3Fh	; ?
+  1058 00000439 3F                      		db  3Fh	; ?
+  1059 0000043A 3F                      		db  3Fh	; ?
+  1060 0000043B 3F                      		db  3Fh	; ?
+  1061 0000043C 3F                      		db  3Fh	; ?
+  1062 0000043D 3F                      		db  3Fh	; ?
+  1063 0000043E 3F                      		db  3Fh	; ?
+  1064 0000043F 3F                      		db  3Fh	; ?
+  1065 00000440 3F                      		db  3Fh	; ?
+  1066 00000441 3F                      		db  3Fh	; ?
+  1067 00000442 3F                      		db  3Fh	; ?
+  1068 00000443 3F                      		db  3Fh	; ?
+  1069 00000444 3F                      		db  3Fh	; ?
+  1070 00000445 3F                      		db  3Fh	; ?
+  1071 00000446 3F                      		db  3Fh	; ?
+  1072 00000447 3F                      		db  3Fh	; ?
+  1073 00000448 3F                      		db  3Fh	; ?
+  1074 00000449 3F                      		db  3Fh	; ?
+  1075 0000044A 3F                      		db  3Fh	; ?
+  1076 0000044B 3F                      		db  3Fh	; ?
+  1077 0000044C 3F                      		db  3Fh	; ?
+  1078 0000044D 3F                      		db  3Fh	; ?
+  1079 0000044E 3F                      		db  3Fh	; ?
+  1080 0000044F 3F                      		db  3Fh	; ?
+  1081 00000450 3F                      		db  3Fh	; ?
+  1082 00000451 3F                      		db  3Fh	; ?
+  1083 00000452 3F                      		db  3Fh	; ?
+  1084 00000453 3F                      		db  3Fh	; ?
+  1085 00000454 3F                      		db  3Fh	; ?
+  1086 00000455 3F                      		db  3Fh	; ?
+  1087 00000456 3F                      		db  3Fh	; ?
+  1088 00000457 3F                      		db  3Fh	; ?
+  1089 00000458 3F                      		db  3Fh	; ?
+  1090 00000459 3F                      		db  3Fh	; ?
+  1091 0000045A 3F                      		db  3Fh	; ?
+  1092 0000045B 3F                      		db  3Fh	; ?
+  1093 0000045C 3F                      		db  3Fh	; ?
+  1094 0000045D 3F                      		db  3Fh	; ?
+  1095 0000045E 3F                      		db  3Fh	; ?
+  1096 0000045F 3F                      		db  3Fh	; ?
+  1097 00000460 3F                      		db  3Fh	; ?
+  1098 00000461 3F                      		db  3Fh	; ?
+  1099 00000462 3F                      		db  3Fh	; ?
+  1100 00000463 3F                      		db  3Fh	; ?
+  1101 00000464 3F                      		db  3Fh	; ?
+  1102                                  
+  1103                                  bss_start:
+  1104                                  
+  1105                                  ABSOLUTE bss_start
+  1106                                  
+  1107 00000465 <res 00000001>          alignb 2
+  1108                                  
+  1109                                  unk_101F9:
+  1110 00000466 <res 000000A0>          		resb  160 
+  1111                                  unk_10299:
+  1112 00000506 <res 00003520>          		resb  13600
+  1113                                  unk_137B9:	
+  1114 00003A26 <res 00000140>          		resb  320
+  1115                                  
+  1116                                  _bss_end:

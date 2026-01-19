@@ -1,0 +1,1229 @@
+     1                                  ; TRDOS 386 Version (22/08/2016)
+     2                                  ; NASM Version: Erdogan Tan (22/08/2016)
+     3                                  
+     4                                  ; 4ge's Xmas 94 Intro fractalzoom source
+     5                                  ; ======================================
+     6                                  
+     7                                  ; Copyright (C) 1994/5 Samuel Marshall. All rights reserved. 
+     8                                  
+     9                                  ; Text and program code by Samuel Marshall, a.k.a. CuteElf / 4ge.
+    10                                  
+    11                                  ; Contact me at the following email address:
+    12                                  
+    13                                  ; Samuel.Marshall@durham.ac.uk
+    14                                  
+    15                                  ; and if you don't get a response, probably it's not during termtime, and
+    16                                  ; I am at home - in which case, I check email here only about once a month
+    17                                  ; (if that). You will get a reply eventually.
+    18                                  
+    19                                  ; My WWW homepage is
+    20                                  
+    21                                  ; http://www.dur.ac.uk/~d405ua/
+    22                                  
+    23                                  ; Enjoy the program... hope it helps you. Don't expect a wonderfully-
+    24                                  ; optimised piece of code, because 1) the zoom routine wasn't really time-
+    25                                  ; critical, and 2) this is the first time I ever wrote a fractal program,
+    26                                  ; in my entire life, and 3) I didn't know how to do fixed-point numbers
+    27                                  ; properly when I wrote this ;)
+    28                                  
+    29                                  ; General Principles for a real-time fractalzoom using this method
+    30                                  ; ================================================================
+    31                                  ;
+    32                                  ; First, we calculate a fractal at twice the size, each way (i.e. 4 times
+    33                                  ; the area) as the screen display area.
+    34                                  ;
+    35                                  ; We then display that fractal, zoomed-out to half size each way, so that
+    36                                  ; it will exactly fill the screen display area.
+    37                                  ;
+    38                                  ; Then, we calculate another fractal twice the size of the display area,
+    39                                  ; but this one is calculated "zoomed in" so that this fractal is a more
+    40                                  ; detailed view of one-quarter of the area of the fractal just calculated.
+    41                                  ;
+    42                                  ; While we are calculating this, which takes a few seconds, we gradually
+    43                                  ; zoom in the fractal we already have - using standard bitmap-zoom 
+    44                                  ; techniques - until eventually by the time the new fractal is finished,
+    45                                  ; the old fractal will be showing at 1:1 size, and will can then be 
+    46                                  ; seamlessly replaced on the display by the new fractal at 1:2. Then
+    47                                  ; repeat.
+    48                                  ;
+    49                                  ; Note: the fractal being DISPLAYED, i.e. the one that's already been
+    50                                  ; calculated, can be zoomed to any point at all within the region, but
+    51                                  ; this decision must be known in advance so that the next fractal is
+    52                                  ; calculated from the right point. That's why you can't change the direction
+    53                                  ; "realtime", only every so often.
+    54                                  
+    55                                  ; I would include references here but I worked the method out myself with
+    56                                  ; no help from anything or anyone, so there aren't any... (oh, by the
+    57                                  ; way, I assume this is the standard method everyone else uses too, it's
+    58                                  ; nothing special or anything, just that I reinvented the wheel one more
+    59                                  ; time ;)
+    60                                  
+    61                                  ; More details are included in the individual function descriptions.
+    62                                  
+    63                                  ; ---- TRDOS 386 --------------------------------------------------------
+    64                                  
+    65                                  ; 19/05/2016
+    66                                  ; 29/04/2016
+    67                                  ; TRDOS 386 system calls (temporary list!)
+    68                                  _ver 	equ 0
+    69                                  _exit 	equ 1
+    70                                  _fork 	equ 2
+    71                                  _read 	equ 3
+    72                                  _write	equ 4
+    73                                  _open	equ 5
+    74                                  _close 	equ 6
+    75                                  _wait 	equ 7
+    76                                  _creat 	equ 8
+    77                                  _link 	equ 9
+    78                                  _unlink	equ 10
+    79                                  _exec	equ 11
+    80                                  _chdir	equ 12
+    81                                  _time 	equ 13
+    82                                  _mkdir 	equ 14
+    83                                  _chmod	equ 15
+    84                                  _chown	equ 16
+    85                                  _break	equ 17
+    86                                  _stat	equ 18
+    87                                  _seek	equ 19
+    88                                  _tell 	equ 20
+    89                                  _mount	equ 21
+    90                                  _umount	equ 22
+    91                                  _setuid	equ 23
+    92                                  _getuid	equ 24
+    93                                  _stime	equ 25
+    94                                  _quit	equ 26	
+    95                                  _intr	equ 27
+    96                                  _fstat	equ 28
+    97                                  _emt 	equ 29
+    98                                  _mdate 	equ 30
+    99                                  _video	equ 31
+   100                                  _audio	equ 32
+   101                                  _timer	equ 33
+   102                                  _sleep	equ 34
+   103                                  _msg    equ 35
+   104                                  _geterr equ 36
+   105                                  _rsrvd1	equ 37
+   106                                  _pri	equ 38
+   107                                  _rele 	equ 39
+   108                                  
+   109                                  %macro sys 1-4
+   110                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+   111                                      ; 03/09/2015	
+   112                                      ; 13/04/2015
+   113                                      ; Retro UNIX 386 v1 system call.	
+   114                                      %if %0 >= 2   
+   115                                          mov ebx, %2
+   116                                          %if %0 >= 3    
+   117                                              mov ecx, %3
+   118                                              %if %0 = 4
+   119                                                 mov edx, %4   
+   120                                              %endif
+   121                                          %endif
+   122                                      %endif
+   123                                      mov eax, %1
+   124                                      ;int 30h
+   125                                      int 40h ; TRDOS 386 (TRDOS v2.0)	   
+   126                                  %endmacro
+   127                                  
+   128                                  ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
+   129                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+   130                                  
+   131                                  [BITS 32] ; 80386 Protected Mode (32 bit) intructions
+   132                                  
+   133                                  [ORG 0] 
+   134                                  
+   135 00000000 E946090000              jmp Start
+   136                                  
+   137                                  Getch:
+   138 00000005 66B80000                mov ax, 0
+   139                                  ;int 16h
+   140 00000009 CD32                    int 32h  ; TRDOS 386 Keyborad Interrupt
+   141 0000000B C3                      retn
+   142                                  
+   143                                  ; You can probably change height without messing things up, but
+   144                                  ; changing the width will I think need some work.
+   145                                  
+   146                                  FRACWIDTH equ 256
+   147                                  FRACHEIGHT equ 128
+   148                                  
+   149                                  ; Fractal parameter
+   150 0000000C 03000000                frac:    dd 3
+   151                                  
+   152                                  ; Memory
+   153 00000010 00000000                enlargebufferseg:        dd 0    ; segment address of the 64*32 enlarge buf.
+   154 00000014 00000000                textureseg:              dd 0    ; the segment address of texture to display.
+   155 00000018 00000000                fractalseg:              dd 0    ; the segment address of texture to create
+   156                                  
+   157                                  ;====================================================================
+   158                                  ;ZOOMTEXTURE - display picture at given zoom fraction
+   159                                  ;--------------------------------------------------------------------
+   160                                  
+   161                                  ; This is pretty obvious; just a standard, fixed-point bitmap
+   162                                  ; display routine. The only extra bit you might notice is that
+   163                                  ; it doubles each pixel, so as to get a larger screen display without
+   164                                  ; taking too long to calculate the fractals.
+   165                                  
+   166                                  ; Data_______________________________________________________________
+   167                                  
+   168 0000001C 0000                    lfrac:   dw 0    
+   169 0000001E 0000                    hfrac:   dw 0    ; texture pixels per real pixel
+   170 00000020 00                      hfracb:  db 0    ; same but a byte
+   171                                  
+   172 00000021 00                      ystart:  db 0
+   173 00000022 00                      xstart:  db 0    ; where to start, in texturemap
+   174                                  
+   175 00000023 0000                    oldbx:   dw 0
+   176                                  
+   177 00000025 0000                    yfracpos: dw 0   ; fractional y-position
+   178                                  
+   179 00000027 00000000                stopat:  dd 0    ; where to stop in screen ram
+   180                                  
+   181                                  ; Source_____________________________________________________________
+   182                                  
+   183                                  ZoomTexture:
+   184 0000002B 50                      push eax
+   185 0000002C 53                      push ebx
+   186 0000002D 51                      push ecx
+   187 0000002E 52                      push edx
+   188 0000002F 56                      push esi
+   189 00000030 57                      push edi
+   190 00000031 55                      push ebp
+   191                                  
+   192 00000032 8B3D[82030000]          mov edi, [screenstart]      ; start position on display memory
+   193 00000038 893D[27000000]          mov [stopat], edi
+   194 0000003E 8105[27000000]00A0-     add dword [stopat], FRACHEIGHT*320 ; stop position on display memory
+   194 00000046 0000               
+   195 00000048 0FB61D[22000000]        movzx ebx, byte [xstart]           ; start position on texture memory
+   196 0000004F 8A3D[21000000]          mov bh, [ystart]
+   197 00000055 8B2D[14000000]          mov ebp, [textureseg]
+   198                                  
+   199 0000005B A0[1E000000]            mov al, [hfrac]
+   200 00000060 A2[20000000]            mov [hfracb], al
+   201                                  
+   202 00000065 668B15[1C000000]        mov dx, [lfrac]
+   203                                  
+   204                                    ZoomYLoop:
+   205                                  
+   206 0000006C 66BE8000                  mov si, FRACWIDTH/2
+   207 00000070 66891D[23000000]          mov [oldbx], bx
+   208                                    ;mov cx, 0
+   209 00000077 31C9                      xor ecx, ecx	
+   210                                  
+   211                                      ZoomXLoop:
+   212                                  
+   213 00000079 8A042B                      mov al, [ebx+ebp]
+   214 0000007C 88C4                        mov ah, al
+   215 0000007E 668907                      mov [edi], ax
+   216 00000081 66898740010000              mov [edi+320], ax
+   217 00000088 6683C702                    add di, 2
+   218 0000008C 66030D[1C000000]            add cx, [lfrac]
+   219 00000093 66131D[1E000000]            adc bx, [hfrac]
+   220                                  
+   221 0000009A 664E                        dec si
+   222 0000009C 75DB                        jnz short ZoomXLoop
+   223                                  
+   224 0000009E 668B1D[23000000]          mov bx, [oldbx]
+   225                                  
+   226 000000A5 660115[25000000]          add [yfracpos], dx
+   227 000000AC 123D[20000000]            adc bh, [hfracb]
+   228                                  
+   229 000000B2 81C780010000              add edi, 640-FRACWIDTH
+   230 000000B8 3B3D[27000000]            cmp edi, [stopat]
+   231 000000BE 72AC                      jb short ZoomYLoop
+   232                                  
+   233                                  ; Check for keypress
+   234 000000C0 B401                    mov ah,1
+   235                                  ;int 16h
+   236 000000C2 CD32                    int 32h ; TRDOS 386 Keyborad Interrupt
+   237 000000C4 7405                    jz short zt_afterkeyhit  
+   238                                  
+   239 000000C6 E909070000              jmp dfs_keyhit
+   240                                  
+   241                                  zt_afterkeyhit:
+   242                                  
+   243 000000CB 5D                      pop ebp
+   244 000000CC 5F                      pop edi
+   245 000000CD 5E                      pop esi
+   246 000000CE 5A                      pop edx
+   247 000000CF 59                      pop ecx
+   248 000000D0 5B                      pop ebx
+   249 000000D1 58                      pop eax
+   250 000000D2 C3                      retn
+   251                                  
+   252                                  ;====================================================================
+   253                                  ;CALCULATE - work out one pixel of Mandelbrot fractal
+   254                                  ;--------------------------------------------------------------------
+   255                                  
+   256                                  ; The fractal formula used, with coordinates x,y, is:
+   257                                  ; A = B = 0. Colour=starting colour.
+   258                                  ;
+   259                                  ; new A = a squared - b squared - x
+   260                                  ; new B = 2 * a * b - y
+   261                                  ;
+   262                                  ; If A squared + B squared > some number frac, then stop.
+   263                                  ; If been round loop more than colour limit (64) times, then stop too.
+   264                                  ;
+   265                                  ; Otherwise, work out next A and B, and increment the colour we're going
+   266                                  ; to use for the pixel.
+   267                                  ;
+   268                                  ; When we get out of the loop, that colour value is the one to draw at
+   269                                  ; this pixel.
+   270                                  
+   271                                  ; Note:
+   272                                  ; The fixed point sections of this are pretty crap; there are proper ways
+   273                                  ; to do fixed point (I think...) so for god's sake don't copy those
+   274                                  ; bits for your own fixed point code.
+   275                                  
+   276                                  ; Data_______________________________________________________________
+   277                                  
+   278 000000D3 00                      colour:  db 0    ; colour to plot the pixel
+   279                                  
+   280 000000D4 00                      esign:    db 0    ; esign of multiplication result
+   281                                  
+   282 000000D5 00000000                la:      dd 0
+   283 000000D9 00000000                ha:      dd 0    
+   284 000000DD 00000000                lb:      dd 0
+   285 000000E1 00000000                hb:      dd 0    ; a,b from a+bi. Low and high words thereof.
+   286                                  
+   287 000000E5 00000000                lasq:    dd 0
+   288 000000E9 00000000                hasq:    dd 0
+   289 000000ED 00000000                lbsq:    dd 0
+   290 000000F1 00000000                hbsq:    dd 0    ; a squared, b squared, low and high words.
+   291                                  
+   292 000000F5 00000000                lnewa:   dd 0
+   293 000000F9 00000000                hnewa:   dd 0    ; temporary storage for `new' veresion of `a'.
+   294                                  
+   295 000000FD 00000000                lx:      dd 0
+   296 00000101 00000000                hx:      dd 0
+   297 00000105 00000000                ly:      dd 0
+   298 00000109 00000000                hy:      dd 0    ; co-oredinates in complex plane of this point
+   299                                  
+   300                                  ; Source_____________________________________________________________
+   301                                  
+   302                                  Calculate:
+   303 0000010D 50                        push eax
+   304 0000010E 53                        push ebx
+   305 0000010F 51                        push ecx
+   306 00000110 52                        push edx
+   307 00000111 56                        push esi
+   308 00000112 57                        push edi
+   309                                  
+   310                                  ; 0) Fix up the x,y data to specific point
+   311                                  ;  mov dword [lx], 2621
+   312                                  ;  mov dword [hx], 1
+   313                                  ;  mov dword [ly], 11107
+   314                                  ;  mov dword [hy], 1
+   315                                  
+   316                                  ; 1) setup colour
+   317 00000113 C605[D3000000]20          mov byte  [colour], 32
+   318                                  
+   319                                  ; 2) clear the a,b and squared variables,
+   320 0000011A 31C0                      xor eax, eax ; 0
+   321 0000011C A3[D5000000]              mov [la], eax
+   322 00000121 A3[D9000000]              mov [ha], eax
+   323 00000126 A3[DD000000]              mov [lb], eax
+   324 0000012B A3[E1000000]              mov [hb], eax
+   325 00000130 A3[E5000000]              mov [lasq], eax
+   326 00000135 A3[E9000000]              mov [hasq], eax
+   327 0000013A A3[ED000000]              mov [lbsq], eax
+   328 0000013F A3[F1000000]              mov [hbsq], eax
+   329                                  
+   330                                    CalcLoop:
+   331                                  
+   332                                    ; 3) increment colour
+   333 00000144 FE05[D3000000]            inc byte [colour]
+   334                                  
+   335                                    ; 4) set up a-squared
+   336                                  asquared:  
+   337 0000014A A1[E5000000]              mov eax, [lasq]
+   338 0000014F 8B15[E9000000]            mov edx, [hasq]
+   339                                  
+   340                                  minusbsquared:
+   341                                    ; 5) subtract b-squared
+   342 00000155 2B05[ED000000]            sub eax, [lbsq]
+   343 0000015B 1B15[F1000000]            sbb edx, [hbsq]
+   344                                  
+   345                                  minusx:  
+   346                                    ; 6) subtract x and store result in new-a
+   347 00000161 2B05[FD000000]            sub eax, [lx]
+   348 00000167 1B15[01010000]            sbb edx, [hx]
+   349 0000016D A3[F5000000]              mov [lnewa], eax
+   350 00000172 8915[F9000000]            mov [hnewa], edx
+   351                                  
+   352                                    ; 7) multiply a and b
+   353                                    
+   354                                  atimesb:
+   355                                    ; a. setup variables
+   356 00000178 8B1D[D5000000]            mov ebx, [la]
+   357 0000017E 8B0D[D9000000]            mov ecx, [ha]
+   358 00000184 8B35[DD000000]            mov esi, [lb]
+   359 0000018A 8B3D[E1000000]            mov edi, [hb]
+   360                                  
+   361                                  fixesigns:  
+   362                                    ; b. sort out esigns to be poesitive
+   363 00000190 C605[D4000000]00          mov byte [esign], 0
+   364 00000197 83F900                    cmp ecx, 0
+   365 0000019A 7D12                      jge short ecxok_1
+   366 0000019C 83F1FF                      xor ecx, 0ffffffffh
+   367 0000019F 83F3FF                      xor ebx, 0ffffffffh
+   368 000001A2 83C301                      add ebx, 1
+   369 000001A5 83D100                      adc ecx, 0
+   370 000001A8 FE05[D4000000]              inc byte [esign]
+   371                                    ecxok_1:
+   372 000001AE 83FF00                    cmp edi, 0
+   373 000001B1 7D12                      jge short ediok_1
+   374 000001B3 83F7FF                      xor edi, 0ffffffffh
+   375 000001B6 83F6FF                      xor esi, 0ffffffffh
+   376 000001B9 83C601                      add esi, 1
+   377 000001BC 83D700                      adc edi, 0
+   378 000001BF FE05[D4000000]              inc byte [esign]
+   379                                    ediok_1:
+   380                                  
+   381                                  multiply:
+   382                                    ; c. multiply the two numbers
+   383 000001C5 C705[E1000000]0000-       mov dword [hb], 0
+   383 000001CD 0000               
+   384 000001CF 89D8                      mov eax, ebx
+   385 000001D1 89F2                      mov edx, esi
+   386 000001D3 F7E2                      mul edx
+   387 000001D5 8915[DD000000]            mov [lb], edx
+   388 000001DB 89D8                      mov eax, ebx
+   389 000001DD 89FA                      mov edx, edi
+   390 000001DF F7E2                      mul edx
+   391 000001E1 0105[DD000000]            add [lb], eax
+   392 000001E7 1115[E1000000]            adc [hb], edx
+   393 000001ED 89C8                      mov eax, ecx
+   394 000001EF 89F2                      mov edx, esi
+   395 000001F1 F7E2                      mul edx
+   396 000001F3 0105[DD000000]            add [lb], eax
+   397 000001F9 1115[E1000000]            adc [hb], edx
+   398 000001FF 89C8                      mov eax, ecx
+   399 00000201 89FA                      mov edx, edi
+   400 00000203 F7E2                      mul edx
+   401 00000205 0105[E1000000]            add [hb], eax
+   402                                  
+   403                                  fixresultesign:
+   404                                    ; d. fix the esign of the result
+   405 0000020B F605[D4000000]01          test byte [esign], 1
+   406 00000212 741C                      jz short esignok_1
+   407 00000214 8335[E1000000]FF            xor dword [hb], 0ffffffffh
+   408 0000021B 8335[DD000000]FF            xor dword [lb], 0ffffffffh
+   409 00000222 8305[FD000000]01            add dword [lx], 1
+   410 00000229 8315[E1000000]00            adc dword [hb], 0
+   411                                    esignok_1:
+   412                                  
+   413                                  doublenumber:
+   414                                    ; 8) Add this to itself, (with carry)
+   415 00000230 A1[DD000000]              mov eax, [lb]
+   416 00000235 8B15[E1000000]            mov edx, [hb]
+   417 0000023B 01C0                      add eax, eax
+   418 0000023D 11D2                      adc edx, edx
+   419                                  
+   420                                  subtracty:
+   421                                    ; 9) Subtract y and store in b
+   422 0000023F 2B05[05010000]            sub eax, [ly]
+   423 00000245 1B15[09010000]            sbb edx, [hy]
+   424 0000024B A3[DD000000]              mov [lb], eax
+   425 00000250 8915[E1000000]            mov [hb], edx
+   426                                  
+   427                                    ; 10) Update a from new-a : combined with
+   428                                    ; 11) Square a and store in a-squared
+   429                                    ; a. setup variable
+   430                                  starttosquare:  
+   431 00000256 8B1D[F5000000]            mov ebx, [lnewa]
+   432 0000025C 8B0D[F9000000]            mov ecx, [hnewa]
+   433 00000262 891D[D5000000]            mov [la], ebx
+   434 00000268 890D[D9000000]            mov [ha], ecx
+   435                                  
+   436                                  fixesign:
+   437                                    ; b. sort out esign to be poesitive
+   438 0000026E 83F900                    cmp ecx, 0
+   439 00000271 7D0C                      jge short ecxok_2
+   440 00000273 83F1FF                      xor ecx, 0ffffffffh
+   441 00000276 83F3FF                      xor ebx, 0ffffffffh
+   442 00000279 83C301                      add ebx, 1
+   443 0000027C 83D100                      adc ecx, 0
+   444                                    ecxok_2:
+   445                                  
+   446                                  squareit:
+   447                                    ; c. square data
+   448 0000027F C705[E9000000]0000-       mov dword [hasq], 0
+   448 00000287 0000               
+   449 00000289 89D8                      mov eax, ebx
+   450 0000028B F7E0                      mul eax
+   451 0000028D 8915[E5000000]            mov [lasq], edx
+   452 00000293 89D8                      mov eax, ebx
+   453 00000295 F7E1                      mul ecx
+   454 00000297 0105[E5000000]            add [lasq], eax
+   455 0000029D 1115[E9000000]            adc [hasq], edx
+   456 000002A3 0105[E5000000]            add [lasq], eax
+   457 000002A9 1115[E9000000]            adc [hasq], edx
+   458 000002AF 89C8                      mov eax, ecx
+   459 000002B1 F7E0                      mul eax
+   460 000002B3 0105[E9000000]            add [hasq], eax
+   461                                  
+   462                                  sametosquareb:
+   463                                    ; 12) Square b and store in b-squared
+   464                                    ; a. setup variable
+   465 000002B9 8B1D[DD000000]            mov ebx, [lb]
+   466 000002BF 8B0D[E1000000]            mov ecx, [hb]
+   467                                  
+   468                                    ; b. sort out esign to be poesitive
+   469 000002C5 83F900                    cmp ecx, 0
+   470 000002C8 7D0C                      jge short ecxok_3
+   471 000002CA 83F1FF                      xor ecx, 0ffffffffh
+   472 000002CD 83F3FF                      xor ebx, 0ffffffffh
+   473 000002D0 83C301                      add ebx, 1
+   474 000002D3 83D100                      adc ecx, 0
+   475                                    ecxok_3:
+   476                                  
+   477                                    ; c. square data
+   478 000002D6 C705[F1000000]0000-       mov dword [hbsq], 0
+   478 000002DE 0000               
+   479 000002E0 89D8                      mov eax, ebx
+   480 000002E2 F7E0                      mul eax
+   481 000002E4 8915[ED000000]            mov [lbsq], edx
+   482 000002EA 89D8                      mov eax, ebx
+   483 000002EC F7E1                      mul ecx
+   484 000002EE 0105[ED000000]            add [lbsq], eax
+   485 000002F4 1115[F1000000]            adc [hbsq], edx
+   486 000002FA 0105[ED000000]            add [lbsq], eax
+   487 00000300 1115[F1000000]            adc [hbsq], edx
+   488 00000306 89C8                      mov eax, ecx
+   489 00000308 F7E0                      mul eax
+   490 0000030A 0105[F1000000]            add [hbsq], eax
+   491                                  
+   492                                  asquaredaddbsquared:  
+   493                                    ; 13) Setup a-squared
+   494 00000310 A1[E5000000]              mov eax, [lasq]
+   495 00000315 8B15[E9000000]            mov edx, [hasq]
+   496                                  
+   497                                    ; 14) Add b-squared
+   498 0000031B 0305[ED000000]            add eax, [lbsq]
+   499 00000321 1315[F1000000]            adc edx, [hbsq]
+   500                                  
+   501                                    ; 15) Compare with *n*, stop if >
+   502 00000327 3B15[0C000000]            cmp edx, [frac]
+   503 0000032D 7F0E                      jg short CalcFinish
+   504                                  
+   505                                    ; 16) If colour > *c*, stop
+   506 0000032F 803D[D3000000]3F          cmp byte [colour], 63
+   507 00000336 7F05                      jg short CalcFinish
+   508                                  
+   509 00000338 E907FEFFFF              jmp CalcLoop
+   510                                  
+   511                                  CalcFinish:
+   512                                  ; 17) Return pixel colour
+   513 0000033D 5F                      pop edi
+   514 0000033E 5E                      pop esi
+   515 0000033F 5A                      pop edx
+   516 00000340 59                      pop ecx
+   517 00000341 5B                      pop ebx
+   518 00000342 58                      pop eax
+   519 00000343 A0[D3000000]            mov al, [colour]
+   520 00000348 C3                      retn
+   521                                  
+   522                                  ;====================================================================
+   523                                  ;FRACTAL - loop round to draw a 256x256 fractal using Calculate
+   524                                  ;--------------------------------------------------------------------
+   525                                  
+   526                                  ; Basically, this just uses fixed-point to go through all the 
+   527                                  ; x and y coordinates corresponding to SCREEN x and y.
+   528                                  ; If you're confused about the "normaltime", "othertime", etc crap
+   529                                  ; in the zooming-in section, well, I *think* this is because the
+   530                                  ; Y-position sometimes needs to start at a half-pixel (i.e. "othertime")
+   531                                  ; but usually ("normaltime") starts on a whole pixel.
+   532                                  
+   533                                  ; Note, it would be possible to speed this up by 1/4, simply by re-using
+   534                                  ; the relevant pixels from the fractal calculated last: see this diagram
+   535                                  
+   536                                  ; We're zooming in to top left corner.
+   537                                  
+   538                                  ; Original fractal      Fractal needs calculating next
+   539                                  ;
+   540                                  ; abcd....              a?b?c?d?
+   541                                  ; efgh....              ????????
+   542                                  ; ijkl....              e?f?g?h?
+   543                                  ; mnop....              ????????
+   544                                  ; ........              i?j?k?l?
+   545                                  ; ........              ????????
+   546                                  ; ........              m?n?o?p?
+   547                                  ; ........              ????????
+   548                                  ;
+   549                                  ; where "." has been calculated on original fractal, but will not be used
+   550                                  ; for the new one, and ? represents what actually needs to be calculated
+   551                                  ; in the new one. (a,b,c,... could be copied from the old one).
+   552                                  ;
+   553                                  ; Actually, this routine doesn't copy over a,b,c,..., they are recalculated.
+   554                                  
+   555                                  ; Data_______________________________________________________________
+   556                                  
+   557 00000349 00000000                lxcentre:    dd 0
+   558 0000034D 00000000                hxcentre:    dd 0
+   559 00000351 00000000                lycentre:    dd 0
+   560 00000355 00000000                hycentre:    dd 0    ; co-ordinates of the window's centre, not used here
+   561                                                       ; (they are used in the main loop...)
+   562 00000359 00000000                lxs:     dd 0
+   563 0000035D 00000000                hxs:     dd 0
+   564 00000361 00000000                lys:     dd 0
+   565 00000365 00000000                hys:     dd 0    ; co-oredinates of the window's top left corner
+   566                                  
+   567 00000369 00000000                lxi:     dd 0
+   568 0000036D 00000000                hxi:     dd 0
+   569 00000371 00000000                lyi:     dd 0
+   570 00000375 00000000                hyi:     dd 0    ; amount to increment fractal parameter per pixel
+   571                                  
+   572 00000379 0000                    ycount:  dw 0
+   573 0000037B 0000                    xcount:  dw 0    ; loop counters
+   574                                  
+   575 0000037D 01                      nodraw:  db 1    ; whether or not to draw the last one
+   576                                  
+   577 0000037E 01                      ydirection: db 1
+   578 0000037F 01                      xdirection: db 1 ; direction of the zoom (0 = left/up, 1=centre, 2=rt/down)
+   579 00000380 01                      newxdirection: db 1
+   580 00000381 01                      newydirection: db 1
+   581                                  
+   582 00000382 00000000                screenstart:   dd 0    ; screen edisplay offset
+   583                                  
+   584                                  ; Source_____________________________________________________________
+   585                                  
+   586                                  Fractal:
+   587 00000386 50                      push eax
+   588 00000387 53                      push ebx
+   589 00000388 51                      push ecx
+   590 00000389 52                      push edx
+   591 0000038A 56                      push esi
+   592 0000038B 57                      push edi
+   593                                  
+   594                                  ; 1) Initialise x and y parameters of fractal to xstart,ystart
+   595 0000038C A1[59030000]            mov eax, [lxs]
+   596 00000391 8B15[5D030000]          mov edx, [hxs]
+   597 00000397 A3[FD000000]            mov [lx], eax
+   598 0000039C 8915[01010000]          mov [hx], edx
+   599 000003A2 A1[61030000]            mov eax, [lys]
+   600 000003A7 8B15[65030000]          mov edx, [hys]
+   601 000003AD A3[05010000]            mov [ly], eax
+   602 000003B2 8915[09010000]          mov [hy], edx
+   603                                  
+   604                                  ; 1.5) Initialise zoom parameters
+   605 000003B8 66C705[1C000000]00-     mov word [lfrac], 1024*63
+   605 000003C0 FC                 
+   606 000003C1 66C705[1E000000]01-     mov word [hfrac], 1
+   606 000003C9 00                 
+   607 000003CA C605[21000000]00        mov byte [ystart], 0
+   608 000003D1 C605[22000000]00        mov byte [xstart], 0
+   609                                  
+   610                                  ; 2) Set up screen pointer
+   611 000003D8 8B3D[18000000]          mov edi, [fractalseg]
+   612                                  
+   613 000003DE 66C705[79030000]80-     mov word [ycount], FRACHEIGHT
+   613 000003E6 00                 
+   614                                    FracYLoop:
+   615                                  
+   616 000003E7 66C705[7B030000]00-       mov word [xcount], FRACWIDTH
+   616 000003EF 01                 
+   617                                      FracXLoop:
+   618                                      
+   619                                      ; 3) Calculate pixel
+   620 000003F0 E818FDFFFF                  call Calculate
+   621                                  
+   622                                      ; 4) Draw pixel
+   623 000003F5 8807                        mov [edi], al
+   624                                  
+   625                                      ; 5) Add X increment to X
+   626 000003F7 A1[69030000]                mov eax, [lxi]
+   627 000003FC 8B15[6D030000]              mov edx, [hxi]
+   628 00000402 0105[FD000000]              add [lx], eax
+   629 00000408 1115[01010000]              adc [hx], edx
+   630                                  
+   631                                      ; 6) Increment screen position
+   632 0000040E 6647                        inc di
+   633                                      
+   634                                      ; 7) If count >127, stop
+   635 00000410 66FF0D[7B030000]            dec word [xcount]
+   636 00000417 75D7                        jnz short FracXLoop
+   637                                  
+   638                                    ; 8) Set X to xstart
+   639 00000419 A1[59030000]              mov eax, [lxs]
+   640 0000041E 8B15[5D030000]            mov edx, [hxs]
+   641 00000424 A3[FD000000]              mov [lx], eax
+   642 00000429 8915[01010000]            mov [hx], edx
+   643                                  
+   644                                    ; 10) Add Y increment to Y
+   645 0000042F A1[69030000]              mov eax, [lxi]
+   646 00000434 8B15[6D030000]            mov edx, [hxi]
+   647 0000043A 0105[05010000]            add [ly], eax
+   648 00000440 1115[09010000]            adc [hy], edx
+   649                                  
+   650                                    ; 10.5) Draw zoomed last fractal if count%2==0
+   651 00000446 66A1[79030000]            mov ax, [ycount]
+   652 0000044C 2401                      and al, 1
+   653 0000044E 7561                      jnz short notthistime
+   654                                    ; Update zoom position
+   655 00000450 66C705[25000000]00-         mov word [yfracpos], 0
+   655 00000458 00                 
+   656 00000459 A0[7F030000]                mov al, [xdirection]
+   657 0000045E 0005[22000000]              add [xstart], al
+   658 00000464 803D[7E030000]00            cmp byte [ydirection], 0
+   659 0000046B 742D                        je short normaltime
+   660 0000046D 803D[7E030000]02            cmp byte [ydirection], 2
+   661 00000474 7508                        jne short ydirection1
+   662 00000476 FE05[21000000]              inc byte [ystart]
+   663 0000047C EB1C                        jmp short normaltime
+   664                                      ydirection1:
+   665 0000047E 66F705[79030000]02-         test word [ycount], 2
+   665 00000486 00                 
+   666 00000487 7408                        jz short othertime
+   667 00000489 FE05[21000000]              inc byte [ystart]
+   668 0000048F EB09                        jmp short normaltime
+   669                                    
+   670                                    othertime:
+   671 00000491 66C705[25000000]00-         mov word [yfracpos], 8000h
+   671 00000499 80                 
+   672                                  
+   673                                    normaltime:
+   674 0000049A 803D[7D030000]00            cmp byte [nodraw], 0
+   675 000004A1 7505                        jne short dontdraw
+   676 000004A3 E883FBFFFF                  call ZoomTexture
+   677                                      dontdraw:
+   678 000004A8 66812D[1C000000]00-         sub word [lfrac], 1024
+   678 000004B0 04                 
+   679                                  
+   680                                    notthistime:
+   681                                  
+   682                                    ; 11) If count>127, stop
+   683 000004B1 66FF0D[79030000]          dec word [ycount]
+   684 000004B8 0F8529FFFFFF              jnz FracYLoop
+   685                                  
+   686 000004BE 5F                      pop edi
+   687 000004BF 5E                      pop esi
+   688 000004C0 5A                      pop edx
+   689 000004C1 59                      pop ecx
+   690 000004C2 5B                      pop ebx
+   691 000004C3 58                      pop eax
+   692 000004C4 C3                      retn
+   693                                  
+   694                                  ;====================================================================
+   695                                  ; SWITCHTEXTURES - switch around the two buffers
+   696                                  ;--------------------------------------------------------------------
+   697                                  
+   698                                  ; This just changes the two buffers when one has been finished; so
+   699                                  ; that the new fractal becomes the one that gets drawn to screen, and 
+   700                                  ; the old fractal will get written over by the one newly being
+   701                                  ; calculated.
+   702                                  
+   703                                  ; This is a separate function, because if you decide to implement
+   704                                  ; the 25% saving described above, you'll need to copy over those
+   705                                  ; re-cycled pixels at some point, and this is a good time to do that.
+   706                                  
+   707                                  ; Source_____________________________________________________________
+   708                                  
+   709                                  SwitchTextures:
+   710 000004C5 50                      push eax
+   711 000004C6 52                      push edx
+   712                                  
+   713 000004C7 A1[18000000]            mov eax, [fractalseg]
+   714 000004CC 8B15[14000000]          mov edx, [textureseg]
+   715 000004D2 8915[18000000]          mov [fractalseg], edx
+   716 000004D8 A3[14000000]            mov [textureseg], eax
+   717                                  
+   718 000004DD 5A                      pop edx
+   719 000004DE 58                      pop eax
+   720 000004DF C3                      retn
+   721                                  
+   722                                  ;====================================================================
+   723                                  ;DOBACKGROUND - the background for lo-res part of demo
+   724                                  ;--------------------------------------------------------------------
+   725                                  
+   726                                  ; Just draws the swirly background things, very simple.
+   727                                  
+   728                                  DoBackground:
+   729 000004E0 50                      push eax
+   730 000004E1 53                      push ebx
+   731 000004E2 51                      push ecx
+   732 000004E3 57                      push edi
+   733                                  
+   734 000004E4 29DB                    sub ebx, ebx ;0        ; bh=y, bl=x
+   735                                  
+   736 000004E6 BF00000A00              mov edi, 0A0000h
+   737 000004EB 89FE                    mov esi, edi
+   738 000004ED 66B900FA                mov cx, 64000 ; ecx = 64000
+   739 000004F1 88D8                    mov al, bl ;0
+   740 000004F3 F3AA                    rep stosb
+   741 000004F5 89F7                    mov edi, esi ; 0A0000h
+   742                                  
+   743                                  db_loop:
+   744 000004F7 88F8                      mov al, bh
+   745 000004F9 F6E3                      mul bl
+   746 000004FB 240F                      and al, 0fh
+   747 000004FD 0410                      add al, 16
+   748 000004FF 8807                      mov [edi], al
+   749 00000501 6647                      inc di
+   750 00000503 6643                      inc bx
+   751 00000505 80FB00                    cmp bl, 0
+   752 00000508 7504                      jne short notnextline
+   753 0000050A 6683C740                  add di, 320-256
+   754                                  notnextline:
+   755 0000050E 6681FB00C1                cmp bx, 256*193
+   756 00000513 72E2                      jb short db_loop
+   757                                  
+   758 00000515 66BF0001                mov di, 256
+   759 00000519 66BAC000                mov dx, 192
+   760                                  
+   761                                  copy_loop:
+   762 0000051D 66B92000                  mov cx, 32
+   763 00000521 F366A5                    rep movsw
+   764 00000524 6681C60001                add si, 320-64
+   765 00000529 6681C70001                add di, 320-64
+   766 0000052E 664A                      dec dx
+   767 00000530 75EB                      jnz short copy_loop
+   768                                  
+   769                                  ;mov di, 256*193
+   770                                  ;mov cx, 8*320
+   771                                  ;mov al, 0
+   772                                  ;rep stosb
+   773                                  
+   774 00000532 5F                      pop edi
+   775 00000533 59                      pop ecx
+   776 00000534 5B                      pop ebx
+   777 00000535 58                      pop eax
+   778                                  
+   779 00000536 C3                      retn
+   780                                  
+   781                                  ;====================================================================
+   782                                  ;DRAWSQUARE - fills a square, for showing which way things are going
+   783                                  ;--------------------------------------------------------------------
+   784                                  
+   785                                  ; I won't bother explaining this, you can all manage to draw a square
+   786                                  ; by now...
+   787                                  
+   788                                  DrawSquare:
+   789 00000537 50                      push eax
+   790 00000538 52                      push edx
+   791 00000539 56                      push esi
+   792 0000053A 57                      push edi
+   793                                  
+   794 0000053B 6689C6                  mov si, ax
+   795                                  
+   796                                  ; bh=starty, ax(now si)=startx
+   797                                  ; dx=width and height
+   798                                  ; cl=colour
+   799 0000053E 6652                    push dx
+   800 00000540 6689DF                  mov di, bx
+   801 00000543 66C1EF08                shr di, 8
+   802 00000547 66B84001                mov ax, 320
+   803 0000054B 66F7E7                  mul di
+   804 0000054E 6601F0                  add ax, si
+   805                                  
+   806 00000551 BF00000A00              mov edi, 0A0000h
+   807 00000556 6689C7                  mov di, ax
+   808 00000559 665A                    pop dx
+   809                                  
+   810 0000055B 88C8                    mov al, cl
+   811                                  
+   812 0000055D 6689D6                  mov si, dx
+   813                                  ds_yloop:
+   814 00000560 6689D1                    mov cx, dx
+   815 00000563 F3AA                      rep stosb
+   816 00000565 6681C74001                add di, 320
+   817 0000056A 6629D7                    sub di, dx
+   818 0000056D 664E                      dec si
+   819 0000056F 75EF                      jnz short ds_yloop
+   820                                  
+   821 00000571 5F                      pop edi
+   822 00000572 5E                      pop esi
+   823 00000573 5A                      pop edx
+   824 00000574 58                      pop eax
+   825 00000575 C3                      retn
+   826                                  
+   827                                  ;====================================================================
+   828                                  ;DRAWDIRECTIONSQUARES - draw the motion direction indicators
+   829                                  ;--------------------------------------------------------------------
+   830                                  
+   831                                  ; this is pretty trivial too.
+   832                                  
+   833                                  DrawDirectionSquares:
+   834 00000576 50                      push eax
+   835 00000577 53                      push ebx
+   836 00000578 51                      push ecx
+   837 00000579 52                      push edx
+   838 0000057A 56                      push esi
+   839 0000057B 57                      push edi
+   840                                  
+   841                                  ; Clear all squares
+   842 0000057C B700                    mov bh, 0        ; was 16
+   843 0000057E 66B80000                mov ax, 0        ; was 16
+   844 00000582 B100                    mov cl, 0
+   845 00000584 66BA2000                mov dx, 32
+   846                                  
+   847 00000588 66BE0300                mov si, 3
+   848                                  dds_yloop:
+   849 0000058C 66BF0300                  mov di, 3
+   850                                    dds_xloop:
+   851 00000590 6683FF02                    cmp di, 2
+   852 00000594 7506                        jne short dds_drawit
+   853 00000596 6683FE02                    cmp si, 2
+   854 0000059A 7405                        je short dds_skipit
+   855                                  
+   856                                      dds_drawit:
+   857 0000059C E896FFFFFF                  call DrawSquare
+   858                                  
+   859                                      dds_skipit:
+   860 000005A1 66059000                    add ax, 9*16
+   861 000005A5 664F                        dec di
+   862 000005A7 75E7                        jnz short dds_xloop
+   863 000005A9 66B80000                  mov ax, 0      
+   864 000005AD 80C750                    add bh, 5*16   
+   865 000005B0 664E                      dec si
+   866 000005B2 75D8                      jnz short dds_yloop
+   867                                  
+   868                                  ; Draw chosen square
+   869 000005B4 803D[81030000]01        cmp byte [newydirection], 1
+   870 000005BB 7509                    jne short drawchosen
+   871 000005BD 803D[80030000]01        cmp byte [newxdirection], 1 
+   872 000005C4 7438                    je short afterchosen
+   873                                  
+   874                                  drawchosen:
+   875 000005C6 B400                    mov ah, 0
+   876 000005C8 A0[81030000]            mov al, [newydirection]
+   877 000005CD 666BC050                imul ax, 5*16    
+   878 000005D1 88C7                    mov bh, al
+   879                                  ;mov eax, 0
+   880                                  ;mov al, [newxdirection]
+   881 000005D3 0FB605[80030000]        movzx eax, byte [newxdirection]
+   882 000005DA 66BE9000                mov si, 9*16
+   883 000005DE 66F7E6                  mul si
+   884 000005E1 66BA2000                mov dx, 32               ; square side length
+   885 000005E5 B101                    mov cl, 1
+   886 000005E7 E84BFFFFFF              call DrawSquare
+   887 000005EC 80C704                  add bh, 4
+   888 000005EF 6683C004                add ax, 4
+   889 000005F3 6683EA08                sub dx, 8
+   890 000005F7 B100                    mov cl, 0
+   891 000005F9 E839FFFFFF              call DrawSquare         ; clear the inside
+   892                                  
+   893                                  afterchosen:
+   894                                  ; Draw actual (current) square
+   895 000005FE 803D[7E030000]01        cmp byte [ydirection], 1
+   896 00000605 7509                    jne short drawcurrent
+   897 00000607 803D[7F030000]01        cmp byte [xdirection], 1
+   898 0000060E 7431                    je short aftercurrent
+   899                                  
+   900                                  drawcurrent:
+   901 00000610 B400                    mov ah, 0
+   902 00000612 A0[7E030000]            mov al, [ydirection]
+   903 00000617 666BC050                imul ax, 5*16  
+   904 0000061B 6683C000                add ax, 0        
+   905 0000061F 88C7                    mov bh, al
+   906 00000621 B400                    mov ah, 0
+   907 00000623 A0[7F030000]            mov al, [xdirection]
+   908 00000628 66BE9000                mov si, 9*16
+   909 0000062C 66F7E6                  mul si
+   910 0000062F 80C704                  add bh, 4
+   911 00000632 6683C004                add ax, 4                ; current square start now in bx.
+   912 00000636 66BA1800                mov dx, 24               ; square side length
+   913 0000063A B102                    mov cl, 2
+   914 0000063C E8F6FEFFFF              call DrawSquare
+   915                                  
+   916                                  aftercurrent:
+   917 00000641 5F                      pop edi
+   918 00000642 5E                      pop esi
+   919 00000643 5A                      pop edx
+   920 00000644 59                      pop ecx
+   921 00000645 5B                      pop ebx
+   922 00000646 58                      pop eax
+   923 00000647 C3                      retn
+   924                                  
+   925                                  ;====================================================================
+   926                                  ;DOFRACTALSECTION - the controllable fractals part of the demo
+   927                                  ;--------------------------------------------------------------------
+   928                                  
+   929                                  ; hopefully what with the background you have already read, this
+   930                                  ; routine is self-explanatory.
+   931                                  
+   932                                  DoFractalSection:
+   933                                  ; Now setup fractal parameters
+   934                                  ; Start at preplanned position
+   935 00000648 C705[4D030000]0000-     mov dword [hxcentre], 000000000h
+   935 00000650 0000               
+   936 00000652 C705[49030000]FFDF-     mov dword [lxcentre], 04afadfffh
+   936 0000065A FA4A               
+   937 0000065C C705[55030000]FEFF-     mov dword [hycentre], 0fffffffeh
+   937 00000664 FFFF               
+   938 00000666 C705[51030000]FFBF-     mov dword [lycentre], 08f71bfffh
+   938 0000066E 718F               
+   939                                  
+   940                                  ; and increment by 1/64 per pixel
+   941 00000670 C705[6D030000]0000-     mov dword [hxi], 0
+   941 00000678 0000               
+   942 0000067A C705[69030000]0000-     mov dword [lxi], 1024*65536
+   942 00000682 0004               
+   943 00000684 C705[75030000]0000-     mov dword [hyi], 0
+   943 0000068C 0000               
+   944 0000068E C705[71030000]0000-     mov dword [lyi], 1024*65536
+   944 00000696 0004               
+   945                                  
+   946 00000698 C705[82030000]6029-     mov dword [screenstart], 0A0000h + (33*320+32)
+   946 000006A0 0A00               
+   947                                  
+   948                                  dfs_fracloop:
+   949                                  
+   950                                  ; Calculate new hxcentre etc depending on xdirection,ydirection
+   951                                  ; (new position = FW/4*(xdirection+1),FH/4*(ydirection+1) on the display)
+   952                                  
+   953                                  ; xcentre=xcentre+fw/4*(xdirection-1)*xi 
+   954 000006A2 803D[7F030000]01        cmp byte [xdirection], 1
+   955 000006A9 742F                    je short xchangedone
+   956 000006AB BA80000000              mov edx, FRACWIDTH/2
+   957 000006B0 A1[69030000]            mov eax, [lxi]
+   958 000006B5 F7E2                    mul edx
+   959 000006B7 803D[7F030000]02        cmp byte [xdirection], 2
+   960 000006BE 750E                    jne short xchangeminus
+   961 000006C0 0105[49030000]            add [lxcentre], eax
+   962 000006C6 1115[4D030000]            adc [hxcentre], edx
+   963 000006CC EB0C                      jmp short xchangedone
+   964                                  xchangeminus:
+   965 000006CE 2905[49030000]            sub [lxcentre], eax
+   966 000006D4 1915[4D030000]            sbb [hxcentre], edx
+   967                                  xchangedone:
+   968                                  
+   969                                  ; Same for Y:
+   970 000006DA 803D[7E030000]01        cmp byte [ydirection], 1
+   971 000006E1 742F                    je short ychangedone
+   972 000006E3 BA40000000              mov edx, FRACHEIGHT/2
+   973 000006E8 A1[71030000]            mov eax, [lyi]
+   974 000006ED F7E2                    mul edx
+   975 000006EF 803D[7E030000]02        cmp byte [ydirection], 2
+   976 000006F6 750E                    jne short ychangeminus
+   977 000006F8 0105[51030000]            add [lycentre], eax
+   978 000006FE 1115[55030000]            adc [hycentre], edx
+   979 00000704 EB0C                      jmp short ychangedone
+   980                                  ychangeminus:
+   981 00000706 2905[51030000]            sub [lycentre], eax
+   982 0000070C 1915[55030000]            sbb [hycentre], edx
+   983                                  ychangedone:
+   984                                  
+   985                                  ; Calculate start hxs,lxs hys,lys to keep hxcentre in middle (at 128,128)
+   986                                  
+   987                                  ; xs=xcentre-128*xi ys=ycentre-128*yi
+   988 00000712 A1[69030000]            mov eax, [lxi]
+   989 00000717 BA80000000              mov edx, FRACWIDTH/2
+   990 0000071C F7E2                    mul edx
+   991 0000071E 89C3                    mov ebx, eax     ; bx is l(xi*128)
+   992 00000720 89D1                    mov ecx, edx     ; cx is h(xi*128)
+   993 00000722 83F3FF                  xor ebx, 0ffffffffh
+   994 00000725 83F1FF                  xor ecx, 0ffffffffh
+   995 00000728 41                      inc ecx         ; cx:bx now negative'd
+   996 00000729 031D[49030000]          add ebx, [lxcentre]
+   997 0000072F 130D[4D030000]          adc ecx, [hxcentre]
+   998 00000735 891D[59030000]          mov [lxs], ebx
+   999 0000073B 890D[5D030000]          mov [hxs], ecx
+  1000                                  
+  1001                                  ; Same for Y:
+  1002 00000741 A1[71030000]            mov eax, [lyi]
+  1003 00000746 BA40000000              mov edx, FRACHEIGHT/2
+  1004 0000074B F7E2                    mul edx
+  1005 0000074D 89C3                    mov ebx, eax     ; bx is l(xi*128)
+  1006 0000074F 89D1                    mov ecx, edx     ; cx is h(xi*128)
+  1007 00000751 83F3FF                  xor ebx, 0ffffffffh
+  1008 00000754 83F1FF                  xor ecx, 0ffffffffh
+  1009 00000757 41                      inc ecx         ; cx:bx now negative'd
+  1010 00000758 031D[51030000]          add ebx, [lycentre]
+  1011 0000075E 130D[55030000]          adc ecx, [hycentre]
+  1012 00000764 891D[61030000]          mov [lys], ebx
+  1013 0000076A 890D[65030000]          mov [hys], ecx
+  1014                                  
+  1015                                  ; Calculate next fractal while we zoom the last one
+  1016 00000770 E811FCFFFF              call Fractal
+  1017                                  
+  1018                                  ; Switch the texture buffers, including copying 1/4 of the pixels
+  1019 00000775 E84BFDFFFF              call SwitchTextures
+  1020                                  
+  1021 0000077A 31C9                    xor ecx, ecx ; 0
+  1022 0000077C 803D[7D030000]01        cmp byte [nodraw], 1
+  1023 00000783 750C                    jne alreadydrawing
+  1024 00000785 C605[7D030000]00        mov byte [nodraw], 0
+  1025 0000078C E84FFDFFFF              call DoBackground
+  1026                                  ;mov cx, 0
+  1027                                  alreadydrawing:
+  1028                                  ; Double magnification
+  1029 00000791 A1[69030000]            mov eax, [lxi]
+  1030 00000796 8B15[6D030000]          mov edx, [hxi]
+  1031 0000079C D1E8                    shr eax, 1
+  1032 0000079E D1EA                    shr edx, 1
+  1033 000007A0 A3[69030000]            mov [lxi], eax
+  1034 000007A5 8915[6D030000]          mov [hxi], edx
+  1035 000007AB A3[71030000]            mov [lyi], eax
+  1036 000007B0 8915[75030000]          mov [hyi], edx
+  1037                                  
+  1038                                  ; Update direction
+  1039 000007B6 A0[80030000]            mov al, [newxdirection]
+  1040 000007BB A2[7F030000]            mov [xdirection], al
+  1041 000007C0 A0[81030000]            mov al, [newydirection]
+  1042 000007C5 A2[7E030000]            mov [ydirection], al
+  1043                                  
+  1044 000007CA E8A7FDFFFF              call DrawDirectionSquares
+  1045                                  
+  1046 000007CF E9CEFEFFFF              jmp dfs_fracloop
+  1047                                  
+  1048                                  dfs_keyhit:
+  1049                                  
+  1050 000007D4 E82CF8FFFF              call Getch
+  1051                                  
+  1052 000007D9 3C37                    cmp al,'7'
+  1053 000007DB 750E                    jne short not7
+  1054 000007DD C605[80030000]00        mov byte [newxdirection], 0
+  1055 000007E4 C605[81030000]00        mov byte [newydirection], 0
+  1056                                  not7:
+  1057                                  
+  1058 000007EB 3C34                    cmp al,'4'
+  1059 000007ED 750E                    jne short not4
+  1060 000007EF C605[80030000]00        mov byte [newxdirection], 0
+  1061 000007F6 C605[81030000]01        mov byte [newydirection], 1
+  1062                                  not4:
+  1063                                  
+  1064 000007FD 3C31                    cmp al,'1'
+  1065 000007FF 750E                    jne short not1
+  1066 00000801 C605[80030000]00        mov byte [newxdirection], 0
+  1067 00000808 C605[81030000]02        mov byte [newydirection], 2
+  1068                                  not1:
+  1069                                  
+  1070 0000080F 3C38                    cmp al,'8'
+  1071 00000811 750E                    jne short not8
+  1072 00000813 C605[80030000]01        mov byte [newxdirection], 1
+  1073 0000081A C605[81030000]00        mov byte [newydirection], 0
+  1074                                  not8:
+  1075                                  
+  1076 00000821 3C35                    cmp al,'5'
+  1077 00000823 750E                    jne short not5
+  1078 00000825 C605[80030000]01        mov byte [newxdirection], 1
+  1079 0000082C C605[81030000]01        mov byte [newydirection], 1
+  1080                                  not5:
+  1081                                  
+  1082 00000833 3C32                    cmp al,'2'
+  1083 00000835 750E                    jne short not2
+  1084 00000837 C605[80030000]01        mov byte [newxdirection], 1
+  1085 0000083E C605[81030000]02        mov byte [newydirection], 2
+  1086                                  not2:
+  1087                                  
+  1088 00000845 3C39                    cmp al, '9'
+  1089 00000847 750E                    jne short not9
+  1090 00000849 C605[80030000]02        mov byte [newxdirection], 2
+  1091 00000850 C605[81030000]00        mov byte [newydirection], 0
+  1092                                  not9:
+  1093                                  
+  1094 00000857 3C36                    cmp al, '6'
+  1095 00000859 750E                    jne short not6
+  1096 0000085B C605[80030000]02        mov byte [newxdirection], 2
+  1097 00000862 C605[81030000]01        mov byte [newydirection], 1
+  1098                                  not6:
+  1099                                  
+  1100 00000869 3C33                    cmp al,'3'
+  1101 0000086B 750E                    jne not3
+  1102 0000086D C605[80030000]02        mov byte [newxdirection],2
+  1103 00000874 C605[81030000]02        mov byte [newydirection],2
+  1104                                  not3:
+  1105                                  
+  1106 0000087B 3C1B                    cmp al, 27
+  1107 0000087D 0F84DC000000            je breakout
+  1108                                  
+  1109 00000883 E8EEFCFFFF              call DrawDirectionSquares
+  1110                                  
+  1111                                  donethecentrechange:
+  1112 00000888 E93EF8FFFF              jmp zt_afterkeyhit    
+  1113                                  
+  1114                                  ;====================================================================
+  1115                                  ;MAIN SECTION & MISC
+  1116                                  ;--------------------------------------------------------------------
+  1117                                  
+  1118                                  Init:
+  1119                                  ; 1) Setup ES segment
+  1120                                  ; 2) Allocate RAM
+  1121 0000088D C705[14000000]0000-     mov dword [textureseg], 10000h ; textureseg is 64k above our segment
+  1121 00000895 0100               
+  1122 00000897 C705[18000000]0000-     mov dword [fractalseg], 20000h ; and fractalseg is 128k above
+  1122 0000089F 0200               
+  1123 000008A1 C705[10000000]-         mov dword [enlargebufferseg], _end
+  1123 000008A7 [84090000]         
+  1124                                  ; 3) Do graphics mode
+  1125 000008AB 66B81300                mov ax, 0013h
+  1126                                  ; Int 10h
+  1127 000008AF CD31                    int 31h ; TRDOS 386 Video Interrupt
+  1128 000008B1 C3                      retn
+  1129                                  
+  1130                                  Shutdown:
+  1131 000008B2 66B80300                mov ax, 0003h
+  1132                                  ;int 10h
+  1133 000008B6 CD31                    int 31h ; TRDOS 386 Video Interrupt
+  1134 000008B8 C3                      retn
+  1135                                  
+  1136                                  message:
+  1137 000008B9 5468616E6B7320666F-     db 'Thanks for watching the modified version of 4ge',39,'S XMaS 94 iNTRo.'
+  1137 000008C2 72207761746368696E-
+  1137 000008CB 6720746865206D6F64-
+  1137 000008D4 696669656420766572-
+  1137 000008DD 73696F6E206F662034-
+  1137 000008E6 6765275320584D6153-
+  1137 000008EF 20393420694E54526F-
+  1137 000008F8 2E                 
+  1138 000008F9 0D0A0D0A                db 13,10,13,10
+  1139 000008FD 476574203467652D78-     db 'Get 4ge-xmas.zip from ftp.cdrom.com for the full version, Tseng gfx only.',13,10,13,10, 0
+  1139 00000906 6D61732E7A69702066-
+  1139 0000090F 726F6D206674702E63-
+  1139 00000918 64726F6D2E636F6D20-
+  1139 00000921 666F72207468652066-
+  1139 0000092A 756C6C207665727369-
+  1139 00000933 6F6E2C205473656E67-
+  1139 0000093C 20676678206F6E6C79-
+  1139 00000945 2E0D0A0D0A00       
+  1140                                  
+  1141                                  Start:
+  1142                                  ; DIRECT VGA MEMORY ACCESS
+  1143                                  ;xor ebx, ebx
+  1144 0000094B B705                    mov bh, 5 ; Direct access/map to VGA memory (0A0000h)
+  1145                                  ;mov eax, _video ; 1Fh
+  1146 0000094D B01F                    mov al, 1Fh ; sys _video ; TRDOS 386 Video functions
+  1147 0000094F CD40                    int 40h   ; TRDOS 386 system call
+  1148                                  ; eax = 0A0000h
+  1149 00000951 21C0                    and eax, eax
+  1150 00000953 7425                    jz short terminate ; error (eax = 0)
+  1151                                  
+  1152 00000955 E833FFFFFF              call Init
+  1153 0000095A E8E9FCFFFF              call DoFractalSection
+  1154                                  breakout:
+  1155 0000095F E84EFFFFFF              call Shutdown
+  1156 00000964 B409                    mov ah, 09h
+  1157 00000966 BE[B9080000]            mov esi, message
+  1158                                  print_msg:
+  1159 0000096B 66BB0700                mov bx, 7
+  1160 0000096F B40E                    mov ah, 0Eh
+  1161                                  pmsg_loop:
+  1162 00000971 AC                      lodsb
+  1163 00000972 20C0                    and al, al
+  1164 00000974 7404                    jz short terminate
+  1165 00000976 CD31                    int 31h	; TRDOS 386 video interrupt
+  1166 00000978 EBF7                    jmp short pmsg_loop	
+  1167                                  terminate:
+  1168                                  sys _exit   ; INT 40h
+  1168                              <1> 
+  1168                              <1> 
+  1168                              <1> 
+  1168                              <1> 
+  1168                              <1>  %if %0 >= 2
+  1168                              <1>  mov ebx, %2
+  1168                              <1>  %if %0 >= 3
+  1168                              <1>  mov ecx, %3
+  1168                              <1>  %if %0 = 4
+  1168                              <1>  mov edx, %4
+  1168                              <1>  %endif
+  1168                              <1>  %endif
+  1168                              <1>  %endif
+  1168 0000097A B801000000          <1>  mov eax, %1
+  1168                              <1> 
+  1168 0000097F CD40                <1>  int 40h
+  1169                                  here:
+  1170 00000981 EBFE                    jmp short here
+  1171                                  
+  1172 00000983 90                      align 2
+  1173                                  
+  1174                                  _end:
