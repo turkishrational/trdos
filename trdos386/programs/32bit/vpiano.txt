@@ -1,0 +1,242 @@
+     1                                  ;===============================================================================
+     2                                  ; Virtual Piano -- a virtual and playable piano
+     3                                  ; By SirPython of Code Review and GitHub
+     4                                  ;
+     5                                  ; virtual_piano.asm
+     6                                  ;===============================================================================
+     7                                  
+     8                                  %define MIDI_CONTROL_PORT 0331h
+     9                                  %define MIDI_DATA_PORT 0330h
+    10                                  %define MIDI_UART_MODE 3Fh
+    11                                  %define MIDI_PIANO_INSTRUMENT 93h
+    12                                  
+    13                                  start:
+    14 00000000 E8B800                      call setup_midi
+    15 00000003 B53C                        mov ch, 60;             default octave(0)
+    16 00000005 B105                        mov cl, 5;              used for making sure that the user does not go too low or too high with the octaves
+    17                                  .loop:
+    18 00000007 E81601                      call read_character
+    19 0000000A E8BD00                      call process_input
+    20                                  
+    21 0000000D 80FF00                      cmp bh, 0;              if bad input OR octave change goes out of range
+    22 00000010 74F5                        je .loop
+    23                                  
+    24 00000012 E81100                      call get_pitch
+    25                                  
+    26 00000015 80FF02                      cmp bh, 2;              if shouldn't play note (was an octave switch)
+    27 00000018 74ED                        je .loop
+    28                                  
+    29 0000001A E80200                      call play_note
+    30                                  
+    31 0000001D EBE8                        jmp .loop
+    32                                  
+    33                                  ;--------------------------------------------------
+    34                                  ; Plays a note
+    35                                  ;
+    36                                  ; IN: AL, CH = pitch, (octave * 12) + 60
+    37                                  ; OUT: NONE
+    38                                  ; ERR: NONE
+    39                                  ; REG: AL
+    40                                  
+    41                                  play_note:
+    42 0000001F 00E8                        add al, ch;             apply the octave
+    43 00000021 EE                          out dx, al;             DX will already contain MIDI_DATA_PORT from the setup_midi function
+    44                                  
+    45 00000022 B07F                        mov al, 7Fh;            note duration
+    46 00000024 EE                          out dx, al
+    47                                  
+    48 00000025 C3                          ret
+    49                                  
+    50                                  ;--------------------------------------------------
+    51                                  ; Based on input, returns a pitch to be played
+    52                                  ;
+    53                                  ; IN: AL = key code
+    54                                  ; OUT: AL, BH, CH = pitch, 2 if no pitch to be played, (octave * 12) + 60
+    55                                  ; ERR: NONE
+    56                                  ; REG: preserved
+    57                                  
+    58                                  get_pitch:
+    59 00000026 3C61                        cmp al, 'a'
+    60 00000028 7440                        je .a
+    61 0000002A 3C73                        cmp al, 's'
+    62 0000002C 7440                        je .s
+    63 0000002E 3C64                        cmp al, 'd'
+    64 00000030 7440                        je .d
+    65 00000032 3C66                        cmp al, 'f'
+    66 00000034 7440                        je .f
+    67 00000036 3C6A                        cmp al, 'j'
+    68 00000038 7440                        je .j
+    69 0000003A 3C6B                        cmp al, 'k'
+    70 0000003C 7440                        je .k
+    71 0000003E 3C6C                        cmp al, 'l'
+    72 00000040 7440                        je .l
+    73 00000042 3C3B                        cmp al, ';'
+    74 00000044 7440                        je .sc
+    75                                  
+    76 00000046 3C77                        cmp al, 'w'
+    77 00000048 7440                        je .w
+    78 0000004A 3C65                        cmp al, 'e'
+    79 0000004C 7440                        je .e
+    80 0000004E 3C72                        cmp al, 'r'
+    81 00000050 7440                        je .r
+    82 00000052 3C74                        cmp al, 't'
+    83 00000054 7440                        je .t
+    84 00000056 3C69                        cmp al, 'i'
+    85 00000058 7440                        je .i
+    86 0000005A 3C6F                        cmp al, 'o'
+    87 0000005C 7440                        je .o
+    88 0000005E 3C70                        cmp al, 'p'
+    89 00000060 7440                        je .p
+    90                                  
+    91 00000062 3C7A                        cmp al, 'z'
+    92 00000064 7440                        je .z
+    93 00000066 3C78                        cmp al, 'x'
+    94 00000068 7446                        je .x
+    95                                  
+    96 0000006A B000                    .a: mov al, 0
+    97 0000006C EB4C                        jmp .end
+    98 0000006E B002                    .s: mov al, 2
+    99 00000070 EB48                        jmp .end
+   100 00000072 B004                    .d: mov al, 4
+   101 00000074 EB44                        jmp .end
+   102 00000076 B005                    .f: mov al, 5
+   103 00000078 EB40                        jmp .end
+   104 0000007A B007                    .j: mov al, 7
+   105 0000007C EB3C                        jmp .end
+   106 0000007E B009                    .k: mov al, 9
+   107 00000080 EB38                        jmp .end
+   108 00000082 B00B                    .l: mov al, 11
+   109 00000084 EB34                        jmp .end
+   110 00000086 B00C                    .sc: mov al, 12
+   111 00000088 EB30                        jmp .end
+   112                                  
+   113 0000008A B001                    .w: mov al, 1
+   114 0000008C EB2C                        jmp .end
+   115 0000008E B003                    .e: mov al, 3
+   116 00000090 EB28                        jmp .end
+   117 00000092 EBE2                    .r: jmp .f
+   118 00000094 EB24                        jmp .end
+   119 00000096 B006                    .t: mov al, 6
+   120 00000098 EB20                        jmp .end
+   121 0000009A B008                    .i: mov al, 8
+   122 0000009C EB1C                        jmp .end
+   123 0000009E B00A                    .o: mov al, 10
+   124 000000A0 EB18                        jmp .end
+   125 000000A2 EBDE                    .p: jmp .l
+   126 000000A4 EB14                        jmp .end
+   127                                  
+   128 000000A6 80C50C                  .z: add ch, 12
+   129 000000A9 80C101                      add cl, 1
+   130 000000AC B702                        mov bh, 2
+   131 000000AE EB0A                        jmp .end
+   132 000000B0 80ED0C                  .x: sub ch, 12
+   133 000000B3 80E901                      sub cl, 1
+   134 000000B6 B702                        mov bh, 2
+   135 000000B8 EB00                        jmp .end
+   136                                  
+   137                                  
+   138                                  .end:
+   139 000000BA C3                          ret
+   140                                  
+   141                                  ;--------------------------------------------------
+   142                                  ; Set's up the MIDI ports for use
+   143                                  ;
+   144                                  ; IN: NONE
+   145                                  ; OUT: NONE
+   146                                  ; ERR: NONE
+   147                                  ; REG: DX
+   148                                  
+   149                                  setup_midi:
+   150 000000BB 50                          push ax
+   151                                  
+   152 000000BC BA3103                      mov dx, MIDI_CONTROL_PORT
+   153 000000BF B03F                        mov al, MIDI_UART_MODE; play notes as soon as they are recieved
+   154 000000C1 EE                          out dx, al
+   155                                  
+   156 000000C2 BA3003                      mov dx, MIDI_DATA_PORT
+   157 000000C5 B093                        mov al, MIDI_PIANO_INSTRUMENT
+   158 000000C7 EE                          out dx, al
+   159                                  
+   160 000000C8 58                          pop ax
+   161 000000C9 C3                          ret
+   162                                  
+   163                                  ;--------------------------------------------------
+   164                                  ; Checks to make sure that input is acceptable
+   165                                  ;
+   166                                  ; IN: AL = key code
+   167                                  ; OUT: BH = 1 (accpetable) or 0 (not acceptable, or octave is trying to change too far)
+   168                                  ; ERR: NONE
+   169                                  ; REG: preserved
+   170                                  
+   171                                  process_input:
+   172                                  
+   173                                  .check_key_code:
+   174 000000CA 3C61                        cmp al, 'a'
+   175 000000CC 744F                        je .safe
+   176 000000CE 3C73                        cmp al, 's'
+   177 000000D0 744B                        je .safe
+   178 000000D2 3C64                        cmp al, 'd'
+   179 000000D4 7447                        je .safe
+   180 000000D6 3C66                        cmp al, 'f'
+   181 000000D8 7443                        je .safe
+   182 000000DA 3C6A                        cmp al, 'j'
+   183 000000DC 743F                        je .safe
+   184 000000DE 3C6B                        cmp al, 'k'
+   185 000000E0 743B                        je .safe
+   186 000000E2 3C6C                        cmp al, 'l'
+   187 000000E4 7437                        je .safe
+   188 000000E6 3C3B                        cmp al, ';'
+   189 000000E8 7433                        je .safe
+   190                                  
+   191 000000EA 3C77                        cmp al, 'w'
+   192 000000EC 742F                        je .safe
+   193 000000EE 3C65                        cmp al, 'e'
+   194 000000F0 742B                        je .safe
+   195 000000F2 3C72                        cmp al, 'r'
+   196 000000F4 7427                        je .safe
+   197 000000F6 3C74                        cmp al, 't'
+   198 000000F8 7423                        je .safe
+   199 000000FA 3C69                        cmp al, 'i'
+   200 000000FC 741F                        je .safe
+   201 000000FE 3C6F                        cmp al, 'o'
+   202 00000100 741B                        je .safe
+   203 00000102 3C70                        cmp al, 'p'
+   204 00000104 7417                        je .safe
+   205                                  
+   206                                  .check_octave_code:
+   207 00000106 3C7A                        cmp al, 'z'
+   208 00000108 7406                        je .z
+   209 0000010A 3C78                        cmp al, 'x'
+   210 0000010C 7407                        je .x
+   211                                  
+   212 0000010E EB0A                        jmp .err;               none of the keys pressed were valid keys
+   213                                  
+   214                                  .z:
+   215 00000110 80F90A                      cmp cl, 10;             if user is about to go out of octave range, then drop down to error
+   216 00000113 7508                        jne .safe
+   217                                  
+   218                                  .x:
+   219 00000115 80F901                      cmp cl, 1
+   220 00000118 7503                        jne .safe
+   221                                  
+   222                                  .err:
+   223 0000011A 30FF                        xor bh, bh
+   224 0000011C C3                          ret
+   225                                  
+   226                                  .safe:
+   227 0000011D B701                        mov bh, 1
+   228 0000011F C3                          ret
+   229                                  
+   230                                  
+   231                                  ;--------------------------------------------------
+   232                                  ; Reads a single character from the user
+   233                                  ;
+   234                                  ; IN: NONE
+   235                                  ; OUT: AL = key code
+   236                                  ; ERR: NONE
+   237                                  ; REG: preserved
+   238                                  
+   239                                  read_character:
+   240 00000120 30E4                        xor ah, ah
+   241 00000122 CD16                        int 16h;                BIOS 16h 00h
+   242 00000124 C3                          ret

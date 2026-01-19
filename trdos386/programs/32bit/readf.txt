@@ -1,0 +1,210 @@
+     1                                  ; ****************************************************************************
+     2                                  ; readfile.s (TRDOS 386, TRDOS v2.0 - sample binary file, 'readfile.prg')
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; READFILE.PRG ! 'sysopen' and 'sysread' TEST program for TRDOS 386 !
+     5                                  ;
+     6                                  ; 11/10/2016
+     7                                  ;
+     8                                  ; [ Last Modification: 12/10/2016 ]
+     9                                  ;
+    10                                  ; ****************************************************************************
+    11                                  ;
+    12                                  ; 29/04/2016
+    13                                  ; TRDOS 386 system calls (temporary list!)
+    14                                  _ver 	equ 0
+    15                                  _exit 	equ 1
+    16                                  _fork 	equ 2
+    17                                  _read 	equ 3
+    18                                  _write	equ 4
+    19                                  _open	equ 5
+    20                                  _close 	equ 6
+    21                                  _wait 	equ 7
+    22                                  _creat 	equ 8
+    23                                  _link 	equ 9
+    24                                  _unlink	equ 10
+    25                                  _exec	equ 11
+    26                                  _chdir	equ 12
+    27                                  _time 	equ 13
+    28                                  _mkdir 	equ 14
+    29                                  _chmod	equ 15
+    30                                  _chown	equ 16
+    31                                  _break	equ 17
+    32                                  _stat	equ 18
+    33                                  _seek	equ 19
+    34                                  _tell 	equ 20
+    35                                  _mount	equ 21
+    36                                  _umount	equ 22
+    37                                  _setuid	equ 23
+    38                                  _getuid	equ 24
+    39                                  _stime	equ 25
+    40                                  _quit	equ 26	
+    41                                  _intr	equ 27
+    42                                  _fstat	equ 28
+    43                                  _emt 	equ 29
+    44                                  _mdate 	equ 30
+    45                                  _stty 	equ 31
+    46                                  _gtty	equ 32
+    47                                  _ilgins	equ 33
+    48                                  _sleep	equ 34
+    49                                  _msg    equ 35
+    50                                  
+    51                                  %macro sys 1-4
+    52                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    53                                      ; 03/09/2015	
+    54                                      ; 13/04/2015
+    55                                      ; Retro UNIX 386 v1 system call.		
+    56                                      %if %0 >= 2   
+    57                                          mov ebx, %2
+    58                                          %if %0 >= 3    
+    59                                              mov ecx, %3
+    60                                              %if %0 = 4
+    61                                                 mov edx, %4   
+    62                                              %endif
+    63                                          %endif
+    64                                      %endif
+    65                                      mov eax, %1
+    66                                      ;int 30h
+    67                                      int 40h ; TRDOS 386 (TRDOS v2.0)		   
+    68                                  %endmacro
+    69                                  
+    70                                  ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
+    71                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    72                                  
+    73                                  [BITS 32] ; We need 32-bit intructions for protected mode
+    74                                  
+    75                                  [ORG 0] 
+    76                                  
+    77                                  START_CODE:
+    78                                  	sys	_open, TextFile, 0 ; open for reading
+    78                              <1> 
+    78                              <1> 
+    78                              <1> 
+    78                              <1> 
+    78                              <1>  %if %0 >= 2
+    78 00000000 BB[B8000000]        <1>  mov ebx, %2
+    78                              <1>  %if %0 >= 3
+    78 00000005 B900000000          <1>  mov ecx, %3
+    78                              <1>  %if %0 = 4
+    78                              <1>  mov edx, %4
+    78                              <1>  %endif
+    78                              <1>  %endif
+    78                              <1>  %endif
+    78 0000000A B805000000          <1>  mov eax, %1
+    78                              <1> 
+    78 0000000F CD40                <1>  int 40h
+    79 00000011 7244                    	jc	short open_error
+    80                                  
+    81 00000013 50                      	push	eax
+    82                                  
+    83 00000014 BE[A9000000]            	mov	esi, msg_reading
+    84 00000019 E829000000              	call	print_msg		   ; INT 31h
+    85                                  
+    86 0000001E 5E                      	pop	esi	
+    87                                  
+    88                                  	sys	_read, esi, BUFFER, 200    ; read 200 bytes
+    88                              <1> 
+    88                              <1> 
+    88                              <1> 
+    88                              <1> 
+    88                              <1>  %if %0 >= 2
+    88 0000001F 89F3                <1>  mov ebx, %2
+    88                              <1>  %if %0 >= 3
+    88 00000021 B9[D4000000]        <1>  mov ecx, %3
+    88                              <1>  %if %0 = 4
+    88 00000026 BAC8000000          <1>  mov edx, %4
+    88                              <1>  %endif
+    88                              <1>  %endif
+    88                              <1>  %endif
+    88 0000002B B803000000          <1>  mov eax, %1
+    88                              <1> 
+    88 00000030 CD40                <1>  int 40h
+    89 00000032 7240                    	jc	short read_error
+    90                                  
+    91                                  show_text:
+    92 00000034 BE[D4000000]            	mov	esi, BUFFER
+    93 00000039 E809000000              	call	print_msg
+    94                                  
+    95                                  terminate:
+    96                                  	sys 	_exit			   ; INT 40h
+    96                              <1> 
+    96                              <1> 
+    96                              <1> 
+    96                              <1> 
+    96                              <1>  %if %0 >= 2
+    96                              <1>  mov ebx, %2
+    96                              <1>  %if %0 >= 3
+    96                              <1>  mov ecx, %3
+    96                              <1>  %if %0 = 4
+    96                              <1>  mov edx, %4
+    96                              <1>  %endif
+    96                              <1>  %endif
+    96                              <1>  %endif
+    96 0000003E B801000000          <1>  mov eax, %1
+    96                              <1> 
+    96 00000043 CD40                <1>  int 40h
+    97                                  here:
+    98 00000045 EBFE                    	jmp	short here
+    99                                  
+   100                                  print_msg:
+   101 00000047 BB0E000000              	mov	ebx, 0Eh       ; yellow characters (bl)
+   102                                  		               ; video page 0 (bh)
+   103                                  	;mov	ah, 0Eh ; teletype output (write tty)
+   104 0000004C 88DC                    	mov	ah, bl
+   105 0000004E AC                      	lodsb
+   106                                  _1:
+   107 0000004F CD31                    	int	31h
+   108 00000051 AC                      	lodsb
+   109 00000052 20C0                    	and	al, al
+   110 00000054 75F9                    	jnz	short _1
+   111                                  _2:
+   112 00000056 C3                      	retn
+   113                                  
+   114                                  open_error:
+   115 00000057 50                      	push	eax
+   116 00000058 BE[80000000]            	mov	esi, msg_open_error
+   117 0000005D E8E5FFFFFF              	call	print_msg		   ; INT 31h
+   118 00000062 58                      	pop	eax
+   119 00000063 83F802                  	cmp	eax, 2
+   120 00000066 75D6                    	jne	short terminate
+   121 00000068 BE[94000000]            	mov	esi, msg_not_found
+   122 0000006D E8D5FFFFFF              	call	print_msg		   ; INT 31h
+   123 00000072 EBCA                    	jmp	short terminate	
+   124                                  
+   125                                  read_error:
+   126 00000074 BE[C3000000]            	mov	esi, msg_read_error
+   127 00000079 E8C9FFFFFF              	call	print_msg		   ; INT 31h
+   128 0000007E EBBE                    	jmp	short terminate
+   129                                  
+   130                                  ;-----------------------------------------------------------------
+   131                                  ;  messages
+   132                                  ;-----------------------------------------------------------------
+   133                                  
+   134                                  msg_open_error:
+   135 00000080 0D0A                    	db 0Dh, 0Ah
+   136 00000082 7379736F70656E2065-     	db 'sysopen error !'
+   136 0000008B 72726F722021       
+   137 00000091 0D0A00                  	db 0Dh, 0Ah, 0
+   138                                  msg_not_found:
+   139 00000094 0D0A                    	db 0Dh, 0Ah
+   140 00000096 66696C65206E6F7420-     	db 'file not found !'
+   140 0000009F 666F756E642021     
+   141 000000A6 0D0A00                  	db 0Dh, 0Ah, 0
+   142                                  msg_reading:
+   143 000000A9 0D0A                    	db 0Dh, 0Ah
+   144 000000AB 72656164696E672066-     	db 'reading file '
+   144 000000B4 696C6520           
+   145                                  TextFile:
+   146 000000B8 524541444D452E5458-     	db 'README.TXT'
+   146 000000C1 54                 
+   147 000000C2 00                      	db 0
+   148                                  msg_read_error:
+   149 000000C3 0D0A                    	db 0Dh, 0Ah
+   150 000000C5 72656164206572726F-     	db 'read error !'
+   150 000000CE 722021             
+   151 000000D1 0D0A00                  	db 0Dh, 0Ah, 0
+   152                                  
+   153                                  ;bss
+   154                                  
+   155                                  BUFFER:
+   156 000000D4 313233343536373839-     	db '1234567890', 0
+   156 000000DD 3000               

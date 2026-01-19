@@ -1,0 +1,2703 @@
+     1                                  ; ****************************************************************************
+     2                                  ; playmod5.s (for TRDOS 386)
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; PLAYMOD5.PRG ! VIA VT8237R MOD PLAYER & VGA DEMO program by Erdogan TAN
+     5                                  ;
+     6                                  ; 05/03/2017
+     7                                  ;
+     8                                  ; [ Last Modification: 24/08/2020 ]
+     9                                  ;
+    10                                  ; Derived from source code of 'PLAY.EXE' (TINYPLAY) by Carlos Hasan (1993)
+    11                                  ;          PLAY.EXE: PLAY.ASM, MODLOAD.ASM, MODPLAY.ASM, SB.ASM
+    12                                  ;
+    13                                  ; Modified by using the source code of 'tinyply4.s' ('TINYPLY4.PRG') 
+    14                                  ; by Erdogan Tan (06/10/2017)
+    15                                  ;
+    16                                  ; Modified from 'wavplay2.s' (11/06/2017)
+    17                                  ;
+    18                                  ; Modified from 'TINYPLAY.PRG' ('tinyplay.s') source code by Erdogan Tan
+    19                                  ;			                     (05/03/2017)
+    20                                  ;
+    21                                  ; Derived from source code of 'TINYPLAY.COM' ('TINYPLAY.ASM') by Erdogan Tan
+    22                                  ;				      (04/03/2017) 
+    23                                  ; Assembler: NASM 2.11
+    24                                  ; ----------------------------------------------------------------------------
+    25                                  ;	   nasm  playmod.s -l playmod.txt -o PLAYMOD.PRG	
+    26                                  ; ****************************************************************************
+    27                                  ; PLAYMOD.ASM by Erdogan Tan (for MSDOS) (15/02/2017)
+    28                                  ; TMODYPLAY.ASM by Erdogan Tan (for MSDOS) (01/10/2017)
+    29                                  
+    30                                  ; 01/03/2017
+    31                                  ; 16/10/2016
+    32                                  ; 29/04/2016
+    33                                  ; TRDOS 386 system calls (temporary list!)
+    34                                  _ver 	equ 0
+    35                                  _exit 	equ 1
+    36                                  _fork 	equ 2
+    37                                  _read 	equ 3
+    38                                  _write	equ 4
+    39                                  _open	equ 5
+    40                                  _close 	equ 6
+    41                                  _wait 	equ 7
+    42                                  _creat 	equ 8
+    43                                  _link 	equ 9
+    44                                  _unlink	equ 10
+    45                                  _exec	equ 11
+    46                                  _chdir	equ 12
+    47                                  _time 	equ 13
+    48                                  _mkdir 	equ 14
+    49                                  _chmod	equ 15
+    50                                  _chown	equ 16
+    51                                  _break	equ 17
+    52                                  _stat	equ 18
+    53                                  _seek	equ 19
+    54                                  _tell 	equ 20
+    55                                  _mount	equ 21
+    56                                  _umount	equ 22
+    57                                  _setuid	equ 23
+    58                                  _getuid	equ 24
+    59                                  _stime	equ 25
+    60                                  _quit	equ 26	
+    61                                  _intr	equ 27
+    62                                  _fstat	equ 28
+    63                                  _emt 	equ 29
+    64                                  _mdate 	equ 30
+    65                                  _video 	equ 31
+    66                                  _audio	equ 32
+    67                                  _timer	equ 33
+    68                                  _sleep	equ 34
+    69                                  _msg    equ 35
+    70                                  _geterr	equ 36
+    71                                  _fpsave	equ 37
+    72                                  _pri	equ 38
+    73                                  _rele	equ 39
+    74                                  _fff	equ 40
+    75                                  _fnf	equ 41
+    76                                  _alloc	equ 42
+    77                                  _dalloc equ 43
+    78                                  _calbac equ 44		
+    79                                  
+    80                                  %macro sys 1-4
+    81                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    82                                      ; 03/09/2015	
+    83                                      ; 13/04/2015
+    84                                      ; Retro UNIX 386 v1 system call.	
+    85                                      %if %0 >= 2   
+    86                                          mov ebx, %2
+    87                                          %if %0 >= 3    
+    88                                              mov ecx, %3
+    89                                              %if %0 = 4
+    90                                                 mov edx, %4   
+    91                                              %endif
+    92                                          %endif
+    93                                      %endif
+    94                                      mov eax, %1
+    95                                      ;int 30h
+    96                                      int 40h ; TRDOS 386 (TRDOS v2.0)	   
+    97                                  %endmacro
+    98                                  
+    99                                  ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
+   100                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+   101                                  
+   102                                  ;; 19/06/2017
+   103                                  ;;BUFFERSIZE equ 2*32768 ; 25/06/2017
+   104                                  ; 23/08/2020
+   105                                  BUFFERSIZE equ 32768 ; 09/10/2017
+   106                                  ;BUFFERSIZE equ 65536 ; 01/08/2020
+   107                                  
+   108                                  ; ----------------------------------------------------------------------------
+   109                                  ; Tiny MOD Player v0.1b by Carlos Hasan.
+   110                                  ;	July 14th, 1993.
+   111                                  
+   112                                  ;=============================================================================
+   113                                  ;  
+   114                                  ;=============================================================================
+   115                                  
+   116                                  [BITS 32]
+   117                                  [org 0]
+   118                                  
+   119                                  Start:
+   120                                  	; clear bss
+   121 00000000 B9[00000800]            	mov	ecx, EOF
+   122 00000005 BF[09100000]            	mov	edi, bss_start
+   123 0000000A 29F9                    	sub	ecx, edi
+   124 0000000C D1E9                    	shr	ecx, 1
+   125 0000000E 31C0                    	xor	eax, eax
+   126 00000010 F366AB                  	rep	stosw
+   127                                  
+   128                                  	; Detect (& Enable) VT8233 Audio Device
+   129 00000013 E831020000              	call    DetectVT8233
+   130 00000018 731B                    	jnc     short GetFileName
+   131                                  
+   132                                  _dev_not_ready:
+   133                                  ; couldn't find the audio device!
+   134                                  	sys	_msg, noDevMsg, 255, 0Fh
+   134                              <1> 
+   134                              <1> 
+   134                              <1> 
+   134                              <1> 
+   134                              <1>  %if %0 >= 2
+   134 0000001A BB[56020000]        <1>  mov ebx, %2
+   134                              <1>  %if %0 >= 3
+   134 0000001F B9FF000000          <1>  mov ecx, %3
+   134                              <1>  %if %0 = 4
+   134 00000024 BA0F000000          <1>  mov edx, %4
+   134                              <1>  %endif
+   134                              <1>  %endif
+   134                              <1>  %endif
+   134 00000029 B823000000          <1>  mov eax, %1
+   134                              <1> 
+   134 0000002E CD40                <1>  int 40h
+   135 00000030 E9F3010000                      jmp     Exit
+   136                                  
+   137                                  GetFileName:  
+   138 00000035 89E6                    	mov	esi, esp
+   139 00000037 AD                      	lodsd
+   140 00000038 83F802                  	cmp	eax, 2 ; two arguments 
+   141                                  		; (program file name & mod file name)
+   142 0000003B 0F82F0010000            	jb	pmsg_usage ; nothing to do
+   143                                  
+   144 00000041 AD                      	lodsd ; program file name address 
+   145 00000042 AD                      	lodsd ; mod file name address (file to be read)
+   146 00000043 89C6                    	mov	esi, eax
+   147 00000045 BF[607F0000]            	mov	edi, mod_file_name
+   148                                  ScanName:       
+   149 0000004A AC                      	lodsb
+   150 0000004B 84C0                    	test	al, al
+   151 0000004D 0F84DE010000            	je	pmsg_usage
+   152 00000053 3C20                    	cmp	al, 20h
+   153 00000055 74F3                    	je	short ScanName	; scan start of name.
+   154 00000057 AA                      	stosb
+   155 00000058 B4FF                    	mov	ah, 0FFh
+   156                                  a_0:	
+   157 0000005A FEC4                    	inc	ah
+   158                                  a_1:
+   159 0000005C AC                      	lodsb
+   160 0000005D AA                      	stosb
+   161 0000005E 3C2E                    	cmp	al, '.'
+   162 00000060 74F8                    	je	short a_0	
+   163 00000062 20C0                    	and	al, al
+   164 00000064 75F6                    	jnz	short a_1
+   165                                  
+   166 00000066 08E4                    	or	ah, ah		; if period NOT found,
+   167 00000068 750B                    	jnz	short PrintMesg	; then add a .MOD extension.
+   168                                  SetExt:
+   169 0000006A 4F                      	dec	edi
+   170 0000006B C7072E4D4F44            	mov	dword [edi], '.MOD'
+   171 00000071 C6470400                	mov	byte [edi+4], 0
+   172                                  PrintMesg:      
+   173                                  	; Prints the Credits Text.
+   174                                  	sys	_msg, Credits, 255, 0Fh
+   174                              <1> 
+   174                              <1> 
+   174                              <1> 
+   174                              <1> 
+   174                              <1>  %if %0 >= 2
+   174 00000075 BB[7B0F0000]        <1>  mov ebx, %2
+   174                              <1>  %if %0 >= 3
+   174 0000007A B9FF000000          <1>  mov ecx, %3
+   174                              <1>  %if %0 = 4
+   174 0000007F BA0F000000          <1>  mov edx, %4
+   174                              <1>  %endif
+   174                              <1>  %endif
+   174                              <1>  %endif
+   174 00000084 B823000000          <1>  mov eax, %1
+   174                              <1> 
+   174 00000089 CD40                <1>  int 40h
+   175                                  _1:
+   176                                  	; 19/06/2017
+   177                                  	; Allocate Audio Buffer (for user)
+   178                                  	sys	_audio, 0200h, BUFFERSIZE, Audio_Buffer
+   178                              <1> 
+   178                              <1> 
+   178                              <1> 
+   178                              <1> 
+   178                              <1>  %if %0 >= 2
+   178 0000008B BB00020000          <1>  mov ebx, %2
+   178                              <1>  %if %0 >= 3
+   178 00000090 B900800000          <1>  mov ecx, %3
+   178                              <1>  %if %0 = 4
+   178 00000095 BA[00800000]        <1>  mov edx, %4
+   178                              <1>  %endif
+   178                              <1>  %endif
+   178                              <1>  %endif
+   178 0000009A B820000000          <1>  mov eax, %1
+   178                              <1> 
+   178 0000009F CD40                <1>  int 40h
+   179 000000A1 727D                    	jc	error_exit
+   180                                  _2:
+   181                                  	; 23/08/2020
+   182                                  	; 03/08/2020
+   183                                  	; Initialize Audio Device (bl = 1 -> Interrupt method)
+   184                                  	sys	_audio, 0301h, 0, ac97_int_handler ; 09/10/2017
+   184                              <1> 
+   184                              <1> 
+   184                              <1> 
+   184                              <1> 
+   184                              <1>  %if %0 >= 2
+   184 000000A3 BB01030000          <1>  mov ebx, %2
+   184                              <1>  %if %0 >= 3
+   184 000000A8 B900000000          <1>  mov ecx, %3
+   184                              <1>  %if %0 = 4
+   184 000000AD BA[8D020000]        <1>  mov edx, %4
+   184                              <1>  %endif
+   184                              <1>  %endif
+   184                              <1>  %endif
+   184 000000B2 B820000000          <1>  mov eax, %1
+   184                              <1> 
+   184 000000B7 CD40                <1>  int 40h
+   185 000000B9 7265                    	jc	error_exit
+   186                                  	
+   187                                  	; 03/08/2020
+   188                                  	; Initialize Audio Device (bl = 0 -> SRB method)
+   189                                  	;sys	_audio, 0300h, 1, srb  ; 09/10/2017 
+   190                                  	;jc	error_exit
+   191                                  
+   192                                  LoadMod:  
+   193 000000BB BF[607F0000]            	mov	edi, mod_file_name
+   194 000000C0 E8F6020000              	call    LoadModule		; Load the MODule...
+   195                                  	; 08/10/2017
+   196 000000C5 731B                    	jnc	short _3		; any error loading?
+   197                                  		
+   198                                  	; yes, print error and Exit.
+   199                                  
+   200                                  	sys	_msg, ErrorMesg, 255, 0Fh
+   200                              <1> 
+   200                              <1> 
+   200                              <1> 
+   200                              <1> 
+   200                              <1>  %if %0 >= 2
+   200 000000C7 BB[AF0F0000]        <1>  mov ebx, %2
+   200                              <1>  %if %0 >= 3
+   200 000000CC B9FF000000          <1>  mov ecx, %3
+   200                              <1>  %if %0 = 4
+   200 000000D1 BA0F000000          <1>  mov edx, %4
+   200                              <1>  %endif
+   200                              <1>  %endif
+   200                              <1>  %endif
+   200 000000D6 B823000000          <1>  mov eax, %1
+   200                              <1> 
+   200 000000DB CD40                <1>  int 40h
+   201                                  
+   202 000000DD E946010000              	jmp     Exit
+   203                                  
+   204                                  _3:
+   205                                  	; 10/06/2017
+   206                                  	sys	_audio, 0E00h ; get audio controller info
+   206                              <1> 
+   206                              <1> 
+   206                              <1> 
+   206                              <1> 
+   206                              <1>  %if %0 >= 2
+   206 000000E2 BB000E0000          <1>  mov ebx, %2
+   206                              <1>  %if %0 >= 3
+   206                              <1>  mov ecx, %3
+   206                              <1>  %if %0 = 4
+   206                              <1>  mov edx, %4
+   206                              <1>  %endif
+   206                              <1>  %endif
+   206                              <1>  %endif
+   206 000000E7 B820000000          <1>  mov eax, %1
+   206                              <1> 
+   206 000000EC CD40                <1>  int 40h
+   207 000000EE 7230                    	jc	error_exit
+   208                                  
+   209                                  	;cmp	ah, 3 ; VT 8233? (VIA AC'97 Audio Controller)
+   210                                  	;jne	_dev_not_ready	
+   211                                  
+   212                                  	; EAX = IRQ Number in AL
+   213                                  	;	Audio Device Number in AH 
+   214                                  	; EBX = DEV/VENDOR ID
+   215                                  	;       (DDDDDDDDDDDDDDDDVVVVVVVVVVVVVVVV)
+   216                                  	; ECX = BUS/DEV/FN 
+   217                                  	;       (00000000BBBBBBBBDDDDDFFF00000000)
+   218                                  	; EDX = Base IO Addr (DX) for SB16 & VT8233
+   219                                  	; EDX = NABMBAR/NAMBAR (for AC97)
+   220                                  	;      (Low word, DX = NAMBAR address)
+   221                                  
+   222 000000F0 A2[26100000]            	mov	[ac97_int_ln_reg], al
+   223 000000F5 891D[18100000]          	mov	[dev_vendor], ebx
+   224 000000FB 890D[1C100000]          	mov	[bus_dev_fn], ecx
+   225 00000101 668915[24100000]        	mov	[ac97_io_base], dx
+   226                                    
+   227 00000108 E88E0A0000              	call	write_audio_dev_info 
+   228                                  
+   229                                  PlayNow:
+   230                                  	; 03/08/2020
+   231                                  	; 30/07/2020
+   232                                  
+   233                                  	; 06/10/2017
+   234                                  
+   235                                  	; DIRECT CGA MEMORY ACCESS
+   236                                  	; bl = 0, bh = 4
+   237                                  	; Direct access/map to CGA memory (0B8000h)
+   238                                  
+   239                                  	sys	_video, 0400h
+   239                              <1> 
+   239                              <1> 
+   239                              <1> 
+   239                              <1> 
+   239                              <1>  %if %0 >= 2
+   239 0000010D BB00040000          <1>  mov ebx, %2
+   239                              <1>  %if %0 >= 3
+   239                              <1>  mov ecx, %3
+   239                              <1>  %if %0 = 4
+   239                              <1>  mov edx, %4
+   239                              <1>  %endif
+   239                              <1>  %endif
+   239                              <1>  %endif
+   239 00000112 B81F000000          <1>  mov eax, %1
+   239                              <1> 
+   239 00000117 CD40                <1>  int 40h
+   240 00000119 3D00800B00              	cmp	eax, 0B8000h
+   241 0000011E 741B                    	je	short _4
+   242                                  error_exit:
+   243                                  	sys	_msg, trdos386_err_msg, 255, 0Eh
+   243                              <1> 
+   243                              <1> 
+   243                              <1> 
+   243                              <1> 
+   243                              <1>  %if %0 >= 2
+   243 00000120 BB[CC0F0000]        <1>  mov ebx, %2
+   243                              <1>  %if %0 >= 3
+   243 00000125 B9FF000000          <1>  mov ecx, %3
+   243                              <1>  %if %0 = 4
+   243 0000012A BA0E000000          <1>  mov edx, %4
+   243                              <1>  %endif
+   243                              <1>  %endif
+   243                              <1>  %endif
+   243 0000012F B823000000          <1>  mov eax, %1
+   243                              <1> 
+   243 00000134 CD40                <1>  int 40h
+   244 00000136 E9ED000000              	jmp	Exit
+   245                                  _4:	 
+   246 0000013B E87B090000              	call    StartPlaying
+   247                                  
+   248                                  	; 03/08/2020
+   249                                          ;; load 65536 bytes into audio buffer
+   250                                  	;mov	edi, Audio_Buffer
+   251                                  	;mov	ebx, BUFFERSIZE ; 65536 bytes ; 01/08/2020
+   252 00000140 E8DD080000              	call	GetSamples
+   253 00000145 72D9                    	jc	short error_exit
+   254                                  
+   255                                  	; 30/07/2020
+   256                                  
+   257                                  	; bh = 16 : update (current) dma half buffer
+   258                                  	; bl = 0  : then switch to the next half buffer
+   259                                  	sys	_audio, 1000h
+   259                              <1> 
+   259                              <1> 
+   259                              <1> 
+   259                              <1> 
+   259                              <1>  %if %0 >= 2
+   259 00000147 BB00100000          <1>  mov ebx, %2
+   259                              <1>  %if %0 >= 3
+   259                              <1>  mov ecx, %3
+   259                              <1>  %if %0 = 4
+   259                              <1>  mov edx, %4
+   259                              <1>  %endif
+   259                              <1>  %endif
+   259                              <1>  %endif
+   259 0000014C B820000000          <1>  mov eax, %1
+   259                              <1> 
+   259 00000151 CD40                <1>  int 40h
+   260                                  	; 14/10/2017
+   261                                  	;sys	_audio, 1002h ; update dma half buffer 2
+   262                                  
+   263                                  	; 30/07/2020
+   264                                          
+   265                                  	; 03/08/2020
+   266                                  	;; load 65536 bytes into audio buffer
+   267                                  	;mov	edi, Audio_Buffer
+   268                                  	;mov	ebx, BUFFERSIZE ; 65536 bytes
+   269 00000153 E8CA080000              	call	GetSamples
+   270 00000158 72C6                    	jc	short error_exit
+   271                                  
+   272                                  	; 09/10/2017 (2*BUFFERSIZE, 64K)
+   273                                  	; 23/06/2017 (2*65536, 128K)
+   274                                  	; Map DMA buffer to user's memory space
+   275                                  	sys	_audio, 0D00h, 2*BUFFERSIZE, DMA_Buffer
+   275                              <1> 
+   275                              <1> 
+   275                              <1> 
+   275                              <1> 
+   275                              <1>  %if %0 >= 2
+   275 0000015A BB000D0000          <1>  mov ebx, %2
+   275                              <1>  %if %0 >= 3
+   275 0000015F B900000100          <1>  mov ecx, %3
+   275                              <1>  %if %0 = 4
+   275 00000164 BA[00000100]        <1>  mov edx, %4
+   275                              <1>  %endif
+   275                              <1>  %endif
+   275                              <1>  %endif
+   275 00000169 B820000000          <1>  mov eax, %1
+   275                              <1> 
+   275 0000016E CD40                <1>  int 40h
+   276                                  	;jc	error_exit
+   277                                  
+   278                                  	; Set Master Volume Level
+   279                                  	sys	_audio, 0B00h, 1D1Dh
+   279                              <1> 
+   279                              <1> 
+   279                              <1> 
+   279                              <1> 
+   279                              <1>  %if %0 >= 2
+   279 00000170 BB000B0000          <1>  mov ebx, %2
+   279                              <1>  %if %0 >= 3
+   279 00000175 B91D1D0000          <1>  mov ecx, %3
+   279                              <1>  %if %0 = 4
+   279                              <1>  mov edx, %4
+   279                              <1>  %endif
+   279                              <1>  %endif
+   279                              <1>  %endif
+   279 0000017A B820000000          <1>  mov eax, %1
+   279                              <1> 
+   279 0000017F CD40                <1>  int 40h
+   280                                  
+   281                                  	; 30/07/2020
+   282                                  	;mov	byte [volume_level], 1Dh ; 29
+   283 00000181 880D[B17F0000]          	mov	[volume_level], cl
+   284                                  
+   285                                  	;mov	word [MixSpeed], 22050	; Mixing at 22.050 kHz
+   286                                  
+   287                                  	; 07/10/2017
+   288                                  	;mov	word [MixSpeed], 22222	; Mixing at 22 kHz
+   289                                  	
+   290                                  	; Start	to play
+   291 00000187 A0[670E0000]            	mov	al, [bps]
+   292 0000018C C0E804                  	shr	al, 4 ; 8 -> 0, 16 -> 1
+   293 0000018F D0E0                    	shl	al, 1 ; 16 -> 2, 8 -> 0
+   294 00000191 8A1D[660E0000]          	mov	bl, [stmo]
+   295 00000197 FECB                    	dec	bl
+   296 00000199 08C3                    	or	bl, al
+   297 0000019B 668B0D[680E0000]        	mov	cx, [MixSpeed] ; [Sample_Rate] ; Hz 
+   298 000001A2 B704                    	mov	bh, 4 ; start to play	
+   299                                  	sys	_audio
+   299                              <1> 
+   299                              <1> 
+   299                              <1> 
+   299                              <1> 
+   299                              <1>  %if %0 >= 2
+   299                              <1>  mov ebx, %2
+   299                              <1>  %if %0 >= 3
+   299                              <1>  mov ecx, %3
+   299                              <1>  %if %0 = 4
+   299                              <1>  mov edx, %4
+   299                              <1>  %endif
+   299                              <1>  %endif
+   299                              <1>  %endif
+   299 000001A4 B820000000          <1>  mov eax, %1
+   299                              <1> 
+   299 000001A9 CD40                <1>  int 40h
+   300                                  
+   301                                  	;; 13/10/2017
+   302                                  	;mov	edi, Audio_Buffer
+   303                                  	;mov	ebx, BUFFERSIZE ; 32768 bytes ; 09/10/2017
+   304                                  	;call	GetSamples
+   305                                  
+   306                                  	;; bh = 16 : update (current) dma half buffer
+   307                                  	;; bl = 0  : then switch to the next half buffer
+   308                                  	;;sys	_audio, 1000h
+   309                                  	;; 14/10/2017
+   310                                  	;sys	_audio, 1002h ; update dma half buffer 2
+   311                                  
+   312                                  	;mov	byte [srb], 0  ; 14/10/2017
+   313                                  	    
+   314                                  	;; SETUP SIGNAL RESPONSE BYTE
+   315                                  	;; 06/03/2017
+   316                                  	;mov	bl, [ac97_int_ln_reg] ; IRQ number
+   317                                  	;mov	bh, 1 ; Link IRQ to user for Signal Response Byte
+   318                                  	;mov	edx, srb  ; Signal Response/Return Byte address  
+   319                                  	;mov	ecx, 0FFh ; Signal Response/Return Byte value  
+   320                                  	;sys	_calbac
+   321                                  	;jc	short error_exit
+   322                                  
+   323                                  	; 06/10/2017
+   324                                  
+   325                                  	;; DIRECT CGA MEMORY ACCESS
+   326                                  	;; bl = 0, bh = 4
+   327                                  	;; Direct access/map to CGA memory (0B8000h)
+   328                                  
+   329                                  	;sys	_video, 0400h
+   330                                  	;cmp	eax, 0B8000h
+   331                                  	;je	short _a3
+   332                                  ;error_exit:
+   333                                  	;sys	_msg, trdos386_err_msg, 255, 0Eh
+   334                                  	;jmp	short Exit
+   335                                  
+   336                                  ; Note: Normally IRQ 0 calls the ModPlay Polling at 18.2Hz thru
+   337                                  ;       the software interrupt 1Ch. If the IRQ 0 is disabled, then
+   338                                  ;       the INT 1Ch MUST BE CALLED at least MixSpeed/1024 times per
+   339                                  ;       second, or the module will sound "looped".
+   340                                  ;       Because we need better sync with the ModPlayer to draw the scope,
+   341                                  ;       the polling is called from my routine, and then the irq 0 must be
+   342                                  ;       disabled. The [DmaBuffer] points to the current buffer of 8-bit
+   343                                  ;       samples played by the Sound Blaster. Note that some samples are
+   344                                  ;       discarded in the next code, just for fun!
+   345                                  
+   346                                  _a3:
+   347                                  	; 02/10/2017
+   348                                  	; Print "Playing..." message.
+   349                                  	sys	_msg, PlayMsg, 255, 0Fh
+   349                              <1> 
+   349                              <1> 
+   349                              <1> 
+   349                              <1> 
+   349                              <1>  %if %0 >= 2
+   349 000001AB BB[EC0F0000]        <1>  mov ebx, %2
+   349                              <1>  %if %0 >= 3
+   349 000001B0 B9FF000000          <1>  mov ecx, %3
+   349                              <1>  %if %0 = 4
+   349 000001B5 BA0F000000          <1>  mov edx, %4
+   349                              <1>  %endif
+   349                              <1>  %endif
+   349                              <1>  %endif
+   349 000001BA B823000000          <1>  mov eax, %1
+   349                              <1> 
+   349 000001BF CD40                <1>  int 40h
+   350                                  	; Get current cursor position
+   351 000001C1 B403                    	mov	ah, 3
+   352 000001C3 B700                    	mov	bh, 0 ; Video Page 0
+   353 000001C5 CD31                    	int	31h
+   354                                  	; dh = row, dl = column
+   355                                  	; 06/10/2017 (scroll check on next line)
+   356 000001C7 80FE18                  	cmp	dh, 24 ; the last row
+   357 000001CA 7202                    	jb	short set_bar_pos
+   358 000001CC FECE                    	dec	dh
+   359                                  set_bar_pos:
+   360 000001CE B050                    	mov	al, 80
+   361 000001D0 F6E6                    	mul	dh
+   362 000001D2 30F6                    	xor	dh, dh
+   363 000001D4 6601D0                  	add	ax, dx
+   364 000001D7 66D1E0                  	shl	ax, 1
+   365 000001DA BB00800B00              	mov	ebx, 0B8000h
+   366 000001DF 6601C3                  	add	bx, ax
+   367 000001E2 891D[0C100000]          	mov	[bar_start], ebx
+   368 000001E8 6683C320                	add	bx, 2*16
+   369 000001EC 891D[10100000]          	mov	[bar_stop], ebx
+   370                                  
+   371                                  	; Print (GoTo) NextLine.
+   372                                  	sys	_msg, NextLine, 3, 07h
+   372                              <1> 
+   372                              <1> 
+   372                              <1> 
+   372                              <1> 
+   372                              <1>  %if %0 >= 2
+   372 000001F2 BB[03100000]        <1>  mov ebx, %2
+   372                              <1>  %if %0 >= 3
+   372 000001F7 B903000000          <1>  mov ecx, %3
+   372                              <1>  %if %0 = 4
+   372 000001FC BA07000000          <1>  mov edx, %4
+   372                              <1>  %endif
+   372                              <1>  %endif
+   372                              <1>  %endif
+   372 00000201 B823000000          <1>  mov eax, %1
+   372                              <1> 
+   372 00000206 CD40                <1>  int 40h
+   373                                  	;
+   374                                  
+   375 00000208 E89A000000              	call	ModPlay ; 13/02/2017
+   376                                  
+   377                                  _s_exit:
+   378 0000020D E858090000              	call	StopPlaying	; STOP!
+   379                                  
+   380                                  	; 02/10/2017
+   381                                  	; Print "OK." message.
+   382                                  	sys	_msg, OkMsg, 255, 0Fh
+   382                              <1> 
+   382                              <1> 
+   382                              <1> 
+   382                              <1> 
+   382                              <1>  %if %0 >= 2
+   382 00000212 BB[00100000]        <1>  mov ebx, %2
+   382                              <1>  %if %0 >= 3
+   382 00000217 B9FF000000          <1>  mov ecx, %3
+   382                              <1>  %if %0 = 4
+   382 0000021C BA0F000000          <1>  mov edx, %4
+   382                              <1>  %endif
+   382                              <1>  %endif
+   382                              <1>  %endif
+   382 00000221 B823000000          <1>  mov eax, %1
+   382                              <1> 
+   382 00000226 CD40                <1>  int 40h
+   383                                  Exit:           
+   384                                  	;call    FreeModule	; Free MODule core.
+   385                                  	
+   386                                  	sys 	_exit	; Bye !
+   386                              <1> 
+   386                              <1> 
+   386                              <1> 
+   386                              <1> 
+   386                              <1>  %if %0 >= 2
+   386                              <1>  mov ebx, %2
+   386                              <1>  %if %0 >= 3
+   386                              <1>  mov ecx, %3
+   386                              <1>  %if %0 = 4
+   386                              <1>  mov edx, %4
+   386                              <1>  %endif
+   386                              <1>  %endif
+   386                              <1>  %endif
+   386 00000228 B801000000          <1>  mov eax, %1
+   386                              <1> 
+   386 0000022D CD40                <1>  int 40h
+   387                                  here:
+   388 0000022F EBFE                    	jmp	short here
+   389                                  
+   390                                  pmsg_usage:
+   391                                  	sys	_msg, msg_usage, 255, 0Fh
+   391                              <1> 
+   391                              <1> 
+   391                              <1> 
+   391                              <1> 
+   391                              <1>  %if %0 >= 2
+   391 00000231 BB[0A0F0000]        <1>  mov ebx, %2
+   391                              <1>  %if %0 >= 3
+   391 00000236 B9FF000000          <1>  mov ecx, %3
+   391                              <1>  %if %0 = 4
+   391 0000023B BA0F000000          <1>  mov edx, %4
+   391                              <1>  %endif
+   391                              <1>  %endif
+   391                              <1>  %endif
+   391 00000240 B823000000          <1>  mov eax, %1
+   391                              <1> 
+   391 00000245 CD40                <1>  int 40h
+   392 00000247 EBDF                    	jmp	short Exit
+   393                                  
+   394                                  DetectVT8233:
+   395                                  	; Detect (BH=1) VT8233 (BL=3) Audio Controller
+   396                                          sys	_audio, 0103h
+   396                              <1> 
+   396                              <1> 
+   396                              <1> 
+   396                              <1> 
+   396                              <1>  %if %0 >= 2
+   396 00000249 BB03010000          <1>  mov ebx, %2
+   396                              <1>  %if %0 >= 3
+   396                              <1>  mov ecx, %3
+   396                              <1>  %if %0 = 4
+   396                              <1>  mov edx, %4
+   396                              <1>  %endif
+   396                              <1>  %endif
+   396                              <1>  %endif
+   396 0000024E B820000000          <1>  mov eax, %1
+   396                              <1> 
+   396 00000253 CD40                <1>  int 40h
+   397 00000255 C3                      	retn
+   398                                  
+   399                                  noDevMsg:
+   400 00000256 4572726F723A20556E-     	db "Error: Unable to find VIA VT8233 based audio device!",13,10,0
+   400 0000025F 61626C6520746F2066-
+   400 00000268 696E64205649412056-
+   400 00000271 543832333320626173-
+   400 0000027A 656420617564696F20-
+   400 00000283 646576696365210D0A-
+   400 0000028C 00                 
+   401                                  
+   402                                  ac97_int_handler:
+   403                                  	; 23/08/2020
+   404                                  	; 30/07/2020
+   405                                  	; 14/10/2017
+   406                                  	; 09/10/2017
+   407                                  
+   408                                  	; 30/07/2020
+   409                                  	; (Following code has been moved to 'p_loop' for fast return
+   410                                  	; from user's interrupt handler.)
+   411                                  
+   412                                  	;; 14/10/2017
+   413                                  	;mov	edi, Audio_Buffer
+   414                                  	;mov	ebx, BUFFERSIZE ; 32768 bytes
+   415 0000028D E890070000              	call	GetSamples
+   416                                  	;jc	error_exit ; 30/07/2020
+   417                                  
+   418                                  	; 19/06/2017
+   419 00000292 C605[27100000]01        	mov	byte [srb], 1 ; interrupt (or signal response byte)
+   420                                  
+   421                                  	sys	_rele ; return from callback service 
+   421                              <1> 
+   421                              <1> 
+   421                              <1> 
+   421                              <1> 
+   421                              <1>  %if %0 >= 2
+   421                              <1>  mov ebx, %2
+   421                              <1>  %if %0 >= 3
+   421                              <1>  mov ecx, %3
+   421                              <1>  %if %0 = 4
+   421                              <1>  mov edx, %4
+   421                              <1>  %endif
+   421                              <1>  %endif
+   421                              <1>  %endif
+   421 00000299 B827000000          <1>  mov eax, %1
+   421                              <1> 
+   421 0000029E CD40                <1>  int 40h
+   422                                  	; we must not come here !
+   423                                  	sys	_exit
+   423                              <1> 
+   423                              <1> 
+   423                              <1> 
+   423                              <1> 
+   423                              <1>  %if %0 >= 2
+   423                              <1>  mov ebx, %2
+   423                              <1>  %if %0 >= 3
+   423                              <1>  mov ecx, %3
+   423                              <1>  %if %0 = 4
+   423                              <1>  mov edx, %4
+   423                              <1>  %endif
+   423                              <1>  %endif
+   423                              <1>  %endif
+   423 000002A0 B801000000          <1>  mov eax, %1
+   423                              <1> 
+   423 000002A5 CD40                <1>  int 40h
+   424                                  
+   425                                  ;=============================================================================
+   426                                  ;      
+   427                                  ;=============================================================================
+   428                                  
+   429                                  ModPlay:
+   430                                  	; 23/08/2020
+   431                                  	; 03/08/2020
+   432                                  	; 30/07/2020
+   433                                  	; 14/10/2017
+   434                                  	; 13/10/2017
+   435                                  	; 06/10/2017, 09/10/2017
+   436                                  	; 19/06/2017, 21/06/2017, 23/06/2017
+   437                                  
+   438                                  	; 05/03/2017 (TRDOS 386)
+   439                                  	; 28/11/2016, 08/12/2016, 13/02/2017, 14/02/2017
+   440                                  
+   441 000002A7 66C70500800B00304E      	mov	word [0B8000h], 4E30h  ; Red '0'
+   442                                  
+   443                                  	; 24/08/2020
+   444 000002B0 FE05[B9030000]          	inc	byte [counter]
+   445                                  
+   446                                  p_loop:
+   447 000002B6 803D[27100000]00        	cmp	byte [srb], 0
+   448 000002BD 761A                    	jna	short q_loop
+   449                                  
+   450 000002BF C605[27100000]00        	mov	byte [srb], 0
+   451                                  
+   452                                  	; 30/07/2020
+   453                                  	; (Following code has been moved here from 'ac97_int_handler')
+   454                                  	; ('GetSamples')
+   455                                  
+   456                                  	; 23/08/2020
+   457                                  	; 03/08/2020
+   458                                  	; 14/10/2017
+   459                                  	;;mov	edi, Audio_Buffer
+   460                                  	;;mov	ebx, BUFFERSIZE ; 65536 bytes ; 01/08/2020
+   461                                  	;call	GetSamples
+   462                                  	;;jc	error_exit ; 30/07/2020
+   463                                  
+   464                                  	; 30/07/2020
+   465 000002C6 A0[B07F0000]            	mov	al, [half_buff]
+   466 000002CB 0431                    	add	al, 31h ; '1' or '2'
+   467 000002CD A200800B00              	mov	[0B8000h], al
+   468                                  	
+   469 000002D2 8035[B07F0000]01        	xor 	byte [half_buff], 1
+   470                                  q_loop:
+   471                                  	; 23/08/2020
+   472 000002D9 F605[B9030000]3F        	test	byte [counter], 63
+   473 000002E0 7545                    	jnz	short r_loop
+   474                                  
+   475 000002E2 B401                    	mov     ah, 1		; any key pressed?
+   476 000002E4 CD32                    	int     32h		; no, Loop.
+   477 000002E6 743F                    	jz	short r_loop
+   478                                  
+   479 000002E8 B400                    	mov     ah, 0		; flush key buffer...
+   480 000002EA CD32                    	int     32h
+   481                                  
+   482                                  	; 09/10/2017
+   483 000002EC 3C2B                    	cmp	al, '+' ; increase sound volume
+   484 000002EE 7405                    	je	short inc_volume_level
+   485 000002F0 3C2D                    	cmp	al, '-'
+   486 000002F2 7424                    	je	short dec_volume_level
+   487                                  q_return:
+   488 000002F4 C3                      	retn
+   489                                  
+   490                                  	; 09/10/2017 (playmod5.s)
+   491                                  	; 24/06/2017 (wavplay2.s)
+   492                                  inc_volume_level:
+   493 000002F5 8A0D[B17F0000]          	mov	cl, [volume_level]
+   494 000002FB 80F91F                  	cmp	cl, 1Fh ; 31
+   495 000002FE 73D9                    	jnb	short q_loop
+   496 00000300 FEC1                    	inc	cl
+   497                                  change_volume_level:
+   498 00000302 880D[B17F0000]          	mov	[volume_level], cl
+   499 00000308 88CD                    	mov	ch, cl
+   500                                  	; Set Master Volume Level
+   501                                  	sys	_audio, 0B00h
+   501                              <1> 
+   501                              <1> 
+   501                              <1> 
+   501                              <1> 
+   501                              <1>  %if %0 >= 2
+   501 0000030A BB000B0000          <1>  mov ebx, %2
+   501                              <1>  %if %0 >= 3
+   501                              <1>  mov ecx, %3
+   501                              <1>  %if %0 = 4
+   501                              <1>  mov edx, %4
+   501                              <1>  %endif
+   501                              <1>  %endif
+   501                              <1>  %endif
+   501 0000030F B820000000          <1>  mov eax, %1
+   501                              <1> 
+   501 00000314 CD40                <1>  int 40h
+   502 00000316 EBC1                    	jmp	short q_loop
+   503                                  dec_volume_level:
+   504 00000318 8A0D[B17F0000]          	mov	cl, [volume_level]
+   505 0000031E 80F901                  	cmp	cl, 1 ; 1
+   506 00000321 76B6                    	jna	short q_loop
+   507 00000323 FEC9                    	dec	cl
+   508 00000325 EBDB                    	jmp	short change_volume_level
+   509                                  
+   510                                  r_loop:
+   511                                  	; 24/08/2020
+   512                                  	; 08/10/2017
+   513 00000327 66FF05[B9030000]        	inc	word [counter]
+   514 0000032E 7586                    	jnz	short p_loop ; 09/10/2017
+   515                                  BarLoop:
+   516                                  	; Get Current DMA buffer Pointer 
+   517                                  	; 23/06/2017
+   518                                  	; bh = 15, get current pointer (DMA buffer offset)
+   519                                  	; bl = 0, for PCM OUT
+   520                                  	; ecx = 0
+   521                                  	;
+   522                                  	sys	_audio, 0F00h, 0
+   522                              <1> 
+   522                              <1> 
+   522                              <1> 
+   522                              <1> 
+   522                              <1>  %if %0 >= 2
+   522 00000330 BB000F0000          <1>  mov ebx, %2
+   522                              <1>  %if %0 >= 3
+   522 00000335 B900000000          <1>  mov ecx, %3
+   522                              <1>  %if %0 = 4
+   522                              <1>  mov edx, %4
+   522                              <1>  %endif
+   522                              <1>  %endif
+   522                              <1>  %endif
+   522 0000033A B820000000          <1>  mov eax, %1
+   522                              <1> 
+   522 0000033F CD40                <1>  int 40h
+   523                                  
+   524                                  	; 06/10/2017
+   525 00000341 BE[00000100]            	mov	esi, DMA_Buffer
+   526 00000346 01C6                    	add     esi, eax	; add offset value
+   527                                      
+   528                                  	; 02/10/2017 
+   529 00000348 8B0D[10100000]          	mov     ecx, [bar_stop]	; get previous bar stop address
+   530 0000034E 8B3D[0C100000]          	mov	edi, [bar_start]
+   531                                  	; 06/10/2017
+   532 00000354 66B80007                	mov	ax, 0700h ; Blank
+   533 00000358 668907                  	mov	[edi], ax
+   534 0000035B 29F9                    	sub	ecx, edi
+   535 0000035D 761E                    	jna	short check_volume
+   536 0000035F 89FA                    	mov	edx, edi
+   537 00000361 D0E9                    	shr	cl, 1
+   538 00000363 F366AB                  	rep	stosw
+   539 00000366 89D7                    	mov	edi, edx
+   540 00000368 8B15[14100000]          	mov	edx, [prev_max]
+   541 0000036E 09D2                    	or	edx, edx
+   542 00000370 740B                    	jz	short check_volume
+   543 00000372 39FA                    	cmp	edx, edi
+   544 00000374 7607                    	jna	short check_volume
+   545 00000376 B0DB                    	mov	al, 0DBh ; 219 ; Block
+   546 00000378 B40C                    	mov	ah, 0Ch ; Light Red
+   547 0000037A 668902                  	mov	[edx], ax
+   548                                  check_volume:
+   549                                  	; 06/10/2017
+   550 0000037D 8A06                    	mov	al, [esi]
+   551 0000037F C0E804                  	shr	al, 4 ; al = 0 to 15
+   552 00000382 742A                    	jz	short update_bar_stop
+   553 00000384 88C1                    	mov	cl, al
+   554                                  draw_bar:
+   555 00000386 B0DB                    	mov	al, 0DBh ; 219 ; Block
+   556 00000388 B40A                    	mov	ah, 0Ah ; Light Green
+   557 0000038A F366AB                  	rep	stosw
+   558 0000038D 89FA                    	mov	edx, edi
+   559 0000038F 4A                      	dec	edx
+   560 00000390 4A                      	dec	edx	
+   561 00000391 3B15[14100000]          	cmp	edx, [prev_max]
+   562 00000397 7508                    	jne	short new_max_volume
+   563 00000399 890D[14100000]          	mov	[prev_max], ecx ; 0 ; *
+   564                                  	;jmp	short blank_prev_max
+   565 0000039F EB0D                    	jmp	short update_bar_stop
+   566                                  new_max_volume:	 
+   567 000003A1 B40C                    	mov	ah, 0Ch ; Light Red
+   568 000003A3 668902                  	mov	[edx], ax
+   569 000003A6 8715[14100000]          	xchg	[prev_max], edx
+   570                                  	;cmp	edx, [prev_max] ; ** not necessary ?!
+   571                                  	;ja	short update_bar_stop ; **  not necessary ?!
+   572                                  blank_prev_max:
+   573 000003AC 890A                    	mov	[edx], ecx ; 0 ; *
+   574                                  update_bar_stop:
+   575 000003AE 893D[10100000]          	mov	[bar_stop], edi
+   576                                  	;
+   577 000003B4 E9FDFEFFFF              	jmp	p_loop
+   578                                  
+   579                                  counter: ; 08/10/2017
+   580 000003B9 FFFF                    	dw 	65535 ; 09/10/2017
+   581                                  
+   582                                  ;=============================================================================
+   583                                  ;               MODLOAD.ASM
+   584                                  ;=============================================================================
+   585                                  
+   586                                  ; Amiga Module Loader v0.1b by Carlos Hasan.
+   587                                  ;	July 10th, 1993.
+   588                                  
+   589                                  ; STRUCTURES
+   590                                  
+   591                                  struc ModSample
+   592 00000000 <res 00000016>          .msName:	resb 22
+   593 00000016 <res 00000002>          .msLength:	resw 1
+   594 00000018 <res 00000001>          .msFinetune:	resb 1
+   595 00000019 <res 00000001>          .msVolume:	resb 1
+   596 0000001A <res 00000002>          .msRepeat:	resw 1
+   597 0000001C <res 00000002>          .msRepLen:	resw 1
+   598                                  .size:		; 30 bytes
+   599                                  endstruc
+   600                                  
+   601                                  struc ModHeader
+   602 00000000 <res 00000014>          .mhName:	resb 20
+   603 00000014 <res 000003A2>          .mhSamples:	resb ModSample.size*31
+   604 000003B6 <res 00000001>          .mhOrderLen:	resb 1
+   605 000003B7 <res 00000001>          .mhReStart:	resb 1
+   606 000003B8 <res 00000080>          .mhOrder:	resb 128
+   607 00000438 <res 00000004>          .mhSign:	resw 2
+   608                                  .size:		; 1084 bytes
+   609                                  endstruc
+   610                                  
+   611                                  struc ModInfoRec
+   612 00000000 <res 00000001>          .OrderLen:	resb 1
+   613 00000001 <res 00000001>          .ReStart:	resb 1
+   614 00000002 <res 00000080>          .Order:		resb 128
+   615 00000082 <res 00000004>          .Patterns:	resd 1
+   616 00000086 <res 0000003E>          .SampOfs:	resw 31
+   617 000000C4 <res 0000003E>          .SampSeg:	resw 31
+   618 00000102 <res 0000003E>          .SampLen:	resw 31
+   619 00000140 <res 0000003E>          .SampRep:	resw 31
+   620 0000017E <res 0000003E>          .SampRepLen:	resw 31
+   621 000001BC <res 0000003E>          .SampVol:	resw 31
+   622                                  .size:		; 506 bytes	
+   623                                  endstruc
+   624                                  
+   625                                  ; CODE
+   626                                  
+   627                                  ; 06/10/2017
+   628                                  ; 04/10/2017
+   629                                  ; /* MOD FileFormat */
+   630                                  
+   631                                  ID_MK	equ 2E4B2E4Dh ; "M.K."
+   632                                  ID_FLT4 equ 34544C46h ; "FLT4"
+   633                                  ID_8CHN equ 4E484338h ; "8CHN"
+   634                                  ID_FLT8 equ 34544C46h ; "FLT8"
+   635                                  
+   636                                  ; CODE
+   637                                  
+   638                                  LoadModule:
+   639                                  	; edi = file name address
+   640                                  
+   641 000003BB 60                      	pushad
+   642                                  
+   643                                  	;call	ClearModInfo
+   644                                  OpenFile:       
+   645                                  	; ebx = ASCIIZ file name address
+   646                                  	; ecx = open mode (0 = open for read)		
+   647                                  	sys	_open, edi, 0 ; open for reading
+   647                              <1> 
+   647                              <1> 
+   647                              <1> 
+   647                              <1> 
+   647                              <1>  %if %0 >= 2
+   647 000003BC 89FB                <1>  mov ebx, %2
+   647                              <1>  %if %0 >= 3
+   647 000003BE B900000000          <1>  mov ecx, %3
+   647                              <1>  %if %0 = 4
+   647                              <1>  mov edx, %4
+   647                              <1>  %endif
+   647                              <1>  %endif
+   647                              <1>  %endif
+   647 000003C3 B805000000          <1>  mov eax, %1
+   647                              <1> 
+   647 000003C8 CD40                <1>  int 40h
+   648 000003CA 0F8262010000            	jc	Failed
+   649 000003D0 A3[28100000]            	mov     [FileHandle], eax
+   650                                  ReadHeader:
+   651                                  	; ebx = File handle
+   652                                  	; ecx = Buffer address
+   653                                  	; edx = Byte count
+   654                                  	sys	_read, [FileHandle], Header, ModHeader.size
+   654                              <1> 
+   654                              <1> 
+   654                              <1> 
+   654                              <1> 
+   654                              <1>  %if %0 >= 2
+   654 000003D5 8B1D[28100000]      <1>  mov ebx, %2
+   654                              <1>  %if %0 >= 3
+   654 000003DB B9[2C100000]        <1>  mov ecx, %3
+   654                              <1>  %if %0 = 4
+   654 000003E0 BA3C040000          <1>  mov edx, %4
+   654                              <1>  %endif
+   654                              <1>  %endif
+   654                              <1>  %endif
+   654 000003E5 B803000000          <1>  mov eax, %1
+   654                              <1> 
+   654 000003EA CD40                <1>  int 40h
+   655 000003EC 0F8231010000            	jc      CloseFile
+   656                                  CheckMK:  
+   657                                  	; 04/10/2017
+   658 000003F2 A1[64140000]            	mov	eax, [Header+ModHeader.mhSign]
+   659                                        
+   660 000003F7 3D4D2E4B2E              	cmp	eax, ID_MK   ; cmp eax, '.K.M'
+   661                                  	;je	short Is4chnMod
+   662 000003FC 742B                    	je	short IsModFile
+   663                                  CheckFLT4:
+   664 000003FE 3D464C5434              	cmp	eax, ID_FLT4 ; cmp eax, '4TLF'
+   665                                  	;je	short Is4chnMod
+   666 00000403 7424                    	je	short IsModFile
+   667                                  Check8CHN:
+   668 00000405 3D3843484E              	cmp	eax, ID_8CHN ; cmp eax,	'NHC8'
+   669 0000040A 740D                    	je	short Is8chnMod
+   670                                  CheckFLT8:
+   671 0000040C 3D464C5434              	cmp	eax, ID_FLT8 ; cmp eax, '8TLF'
+   672                                  	; 06/10/2017
+   673 00000411 7406                    	je	short Is8chnMod
+   674 00000413 F9                      	stc
+   675 00000414 E90A010000              	jmp	CloseFile
+   676                                  Is8chnMod:
+   677 00000419 C605[07100000]08        	mov	byte [numtracks], 8	; 8-CHANNEL-MOD
+   678 00000420 C605[06100000]0B        	mov	byte [pattern_shift], 11 ; Pattern Size = 2048 bytes
+   679 00000427 EB00                    	jmp	short IsModFile
+   680                                  ;Is4chnMod:
+   681                                  ;	mov	byte [numtracks], 4	; 4-CHANNEL-MOD
+   682                                  ;	mov	byte [pattern_shift], 11 ; Pattern Size = 1024 bytes
+   683                                  
+   684                                  IsModFile:
+   685 00000429 A0[E2130000]            	mov     al, [Header+ModHeader.mhOrderLen]
+   686 0000042E A2[68140000]            	mov     [ModInfo.OrderLen], al
+   687                                  
+   688 00000433 A0[E3130000]            	mov     al, [Header+ModHeader.mhReStart]
+   689 00000438 3A05[E2130000]          	cmp     al, [Header+ModHeader.mhOrderLen]
+   690 0000043E 7202                    	jb      short SetReStart
+   691 00000440 B07F                    	mov     al, 7Fh
+   692                                  SetReStart:
+   693 00000442 A2[69140000]            	mov     [ModInfo.ReStart], al
+   694                                  
+   695                                  	;mov	ecx, 128
+   696 00000447 66B98000                	mov	cx, 128
+   697 0000044B 31D2                    	xor     edx, edx
+   698 0000044D 31DB                    	xor     ebx, ebx
+   699                                  CopyOrder:
+   700 0000044F 8AB3[E4130000]          	mov     dh, [Header+ModHeader.mhOrder+ebx]
+   701 00000455 88B3[6A140000]          	mov     [ModInfo.Order+ebx], dh
+   702 0000045B 38D6                    	cmp     dh, dl
+   703 0000045D 7202                    	jb      short NextOrder
+   704 0000045F 88F2                    	mov     dl, dh ; Max. pattern number ; 04/10/2017
+   705                                  NextOrder:
+   706 00000461 43                      	inc     ebx
+   707 00000462 E2EB                    	loop    CopyOrder
+   708                                  AllocPatterns:  
+   709 00000464 81E2FF000000            	and	edx, 0FFh
+   710                                  	; 04/10/2017
+   711                                  	;inx	dx  ; 12/03/2017
+   712 0000046A FEC2                    	inc	dl
+   713                                  	; dl = number of patterns (04/07/2017)
+   714 0000046C 8A0D[06100000]          	mov	cl, [pattern_shift] ; 10 for 4 channels, 11 for 8 channels
+   715 00000472 D3E2                    	shl	edx, cl ; 10 ; *1024 ; (byte count of patterns *64*4*4)
+   716                                  				     ; *2048 ; (byte count of patterns *64*8*4)
+   717                                  	;
+   718 00000474 89D5                    	mov	ebp, edx ; offset of samples (04/07/2017)
+   719                                  	;mov	ecx, 10000h ; next 64K (4096*16)
+   720 00000476 B9[00000200]            	mov	ecx, file_buffer ; 12/03/2017
+   721                                  	;
+   722 0000047B 890D[EA140000]          	mov	[ModInfo.Patterns], ecx
+   723                                  	;
+   724 00000481 01CD                    	add	ebp, ecx ; next offset for samples
+   725                                  ReadPatterns:  
+   726                                  	;mov	ebx, [FileHandle] 
+   727                                  	; ebx = File handle
+   728                                  	; ecx = Buffer address
+   729                                  	; edx = Byte count
+   730                                  	sys	_read, [FileHandle]
+   730                              <1> 
+   730                              <1> 
+   730                              <1> 
+   730                              <1> 
+   730                              <1>  %if %0 >= 2
+   730 00000483 8B1D[28100000]      <1>  mov ebx, %2
+   730                              <1>  %if %0 >= 3
+   730                              <1>  mov ecx, %3
+   730                              <1>  %if %0 = 4
+   730                              <1>  mov edx, %4
+   730                              <1>  %endif
+   730                              <1>  %endif
+   730                              <1>  %endif
+   730 00000489 B803000000          <1>  mov eax, %1
+   730                              <1> 
+   730 0000048E CD40                <1>  int 40h
+   731 00000490 0F828D000000            	jc      CloseFile
+   732                                  
+   733                                  	; patterns have been loaded here... (04/07/2017)
+   734                                  
+   735 00000496 BE[40100000]            	mov	esi, Header+ModHeader.mhSamples
+   736 0000049B 31FF                    	xor     edi, edi
+   737                                  CopySamples:
+   738 0000049D 668B4616                	mov     ax, [esi+ModSample.msLength]
+   739 000004A1 86C4                    	xchg    al, ah
+   740 000004A3 66D1E0                  	shl     ax, 1
+   741 000004A6 668987[6A150000]        	mov     [ModInfo.SampLen+edi], ax
+   742 000004AD 8A4619                  	mov     al, [esi+ModSample.msVolume]
+   743 000004B0 30E4                    	xor     ah, ah
+   744 000004B2 668987[24160000]        	mov     [ModInfo.SampVol+edi], ax
+   745 000004B9 668B461A                	mov     ax, [esi+ModSample.msRepeat]
+   746 000004BD 86C4                    	xchg    al, ah
+   747 000004BF 66D1E0                  	shl     ax, 1
+   748 000004C2 668987[A8150000]        	mov     [ModInfo.SampRep+edi], ax
+   749 000004C9 668B461C                	mov     ax, [esi+ModSample.msRepLen]
+   750 000004CD 86C4                    	xchg    al, ah
+   751 000004CF 66D1E0                  	shl     ax, 1
+   752 000004D2 668987[E6150000]        	mov     [ModInfo.SampRepLen+edi], ax
+   753 000004D9 83C61E                  	add     esi, ModSample.size
+   754 000004DC 6683C702                	add     di, 2
+   755 000004E0 6683FF3E                	cmp     di, 2*31
+   756 000004E4 72B7                    	jb      short CopySamples
+   757                                  
+   758 000004E6 31F6                    	xor     esi, esi
+   759                                  AllocSamples:
+   760 000004E8 0FB796[6A150000]        	movzx	edx, word [ModInfo.SampLen+esi]
+   761                                  	; 07/10/2017
+   762                                  	;shr	dx, 4 ; ***
+   763 000004EF 21D2                    	and	edx, edx
+   764 000004F1 7426                    	jz      short NextSample
+   765                                  	;inc	dx  ; number of paragraphs ; ***
+   766                                  	;shl	dx, 4 ; ***
+   767 000004F3 89E8                    	mov	eax, ebp
+   768 000004F5 668986[EE140000]        	mov	[ModInfo.SampOfs+esi], ax
+   769 000004FC C1E810                  	shr	eax, 16
+   770 000004FF 668986[2C150000]        	mov	[ModInfo.SampSeg+esi], ax
+   771 00000506 89E9                    	mov	ecx, ebp
+   772 00000508 01D5                    	add	ebp, edx ; next offset for sample 
+   773                                  ReadSample:
+   774                                  	;mov	ebx, [FileHandle]
+   775                                  	;movzx  edx, [ModInfo.SampLen+esi]
+   776                                  	;mov    ecx, [ModInfo.SampOfs+esi]
+   777                                  
+   778                                  	; ebx = File handle
+   779                                  	; ecx = Buffer address
+   780                                  	; edx = Byte count
+   781                                  	sys	_read, [FileHandle]
+   781                              <1> 
+   781                              <1> 
+   781                              <1> 
+   781                              <1> 
+   781                              <1>  %if %0 >= 2
+   781 0000050A 8B1D[28100000]      <1>  mov ebx, %2
+   781                              <1>  %if %0 >= 3
+   781                              <1>  mov ecx, %3
+   781                              <1>  %if %0 = 4
+   781                              <1>  mov edx, %4
+   781                              <1>  %endif
+   781                              <1>  %endif
+   781                              <1>  %endif
+   781 00000510 B803000000          <1>  mov eax, %1
+   781                              <1> 
+   781 00000515 CD40                <1>  int 40h
+   782 00000517 720A                    	jc      short CloseFile
+   783                                  
+   784                                  NextSample:
+   785 00000519 6683C602                	add     si, 2
+   786 0000051D 6683FE3E                	cmp     si, 2*31
+   787 00000521 72C5                    	jb      short AllocSamples
+   788                                  CloseFile:      
+   789 00000523 9C                      	pushf
+   790                                  	sys	_close, [FileHandle]
+   790                              <1> 
+   790                              <1> 
+   790                              <1> 
+   790                              <1> 
+   790                              <1>  %if %0 >= 2
+   790 00000524 8B1D[28100000]      <1>  mov ebx, %2
+   790                              <1>  %if %0 >= 3
+   790                              <1>  mov ecx, %3
+   790                              <1>  %if %0 = 4
+   790                              <1>  mov edx, %4
+   790                              <1>  %endif
+   790                              <1>  %endif
+   790                              <1>  %endif
+   790 0000052A B806000000          <1>  mov eax, %1
+   790                              <1> 
+   790 0000052F CD40                <1>  int 40h
+   791 00000531 9D                      	popf
+   792                                  Failed:       
+   793 00000532 61                      	popad
+   794 00000533 C3                      	retn
+   795                                  
+   796                                  ;=============================================================================
+   797                                  ;               MODPLAY.ASM
+   798                                  ;=============================================================================
+   799                                  
+   800                                  ; Amiga Module Loader v0.3b by Carlos Hasan.
+   801                                  ;	July 23th, 1993.
+   802                                  
+   803                                  ; EQUATES
+   804                                  
+   805                                  ;NumTracks	equ 4 ; 06/10/2017 ([numtracks])
+   806                                  DefTempo        equ 6
+   807                                  DefBpm          equ 125
+   808                                  MidCRate        equ 8448
+   809                                  ;MixBufSize	equ 4096
+   810                                  ; 03/08/2020
+   811                                  MixBufSize	equ 8192	
+   812                                  
+   813                                  ; STRUCTURES
+   814                                  
+   815                                  struc TrackInfo  ; 01/10/2017 (TMODPLAY.ASM) modif. by Erdogan Tan
+   816 00000000 <res 00000004>          .Samples:	resd 1
+   817                                  ;.Position:	resw 1
+   818 00000004 <res 00000004>          .Position:	resd 1 ; 01/10/2017 - TRDOS 386 modification ! 
+   819 00000008 <res 00000002>          .Len:		resw 1
+   820 0000000A <res 00000002>          .Repeat:	resw 1
+   821 0000000C <res 00000002>          .RepLen:	resw 1
+   822 0000000E <res 00000001>          .Volume: 	resb 1 ; Volume
+   823 0000000F <res 00000001>          .VolDiff:	resb 1 ; 01/10/2017 ; Volume difference (Tremolo)
+   824                                  ;.Error:	resb 1
+   825                                  ;.Reserved:	resb 1 ; 01/10/2017
+   826 00000010 <res 00000002>          .Period:	resw 1 ; Period
+   827 00000012 <res 00000002>          .Pitch:		resw 1 
+   828 00000014 <res 00000002>          .Effect:	resw 1 ; Effect
+   829 00000016 <res 00000002>          .PortTo:	resw 1 ; Toneporta wanted period
+   830 00000018 <res 00000001>          .PortParm:	resb 1 ; Toneporta speed
+   831 00000019 <res 00000001>          .VibPos:	resb 1 ; Vibrato wave position 
+   832 0000001A <res 00000001>          .VibParm:	resb 1 ; Vibrato depth/rate
+   833 0000001B <res 00000001>          .TremPos:	resb 1 ; 01/10/2017 ; Tremolo wave position
+   834 0000001C <res 00000001>          .TremParm:	resb 1 ; 01/10/2017 ; Tremolo depth/rate
+   835                                  ;.OldSampOfs:	resb 1 ; ******* ; 01/10/2017
+   836 0000001D <res 00000001>          .Error:		resb 1 ; 01/10/2017
+   837 0000001E <res 00000006>          .Arp:		resw 3
+   838 00000024 <res 00000002>          .ArpIndex:	resw 1
+   839                                  .size:		; 38 bytes ; 01/10/2017 -  TRDOS 386
+   840                                  endstruc
+   841                                  
+   842                                  ; CODE
+   843                                  
+   844                                  ;--------------------------------------------------------------------------
+   845                                  ; updatechannel - update the track using the current effect
+   846                                  ;--------------------------------------------------------------------------
+   847                                  ; 
+   848                                  ;--------------------------------------------------------------------------
+   849                                  ; BeatTrack:  Process the next beat in one track.
+   850                                  ;  In:
+   851                                  ;    ds:di -  Track info Address.
+   852                                  ;--------------------------------------------------------------------------
+   853                                  
+   854                                  ; edi = Track info address
+   855                                  
+   856                                  updatechannel:
+   857                                  BeatTrack:	; updatechannel ; 01/10/2017 (TMODPLAY.ASM)
+   858                                  
+   859 00000534 668B5714                	mov     dx, [edi+TrackInfo.Effect]
+   860                                  
+   861                                  	;test   dx, dx
+   862                                  	;je     short None
+   863                                  	;cmp    dh, 00h
+   864                                  	;je     short Arpeggio
+   865                                  	;cmp    dh, 01h
+   866                                  	;je     short PortUp
+   867                                  	;cmp    dh, 02h
+   868                                  	;je     short PortDown
+   869                                  	;cmp    dh, 03h
+   870                                  	;je     TonePort
+   871                                  	;cmp    dh, 04h
+   872                                  	;je     Vibrato
+   873                                  	;cmp    dh, 05h
+   874                                  	;je     PortSlide
+   875                                  	;cmp    dh, 06h
+   876                                  	;je     VibSlide
+   877                                  	;cmp    dh, 0Ah
+   878                                  	;je     VolSlide
+   879                                  	;retn
+   880                                  
+   881 00000538 0FB6C6                  	movzx	eax, dh
+   882 0000053B 240F                    	and	al, 0Fh
+   883 0000053D FF2485[5C0D0000]        	jmp	dword [4*eax+efxtable2] ; TRDOS 386 ! (32 bits)
+   884                                  efxnull:
+   885                                  None:           
+   886 00000544 C3                      	retn
+   887                                  efxarpeggio2:
+   888                                  	; 01/10/2017
+   889 00000545 84D2                    	test    dl, dl
+   890 00000547 74FB                    	jz      short efxnull
+   891                                  Arpeggio:
+   892 00000549 0FB75F24                	movzx   ebx, word [edi+TrackInfo.ArpIndex]
+   893 0000054D 668B441F1E              	mov     ax, [edi+TrackInfo.Arp+ebx]
+   894 00000552 66894712                	mov     [edi+TrackInfo.Pitch], ax
+   895 00000556 6683C302                	add     bx, 2
+   896 0000055A 6683FB06                	cmp     bx, 6
+   897 0000055E 7202                    	jb      short SetArpIndex
+   898 00000560 31DB                    	xor     ebx, ebx
+   899                                  SetArpIndex:
+   900 00000562 66895F24                	mov     [edi+TrackInfo.ArpIndex], bx
+   901 00000566 C3                      	retn
+   902                                  efxportaup:
+   903                                  PortUp:
+   904 00000567 30F6                    	xor     dh, dh
+   905                                  	;mov	bx, [edi+TrackInfo.Period]
+   906 00000569 0FB75F10                	movzx	ebx, word [edi+TrackInfo.Period] ; 02/10/2017
+   907 0000056D 6629D3                  	sub     bx, dx
+   908                                  	;cmp	bx, 113
+   909 00000570 6683FB1C                	cmp	bx, 28 ; 01/10/2017 
+   910 00000574 7D04                    	jge     short NotSmall
+   911                                  	;mov	bx, 113
+   912 00000576 66BB1C00                	mov	bx, 28 ; 01/10/2017
+   913                                  NotSmall:
+   914 0000057A 66895F10                	mov     [edi+TrackInfo.Period], bx
+   915 0000057E 6601DB                  	add     bx, bx
+   916                                  	;mov	ax, [PitchTable+bx]
+   917 00000581 668B83[62160000]        	mov	ax, [PitchTable+ebx]  ; 02/10/2017
+   918 00000588 66894712                	mov     [edi+TrackInfo.Pitch], ax
+   919 0000058C C3                      	retn
+   920                                  efxportadown:
+   921                                  PortDown:
+   922 0000058D 30F6                    	xor     dh, dh
+   923                                  	;mov	bx, [edi+TrackInfo.Period]
+   924 0000058F 0FB75F10                	movzx	ebx, word [edi+TrackInfo.Period] ; 02/10/2017
+   925 00000593 6601D3                  	add     bx, dx
+   926 00000596 6681FB600D              	cmp	bx, 3424 ; 01/10/2017 
+   927                                  	;cmp	bx, 856
+   928 0000059B 7E04                    	jle     short NotBig
+   929                                  	;mov	bx, 856
+   930 0000059D 66BB600D                	mov	bx, 3424 ; 01/10/2017
+   931                                  NotBig:         
+   932 000005A1 66895F10                	mov     [edi+TrackInfo.Period], bx
+   933 000005A5 6601DB                  	add     bx, bx
+   934                                  	;mov	ax, [PitchTable+bx]
+   935 000005A8 668B83[62160000]        	mov	ax, [PitchTable+ebx]  ; 02/10/2017
+   936 000005AF 66894712                	mov     [edi+TrackInfo.Pitch], ax
+   937 000005B3 C3                      	retn
+   938                                  efxtoneporta2:
+   939                                  TonePort:
+   940 000005B4 30F6                    	xor     dh, dh
+   941 000005B6 668B4716                	mov     ax, [edi+TrackInfo.PortTo]
+   942                                  	;mov	bx, [edi+TrackInfo.Period]
+   943 000005BA 0FB75F10                	movzx	ebx, word [edi+TrackInfo.Period] ; 02/10/2017
+   944 000005BE 6639C3                  	cmp     bx, ax
+   945 000005C1 7429                    	je      short NoPort
+   946 000005C3 7F0D                    	jg      short PortToUp
+   947                                  PortToDown:     
+   948 000005C5 6601D3                  	add     bx, dx
+   949 000005C8 6639C3                  	cmp     bx, ax
+   950 000005CB 7E0D                    	jle     short SetPort
+   951                                  FixPort:        
+   952 000005CD 6689C3                  	mov     bx, ax
+   953 000005D0 EB08                    	jmp     short SetPort
+   954                                  PortToUp:
+   955 000005D2 6629D3                  	sub     bx, dx
+   956 000005D5 6639C3                  	cmp     bx, ax
+   957 000005D8 7CF3                    	jl      short FixPort
+   958                                  SetPort:        
+   959 000005DA 66895F10                	mov     [edi+TrackInfo.Period], bx
+   960 000005DE 6601DB                  	add     bx, bx
+   961                                  	;mov	ax, [PitchTable+bx]
+   962 000005E1 668B83[62160000]        	mov	ax, [PitchTable+ebx]  ; 02/10/2017
+   963 000005E8 66894712                	mov     [edi+TrackInfo.Pitch], ax
+   964                                  NoPort:         
+   965 000005EC C3                      	retn
+   966                                  efxvibrato2:
+   967                                  	; 01/10/2017
+   968                                  Vibrato:
+   969 000005ED 88D6                    	mov     dh, dl
+   970                                  	;and	dl, 0Fh
+   971                                  	;shr	dh, 4
+   972                                  	;shl	dh, 2
+   973 000005EF 6681E20FF0              	and     dx, 0F00Fh
+   974 000005F4 C0EE02                  	shr     dh, 2
+   975                                  	;add	[edi+TrackInfo.VibPos], dh
+   976                                  	;mov	dh, [edi+TrackInfo.VibPos]
+   977                                  	;mov	bl, dh
+   978 000005F7 8A5F19                  	mov	bl, [edi+TrackInfo.VibPos]  ; 01/10/2017
+   979 000005FA 007719                  	add	[edi+TrackInfo.VibPos], dh
+   980 000005FD 88DE                    	mov	dh, bl ; 01/10/2017
+   981 000005FF C0EB02                  	shr     bl, 2
+   982                                  	;and	bx, 1Fh
+   983                                  	;mov	al, [SinTable+bx]
+   984 00000602 83E31F                  	and	ebx, 1Fh
+   985 00000605 8A83[440E0000]          	mov	al, [SinTable+ebx]
+   986 0000060B F6E2                    	mul     dl
+   987                                  	;rol	ax, 1
+   988                                  	;xchg	al, ah
+   989                                  	;and	ah, 1
+   990 0000060D 66C1E807                	shr	ax, 7
+   991 00000611 84F6                    	test    dh, dh
+   992 00000613 7903                    	jns     short VibUp
+   993 00000615 66F7D8                  	neg     ax
+   994                                  VibUp:          
+   995 00000618 66034710                	add     ax, [edi+TrackInfo.Period]
+   996 0000061C 6689C3                  	mov	bx, ax
+   997                                  	;movzx	ebx, ax
+   998 0000061F 6683FB71                	cmp     bx, 113
+   999                                  	;cmp	bx, 113
+  1000 00000623 6683FB1C                	cmp	bx, 28  ; 01/10/2017
+  1001 00000627 7D06                    	jge     short NoLoVib
+  1002                                  	;mov	bx, 113
+  1003 00000629 66BB1C00                	mov	bx, 28	; 01/10/2017
+  1004 0000062D EB0B                    	jmp	short NoHiVib ; 01/10/2017	
+  1005                                  NoLoVib:        
+  1006 0000062F 6681FB600D              	cmp	bx, 3424 ; 01/10/2017 
+  1007                                  	;cmp	bx, 856
+  1008 00000634 7E04                    	jle     short NoHiVib
+  1009                                  	;mov	bx, 856
+  1010 00000636 66BB600D                	mov	bx, 3424 ; 01/10/2017
+  1011                                  NoHiVib:        
+  1012 0000063A 6601DB                  	add     bx, bx
+  1013                                  	;mov	ax, [PitchTable+bx]
+  1014 0000063D 668B83[62160000]        	mov	ax, [PitchTable+ebx] ; 01/10/2017
+  1015 00000644 66894712                	mov     [edi+TrackInfo.Pitch], ax
+  1016 00000648 C3                      	retn
+  1017                                  efxtoneslide:
+  1018                                  PortSlide:
+  1019 00000649 E812000000              	call    VolSlide
+  1020 0000064E 8A5718                  	mov     dl, [edi+TrackInfo.PortParm]  ; .tonespeed
+  1021 00000651 E95EFFFFFF              	jmp     TonePort  ; efxtoneporta2
+  1022                                  efxvibslide:
+  1023                                  VibSlide:
+  1024 00000656 E805000000              	call    VolSlide
+  1025 0000065B 8A571A                  	mov     dl, [edi+TrackInfo.VibParm]
+  1026 0000065E EB8D                    	jmp     short Vibrato  ; efxvibrato2
+  1027                                  efxvolslide:
+  1028                                  VolSlide:
+  1029 00000660 88D6                    	mov     dh, dl
+  1030 00000662 80E20F                  	and     dl, 0Fh
+  1031 00000665 C0EE04                  	shr     dh, 4
+  1032 00000668 8A470E                  	mov     al, [edi+TrackInfo.Volume]
+  1033 0000066B 28D0                    	sub     al, dl
+  1034 0000066D 7D02                    	jge     short NoLoVol
+  1035 0000066F 30C0                    	xor     al, al
+  1036                                  NoLoVol:        
+  1037 00000671 00F0                    	add     al, dh
+  1038 00000673 3C40                    	cmp     al, 64
+  1039 00000675 7602                    	jbe     short NoHiVol
+  1040 00000677 B040                    	mov     al, 64
+  1041                                  NoHiVol:        
+  1042 00000679 88470E                  	mov     [edi+TrackInfo.Volume], al
+  1043 0000067C C3                      	retn
+  1044                                  
+  1045                                  efxtremolo2:
+  1046                                  	; 01/10/2017 (TMODPLAY.ASM)
+  1047                                  Tremolo:
+  1048 0000067D 88D6                    	mov     dh, dl
+  1049 0000067F 6681E20FF0              	and     dx, 0F00Fh
+  1050 00000684 C0EE02                  	shr     dh, 2
+  1051 00000687 8A5F1B                  	mov	bl, [edi+TrackInfo.TremPos]
+  1052 0000068A 00771B                  	add	[edi+TrackInfo.TremPos], dh
+  1053 0000068D 88DE                    	mov	dh, bl
+  1054 0000068F C0EB02                  	shr     bl, 2
+  1055                                  	; 01/10/2017 - TRDOS 386
+  1056                                  	;and	bx, 1Fh
+  1057 00000692 83E31F                  	and	ebx, 1Fh 
+  1058                                  	;mov	al, [SinTable+bx]
+  1059 00000695 8A83[440E0000]          	mov     al, [SinTable+ebx]
+  1060 0000069B F6E2                    	mul     dl
+  1061 0000069D 66C1E806                	shr	ax, 6
+  1062 000006A1 84F6                    	test    dh, dh
+  1063 000006A3 7D03                    	jge	short Tremolo_1 ; efxtremolof2
+  1064 000006A5 66F7D8                  	neg     ax
+  1065                                  efxtremolof2:
+  1066                                  Tremolo_1:      
+  1067 000006A8 8A670E                  	mov	ah, [edi+TrackInfo.Volume]    
+  1068 000006AB 00E0                    	add     al, ah
+  1069 000006AD 7D02                    	jge     short Tremolo_2 ; efxtremolof3
+  1070 000006AF 30C0                    	xor     al, al
+  1071                                  efxtremolof3:
+  1072                                  Tremolo_2:       
+  1073 000006B1 3C40                    	cmp     al, 64 ; 40h
+  1074 000006B3 7E02                    	jle     short Tremolo_3 ; efxtremolof4
+  1075 000006B5 B040                    	mov     al, 64 ; 40h
+  1076                                  efxtremolof4:
+  1077                                  Tremolo_3:       
+  1078 000006B7 28E0                    	sub	al, ah  ; ****** 
+  1079 000006B9 88470F                  	mov     [edi+TrackInfo.VolDiff], al
+  1080 000006BC C3                      	retn	
+  1081                                  
+  1082                                  ;--------------------------------------------------------------------------
+  1083                                  ; readchannel - read the next note event from the pattern sheet
+  1084                                  ;--------------------------------------------------------------------------
+  1085                                  ;
+  1086                                  ;--------------------------------------------------------------------------
+  1087                                  ; GetTrack:   Get the next Note from a pattern.
+  1088                                  ;  In:
+  1089                                  ;    ds:di -  Track info Address.
+  1090                                  ;    es:si -  Pattern Note Address.
+  1091                                  ; Out:
+  1092                                  ;    es:si -  The Next Pattern Note address.
+  1093                                  ;--------------------------------------------------------------------------
+  1094                                  
+  1095                                  ; esi = Pattern note address
+  1096                                  ; edi = Track info address
+  1097                                  
+  1098                                  readchannel:
+  1099                                  GetTrack: 	; readchannel ; 01/10/2017 (TMODPLAY.ASM)
+  1100 000006BD 66AD                    	lodsw
+  1101 000006BF 86C4                    	xchg    al, ah
+  1102 000006C1 88E3                    	mov	bl, ah
+  1103 000006C3 80E40F                  	and     ah, 0Fh
+  1104 000006C6 6689C1                  	mov     cx, ax
+  1105 000006C9 66AD                    	lodsw
+  1106 000006CB 86C4                    	xchg    al, ah
+  1107 000006CD 88E7                    	mov     bh, ah
+  1108 000006CF 80E40F                  	and     ah, 0Fh
+  1109 000006D2 6689C2                  	mov     dx, ax
+  1110 000006D5 66895714                	mov     [edi+TrackInfo.Effect], dx
+  1111                                  	; 01/10/2017 - TRDOS 386
+  1112                                  	;and	bl, 0F0h
+  1113 000006D9 81E3F0FF0000            	and	ebx, 0FFF0h
+  1114 000006DF C0EF04                  	shr     bh, 4
+  1115 000006E2 08FB                    	or      bl, bh
+  1116 000006E4 7446                    	je      short SetPeriod
+  1117                                  SetSample:
+  1118 000006E6 30FF                    	xor	bh, bh
+  1119                                  	;and	ebx, 0FFh
+  1120 000006E8 FECB                    	dec     bl
+  1121 000006EA 01DB                    	add     ebx, ebx
+  1122 000006EC 668B83[24160000]        	mov     ax, [ModInfo.SampVol+ebx]
+  1123 000006F3 88470E                  	mov     [edi+TrackInfo.Volume], al
+  1124 000006F6 668B83[EE140000]        	mov     ax, [ModInfo.SampOfs+ebx]
+  1125 000006FD 668907                  	mov     [edi+TrackInfo.Samples], ax
+  1126 00000700 668B83[2C150000]        	mov     ax, [ModInfo.SampSeg+ebx]
+  1127 00000707 66894702                	mov     [edi+TrackInfo.Samples+2], ax
+  1128 0000070B 668B83[6A150000]        	mov     ax, [ModInfo.SampLen+ebx]
+  1129 00000712 66894708                	mov     [edi+TrackInfo.Len], ax
+  1130 00000716 668B83[A8150000]        	mov     ax, [ModInfo.SampRep+ebx]
+  1131 0000071D 6689470A                	mov     [edi+TrackInfo.Repeat], ax
+  1132 00000721 668B83[E6150000]        	mov     ax, [ModInfo.SampRepLen+ebx]
+  1133 00000728 6689470C                	mov     [edi+TrackInfo.RepLen], ax
+  1134                                  SetPeriod:      
+  1135 0000072C 6685C9                  	test    cx, cx
+  1136 0000072F 7425                    	jz      short SetEffect
+  1137                                  
+  1138 00000731 66894F16                	mov     [edi+TrackInfo.PortTo], cx ; *
+  1139                                  	
+  1140 00000735 80FE03                  	cmp     dh, 03h
+  1141                                  	;je	short SetEffect
+  1142 00000738 7428                    	je	short efxtoneporta ; 01/10/2017
+  1143                                  
+  1144 0000073A 66894F10                	mov     [edi+TrackInfo.Period], cx
+  1145                                  	;movzx	ebx, cx
+  1146 0000073E 6689CB                  	mov     bx, cx
+  1147 00000741 6601DB                  	add     bx, bx
+  1148                                  	;mov	ax, [PitchTable+bx]
+  1149 00000744 668B83[62160000]        	mov	ax, [PitchTable+ebx] ; 01/10/2017
+  1150 0000074B 66894712                	mov     [edi+TrackInfo.Pitch], ax
+  1151 0000074F C7470400000000          	mov     dword [edi+TrackInfo.Position], 0
+  1152                                  SetEffect:
+  1153                                  	;test	dx, dx
+  1154                                  	;je	short InitNone
+  1155                                  	;cmp	dh, 00h
+  1156                                  	;je	InitArpeggio
+  1157                                  	;cmp	dh, 03h
+  1158                                  	;je	short InitTonePort
+  1159                                  	;cmp	dh, 04h
+  1160                                  	;je	short InitVibrato
+  1161                                  	;cmp	dh, 09h
+  1162                                  	;je	short SampleOfs
+  1163                                  	;cmp	dh, 0Bh
+  1164                                  	;je	short PosJump
+  1165                                  	;cmp	dh, 0Ch
+  1166                                  	;je	short SetVolume
+  1167                                  	;cmp	dh, 0Dh
+  1168                                  	;je	short Break
+  1169                                  	;cmp	dh, 0Fh
+  1170                                  	;je	SetSpeed
+  1171                                  	;retn
+  1172                                  
+  1173                                  	; 01/10/2017 (TMODPLAY.ASM)
+  1174                                  	
+  1175                                  	; dx = [di+TrackInfo.Effect]
+  1176                                  	
+  1177 00000756 0FB6C6                  	movzx	eax, dh
+  1178 00000759 240F                    	and	al, 0Fh
+  1179 0000075B FF2485[1C0D0000]        	jmp	dword [4*eax+efxtable] ; TRDOS 386 ! (32 bits)
+  1180                                  ;efxnull:
+  1181                                  ;InitNone:
+  1182                                  ;	retn
+  1183                                  efxtoneporta:
+  1184                                  	; 01/10/2017
+  1185                                  	; cx = period
+  1186                                  	;mov	[edi+TrackInfo.PortTo], cx ; *
+  1187                                  InitTonePort:
+  1188 00000762 84D2                    	test    dl, dl
+  1189 00000764 7503                    	jnz     short SetPortParm
+  1190 00000766 8A5718                  	mov     dl, [edi+TrackInfo.PortParm] ; .tonespeed
+  1191                                  SetPortParm:    
+  1192 00000769 885718                  	mov     [edi+TrackInfo.PortParm], dl
+  1193 0000076C 66895714                	mov     [edi+TrackInfo.Effect], dx
+  1194 00000770 C3                      	retn
+  1195                                  efxvibrato:
+  1196                                  InitVibrato:
+  1197 00000771 8A471A                  	mov     al, [edi+TrackInfo.VibParm]
+  1198 00000774 88C4                    	mov     ah, al
+  1199                                  	;and	al, 0Fh
+  1200                                  	;and	ah, 0F0h
+  1201 00000776 66250FF0                	and	ax, 0F00Fh
+  1202 0000077A F6C20F                  	test    dl, 0Fh
+  1203 0000077D 7502                    	jne     short OkDepth
+  1204 0000077F 08C2                    	or      dl, al
+  1205                                  OkDepth:        
+  1206 00000781 F6C2F0                  	test    dl, 0F0h
+  1207 00000784 7502                    	jnz     short OkRate
+  1208 00000786 08E2                    	or      dl, ah
+  1209                                  OkRate:         
+  1210 00000788 88571A                  	mov     [edi+TrackInfo.VibParm], dl
+  1211 0000078B 66895714                	mov     [edi+TrackInfo.Effect], dx
+  1212 0000078F 6685C9                  	test    cx, cx
+  1213 00000792 7404                    	jz      short OkPos
+  1214 00000794 C6471900                	mov     byte [edi+TrackInfo.VibPos], 0
+  1215                                  OkPos:          
+  1216 00000798 C3                      	retn
+  1217                                  efxsampoffset:
+  1218                                  	; 01/10/2017 ; *******
+  1219                                  SampleOfs:         
+  1220                                  ;	test    dl, dl
+  1221                                  ;	jnz     short SetSampleOfs
+  1222                                  ;	mov     dl, [edi+TrackInfo.OldSampOfs]
+  1223                                  ;SetSampleOfs:
+  1224                                  ;	mov     [edi+TrackInfo.OldSampOfs], dl
+  1225 00000799 88D6                    	mov     dh, dl
+  1226 0000079B 81E200FF0000            	and 	edx, 0FF00h ; 05/03/2017
+  1227 000007A1 895704                  	mov     [edi+TrackInfo.Position], edx
+  1228 000007A4 C3                      	retn
+  1229                                  efxpattjump:
+  1230                                  PosJump:
+  1231 000007A5 8815[1A7E0000]          	mov     [OrderPos], dl
+  1232 000007AB C605[1E7E0000]40        	mov     byte [Row], 64
+  1233 000007B2 C3                      	retn
+  1234                                  efxsetvolume:
+  1235                                  SetVolume:
+  1236 000007B3 80FA40                  	cmp     dl, 64
+  1237 000007B6 7602                    	jbe     short OkVol
+  1238 000007B8 B240                    	mov     dl, 64
+  1239                                  OkVol:
+  1240                                  	; 01/10/2017 (TrackInfo.VolDiff, tremolo effect)
+  1241 000007BA 30F6                    	xor	dh, dh ; reset TrackInfo.VolDiff ; Not necessary !?
+  1242                                  	;mov	[edi+TrackInfo.Volume], dl
+  1243 000007BC 6689570E                	mov	[edi+TrackInfo.Volume], dx 
+  1244 000007C0 C3                      	retn
+  1245                                  efxbreak:
+  1246                                  Break:
+  1247 000007C1 88D6                    	mov     dh, dl
+  1248 000007C3 80E20F                  	and     dl, 0Fh
+  1249 000007C6 C0EE04                  	shr     dh, 4
+  1250 000007C9 00F6                    	add     dh, dh
+  1251 000007CB 00F2                    	add     dl, dh
+  1252 000007CD C0E602                  	shl     dh, 2
+  1253 000007D0 00F2                    	add     dl, dh
+  1254 000007D2 8815[1F7E0000]          	mov     [BreakRow], dl
+  1255 000007D8 C605[1E7E0000]40        	mov     byte [Row], 64
+  1256 000007DF C3                      	retn
+  1257                                  efxsetspeed:
+  1258                                  SetSpeed:
+  1259 000007E0 84D2                    	test    dl,dl
+  1260 000007E2 7432                    	je      short Skip
+  1261 000007E4 80FA1F                  	cmp     dl,31
+  1262 000007E7 770D                    	ja      short SetBpm
+  1263                                  SetTempo:       
+  1264 000007E9 8815[1B7E0000]          	mov     [Tempo], dl
+  1265 000007EF 8815[1C7E0000]          	mov     [TempoWait], dl
+  1266 000007F5 C3                      	retn
+  1267                                  SetBpm:
+  1268 000007F6 8815[1D7E0000]          	mov     [Bpm], dl
+  1269 000007FC B067                    	mov     al, 103
+  1270 000007FE F6E2                    	mul     dl
+  1271 00000800 88E3                    	mov     bl, ah
+  1272 00000802 30FF                    	xor     bh, bh
+  1273 00000804 66A1[680E0000]          	mov     ax, [MixSpeed]
+  1274 0000080A 6631D2                  	xor     dx, dx
+  1275 0000080D 66F7F3                  	div     bx
+  1276 00000810 66A3[207E0000]          	mov     [BpmSamples], ax
+  1277                                  Skip:           
+  1278 00000816 C3                      	retn
+  1279                                  efxarpeggio:
+  1280                                  	; 01/10/2017
+  1281 00000817 84D2                    	test    dl, dl
+  1282                                  	;je	efxnull
+  1283 00000819 74FB                    	je	short Skip
+  1284                                  InitArpeggio:
+  1285 0000081B 88D6                    	mov     dh, dl
+  1286 0000081D 80E20F                  	and     dl, 0Fh
+  1287 00000820 C0EE04                  	shr     dh, 4
+  1288                                  	; 01/10/2017
+  1289                                  	;mov	cx, 36
+  1290 00000823 66B95400                	mov	cx, 84 ; 84 notes/periods
+  1291 00000827 31DB                    	xor     ebx, ebx
+  1292 00000829 668B4710                	mov     ax, [edi+TrackInfo.Period]
+  1293                                  gt_ScanPeriod:
+  1294                                  	;cmp	ax, [PeriodTable+bx]
+  1295 0000082D 663B83[9C0D0000]        	cmp	ax, [PeriodTable+ebx]
+  1296 00000834 7306                    	jae     short SetArp
+  1297 00000836 6683C302                	add     bx, 2
+  1298 0000083A E2F1                    	loop    gt_ScanPeriod
+  1299                                  SetArp:         
+  1300 0000083C 6601D2                  	add     dx, dx
+  1301 0000083F 00DE                    	add     dh, bl
+  1302 00000841 00DA                    	add     dl, bl
+  1303                                  	; 01/10/2017
+  1304                                  	;mov	bx, [PeriodTable+bx]
+  1305 00000843 668B9B[9C0D0000]        	mov	bx, [PeriodTable+ebx]
+  1306                                  	;add	bx, bx
+  1307 0000084A 01DB                    	add	ebx, ebx
+  1308                                  	;mov	ax, [PitchTable+bx]
+  1309 0000084C 668B83[62160000]        	mov	ax, [PitchTable+ebx]
+  1310 00000853 6689471E                	mov     [edi+TrackInfo.Arp], ax
+  1311 00000857 88F3                    	mov     bl, dh
+  1312 00000859 30FF                    	xor     bh, bh
+  1313 0000085B 668B9B[9C0D0000]        	mov	bx, [PeriodTable+ebx]
+  1314                                  	;add	bx, bx
+  1315 00000862 01DB                    	add	ebx, ebx
+  1316                                  	;mov	ax, [PitchTable+bx]
+  1317 00000864 668B83[62160000]        	mov	ax, [PitchTable+ebx]
+  1318 0000086B 66894720                	mov     [edi+TrackInfo.Arp+2], ax
+  1319 0000086F 88D3                    	mov     bl, dl
+  1320 00000871 30FF                    	xor     bh, bh
+  1321 00000873 668B9B[9C0D0000]        	mov	bx, [PeriodTable+ebx]
+  1322                                  	;add	bx, bx
+  1323 0000087A 01DB                    	add	ebx, ebx
+  1324                                  	;mov	ax, [PitchTable+bx]
+  1325 0000087C 668B83[62160000]        	mov	ax, [PitchTable+ebx]
+  1326 00000883 66894722                	mov     [edi+TrackInfo.Arp+4], ax
+  1327 00000887 66C747240000            	mov     word [edi+TrackInfo.ArpIndex], 0
+  1328 0000088D C3                      	retn
+  1329                                  
+  1330                                  efxtremolo:
+  1331                                  	; 01/10/2017 (TMODPLAY.ASM)
+  1332                                  InitTremolo:
+  1333 0000088E 8A471C                  	mov     al, [edi+TrackInfo.TremParm]
+  1334 00000891 88C4                    	mov     ah, al
+  1335 00000893 66250FF0                	and     ax, 0F00Fh
+  1336 00000897 F6C20F                  	test    dl, 0Fh
+  1337 0000089A 7502                    	jnz     short InitTremolo_1 ; efxtremolof0
+  1338 0000089C 08C2                    	or      dl, al
+  1339                                  efxtremolof0:
+  1340                                  InitTremolo_1: 
+  1341 0000089E F6C2F0                  	test    dl, 0F0h
+  1342 000008A1 7502                    	jnz     short InitTremolo_2 ; efxtremolof1
+  1343 000008A3 08E2                    	or      dl, ah
+  1344                                  efxtremolof1:
+  1345                                  InitTremolo_2:
+  1346 000008A5 88571C                  	mov     [edi+TrackInfo.TremParm], dl
+  1347 000008A8 66895714                	mov     [edi+TrackInfo.Effect], dx
+  1348 000008AC C3                      	retn
+  1349                                  
+  1350                                  ;--------------------------------------------------------------------------
+  1351                                  ; pollmodule - polls the module player
+  1352                                  ;--------------------------------------------------------------------------
+  1353                                  ;--------------------------------------------------------------------------
+  1354                                  ; UpdateTracks:  Main code to process the next tick to be played.
+  1355                                  ;--------------------------------------------------------------------------
+  1356                                  
+  1357                                  pollmodule:
+  1358                                  UpdateTracks: ; polmodule ; 01/10/2017 (TMODPLAY.ASM)
+  1359 000008AD FE0D[1C7E0000]          	dec     byte [TempoWait]
+  1360 000008B3 7417                    	jz      short GetTracks
+  1361                                  
+  1362                                  	;mov	ecx, NumTracks
+  1363 000008B5 0FB70D[07100000]        	movzx	ecx, word [numtracks] ; 06/10/2017
+  1364 000008BC BF[307E0000]            	mov	edi, Tracks
+  1365                                  BeatTracks:
+  1366 000008C1 E86EFCFFFF              	call	BeatTrack	
+  1367 000008C6 83C726                  	add	edi, TrackInfo.size
+  1368 000008C9 E2F6                    	loop	BeatTracks
+  1369 000008CB C3                      	retn
+  1370                                  GetTracks:
+  1371 000008CC A0[1B7E0000]            	mov     al, [Tempo]
+  1372 000008D1 A2[1C7E0000]            	mov     [TempoWait], al
+  1373                                  
+  1374 000008D6 8B35[2C7E0000]          	mov	esi, [Note]
+  1375 000008DC 803D[1E7E0000]40        	cmp     byte [Row], 64
+  1376 000008E3 7268                    	jb      short NoPattWrap
+  1377                                  
+  1378 000008E5 8B35[EA140000]          	mov	esi, [ModInfo.Patterns]
+  1379 000008EB 8A1D[1A7E0000]          	mov     bl, [OrderPos]
+  1380 000008F1 3A1D[68140000]          	cmp     bl, [ModInfo.OrderLen]
+  1381 000008F7 7214                    	jb      short NoOrderWrap
+  1382 000008F9 8A1D[69140000]          	mov     bl, [ModInfo.ReStart]
+  1383 000008FF 881D[1A7E0000]          	mov     [OrderPos], bl
+  1384 00000905 3A1D[68140000]          	cmp     bl, [ModInfo.OrderLen]
+  1385 0000090B 7364                    	jae     short NoUpdate
+  1386                                  NoOrderWrap:    
+  1387                                  	;xor	bh, bh
+  1388 0000090D 81E3FF000000            	and	ebx, 0FFh
+  1389 00000913 8A9B[6A140000]          	mov     bl, [ModInfo.Order+ebx]
+  1390                                  	; 05/10/2017
+  1391                                  	;shl	ebx, 10 ; *1024
+  1392 00000919 8A0D[06100000]          	mov	cl, [pattern_shift] ; 10 or 11
+  1393 0000091F D3E3                    	shl	ebx, cl ; *1024 or *2048
+  1394                                  	;
+  1395 00000921 01DE                    	add     esi, ebx
+  1396 00000923 8A1D[1F7E0000]          	mov     bl, [BreakRow]
+  1397 00000929 881D[1E7E0000]          	mov     [Row], bl
+  1398                                  	;xor	bh, bh
+  1399 0000092F 81E3FF000000            	and	ebx, 0FFh
+  1400 00000935 883D[1F7E0000]          	mov     [BreakRow], bh ; 0
+  1401 0000093B 66C1E304                	shl     bx, 4
+  1402 0000093F 01DE                    	add     esi, ebx
+  1403 00000941 8935[2C7E0000]          	mov     [Note], esi
+  1404 00000947 FE05[1A7E0000]          	inc     byte [OrderPos]
+  1405                                  NoPattWrap:     
+  1406 0000094D FE05[1E7E0000]          	inc     byte [Row]
+  1407                                  
+  1408                                  	;cld
+  1409                                  	;mov	ecx, NumTracks
+  1410 00000953 0FB70D[07100000]        	movzx	ecx, word [numtracks] ; 06/10/2017
+  1411 0000095A BF[307E0000]            	mov	edi, Tracks
+  1412                                  GetTracks_next:
+  1413 0000095F 51                      	push	ecx	
+  1414 00000960 E858FDFFFF              	call	GetTrack
+  1415 00000965 59                      	pop	ecx
+  1416 00000966 83C726                  	add	edi, TrackInfo.size
+  1417 00000969 E2F4                    	loop	GetTracks_next
+  1418                                  
+  1419 0000096B 8935[2C7E0000]          	mov     [Note], esi
+  1420                                  NoUpdate:
+  1421 00000971 C3                      	retn
+  1422                                  
+  1423                                  ;--------------------------------------------------------------------------
+  1424                                  ; MixTrack:  Mixes one track into a CLEAN buffer.
+  1425                                  ;  In:
+  1426                                  ;   ds:si -  Track Info Address.
+  1427                                  ;   ds:di -  Buffer Address.
+  1428                                  ;    cx   -  Buffer Size.
+  1429                                  ;--------------------------------------------------------------------------
+  1430                                  
+  1431                                  ; esi = Track info address
+  1432                                  ; edi = Buffer address
+  1433                                  ; ecx = Buffer size
+  1434                                  
+  1435                                  MixTrack:
+  1436 00000972 66837E0C02              	cmp     word [esi+TrackInfo.RepLen], 2
+  1437 00000977 7752                    	ja      short MixLooped
+  1438                                  MixNonLooped:   
+  1439 00000979 8B16                    	mov	edx, [esi+TrackInfo.Samples]
+  1440 0000097B 8B5E04                  	mov	ebx, [esi+TrackInfo.Position]
+  1441 0000097E 0FB76E08                	movzx   ebp, word [esi+TrackInfo.Len]
+  1442 00000982 52                      	push    edx
+  1443 00000983 56                      	push    esi
+  1444 00000984 01D3                    	add     ebx, edx
+  1445 00000986 01D5                    	add     ebp, edx
+  1446 00000988 668B5612                	mov     dx, [esi+TrackInfo.Pitch]
+  1447                                  	; 01/10/2017
+  1448                                  	;mov	al, [esi+TrackInfo.Volume]
+  1449 0000098C 668B460E                	mov	ax, [esi+TrackInfo.Volume]
+  1450                                  	; ah = [esi+TrackInfo.VolDiff]
+  1451 00000990 00E0                    	add	al, ah ; ****** 
+  1452 00000992 C6460F00                	mov	byte [esi+TrackInfo.VolDiff], 0
+  1453 00000996 8A661D                  	mov     ah, [esi+TrackInfo.Error]
+  1454 00000999 89DE                    	mov     esi, ebx
+  1455 0000099B 31DB                    	xor	ebx, ebx ; 01/10/2017 ; *
+  1456 0000099D 88C7                    	mov     bh, al
+  1457 0000099F 88D0                    	mov     al, dl
+  1458 000009A1 88F2                    	mov     dl, dh
+  1459                                  	;xor	dh, dh
+  1460 000009A3 81E2FF000000            	and	edx, 0FFh
+  1461                                  nlMixSamp:      
+  1462 000009A9 39EE                    	cmp     esi, ebp
+  1463 000009AB 7311                    	jae     short nlMixBye
+  1464 000009AD 8A1E                    	mov     bl, [esi]
+  1465                                  	;mov	bl, [VolTable+bx]
+  1466 000009AF 8A9B[1A1D0000]          	mov	bl, [VolTable+ebx] ; 01/10/2017 ; *	
+  1467 000009B5 001F                    	add     [edi], bl
+  1468 000009B7 47                      	inc     edi
+  1469 000009B8 00C4                    	add     ah, al
+  1470 000009BA 11D6                    	adc     esi, edx
+  1471 000009BC E2EB                    	loop    nlMixSamp
+  1472                                  nlMixBye:       
+  1473 000009BE 89F3                    	mov     ebx, esi
+  1474 000009C0 5E                      	pop     esi
+  1475 000009C1 5A                      	pop     edx
+  1476 000009C2 29D3                    	sub     ebx, edx
+  1477 000009C4 895E04                  	mov     [esi+TrackInfo.Position], ebx
+  1478 000009C7 88661D                  	mov     [esi+TrackInfo.Error], ah
+  1479 000009CA C3                      	retn
+  1480                                  MixLooped:
+  1481 000009CB 8B16                    	mov	edx, [esi+TrackInfo.Samples]
+  1482 000009CD 8B5E04                  	mov	ebx, [esi+TrackInfo.Position]
+  1483 000009D0 0FB76E0C                	movzx	ebp, word [esi+TrackInfo.RepLen]
+  1484 000009D4 892D[287E0000]          	mov     [BufRep], ebp
+  1485                                  	;add	ebp, [esi+TrackInfo.Repeat] ; BUG !
+  1486 000009DA 66036E0A                	add     bp, [esi+TrackInfo.Repeat] ; 07/10/2017 (BUGfix!)
+  1487 000009DE 52                      	push    edx
+  1488 000009DF 56                      	push    esi
+  1489 000009E0 01D3                    	add     ebx, edx
+  1490 000009E2 01D5                    	add     ebp, edx
+  1491 000009E4 668B5612                	mov     dx, [esi+TrackInfo.Pitch]
+  1492                                  	; 01/10/2017
+  1493                                  	;mov	al, [esi+TrackInfo.Volume]
+  1494 000009E8 668B460E                	mov	ax, [esi+TrackInfo.Volume]
+  1495                                  	; ah = [esi+TrackInfo.VolDiff]
+  1496 000009EC 00E0                    	add	al, ah ; ****** 
+  1497 000009EE C6460F00                	mov	byte [esi+TrackInfo.VolDiff], 0
+  1498 000009F2 8A661D                  	mov     ah, [esi+TrackInfo.Error]
+  1499                                  	;mov	si, bx
+  1500 000009F5 89DE                    	mov	esi, ebx ; 04/09/2017
+  1501 000009F7 31DB                    	xor	ebx, ebx ; 01/10/2017 ; *
+  1502 000009F9 88C7                    	mov     bh, al
+  1503 000009FB 88D0                    	mov     al, dl
+  1504 000009FD 88F2                    	mov     dl, dh
+  1505                                  	;xor	dh, dh
+  1506 000009FF 81E2FF000000            	and	edx, 0FFh
+  1507                                  lpMixSamp:      
+  1508 00000A05 39EE                    	cmp     esi, ebp
+  1509 00000A07 7206                    	jb      short lpMixNow
+  1510 00000A09 2B35[287E0000]          	sub     esi, [BufRep]
+  1511                                  lpMixNow:       
+  1512 00000A0F 8A1E                    	mov     bl, [esi]
+  1513                                  	;mov	bl, [VolTable+bx]
+  1514 00000A11 8A9B[1A1D0000]          	mov	bl, [VolTable+ebx] ; 01/10/2017 ; *
+  1515 00000A17 001F                    	add     [edi], bl
+  1516 00000A19 47                      	inc     edi
+  1517 00000A1A 00C4                    	add     ah, al
+  1518 00000A1C 11D6                    	adc	esi, edx
+  1519 00000A1E E2E5                    	loop    lpMixSamp
+  1520                                  lpMixBye:       
+  1521                                  ;	mov     ebx, esi
+  1522                                  ;	pop     esi
+  1523                                  ;	pop     edx
+  1524                                  ;	sub     ebx, edx
+  1525                                  ;	mov     [esi+TrackInfo.Position], ebx
+  1526                                  ;	mov     [esi+TrackInfo.Error], ah
+  1527                                  ;	retn
+  1528 00000A20 EB9C                    	jmp	short nlMixBye
+  1529                                  
+  1530                                  ;--------------------------------------------------------------------------
+  1531                                  ; GetSamples:  Returns the next chunk of samples to be played.
+  1532                                  ;  In:
+  1533                                  ;    Buffer  - Buffer Address.
+  1534                                  ;    Count   - Buffer Size.
+  1535                                  ;--------------------------------------------------------------------------
+  1536                                  
+  1537                                  mixpoll:
+  1538                                  GetSamples:	; mixpoll ; 01/10/2017 (TMODPLAY.ASM)
+  1539                                  
+  1540                                  	; 03/08/2020
+  1541 00000A22 BF[00800000]            	mov     edi, Audio_Buffer
+  1542 00000A27 BB00800000              	mov	ebx, BUFFERSIZE ; 65536 bytes ; 01/08/2020
+  1543                                  
+  1544                                  	; edi = buffer address
+  1545                                  	; ebx = count
+  1546                                  
+  1547 00000A2C 60                      	pushad
+  1548                                  
+  1549                                  	;cld
+  1550                                  
+  1551                                  	; 03/08/2020
+  1552                                  	; clear audio buffer
+  1553 00000A2D B900200000              	mov	ecx, BUFFERSIZE / 4
+  1554 00000A32 89FE                    	mov	esi, edi
+  1555 00000A34 B880808080              	mov	eax, 80808080h
+  1556 00000A39 F3AB                    	rep	stosd
+  1557 00000A3B 89F7                    	mov	edi, esi
+  1558                                  
+  1559                                  NextChunk:      
+  1560 00000A3D 66833D[267E0000]00      	cmp     word [BufLen], 0
+  1561 00000A45 754A                    	jne     short CopyChunk
+  1562                                  
+  1563 00000A47 53                      	push    ebx
+  1564 00000A48 57                      	push    edi
+  1565                                  MixChunk:       
+  1566 00000A49 BF[1A5E0000]            	mov	edi, MixBuffer
+  1567 00000A4E 0FB70D[207E0000]        	movzx	ecx, word [BpmSamples]
+  1568                                  	;mov	cx, [BpmSamples]
+  1569 00000A55 893D[227E0000]          	mov     [BufPtr], edi
+  1570 00000A5B 66890D[267E0000]        	mov     [BufLen], cx
+  1571                                  
+  1572 00000A62 B080                    	mov     al, 80h
+  1573 00000A64 F3AA                    	rep     stosb
+  1574                                  
+  1575                                  	;mov	cx, NumTracks
+  1576                                  	;mov	cl, NumTracks ; 01/10/2017
+  1577 00000A66 8A0D[07100000]          	mov	cl, [numtracks] ; 06/10/2017
+  1578 00000A6C BE[0A7E0000]            	mov	esi, Tracks - TrackInfo.size
+  1579                                  GetSamples_next:
+  1580 00000A71 51                      	push	ecx
+  1581 00000A72 83C626                  	add	esi, TrackInfo.size
+  1582 00000A75 668B0D[267E0000]        	mov	cx, [BufLen]
+  1583 00000A7C 8B3D[227E0000]          	mov	edi, [BufPtr]
+  1584 00000A82 E8EBFEFFFF              	call	MixTrack
+  1585 00000A87 59                      	pop	ecx
+  1586 00000A88 E2E7                    	loop	GetSamples_next	
+  1587                                  
+  1588 00000A8A E81EFEFFFF              	call    UpdateTracks
+  1589                                  
+  1590 00000A8F 5F                      	pop     edi
+  1591 00000A90 5B                      	pop     ebx
+  1592                                  CopyChunk:      
+  1593                                  	;mov	cx, [BufLen]
+  1594 00000A91 0FB70D[267E0000]        	movzx	ecx, word [BufLen]
+  1595 00000A98 39D9                    	cmp	ecx, ebx
+  1596                                  	;cmp	cx, bx
+  1597 00000A9A 7602                    	jbe     short MoveChunk
+  1598                                  	;mov	cx, bx
+  1599 00000A9C 89D9                    	mov     ecx, ebx
+  1600                                  MoveChunk:
+  1601 00000A9E 8B35[227E0000]          	mov     esi, [BufPtr]
+  1602 00000AA4 010D[227E0000]          	add     [BufPtr], ecx
+  1603 00000AAA 66290D[267E0000]        	sub     [BufLen], cx
+  1604 00000AB1 29CB                    	sub     ebx, ecx
+  1605 00000AB3 F3A4                    	rep     movsb
+  1606 00000AB5 85DB                    	test    ebx, ebx
+  1607 00000AB7 7584                    	jnz     short NextChunk
+  1608                                  
+  1609 00000AB9 61                      	popad
+  1610 00000ABA C3                      	retn
+  1611                                  
+  1612                                  ;--------------------------------------------------------------------------
+  1613                                  ; StartPlaying: Initializes the Sound System.
+  1614                                  ;  In:
+  1615                                  ;   Module Information Resources.
+  1616                                  ;--------------------------------------------------------------------------
+  1617                                  
+  1618                                  StartPlaying:
+  1619 00000ABB 60                      	pushad
+  1620                                  SetModParms:    
+  1621 00000ABC C605[1A7E0000]00        	mov     byte [OrderPos], 0
+  1622 00000AC3 C605[1B7E0000]06        	mov     byte [Tempo], DefTempo
+  1623 00000ACA C605[1C7E0000]06        	mov     byte [TempoWait], DefTempo
+  1624 00000AD1 C605[1D7E0000]7D        	mov     byte [Bpm], DefBpm
+  1625 00000AD8 C605[1E7E0000]40        	mov     byte [Row], 64
+  1626 00000ADF C605[1F7E0000]00        	mov     byte [BreakRow], 0
+  1627 00000AE6 66A1[680E0000]          	mov     ax, [MixSpeed]
+  1628 00000AEC 31D2                    	xor     edx, edx
+  1629 00000AEE 66BB3200                	mov     bx, 24*DefBpm/60
+  1630 00000AF2 66F7F3                  	div     bx
+  1631 00000AF5 66A3[207E0000]          	mov     [BpmSamples], ax
+  1632                                  ClearTracks:    
+  1633 00000AFB BF[307E0000]            	mov     edi, Tracks
+  1634                                  	; 06/10/2017
+  1635                                  	;mov	ecx, NumTracks*TrackInfo.size
+  1636 00000B00 B826000000              	mov	eax, TrackInfo.size
+  1637 00000B05 0FB70D[07100000]        	movzx	ecx, word [numtracks]
+  1638 00000B0C F7E1                    	mul	ecx
+  1639 00000B0E 89C1                    	mov	ecx, eax
+  1640 00000B10 31C0                    	xor	eax, eax
+  1641                                  	;cld
+  1642 00000B12 F3AA                    	rep     stosb
+  1643                                  
+  1644 00000B14 A3[227E0000]            	mov     [BufPtr], eax
+  1645 00000B19 66A3[267E0000]          	mov     [BufLen], ax
+  1646                                  MakePitch:
+  1647 00000B1F 66B80021                	mov     ax, MidCRate
+  1648 00000B23 66BBAC01                	mov     bx, 428
+  1649 00000B27 66F7E3                  	mul     bx
+  1650 00000B2A 66F735[680E0000]        	div     word [MixSpeed]
+  1651 00000B31 30F6                    	xor     dh, dh
+  1652 00000B33 88E2                    	mov     dl, ah
+  1653 00000B35 88C4                    	mov     ah, al
+  1654 00000B37 30C0                    	xor     al, al
+  1655 00000B39 66B95903                	mov	cx, 857 ; 23/08/2020
+  1656                                  	;mov	cx, 3425  ; 01/10/2017 (TMODPLAY.ASM)
+  1657 00000B3D 31DB                    	xor     ebx, ebx
+  1658 00000B3F BF[62160000]            	mov     edi, PitchTable
+  1659                                  PitchLoop:      
+  1660 00000B44 50                      	push    eax
+  1661 00000B45 52                      	push    edx
+  1662 00000B46 6639DA                  	cmp     dx, bx
+  1663 00000B49 7303                    	jae     short NoDiv
+  1664 00000B4B 66F7F3                  	div     bx
+  1665                                  NoDiv:          
+  1666 00000B4E 66AB                    	stosw
+  1667 00000B50 5A                      	pop     edx
+  1668 00000B51 58                      	pop     eax
+  1669 00000B52 43                      	inc     ebx
+  1670 00000B53 E2EF                    	loop    PitchLoop
+  1671                                  MakeVolume:     
+  1672 00000B55 66B90041                	mov     cx, 16640
+  1673 00000B59 89CB                    	mov     ebx, ecx
+  1674                                  VolLoop:
+  1675 00000B5B 4B                      	dec     ebx
+  1676 00000B5C 88D8                    	mov     al, bl
+  1677 00000B5E F6EF                    	imul    bh
+  1678 00000B60 88A3[1A1D0000]          	mov     [VolTable+ebx], ah
+  1679 00000B66 E2F3                    	loop    VolLoop
+  1680                                  
+  1681 00000B68 61                      	popad
+  1682 00000B69 C3                      	retn
+  1683                                  
+  1684                                  ;--------------------------------------------------------------------------
+  1685                                  ; StopPlaying: ShutDown the Sound System.
+  1686                                  ;--------------------------------------------------------------------------
+  1687                                  
+  1688                                  StopPlaying:
+  1689                                  	; 19/06/2017
+  1690                                  	; Stop Playing
+  1691                                  	sys	_audio, 0700h
+  1691                              <1> 
+  1691                              <1> 
+  1691                              <1> 
+  1691                              <1> 
+  1691                              <1>  %if %0 >= 2
+  1691 00000B6A BB00070000          <1>  mov ebx, %2
+  1691                              <1>  %if %0 >= 3
+  1691                              <1>  mov ecx, %3
+  1691                              <1>  %if %0 = 4
+  1691                              <1>  mov edx, %4
+  1691                              <1>  %endif
+  1691                              <1>  %endif
+  1691                              <1>  %endif
+  1691 00000B6F B820000000          <1>  mov eax, %1
+  1691                              <1> 
+  1691 00000B74 CD40                <1>  int 40h
+  1692                                  	; Cancel callback service (for user)
+  1693                                  	sys	_audio, 0900h
+  1693                              <1> 
+  1693                              <1> 
+  1693                              <1> 
+  1693                              <1> 
+  1693                              <1>  %if %0 >= 2
+  1693 00000B76 BB00090000          <1>  mov ebx, %2
+  1693                              <1>  %if %0 >= 3
+  1693                              <1>  mov ecx, %3
+  1693                              <1>  %if %0 = 4
+  1693                              <1>  mov edx, %4
+  1693                              <1>  %endif
+  1693                              <1>  %endif
+  1693                              <1>  %endif
+  1693 00000B7B B820000000          <1>  mov eax, %1
+  1693                              <1> 
+  1693 00000B80 CD40                <1>  int 40h
+  1694                                  	; Deallocate Audio Buffer (for user)
+  1695                                  	sys	_audio, 0A00h
+  1695                              <1> 
+  1695                              <1> 
+  1695                              <1> 
+  1695                              <1> 
+  1695                              <1>  %if %0 >= 2
+  1695 00000B82 BB000A0000          <1>  mov ebx, %2
+  1695                              <1>  %if %0 >= 3
+  1695                              <1>  mov ecx, %3
+  1695                              <1>  %if %0 = 4
+  1695                              <1>  mov edx, %4
+  1695                              <1>  %endif
+  1695                              <1>  %endif
+  1695                              <1>  %endif
+  1695 00000B87 B820000000          <1>  mov eax, %1
+  1695                              <1> 
+  1695 00000B8C CD40                <1>  int 40h
+  1696                                  	; Disable Audio Device
+  1697                                  	sys	_audio, 0C00h
+  1697                              <1> 
+  1697                              <1> 
+  1697                              <1> 
+  1697                              <1> 
+  1697                              <1>  %if %0 >= 2
+  1697 00000B8E BB000C0000          <1>  mov ebx, %2
+  1697                              <1>  %if %0 >= 3
+  1697                              <1>  mov ecx, %3
+  1697                              <1>  %if %0 = 4
+  1697                              <1>  mov edx, %4
+  1697                              <1>  %endif
+  1697                              <1>  %endif
+  1697                              <1>  %endif
+  1697 00000B93 B820000000          <1>  mov eax, %1
+  1697                              <1> 
+  1697 00000B98 CD40                <1>  int 40h
+  1698                                  
+  1699 00000B9A C3                      	retn
+  1700                                  
+  1701                                  ;=============================================================================
+  1702                                  ; 
+  1703                                  ;=============================================================================
+  1704                                  
+  1705                                  ;dword2str:
+  1706                                  ;	; 13/11/2016 - Erdogan Tan 
+  1707                                  ;	; eax = dword value
+  1708                                  ;	;
+  1709                                  ;	call	dwordtohex
+  1710                                  ;	mov	[dword_str], edx
+  1711                                  ;	mov	[dword_str+4], eax
+  1712                                  ;	mov	si, dword_str
+  1713                                  ;	retn
+  1714                                  
+  1715                                  	; 05/03/2017 (TRDOS 386)
+  1716                                  	; trdos386.s (unix386.s) - 10/05/2015
+  1717                                  	; Convert binary number to hexadecimal string
+  1718                                  
+  1719                                  ;bytetohex:
+  1720                                  ;	; INPUT ->
+  1721                                  ;	; 	AL = byte (binary number)
+  1722                                  ;	; OUTPUT ->
+  1723                                  ;	;	AX = hexadecimal string
+  1724                                  ;	;
+  1725                                  ;	push	ebx
+  1726                                  ;	movzx	ebx, al
+  1727                                  ;	shr	bl, 4
+  1728                                  ;	mov	bl, [ebx+hex_chars] 	 	
+  1729                                  ;	xchg	bl, al
+  1730                                  ;	and	bl, 0Fh
+  1731                                  ;	mov	ah, [ebx+hex_chars] 
+  1732                                  ;	pop	ebx	
+  1733                                  ;	retn
+  1734                                  
+  1735                                  ;wordtohex:
+  1736                                  ;	; INPUT ->
+  1737                                  ;	; 	AX = word (binary number)
+  1738                                  ;	; OUTPUT ->
+  1739                                  ;	;	EAX = hexadecimal string
+  1740                                  ;	;
+  1741                                  ;	push	ebx
+  1742                                  ;	xor	ebx, ebx
+  1743                                  ;	xchg	ah, al
+  1744                                  ;	push	eax
+  1745                                  ;	mov	bl, ah
+  1746                                  ;	shr	bl, 4
+  1747                                  ;	mov	al, [ebx+hex_chars] 	 	
+  1748                                  ;	mov	bl, ah
+  1749                                  ;	and	bl, 0Fh
+  1750                                  ;	mov	ah, [ebx+hex_chars]
+  1751                                  ;	shl	eax, 16
+  1752                                  ;	pop	eax
+  1753                                  ;	pop	ebx
+  1754                                  ;	jmp	short bytetohex
+  1755                                  
+  1756                                  ;dwordtohex:
+  1757                                  ;	; INPUT ->
+  1758                                  ;	; 	EAX = dword (binary number)
+  1759                                  ;	; OUTPUT ->
+  1760                                  ;	;	EDX:EAX = hexadecimal string
+  1761                                  ;	;
+  1762                                  ;	push	eax
+  1763                                  ;	shr	eax, 16
+  1764                                  ;	call	wordtohex
+  1765                                  ;	mov	edx, eax
+  1766                                  ;	pop	eax
+  1767                                  ;	call	wordtohex
+  1768                                  ;	retn
+  1769                                  
+  1770                                  	; 19/06/2017
+  1771                                  	; 05/03/2017 (TRDOS 386)
+  1772                                  	; 13/11/2016 - Erdogan Tan
+  1773                                  write_audio_dev_info:
+  1774                                  	; BUS/DEV/FN
+  1775                                  	;	00000000BBBBBBBBDDDDDFFF00000000
+  1776                                  	; DEV/VENDOR
+  1777                                  	;	DDDDDDDDDDDDDDDDVVVVVVVVVVVVVVVV
+  1778                                  
+  1779 00000B9B 8B35[18100000]          	mov	esi, [dev_vendor]
+  1780 00000BA1 6689F0                  	mov	ax, si
+  1781 00000BA4 0FB6D8                  	movzx	ebx, al
+  1782 00000BA7 88DA                    	mov	dl, bl
+  1783 00000BA9 80E30F                  	and	bl, 0Fh
+  1784 00000BAC 8A83[6A0E0000]          	mov	al, [ebx+hex_chars]
+  1785 00000BB2 A2[AF0E0000]            	mov	[msgVendorId+3], al
+  1786 00000BB7 88D3                    	mov	bl, dl
+  1787 00000BB9 C0EB04                  	shr	bl, 4
+  1788 00000BBC 8A83[6A0E0000]          	mov	al, [ebx+hex_chars]
+  1789 00000BC2 A2[AE0E0000]            	mov	[msgVendorId+2], al
+  1790 00000BC7 88E3                    	mov	bl, ah
+  1791 00000BC9 88DA                    	mov	dl, bl
+  1792 00000BCB 80E30F                  	and	bl, 0Fh
+  1793 00000BCE 8A83[6A0E0000]          	mov	al, [ebx+hex_chars]
+  1794 00000BD4 A2[AD0E0000]            	mov	[msgVendorId+1], al
+  1795 00000BD9 88D3                    	mov	bl, dl
+  1796 00000BDB C0EB04                  	shr	bl, 4
+  1797 00000BDE 8A83[6A0E0000]          	mov	al, [ebx+hex_chars]
+  1798 00000BE4 A2[AC0E0000]            	mov	[msgVendorId], al
+  1799 00000BE9 C1EE10                  	shr	esi, 16
+  1800 00000BEC 6689F0                  	mov	ax, si
+  1801 00000BEF 88C3                    	mov	bl, al
+  1802 00000BF1 88DA                    	mov	dl, bl
+  1803 00000BF3 80E30F                  	and	bl, 0Fh
+  1804 00000BF6 8A83[6A0E0000]          	mov	al, [ebx+hex_chars]
+  1805 00000BFC A2[C00E0000]            	mov	[msgDevId+3], al
+  1806 00000C01 88D3                    	mov	bl, dl
+  1807 00000C03 C0EB04                  	shr	bl, 4
+  1808 00000C06 8A83[6A0E0000]          	mov	al, [ebx+hex_chars]
+  1809 00000C0C A2[BF0E0000]            	mov	[msgDevId+2], al
+  1810 00000C11 88E3                    	mov	bl, ah
+  1811 00000C13 88DA                    	mov	dl, bl
+  1812 00000C15 80E30F                  	and	bl, 0Fh
+  1813 00000C18 8A83[6A0E0000]          	mov	al, [ebx+hex_chars]
+  1814 00000C1E A2[BE0E0000]            	mov	[msgDevId+1], al
+  1815 00000C23 88D3                    	mov	bl, dl
+  1816 00000C25 C0EB04                  	shr	bl, 4
+  1817 00000C28 8A83[6A0E0000]          	mov	al, [ebx+hex_chars]
+  1818 00000C2E A2[BD0E0000]            	mov	[msgDevId], al
+  1819                                  
+  1820 00000C33 8B35[1C100000]          	mov	esi, [bus_dev_fn]
+  1821 00000C39 C1EE08                  	shr	esi, 8
+  1822 00000C3C 6689F0                  	mov	ax, si
+  1823 00000C3F 88C3                    	mov	bl, al
+  1824 00000C41 88DA                    	mov	dl, bl
+  1825 00000C43 80E307                  	and	bl, 7 ; bit 0,1,2
+  1826 00000C46 8A83[6A0E0000]          	mov	al, [ebx+hex_chars]
+  1827 00000C4C A2[E40E0000]            	mov	[msgFncNo+1], al
+  1828 00000C51 88D3                    	mov	bl, dl
+  1829 00000C53 C0EB03                  	shr	bl, 3
+  1830 00000C56 88DA                    	mov	dl, bl
+  1831 00000C58 80E30F                  	and	bl, 0Fh
+  1832 00000C5B 8A83[6A0E0000]          	mov	al, [ebx+hex_chars]
+  1833 00000C61 A2[D60E0000]            	mov	[msgDevNo+1], al
+  1834 00000C66 88D3                    	mov	bl, dl
+  1835 00000C68 C0EB04                  	shr	bl, 4
+  1836 00000C6B 8A83[6A0E0000]          	mov	al, [ebx+hex_chars]
+  1837 00000C71 A2[D50E0000]            	mov	[msgDevNo], al
+  1838 00000C76 88E3                    	mov	bl, ah
+  1839 00000C78 88DA                    	mov	dl, bl
+  1840 00000C7A 80E30F                  	and	bl, 0Fh
+  1841 00000C7D 8A83[6A0E0000]          	mov	al, [ebx+hex_chars]
+  1842 00000C83 A2[CA0E0000]            	mov	[msgBusNo+1], al
+  1843 00000C88 88D3                    	mov	bl, dl
+  1844 00000C8A C0EB04                  	shr	bl, 4
+  1845 00000C8D 8A83[6A0E0000]          	mov	al, [ebx+hex_chars]
+  1846 00000C93 A2[C90E0000]            	mov	[msgBusNo], al
+  1847                                  
+  1848 00000C98 66A1[24100000]          	mov	ax, [ac97_io_base]
+  1849 00000C9E 88C3                    	mov	bl, al
+  1850 00000CA0 88DA                    	mov	dl, bl
+  1851 00000CA2 80E30F                  	and	bl, 0Fh
+  1852 00000CA5 8A83[6A0E0000]          	mov	al, [ebx+hex_chars]
+  1853 00000CAB A2[FD0E0000]            	mov	[msgIOBaseAddr+3], al
+  1854 00000CB0 88D3                    	mov	bl, dl
+  1855 00000CB2 C0EB04                  	shr	bl, 4
+  1856 00000CB5 8A83[6A0E0000]          	mov	al, [ebx+hex_chars]
+  1857 00000CBB A2[FC0E0000]            	mov	[msgIOBaseAddr+2], al
+  1858 00000CC0 88E3                    	mov	bl, ah
+  1859 00000CC2 88DA                    	mov	dl, bl
+  1860 00000CC4 80E30F                  	and	bl, 0Fh
+  1861 00000CC7 8A83[6A0E0000]          	mov	al, [ebx+hex_chars]
+  1862 00000CCD A2[FB0E0000]            	mov	[msgIOBaseAddr+1], al
+  1863 00000CD2 88D3                    	mov	bl, dl
+  1864 00000CD4 C0EB04                  	shr	bl, 4
+  1865 00000CD7 8A83[6A0E0000]          	mov	al, [ebx+hex_chars]
+  1866 00000CDD A2[FA0E0000]            	mov	[msgIOBaseAddr], al
+  1867                                  
+  1868                                  	; 24/11/2016
+  1869 00000CE2 30E4                    	xor	ah, ah
+  1870 00000CE4 A0[26100000]            	mov	al, [ac97_int_ln_reg]
+  1871 00000CE9 B10A                    	mov	cl, 10
+  1872 00000CEB F6F1                    	div	cl
+  1873 00000CED 660105[050F0000]        	add	[msgIRQ], ax
+  1874 00000CF4 20C0                    	and	al, al
+  1875 00000CF6 750D                    	jnz	short _w_ac97imsg_ ; 19/06/2017
+  1876 00000CF8 A0[060F0000]            	mov	al, [msgIRQ+1]
+  1877 00000CFD B420                    	mov	ah, ' '
+  1878 00000CFF 66A3[050F0000]          	mov	[msgIRQ], ax
+  1879                                  _w_ac97imsg_:
+  1880                                  	; EBX = Message address
+  1881                                  	; ECX = Max. message length (or stop on ZERO character)
+  1882                                  	;	(1 to 255)
+  1883                                  	; DL  = Message color (07h = light gray, 0Fh = white) 
+  1884                                       	sys 	_msg, msgAC97Info, 255, 07h
+  1884                              <1> 
+  1884                              <1> 
+  1884                              <1> 
+  1884                              <1> 
+  1884                              <1>  %if %0 >= 2
+  1884 00000D05 BB[7B0E0000]        <1>  mov ebx, %2
+  1884                              <1>  %if %0 >= 3
+  1884 00000D0A B9FF000000          <1>  mov ecx, %3
+  1884                              <1>  %if %0 = 4
+  1884 00000D0F BA07000000          <1>  mov edx, %4
+  1884                              <1>  %endif
+  1884                              <1>  %endif
+  1884                              <1>  %endif
+  1884 00000D14 B823000000          <1>  mov eax, %1
+  1884                              <1> 
+  1884 00000D19 CD40                <1>  int 40h
+  1885 00000D1B C3                              retn
+  1886                                  
+  1887                                  ;=============================================================================
+  1888                                  ;               preinitialized data
+  1889                                  ;=============================================================================
+  1890                                  
+  1891                                  ;=============================================================================
+  1892                                  ; Protracker effects stuff
+  1893                                  ;=============================================================================
+  1894                                  
+  1895                                  ;-----------------------------------------------------------------------------
+  1896                                  ; Effect jump tables
+  1897                                  ;-----------------------------------------------------------------------------
+  1898                                  
+  1899                                  align 4
+  1900                                  
+  1901                                  efxtable:
+  1902 00000D1C [17080000]              	dd      efxarpeggio	; 0 - arpeggio
+  1903 00000D20 [44050000]              	dd      efxnull	; 1 - porta up
+  1904 00000D24 [44050000]              	dd      efxnull	; 2 - porta down
+  1905 00000D28 [62070000]              	dd      efxtoneporta	; 3 - tone porta
+  1906 00000D2C [71070000]              	dd      efxvibrato	; 4 - vibrato
+  1907 00000D30 [44050000]              	dd      efxnull		; 5 - tone+slide
+  1908 00000D34 [44050000]              	dd      efxnull		; 6 - vibrato+slide
+  1909 00000D38 [8E080000]              	dd      efxtremolo	; 7 - tremolo
+  1910 00000D3C [44050000]              	dd      efxnull		; 8 - unused
+  1911 00000D40 [99070000]              	dd      efxsampoffset	; 9 - sample offset
+  1912 00000D44 [44050000]              	dd      efxnull		; A - volume slide
+  1913 00000D48 [A5070000]              	dd      efxpattjump	; B - pattern jump
+  1914 00000D4C [B3070000]              	dd      efxsetvolume	; C - set volume
+  1915 00000D50 [C1070000]              	dd      efxbreak	; D - break pattern
+  1916 00000D54 [44050000]              	dd      efxnull		; E - extra effects
+  1917 00000D58 [E0070000]              	dd      efxsetspeed	; F - set speed
+  1918                                  
+  1919                                  efxtable2:
+  1920 00000D5C [45050000]              	dd      efxarpeggio2	; 0 - arpeggio
+  1921 00000D60 [67050000]              	dd      efxportaup	; 1 - porta up
+  1922 00000D64 [8D050000]              	dd      efxportadown	; 2 - porta down
+  1923 00000D68 [B4050000]              	dd      efxtoneporta2	; 3 - tone porta
+  1924 00000D6C [ED050000]              	dd      efxvibrato2	; 4 - vibrato
+  1925 00000D70 [49060000]              	dd      efxtoneslide	; 5 - tone+slide
+  1926 00000D74 [56060000]              	dd      efxvibslide	; 6 - vibrato+slide
+  1927 00000D78 [7D060000]              	dd      efxtremolo2	; 7 - tremolo
+  1928 00000D7C [44050000]              	dd      efxnull		; 8 - unused
+  1929 00000D80 [44050000]              	dd      efxnull		; 9 - sample offset
+  1930 00000D84 [60060000]              	dd      efxvolslide	; A - volume slide
+  1931 00000D88 [44050000]              	dd      efxnull		; B - pattern jump
+  1932 00000D8C [44050000]              	dd      efxnull		; C - set volume
+  1933 00000D90 [44050000]              	dd      efxnull		; D - break pattern
+  1934 00000D94 [44050000]              	dd      efxnull		; E - extra effects
+  1935 00000D98 [44050000]              	dd      efxnull		; F - set speed
+  1936                                  
+  1937                                  ;-----------------------------------------------------------------------------
+  1938                                  ; Amiga period table
+  1939                                  ;-----------------------------------------------------------------------------
+  1940                                  
+  1941                                  ;PeriodTable0:	
+  1942                                  ;	dw	0
+  1943                                  PeriodTable:
+  1944 00000D9C 600DA00CE80B400B98-     	dw	3424,3232,3048,2880,2712,2560,2416,2280,2152,2032,1920,1812
+  1944 00000DA5 0A000A7009E8086808-
+  1944 00000DAE F00780071407       
+  1945 00000DB4 B0065006F405A0054C-     	dw	1712,1616,1524,1440,1356,1280,1208,1140,1076,1016,960,906
+  1945 00000DBD 050005B80474043404-
+  1945 00000DC6 F803C0038A03       
+  1946 00000DCC 58032803FA02D002A6-     	dw	856,808,762,720,678,640,604,570,538,508,480,453
+  1946 00000DD5 0280025C023A021A02-
+  1946 00000DDE FC01E001C501       
+  1947 00000DE4 AC0194017D01680153-     	dw	428,404,381,360,339,320,302,285,269,254,240,226
+  1947 00000DED 0140012E011D010D01-
+  1947 00000DF6 FE00F000E200       
+  1948 00000DFC D600CA00BE00B400AA-     	dw	214,202,190,180,170,160,151,143,135,127,120,113
+  1948 00000E05 00A00097008F008700-
+  1948 00000E0E 7F0078007100       
+  1949 00000E14 6B0065005F005A0055-     	dw	107,101,95,90,85,80,75,71,67,63,60,56
+  1949 00000E1D 0050004B0047004300-
+  1949 00000E26 3F003C003800       
+  1950 00000E2C 350032002F002D002A-     	dw	53,50,47,45,42,40,37,35,33,31,30,28
+  1950 00000E35 002800250023002100-
+  1950 00000E3E 1F001E001C00       
+  1951                                  
+  1952                                  ;-----------------------------------------------------------------------------
+  1953                                  ; Sinus wave table
+  1954                                  ;-----------------------------------------------------------------------------
+  1955                                  
+  1956                                  SinTable:
+  1957 00000E44 0019324A62788EA2B4-     	db	0,25,50,74,98,120,142,162,180,197,212,225
+  1957 00000E4D C5D4E1             
+  1958 00000E50 ECF4FAFEFFFEFAF4EC-     	db	236,244,250,254,255,254,250,244,236,225
+  1958 00000E59 E1                 
+  1959 00000E5A D4C5B4A28E78624A32-     	db	212,197,180,162,142,120,98,74,50,25
+  1959 00000E63 19                 
+  1960                                  
+  1961 00000E64 0000                    	dw	0
+  1962                                  
+  1963                                  ;=============================================================================
+  1964                                  ;              AC'97 data
+  1965                                  ;=============================================================================
+  1966                                  
+  1967 00000E66 01                      stmo:		db 1 ; stereo (2) or mono (1)  
+  1968 00000E67 08                      bps:		db 8 ; bits per sample (8 or 16)
+  1969                                  Sample_Rate:
+  1970                                  ;MixSpeed:	dw 22050 ; Hz
+  1971 00000E68 CE56                    MixSpeed:	dw 22222 ; Hz ; 01/08/2020
+  1972                                  ;MixSpeed:	dw 11025 ; Hz ; 30/07/2020
+  1973                                  
+  1974                                  ; 13/11/2016
+  1975 00000E6A 303132333435363738-     hex_chars:	db "0123456789ABCDEF", 0
+  1975 00000E73 3941424344454600   
+  1976                                  msgAC97Info:	
+  1977 00000E7B 0D0A                    		db 0Dh, 0Ah
+  1978 00000E7D 414339372041756469-     		db "AC97 Audio Controller & Codec Info", 0Dh, 0Ah 
+  1978 00000E86 6F20436F6E74726F6C-
+  1978 00000E8F 6C6572202620436F64-
+  1978 00000E98 656320496E666F0D0A 
+  1979 00000EA1 56656E646F72204944-     		db "Vendor ID: "
+  1979 00000EAA 3A20               
+  1980 00000EAC 303030306820446576-     msgVendorId:	db "0000h Device ID: "
+  1980 00000EB5 6963652049443A20   
+  1981 00000EBD 30303030680D0A          msgDevId:	db "0000h", 0Dh, 0Ah
+  1982 00000EC4 4275733A20              		db "Bus: "
+  1983 00000EC9 303068204465766963-     msgBusNo:	db "00h Device: "
+  1983 00000ED2 653A20             
+  1984 00000ED5 3030682046756E6374-     msgDevNo:	db "00h Function: "
+  1984 00000EDE 696F6E3A20         
+  1985 00000EE3 303068                  msgFncNo:	db "00h"
+  1986 00000EE6 0D0A                    		db 0Dh, 0Ah
+  1987 00000EE8 492F4F204261736520-     		db "I/O Base Address: "
+  1987 00000EF1 416464726573733A20 
+  1988 00000EFA 303030306820495251-     msgIOBaseAddr:	db "0000h IRQ: "
+  1988 00000F03 3A20               
+  1989 00000F05 3030                    msgIRQ:		dw 3030h
+  1990 00000F07 0D0A00                  		db 0Dh, 0Ah, 0
+  1991                                  ;msgSampleRate:	db "Sample Rate: "
+  1992                                  ;msgHertz:	db "00000 Hz ", 0
+  1993                                  ;msg8Bits:	db "8 bits ", 0
+  1994                                  ;msgMono:	db "Mono", 0Dh, 0Ah, 0Dh, 0Ah, 0
+  1995                                  ;msg16Bits:	db "16 bits ", 0
+  1996                                  ;msgStereo:	db "Stereo", 0Dh, 0Ah, 0Dh, 0Ah, 0
+  1997                                  
+  1998                                  ;; 13/11/2016 - Erdogan Tan (Ref: KolibriOS, codec.inc)
+  1999                                  ;codec_id:	   dd 0
+  2000                                  ;codec_chip_id:	   dd 0
+  2001                                  ;codec_vendor_ids: dw 0
+  2002                                  ;codec_chip_ids:   dw 0
+  2003                                  
+  2004                                  ;dword_str:	dd 30303030h, 30303030h
+  2005                                  ;	 	db 'h', 0Dh, 0Ah, 0
+  2006                                  
+  2007                                  ;=============================================================================
+  2008                                  ; Copyright Strings & Messages
+  2009                                  ;=============================================================================
+  2010                                  
+  2011                                  msg_usage:
+  2012 00000F0A 54696E79204D4F4420-     		db	'Tiny MOD Player for TRDOS 386 by Erdogan Tan. '
+  2012 00000F13 506C6179657220666F-
+  2012 00000F1C 72205452444F532033-
+  2012 00000F25 383620627920457264-
+  2012 00000F2E 6F67616E2054616E2E-
+  2012 00000F37 20                 
+  2013 00000F38 417567757374203230-     		db	'August 2020.',10,13
+  2013 00000F41 32302E0A0D         
+  2014 00000F46 75736167653A207469-     		db	'usage: tinyplay filename.mod', 10, 13,0
+  2014 00000F4F 6E79706C6179206669-
+  2014 00000F58 6C656E616D652E6D6F-
+  2014 00000F61 640A0D00           
+  2015 00000F65 31352F31302F323031-     		db	'15/10/2017',0
+  2015 00000F6E 3700               
+  2016 00000F70 32342F30382F323032-     		db	'24/08/2020',0
+  2016 00000F79 3000               
+  2017                                  
+  2018                                  ;Credits:	db	'Amiga Module Player v0.3b by Carlos Hasan.'
+  2019                                  
+  2020 00000F7B 54696E79204D4F4420-     Credits:	db	'Tiny MOD Player v0.1b by Carlos Hasan. July 1993.'
+  2020 00000F84 506C61796572207630-
+  2020 00000F8D 2E3162206279204361-
+  2020 00000F96 726C6F732048617361-
+  2020 00000F9F 6E2E204A756C792031-
+  2020 00000FA8 3939332E           
+  2021 00000FAC 0A0D00                  		db	10,13,0
+  2022 00000FAF 4572726F72206C6F61-     ErrorMesg:	db	'Error loading Module file.',10,13,0
+  2022 00000FB8 64696E67204D6F6475-
+  2022 00000FC1 6C652066696C652E0A-
+  2022 00000FCA 0D00               
+  2023                                  ;MsgNotFound:	db	'Sound Blaster not found or IRQ error.',10,13,0
+  2024                                  ;MsgFound:	db	'Sound Blaster found at Address 2'
+  2025                                  ;PortText:	db	'x0h, IRQ '
+  2026                                  ;IrqText:	db	'x.',10,13,0
+  2027                                  
+  2028                                  trdos386_err_msg:
+  2029 00000FCC 5452444F5320333836-     		db	'TRDOS 386 System call error !', 10, 13,0
+  2029 00000FD5 2053797374656D2063-
+  2029 00000FDE 616C6C206572726F72-
+  2029 00000FE7 20210A0D00         
+  2030                                  
+  2031                                  PlayMsg:
+  2032 00000FEC 0D0A                    		db	0Dh, 0Ah
+  2033 00000FEE 506C6179696E67206D-     		db	"Playing music... "
+  2033 00000FF7 757369632E2E2E20   
+  2034 00000FFF 00                      		db	0
+  2035                                  OkMsg:
+  2036 00001000 4F4B2E                  		db	"OK."
+  2037                                  NextLine:
+  2038 00001003 0D0A00                  		db	0Dh, 0Ah, 0
+  2039                                  
+  2040                                  ; 04/10/2017
+  2041 00001006 0A                      pattern_shift:	db 10
+  2042 00001007 0400                    numtracks:	dw 4
+  2043                                  
+  2044                                  ;=============================================================================
+  2045                                  ;        	uninitialized data
+  2046                                  ;=============================================================================
+  2047                                  
+  2048                                  bss_start:
+  2049                                  
+  2050                                  ABSOLUTE bss_start
+  2051                                  
+  2052 00001009 <res 00000003>          alignb 4
+  2053                                  
+  2054                                  ; 02/10/2017
+  2055 0000100C <res 00000004>          bar_start:	resd	1
+  2056 00001010 <res 00000004>          bar_stop:	resd	1
+  2057                                  ; 06/10/2017
+  2058 00001014 <res 00000004>          prev_max:	resd	1
+  2059                                  
+  2060 00001018 <res 00000004>          dev_vendor:	resd 1
+  2061 0000101C <res 00000004>          bus_dev_fn:	resd 1
+  2062 00001020 <res 00000004>          stats_cmd:	resd 1
+  2063 00001024 <res 00000002>          ac97_io_base:	resw 1
+  2064 00001026 <res 00000001>          ac97_int_ln_reg: resb 1
+  2065 00001027 <res 00000001>          srb:		resb 1
+  2066                                  
+  2067                                  ; MODLOAD.ASM
+  2068 00001028 <res 00000004>          FileHandle:	resd 1
+  2069 0000102C <res 0000043C>          Header:		resb ModHeader.size
+  2070                                  
+  2071                                  ; MODPLAY.ASM
+  2072                                  ;MixSpeed:	    resw 1
+  2073                                  
+  2074                                  ModInfo:
+  2075 00001468 <res 00000001>          ModInfo.OrderLen:   resb 1
+  2076 00001469 <res 00000001>          ModInfo.ReStart:    resb 1
+  2077 0000146A <res 00000080>          ModInfo.Order:	    resb 128
+  2078 000014EA <res 00000004>          ModInfo.Patterns:   resd 1
+  2079                                  
+  2080 000014EE <res 0000003E>          ModInfo.SampOfs:    resw 31
+  2081 0000152C <res 0000003E>          ModInfo.SampSeg:    resw 31
+  2082 0000156A <res 0000003E>          ModInfo.SampLen:    resw 31
+  2083 000015A8 <res 0000003E>          ModInfo.SampRep:    resw 31
+  2084 000015E6 <res 0000003E>          ModInfo.SampRepLen: resw 31
+  2085 00001624 <res 0000003E>          ModInfo.SampVol:    resw 31
+  2086                                  
+  2087                                  ; MODPLAY.ASM
+  2088 00001662 <res 000006B2>          PitchTable:	resw 857 ; 23/08/2020
+  2089                                  		;resw 3425 ; 01/10/2017 (TMODPLAY.ASM)
+  2090 00001D14 <res 00000006>          		resw 3 ; 23/08/2020
+  2091 00001D1A <res 00004100>          VolTable:	resb 16640
+  2092 00005E1A <res 00002000>          MixBuffer       resb MixBufSize ; 8192
+  2093                                  
+  2094                                  ; MODPLAY.ASM
+  2095 00007E1A <res 00000001>          OrderPos:	resb 1
+  2096 00007E1B <res 00000001>          Tempo:		resb 1
+  2097 00007E1C <res 00000001>          TempoWait:	resb 1
+  2098 00007E1D <res 00000001>          Bpm:		resb 1
+  2099 00007E1E <res 00000001>          Row:		resb 1
+  2100 00007E1F <res 00000001>          BreakRow:	resb 1
+  2101 00007E20 <res 00000002>          BpmSamples:	resw 1
+  2102 00007E22 <res 00000004>          BufPtr:		resd 1
+  2103 00007E26 <res 00000002>          BufLen:		resw 1
+  2104 00007E28 <res 00000004>          BufRep:		resd 1
+  2105 00007E2C <res 00000004>          Note:		resd 1
+  2106                                  ;Tracks:	resb TrackInfo.size*NumTracks
+  2107                                  
+  2108                                  ; 06/10/2017
+  2109 00007E30 <res 00000130>          Tracks:		resb TrackInfo.size*8
+  2110                                  
+  2111                                  mod_file_name:
+  2112 00007F60 <res 00000050>          		resb 80
+  2113                                  
+  2114                                  ; 30/07/2020
+  2115 00007FB0 <res 00000001>          half_buff:	resb 1
+  2116                                  
+  2117                                  ; 09/10/2017
+  2118 00007FB1 <res 00000001>          volume_level:	resb 1
+  2119                                  
+  2120                                  ; 23/08/2020
+  2121                                  
+  2122 00007FB2 <res 0000004E>          alignb 4096
+  2123                                  ; 01/08/2020
+  2124                                  ;alignb 65536
+  2125                                  
+  2126                                  Audio_Buffer:
+  2127 00008000 <res 00008000>          		resb BUFFERSIZE ; 32768 ; 23/08/2020
+  2128                                  
+  2129                                  alignb 65536
+  2130                                  
+  2131 00010000 <res 00010000>          DMA_Buffer:	resb 2*BUFFERSIZE  ; 65536 ; 23/08/2020 
+  2132                                  
+  2133                                  file_buffer:
+  2134 00020000 <res 00060000>          		resb 65536*6 ; 06/10/2017
+  2135                                  EOF:

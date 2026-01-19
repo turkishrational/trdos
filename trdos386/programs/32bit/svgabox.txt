@@ -1,0 +1,528 @@
+     1                                  ; ****************************************************************************
+     2                                  ; svgabox.s - TRDOS 386 (TRDOS v2.0.3) Test Program - LFB data transfers
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ;
+     5                                  ; 25/01/2021
+     6                                  ;
+     7                                  ; ****************************************************************************
+     8                                  ; nasm svgabox.s -l svgabox.txt -o SVGABOX.PRG -Z error.txt
+     9                                  
+    10                                  ; 14/07/2020
+    11                                  ; 31/12/2017
+    12                                  ; TRDOS 386 (v2.0) system calls
+    13                                  _ver 	equ 0
+    14                                  _exit 	equ 1
+    15                                  _fork 	equ 2
+    16                                  _read 	equ 3
+    17                                  _write	equ 4
+    18                                  _open	equ 5
+    19                                  _close 	equ 6
+    20                                  _wait 	equ 7
+    21                                  _create	equ 8
+    22                                  _rename	equ 9
+    23                                  _delete	equ 10
+    24                                  _exec	equ 11
+    25                                  _chdir	equ 12
+    26                                  _time 	equ 13
+    27                                  _mkdir 	equ 14
+    28                                  _chmod	equ 15
+    29                                  _rmdir	equ 16
+    30                                  _break	equ 17
+    31                                  _drive	equ 18
+    32                                  _seek	equ 19
+    33                                  _tell 	equ 20
+    34                                  _memory	equ 21
+    35                                  _prompt	equ 22
+    36                                  _path	equ 23
+    37                                  _env	equ 24
+    38                                  _stime	equ 25
+    39                                  _quit	equ 26	
+    40                                  _intr	equ 27
+    41                                  _dir	equ 28
+    42                                  _emt 	equ 29
+    43                                  _ldrvt 	equ 30
+    44                                  _video 	equ 31
+    45                                  _audio	equ 32
+    46                                  _timer	equ 33
+    47                                  _sleep	equ 34
+    48                                  _msg    equ 35
+    49                                  _geterr	equ 36
+    50                                  _fpstat	equ 37
+    51                                  _pri	equ 38
+    52                                  _rele	equ 39
+    53                                  _fff	equ 40
+    54                                  _fnf	equ 41
+    55                                  _alloc	equ 42
+    56                                  _dalloc equ 43
+    57                                  _calbac equ 44
+    58                                  _dma	equ 45	
+    59                                  
+    60                                  %macro sys 1-4
+    61                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    62                                      ; 03/09/2015	
+    63                                      ; 13/04/2015
+    64                                      ; Retro UNIX 386 v1 system call.		
+    65                                      %if %0 >= 2   
+    66                                          mov ebx, %2
+    67                                          %if %0 >= 3    
+    68                                              mov ecx, %3
+    69                                              %if %0 = 4
+    70                                                 mov edx, %4   
+    71                                              %endif
+    72                                          %endif
+    73                                      %endif
+    74                                      mov eax, %1
+    75                                      ;int 30h
+    76                                      int 40h ; TRDOS 386 (TRDOS v2.0)		   
+    77                                  %endmacro
+    78                                  
+    79                                  ; Retro UNIX 386 v1 system call format:
+    80                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    81                                  
+    82                                  [BITS 32] ; We need 32-bit intructions for protected mode
+    83                                  
+    84                                  [ORG 0] 
+    85                                  
+    86                                  START_CODE:
+    87                                  	; clear bss
+    88 00000000 BF[74040000]            	mov	edi, bss_start
+    89 00000005 B906100000              	mov	ecx, (bss_end - bss_start)/4
+    90                                  	;xor	eax, eax
+    91 0000000A F3AB                    	rep	stosd
+    92                                  
+    93                                  	; program message
+    94 0000000C BE[DC020000]            	mov	esi, program_msg
+    95 00000011 E800020000              	call	print_msg
+    96                                  
+    97                                  ; 25/01/2021 (TRDOS 386 v2.0.3)
+    98                                  
+    99                                  	; DIRECT LINEAR FRAME BUFFER ACCESS
+   100                                   	;xor    ebx, ebx
+   101                                   	;mov	bh, 6 ; Direct access/map to LFB address
+   102                                   	;mov	bl, 5 ; bl = 05h -> 105h, VESA MODE 105h
+   103 00000016 66BB0506                	mov	bx, 605h  ; Direct access/map to LFB for VBE video mode 105h
+   104                                  	;mov    eax, _video ; 1Fh
+   105 0000001A B81F000000               	mov     eax, 1Fh ; sys _video ; TRDOS 386 Video functions
+   106 0000001F CD40                     	int     40h   ; TRDOS 386 system call
+   107 00000021 09C0                    	or	eax, eax
+   108 00000023 7437                    	jz	short lfb_error
+   109 00000025 A3[74040000]            	mov	[LFB_addr], eax
+   110                                  
+   111 0000002A C1E810                  	shr	eax, 16 ; ax = high word of LFB address	
+   112 0000002D E869020000              	call	wordtohex
+   113 00000032 A3[38040000]            	mov	[lfb_addr_str], eax
+   114                                  
+   115 00000037 BE[0D040000]            	mov	esi, msg_lfb_ok
+   116 0000003C E8D5010000              	call	print_msg	
+   117                                  
+   118 00000041 30E4                    	xor	ah, ah
+   119                                  	;int	16h	; KEYBOARD - READ CHAR FROM BUFFER, WAIT IF EMPTY
+   120                                  			; Return: AH = scan code, AL = character
+   121 00000043 CD32                    	int	32h	; TRDOS 386 Keyboard interrupt 
+   122                                  
+   123                                  	;xor	ecx, ecx			
+   124                                  	
+   125                                  set_vesa_vbe_mode:
+   126 00000045 66B8024F                	mov    	ax, 4F02h ; vbe function 02h, set video mode
+   127                                  	;int    10h	  ; bios video interrupt
+   128 00000049 66BB0141                	mov	bx, 4101h ; vbe mode 101h with LFB (640x480, 256 colors)
+   129 0000004D CD31                    	int     31h ; TRDOS 386 - Video interrupt
+   130 0000004F 6683F84F                	cmp	ax, 004Fh
+   131 00000053 741C                    	je	short vbe_mode_set_ok
+   132                                  vbe_error:
+   133 00000055 BE[CD030000]            	mov	esi, msg_vbe_error
+   134 0000005A EB07                    	jmp	short error
+   135                                  lfb_error:
+   136 0000005C BE[ED030000]            	mov	esi, msg_lfb_error
+   137 00000061 EB00                    	jmp	short error
+   138                                  error:
+   139 00000063 E8AE010000              	call	print_msg
+   140                                  _terminate:
+   141                                  	sys	_exit
+   141                              <1> 
+   141                              <1> 
+   141                              <1> 
+   141                              <1> 
+   141                              <1>  %if %0 >= 2
+   141                              <1>  mov ebx, %2
+   141                              <1>  %if %0 >= 3
+   141                              <1>  mov ecx, %3
+   141                              <1>  %if %0 = 4
+   141                              <1>  mov edx, %4
+   141                              <1>  %endif
+   141                              <1>  %endif
+   141                              <1>  %endif
+   141 00000068 B801000000          <1>  mov eax, %1
+   141                              <1> 
+   141 0000006D CD40                <1>  int 40h
+   142                                  _hang:
+   143 0000006F EBFE                    	jmp	short _hang
+   144                                  
+   145                                  vbe_mode_set_ok:
+   146                                  	; create a box and the center of 640x480 screen 
+   147                                  reset:	
+   148 00000071 B380                    	mov	bl, 128  ; color
+   149 00000073 881D[84040000]          	mov	[boxcolor], bl
+   150 00000079 881D[85040000]          	mov	[color], bl
+   151                                  
+   152 0000007F B140                    	mov	cl, 64
+   153 00000081 880D[80040000]          	mov	[boxsize], cl 
+   154                                  
+   155                                  	; BL = Box (Square) Color
+   156                                  	; CL = Box (Square) Size
+   157 00000087 E89B010000              	call	colorbox
+   158                                  
+   159                                  	; move colorbox to center of screen
+   160                                  center:
+   161 0000008C E8DE010000              	call	movecenter
+   162                                  _0:
+   163 00000091 E8A2010000              	call	drawbox
+   164                                  
+   165                                  waitforkey:
+   166 00000096 B401                    	mov	ah, 1
+   167 00000098 CD32                    	int	32h
+   168 0000009A 740B                    	jz	short getkey
+   169 0000009C FF05[88040000]          	inc	dword [counter]
+   170 000000A2 90                      	nop
+   171 000000A3 90                      	nop
+   172 000000A4 90                      	nop
+   173 000000A5 EBEF                    	jmp	short waitforkey
+   174                                  getkey:
+   175 000000A7 30E4                    	xor	ah, ah
+   176 000000A9 CD32                    	int	32h
+   177                                  
+   178 000000AB 663D032E                	cmp	ax, 2E03h
+   179 000000AF 0F844E010000            	je	terminate
+   180 000000B5 3C1B                    	cmp	al, 1Bh ; ESC key
+   181 000000B7 0F8446010000            	je	terminate	
+   182                                  
+   183 000000BD 3C2B                    	cmp	al, '+'
+   184 000000BF 7528                    	jne	short _2
+   185                                  
+   186                                  	; black box (clear box)
+   187 000000C1 803D[80040000]78        	cmp	byte [boxsize], 120
+   188 000000C8 77CC                    	ja	short waitforkey
+   189 000000CA C605[85040000]00        	mov	byte [color], 0
+   190 000000D1 E862010000              	call	drawbox
+   191                                  	; increase box size
+   192 000000D6 8005[80040000]08        	add	byte [boxsize], 8
+   193                                  _1:
+   194 000000DD A0[84040000]            	mov	al, [boxcolor]
+   195 000000E2 A2[85040000]            	mov	[color], al
+   196 000000E7 EBA8                    	jmp	short _0
+   197                                  _2:
+   198 000000E9 3C2D                    	cmp	al, '-'
+   199 000000EB 751E                    	jne	short _3
+   200                                  
+   201                                  	; black box (clear box)
+   202 000000ED 803D[80040000]48        	cmp	byte [boxsize], 72
+   203 000000F4 7215                    	jb	short _3
+   204 000000F6 C605[85040000]00        	mov	byte [color], 0
+   205 000000FD E836010000              	call	drawbox
+   206                                  	; decrease box size
+   207 00000102 802D[80040000]08        	sub	byte [boxsize], 8
+   208 00000109 EBD2                    	jmp	short _1
+   209                                  _3:
+   210 0000010B 3C20                    	cmp	al, 20h  ; space
+   211 0000010D 7509                    	jne	short _4
+   212 0000010F 8005[84040000]01        	add	byte [boxcolor], 1
+   213 00000116 EBC5                    	jmp	short _1
+   214                                  _4:
+   215 00000118 80FC4B                  	cmp	ah, 4Bh
+   216 0000011B 7524                    	jne	short _5
+   217                                  
+   218                                  	; left arrow
+   219 0000011D 66833D[7C040000]04      	cmp	word [x_pos], 4
+   220 00000125 0F866BFFFFFF            	jna	waitforkey
+   221                                  
+   222 0000012B C605[85040000]00        	mov	byte [color], 0
+   223 00000132 E801010000              	call	drawbox
+   224                                  	
+   225 00000137 66832D[7C040000]04      	sub	word [x_pos], 4
+   226 0000013F EB9C                    	jmp	short _1
+   227                                  _5:
+   228 00000141 80FC4D                  	cmp	ah, 4Dh
+   229 00000144 7531                    	jne	short _6
+   230                                  
+   231                                  	; right arrow
+   232 00000146 8B0D[7C040000]          	mov	ecx, [x_pos]
+   233 0000014C 030D[80040000]          	add	ecx, [boxsize]
+   234 00000152 81F97C020000            	cmp	ecx, 636
+   235 00000158 0F8738FFFFFF            	ja	waitforkey
+   236                                  
+   237 0000015E C605[85040000]00        	mov	byte [color], 0
+   238 00000165 E8CE000000              	call	drawbox
+   239                                  	
+   240 0000016A 668305[7C040000]04      	add	word [x_pos], 4
+   241 00000172 E966FFFFFF              	jmp	_1
+   242                                  _6:
+   243 00000177 80FC50                  	cmp	ah, 50h
+   244 0000017A 7531                    	jne	short _7
+   245                                  
+   246                                  	; down arrow
+   247 0000017C 8B0D[78040000]          	mov	ecx, [y_pos]
+   248 00000182 030D[80040000]          	add	ecx, [boxsize]
+   249 00000188 81F9DC010000            	cmp	ecx, 476
+   250 0000018E 0F8702FFFFFF            	ja	waitforkey
+   251                                  
+   252 00000194 C605[85040000]00        	mov	byte [color], 0
+   253 0000019B E898000000              	call	drawbox
+   254                                  	
+   255 000001A0 668305[78040000]04      	add	word [y_pos], 4
+   256 000001A8 E930FFFFFF              	jmp	_1
+   257                                  _7:
+   258 000001AD 80FC48                  	cmp	ah, 48h
+   259 000001B0 7527                    	jne	short _8
+   260                                  
+   261                                  	; up arrow
+   262 000001B2 66833D[78040000]04      	cmp	word [y_pos], 4
+   263 000001BA 0F86D6FEFFFF            	jna	waitforkey
+   264                                  
+   265 000001C0 C605[85040000]00        	mov	byte [color], 0
+   266 000001C7 E86C000000              	call	drawbox
+   267                                  	
+   268 000001CC 66832D[78040000]04      	sub	word [y_pos], 4
+   269 000001D4 E904FFFFFF              	jmp	_1
+   270                                  _8:
+   271 000001D9 80FC47                  	cmp	ah, 47h ; Home key
+   272 000001DC 7505                    	jne	short _9
+   273 000001DE E9A9FEFFFF              	jmp	center
+   274                                  _9:
+   275 000001E3 80FC4F                  	cmp	ah, 4Fh ; End key
+   276 000001E6 7505                    	jne	short _10
+   277 000001E8 E984FEFFFF              	jmp	reset
+   278                                  _10:	
+   279 000001ED 663D0D1C                	cmp	ax, 1C0Dh
+   280 000001F1 0F859FFEFFFF            	jne	waitforkey
+   281 000001F7 8005[84040000]10        	add	byte [boxcolor], 16
+   282 000001FE E9DAFEFFFF              	jmp	_1	
+   283                                  
+   284                                  terminate:
+   285 00000203 E8CD000000              	call	set_text_mode
+   286                                  	sys	_exit
+   286                              <1> 
+   286                              <1> 
+   286                              <1> 
+   286                              <1> 
+   286                              <1>  %if %0 >= 2
+   286                              <1>  mov ebx, %2
+   286                              <1>  %if %0 >= 3
+   286                              <1>  mov ecx, %3
+   286                              <1>  %if %0 = 4
+   286                              <1>  mov edx, %4
+   286                              <1>  %endif
+   286                              <1>  %endif
+   286                              <1>  %endif
+   286 00000208 B801000000          <1>  mov eax, %1
+   286                              <1> 
+   286 0000020D CD40                <1>  int 40h
+   287                                  halt:
+   288 0000020F EBFE                    	jmp	short halt
+   289                                  	
+   290                                  next_line:
+   291                                  	; next line
+   292 00000211 BE[CA030000]            	mov	esi, nextline
+   293                                  print_msg:
+   294 00000216 B40E                    	mov	ah, 0Eh
+   295 00000218 BB07000000              	mov	ebx, 7
+   296                                  	;mov	bl, 7 ; char attribute & color
+   297                                  p_next_chr:
+   298 0000021D AC                      	lodsb
+   299 0000021E 08C0                    	or	al, al
+   300 00000220 7404                    	jz	short p_retn ; retn	
+   301 00000222 CD31                    	int	31h
+   302 00000224 EBF7                    	jmp	short p_next_chr
+   303                                  p_retn:
+   304 00000226 C3                      	retn
+   305                                  
+   306                                  colorbox:
+   307                                  	; BL = color
+   308                                  	; CL = box size in pixels
+   309                                  	
+   310                                  	; Modified regs: eax, ecx, edi
+   311                                  	
+   312 00000227 0FB6C1                  	movzx	eax, cl
+   313 0000022A F6E1                    	mul	cl
+   314 0000022C 89C1                    	mov	ecx, eax
+   315 0000022E BF[8C040000]            	mov	edi, boxbuff
+   316 00000233 88D8                    	mov	al, bl
+   317 00000235 F3AA                    	rep	stosb
+   318 00000237 C3                      	retn	
+   319                                  	
+   320                                  drawbox:
+   321                                  	; INPUT:
+   322                                  	;	[LFB_addr]
+   323                                  	;	[x_pos]
+   324                                  	;	[y_pos]
+   325                                  	;	[boxsize]
+   326                                  	;	[color]
+   327                                  	;
+   328                                  	; Modified registers: edi, eax, ecx, ebx, edx	
+   329                                  
+   330 00000238 8B3D[74040000]          	mov	edi, [LFB_addr]
+   331 0000023E B880020000              	mov	eax, 640
+   332 00000243 F725[78040000]          	mul	dword [y_pos]
+   333 00000249 0305[7C040000]          	add	eax, [x_pos]
+   334 0000024F 8B0D[80040000]          	mov	ecx, [boxsize]
+   335 00000255 01C7                    	add	edi, eax
+   336 00000257 89CB                    	mov	ebx, ecx  ; height = width	
+   337                                  _dbox:
+   338 00000259 51                      	push	ecx
+   339 0000025A 57                      	push	edi
+   340 0000025B 89D9                    	mov	ecx, ebx ; width
+   341 0000025D A0[85040000]            	mov	al, [color]
+   342 00000262 F3AA                    	rep	stosb
+   343 00000264 5F                      	pop	edi
+   344 00000265 81C780020000            	add	edi, 640
+   345 0000026B 59                      	pop	ecx 	
+   346 0000026C E2EB                    	loop	_dbox 	 			
+   347 0000026E C3                      	retn
+   348                                  
+   349                                  movecenter:
+   350                                  	; Modified registers: ecx	
+   351                                  
+   352 0000026F B980020000              	mov	ecx, 640
+   353 00000274 662B0D[80040000]        	sub	cx, [boxsize]
+   354 0000027B 66D1E9                  	shr	cx, 1
+   355 0000027E 66890D[7C040000]        	mov	[x_pos], cx
+   356 00000285 66B9E001                	mov	cx, 480
+   357 00000289 662B0D[80040000]        	sub	cx, [boxsize]
+   358 00000290 66D1E9                  	shr	cx, 1
+   359 00000293 66890D[78040000]        	mov	[y_pos], cx
+   360 0000029A C3                      	retn	
+   361                                  
+   362                                  wordtohex:
+   363                                  	; INPUT ->
+   364                                  	; 	ax = word (binary number)
+   365                                  	; OUTPUT ->
+   366                                  	;	eax = hexadecimal string
+   367                                  	;
+   368 0000029B 53                      	push	ebx
+   369 0000029C 31DB                    	xor	ebx, ebx
+   370 0000029E 86E0                    	xchg	ah, al
+   371 000002A0 6650                    	push	ax
+   372 000002A2 88E3                    	mov	bl, ah
+   373 000002A4 C0EB04                  	shr	bl, 4
+   374 000002A7 8A83[61040000]          	mov	al, [ebx+hexchrs] 	 	
+   375 000002AD 88E3                    	mov	bl, ah
+   376 000002AF 80E30F                  	and	bl, 0Fh
+   377 000002B2 8AA3[61040000]          	mov	ah, [ebx+hexchrs]
+   378 000002B8 C1E010                  	shl	eax, 16
+   379 000002BB 6658                    	pop	ax
+   380 000002BD 88C3                    	mov	bl, al
+   381 000002BF C0EB04                  	shr	bl, 4
+   382 000002C2 8A9B[61040000]          	mov	bl, [ebx+hexchrs] 	 	
+   383 000002C8 86D8                    	xchg	bl, al	 	
+   384 000002CA 80E30F                  	and	bl, 0Fh
+   385 000002CD 8AA3[61040000]          	mov	ah, [ebx+hexchrs] 
+   386 000002D3 5B                      	pop	ebx	
+   387 000002D4 C3                      	retn
+   388                                  
+   389                                  set_text_mode:
+   390 000002D5 30E4                    	xor    ah, ah
+   391 000002D7 B003                    	mov    al, 3                        
+   392                                   	;int   10h	; al = 03h text mode, int 10 video
+   393 000002D9 CD31                    	int    31h ; TRDOS 386 - Video interrupt
+   394 000002DB C3                      	retn
+   395                                  		
+   396                                  program_msg:
+   397 000002DC 5452444F5320333836-     	db "TRDOS 386 v2.0.3 - Linear Frame Buffer ('sysvideo') Test Program"
+   397 000002E5 2076322E302E33202D-
+   397 000002EE 204C696E6561722046-
+   397 000002F7 72616D652042756666-
+   397 00000300 657220282773797376-
+   397 00000309 6964656F2729205465-
+   397 00000312 73742050726F677261-
+   397 0000031B 6D                 
+   398 0000031C 0D0A                    	db 0Dh, 0Ah
+   399 0000031E 6279204572646F6761-     	db "by Erdogan Tan - 25/01/2021"
+   399 00000327 6E2054616E202D2032-
+   399 00000330 352F30312F32303231 
+   400 00000339 0D0A00                  	db 0Dh, 0Ah, 0
+   401                                  
+   402                                  press_any_key_msg:
+   403 0000033C 557365204172726F77-     	db "Use Arrow Keys, Page Up, Page Down, Home, End to move the BOX .."
+   403 00000345 204B6579732C205061-
+   403 0000034E 67652055702C205061-
+   403 00000357 676520446F776E2C20-
+   403 00000360 486F6D652C20456E64-
+   403 00000369 20746F206D6F766520-
+   403 00000372 74686520424F58202E-
+   403 0000037B 2E                 
+   404 0000037C 0D0A                    	db 0Dh, 0Ah
+   405 0000037E 557365202B2C2D2074-     	db "Use +,- to increase and decrease BOX size .."		
+   405 00000387 6F20696E6372656173-
+   405 00000390 6520616E6420646563-
+   405 00000399 726561736520424F58-
+   405 000003A2 2073697A65202E2E   
+   406 000003AA 0D0A                    	db 0Dh, 0Ah
+   407 000003AC 0D0A                    	db 0Dh, 0Ah
+   408 000003AE 507265737320616E79-     	db "Press any key to continue .."
+   408 000003B7 206B657920746F2063-
+   408 000003C0 6F6E74696E7565202E-
+   408 000003C9 2E                 
+   409                                  nextline:
+   410 000003CA 0D0A00                  	db 0Dh, 0Ah, 0	
+   411                                  
+   412                                  msg_vbe_error:
+   413 000003CD 0D0A                    	db 0Dh, 0Ah
+   414 000003CF 766573612076626520-     	db 'vesa vbe video mode error !'
+   414 000003D8 766964656F206D6F64-
+   414 000003E1 65206572726F722021 
+   415 000003EA 0D0A00                  	db 0Dh, 0Ah, 0		
+   416                                  msg_lfb_error:
+   417 000003ED 0D0A                    	db 0Dh, 0Ah
+   418 000003EF 6C696E656172206672-     	db 'linear frame buffer error !'
+   418 000003F8 616D65206275666665-
+   418 00000401 72206572726F722021 
+   419 0000040A 0D0A00                  	db 0Dh, 0Ah, 0
+   420                                  
+   421                                  msg_lfb_ok:
+   422 0000040D 0D0A                    	db 0Dh, 0Ah
+   423 0000040F 6C696E656172206672-     	db 'linear frame buffer ready .. (at address '
+   423 00000418 616D65206275666665-
+   423 00000421 72207265616479202E-
+   423 0000042A 2E2028617420616464-
+   423 00000433 7265737320         
+   424                                  lfb_addr_str: ; 8 (hex) digits
+   425 00000438 303030303030303068-     	db '00000000h)'
+   425 00000441 29                 
+   426 00000442 0D0A                    	db 0Dh, 0Ah
+   427 00000444 70726573732061206B-     	db 'press a key to continue ..'	
+   427 0000044D 657920746F20636F6E-
+   427 00000456 74696E7565202E2E   
+   428 0000045E 0D0A00                  	db 0Dh, 0Ah, 0
+   429                                  
+   430                                  hexchrs:
+   431 00000461 303132333435363738-     	db '0123456789ABCDEF'
+   431 0000046A 39414243444546     
+   432                                  
+   433                                  bss:
+   434                                  
+   435                                  ABSOLUTE bss
+   436                                  
+   437 00000471 <res 00000003>          alignb 4
+   438                                  
+   439                                  bss_start:
+   440                                  
+   441                                  LFB_addr:
+   442 00000474 <res 00000004>          	resd 1	
+   443                                  
+   444 00000478 <res 00000004>          y_pos:	resd 1
+   445                                  
+   446 0000047C <res 00000004>          x_pos:	resd 1
+   447                                  
+   448                                  boxsize:
+   449 00000480 <res 00000004>          	resd 1
+   450                                  boxcolor:
+   451 00000484 <res 00000001>          	resb 1
+   452 00000485 <res 00000001>          color:	resb 1
+   453 00000486 <res 00000002>          	resw 1
+   454                                  
+   455                                  counter:
+   456 00000488 <res 00000004>          	resd 1
+   457                                  
+   458                                  boxbuff:
+   459 0000048C <res 00004000>          	resb 128*128
+   460                                  
+   461                                  bss_end:

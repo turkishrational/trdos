@@ -1,0 +1,189 @@
+     1                                  ; ****************************************************************************
+     2                                  ; vgawstr.s - TRDOS 386 (TRDOS v2.0.3) Test Program - write string 
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ;
+     5                                  ; 05/12/2020
+     6                                  ;
+     7                                  ; ****************************************************************************
+     8                                  ; writestr.s (05/12/2020)
+     9                                  
+    10                                  ; 01/03/2017
+    11                                  ; 16/10/2016
+    12                                  ; 29/04/2016
+    13                                  ; TRDOS 386 system calls (temporary list!)
+    14                                  _ver 	equ 0
+    15                                  _exit 	equ 1
+    16                                  _fork 	equ 2
+    17                                  _read 	equ 3
+    18                                  _write	equ 4
+    19                                  _open	equ 5
+    20                                  _close 	equ 6
+    21                                  _wait 	equ 7
+    22                                  _creat 	equ 8
+    23                                  _link 	equ 9
+    24                                  _unlink	equ 10
+    25                                  _exec	equ 11
+    26                                  _chdir	equ 12
+    27                                  _time 	equ 13
+    28                                  _mkdir 	equ 14
+    29                                  _chmod	equ 15
+    30                                  _chown	equ 16
+    31                                  _break	equ 17
+    32                                  _stat	equ 18
+    33                                  _seek	equ 19
+    34                                  _tell 	equ 20
+    35                                  _mount	equ 21
+    36                                  _umount	equ 22
+    37                                  _setuid	equ 23
+    38                                  _getuid	equ 24
+    39                                  _stime	equ 25
+    40                                  _quit	equ 26	
+    41                                  _intr	equ 27
+    42                                  _fstat	equ 28
+    43                                  _emt 	equ 29
+    44                                  _mdate 	equ 30
+    45                                  _video 	equ 31
+    46                                  _audio	equ 32
+    47                                  _timer	equ 33
+    48                                  _sleep	equ 34
+    49                                  _msg    equ 35
+    50                                  _geterr	equ 36
+    51                                  _fpsave	equ 37
+    52                                  _pri	equ 38
+    53                                  _rele	equ 39
+    54                                  _fff	equ 40
+    55                                  _fnf	equ 41
+    56                                  _alloc	equ 42
+    57                                  _dalloc equ 43
+    58                                  _calbac equ 44
+    59                                  
+    60                                  %macro sys 1-4
+    61                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    62                                      ; 03/09/2015	
+    63                                      ; 13/04/2015
+    64                                      ; Retro UNIX 386 v1 system call.	
+    65                                      %if %0 >= 2   
+    66                                          mov ebx, %2
+    67                                          %if %0 >= 3    
+    68                                              mov ecx, %3
+    69                                              %if %0 = 4
+    70                                                 mov edx, %4   
+    71                                              %endif
+    72                                          %endif
+    73                                      %endif
+    74                                      mov eax, %1
+    75                                      ;int 30h
+    76                                      int 40h ; TRDOS 386 (TRDOS v2.0)	   
+    77                                  %endmacro
+    78                                  
+    79                                  ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
+    80                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    81                                  
+    82                                  ;========================================================================
+    83                                  ; TEST VESA VBE 3 16 BIT PROTECTED MODE INTERFACE FAR CALL FOR TRDOS 386 
+    84                                  ;========================================================================
+    85                                  
+    86                                  [BITS 32]	; 32-bit intructions
+    87                                  
+    88                                  [ORG 0] 
+    89                                  START_CODE:
+    90                                  		; set video mode to 13h
+    91 00000000 B813000000              		mov 	eax, 13h
+    92 00000005 CD31                    		int	31h
+    93                                  
+    94                                  		; write character string
+    95                                  
+    96 00000007 BD[52000000]            		mov	ebp, message
+    97                                  		;mov	ecx, msg_end - message
+    98 0000000C B9C1000000              		mov	ecx, m_length
+    99 00000011 BB0F000000              		mov	ebx, 0Fh  ; white
+   100 00000016 BA00010000              		mov	edx, 0100h ; row 1, column 0
+   101 0000001B B801130000              		mov	eax, 1301h
+   102 00000020 CD31                    		int	31h ; int 10h
+   103                                  
+   104                                  		; wait for keystroke
+   105 00000022 30E4                    		xor	ah, ah
+   106 00000024 CD32                    		int	32h
+   107                                  
+   108                                  		; set video mode to 03h
+   109 00000026 B803000000              		mov	eax, 03h
+   110 0000002B CD31                    		int	31h
+   111                                  
+   112                                  		; get cursor position
+   113 0000002D B403                    		mov	ah, 03h
+   114                                  		;xor	bh, bh
+   115 0000002F CD31                    		int	31h
+   116                                  		; dx = cursor position
+   117                                  
+   118 00000031 BD[52000000]            		mov	ebp, message
+   119                                  		;mov	ecx, msg_end - message
+   120 00000036 B9C1000000              		mov	ecx, m_length
+   121 0000003B BB0F000000              		mov	ebx, 0Fh  ; white
+   122 00000040 B801130000              		mov	eax, 1301h
+   123 00000045 CD31                    		int	31h ; int 10h
+   124                                  
+   125 00000047 30E4                    		xor	ah, ah
+   126 00000049 CD32                    		int	32h
+   127                                  
+   128                                  		sys	_exit
+   128                              <1> 
+   128                              <1> 
+   128                              <1> 
+   128                              <1> 
+   128                              <1>  %if %0 >= 2
+   128                              <1>  mov ebx, %2
+   128                              <1>  %if %0 >= 3
+   128                              <1>  mov ecx, %3
+   128                              <1>  %if %0 = 4
+   128                              <1>  mov edx, %4
+   128                              <1>  %endif
+   128                              <1>  %endif
+   128                              <1>  %endif
+   128 0000004B B801000000          <1>  mov eax, %1
+   128                              <1> 
+   128 00000050 CD40                <1>  int 40h
+   129                                  
+   130                                  ;-----------------------------------------------------------------
+   131                                  ;  MESSAGE
+   132                                  ;-----------------------------------------------------------------
+   133                                  
+   134                                  message:
+   135 00000052 0D0A                    	db	0Dh,0Ah
+   136 00000054 5452444F5320333836-     	db	"TRDOS 386 Video Bios Write String Test"
+   136 0000005D 20566964656F204269-
+   136 00000066 6F7320577269746520-
+   136 0000006F 537472696E67205465-
+   136 00000078 7374               
+   137 0000007A 0D0A0D0A                	db	0Dh,0Ah,0Dh,0Ah
+   138 0000007E 30302C30312C30322C-     	db	"00,01,02,03,04,05,06,07,08,09,10"
+   138 00000087 30332C30342C30352C-
+   138 00000090 30362C30372C30382C-
+   138 00000099 30392C3130         
+   139 0000009E 0D0A                    	db	0Dh,0Ah
+   140 000000A0 31312C31322C31332C-     	db	"11,12,13,14,15,16,17,18,19,20,21"
+   140 000000A9 31342C31352C31362C-
+   140 000000B2 31372C31382C31392C-
+   140 000000BB 32302C3231         
+   141 000000C0 0D0A                    	db	0Dh,0Ah
+   142 000000C2 412C422C432C442C45-     	db	"A,B,C,D,E,F,G,H,I,J,K,L,M"
+   142 000000CB 2C462C472C482C492C-
+   142 000000D4 4A2C4B2C4C2C4D     
+   143 000000DB 0D0A                    	db	0Dh,0Ah
+   144 000000DD 4E2C4F2C502C512C52-     	db	"N,O,P,Q,R,S,T,U,V,X,W,Y,Z"
+   144 000000E6 2C532C542C552C562C-
+   144 000000EF 582C572C592C5A     
+   145 000000F6 0D0A0D0A                	db	0Dh,0Ah,0Dh, 0Ah
+   146 000000FA 287072657373206120-     	db	"(press a key to exit)"
+   146 00000103 6B657920746F206578-
+   146 0000010C 697429             
+   147 0000010F 0D0A0D0A                	db	0Dh,0Ah,0Dh,0Ah	
+   148                                  m_length equ $ - message
+   149                                  ;msg_end:
+   150 00000113 00                      	db	0 
+   151                                  
+   152 00000114 4572646F67616E2054-     	db	"Erdogan Tan - 05/12/2020 (TRDOS 386 v2.0.3)"
+   152 0000011D 616E202D2030352F31-
+   152 00000126 322F32303230202854-
+   152 0000012F 52444F532033383620-
+   152 00000138 76322E302E3329     
+   153 0000013F 00                      	db	0 	

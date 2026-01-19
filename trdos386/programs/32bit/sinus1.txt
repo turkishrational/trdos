@@ -1,0 +1,440 @@
+     1                                  ; ****************************************************************************
+     2                                  ; sinus1.s - TRDOS 386 (TRDOS v2.0.3) Test Program - 'sysvideo' pixel tests
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ;
+     5                                  ; 19/02/2021
+     6                                  ;
+     7                                  ; ****************************************************************************
+     8                                  ; nasm sinus1.s -l sinus1.txt -o SINUS1.PRG -Z error.txt
+     9                                  ; (modified from 'circle5.s', 15/02/2021)
+    10                                  
+    11                                  ; Draw sinus wave/curve by using 'sysvideo' bx=0305h
+    12                                  
+    13                                  ; 14/07/2020
+    14                                  ; 31/12/2017
+    15                                  ; TRDOS 386 (v2.0) system calls
+    16                                  _ver 	equ 0
+    17                                  _exit 	equ 1
+    18                                  _fork 	equ 2
+    19                                  _read 	equ 3
+    20                                  _write	equ 4
+    21                                  _open	equ 5
+    22                                  _close 	equ 6
+    23                                  _wait 	equ 7
+    24                                  _create	equ 8
+    25                                  _rename	equ 9
+    26                                  _delete	equ 10
+    27                                  _exec	equ 11
+    28                                  _chdir	equ 12
+    29                                  _time 	equ 13
+    30                                  _mkdir 	equ 14
+    31                                  _chmod	equ 15
+    32                                  _rmdir	equ 16
+    33                                  _break	equ 17
+    34                                  _drive	equ 18
+    35                                  _seek	equ 19
+    36                                  _tell 	equ 20
+    37                                  _memory	equ 21
+    38                                  _prompt	equ 22
+    39                                  _path	equ 23
+    40                                  _env	equ 24
+    41                                  _stime	equ 25
+    42                                  _quit	equ 26	
+    43                                  _intr	equ 27
+    44                                  _dir	equ 28
+    45                                  _emt 	equ 29
+    46                                  _ldrvt 	equ 30
+    47                                  _video 	equ 31
+    48                                  _audio	equ 32
+    49                                  _timer	equ 33
+    50                                  _sleep	equ 34
+    51                                  _msg    equ 35
+    52                                  _geterr	equ 36
+    53                                  _fpstat	equ 37
+    54                                  _pri	equ 38
+    55                                  _rele	equ 39
+    56                                  _fff	equ 40
+    57                                  _fnf	equ 41
+    58                                  _alloc	equ 42
+    59                                  _dalloc equ 43
+    60                                  _calbac equ 44
+    61                                  _dma	equ 45	
+    62                                  
+    63                                  %macro sys 1-4
+    64                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    65                                      ; 03/09/2015	
+    66                                      ; 13/04/2015
+    67                                      ; Retro UNIX 386 v1 system call.		
+    68                                      %if %0 >= 2   
+    69                                          mov ebx, %2
+    70                                          %if %0 >= 3    
+    71                                              mov ecx, %3
+    72                                              %if %0 = 4
+    73                                                 mov edx, %4   
+    74                                              %endif
+    75                                          %endif
+    76                                      %endif
+    77                                      mov eax, %1
+    78                                      ;int 30h
+    79                                      int 40h ; TRDOS 386 (TRDOS v2.0)		   
+    80                                  %endmacro
+    81                                  
+    82                                  ; Retro UNIX 386 v1 system call format:
+    83                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    84                                  
+    85                                  [BITS 32] ; We need 32-bit intructions for protected mode
+    86                                  
+    87                                  [ORG 0] 
+    88                                  
+    89                                  START_CODE:
+    90                                  	; clear bss
+    91 00000000 BF[7C030000]            	mov	edi, bss_start
+    92 00000005 B900040000              	mov	ecx, (bss_end - bss_start)/4
+    93                                  	;xor	eax, eax
+    94 0000000A F3AB                    	rep	stosd
+    95                                  
+    96                                  	; program message
+    97 0000000C BE[6C010000]            	mov	esi, program_msg
+    98 00000011 E895000000              	call	print_msg
+    99                                  
+   100 00000016 30E4                    	xor	ah, ah
+   101                                  	;int	16h	; KEYBOARD - READ CHAR FROM BUFFER, WAIT IF EMPTY
+   102                                  			; Return: AH = scan code, AL = character
+   103 00000018 CD32                    	int	32h	; TRDOS 386 Keyboard interrupt 
+   104                                  
+   105                                  	;; Set Video Mode to 13h
+   106                                  	;sys	_video, 0813h
+   107                                  	;cmp	eax, 14h 
+   108                                  	;je	short mode_13h_set_ok
+   109                                  
+   110                                  	; set VGA mode by using int 31h
+   111 0000001A 66B81300                	mov	ax, 13h	; mode 13h ; 
+   112 0000001E CD31                    	int	31h	; real mode: int 10h
+   113 00000020 EB0E                    	jmp	short mode_13h_set_ok
+   114                                  
+   115                                  terminate:
+   116 00000022 E83E010000              	call	set_text_mode
+   117                                  	sys	_exit
+   117                              <1> 
+   117                              <1> 
+   117                              <1> 
+   117                              <1> 
+   117                              <1>  %if %0 >= 2
+   117                              <1>  mov ebx, %2
+   117                              <1>  %if %0 >= 3
+   117                              <1>  mov ecx, %3
+   117                              <1>  %if %0 = 4
+   117                              <1>  mov edx, %4
+   117                              <1>  %endif
+   117                              <1>  %endif
+   117                              <1>  %endif
+   117 00000027 B801000000          <1>  mov eax, %1
+   117                              <1> 
+   117 0000002C CD40                <1>  int 40h
+   118                                  halt:
+   119 0000002E EBFE                    	jmp	short halt
+   120                                  
+   121                                  mode_13h_set_ok:
+   122 00000030 C605[74030000]1C        	mov	byte [color], 28 ; initial pixel color
+   123                                  _0:
+   124 00000037 E880000000              	call	drawsinewave
+   125                                  waitforkey:
+   126                                  	;mov	ah, 1
+   127                                  	;int	32h
+   128                                  	;jz	short getkey
+   129                                  	;inc	word [counter]
+   130                                  	;nop
+   131                                  	;nop
+   132                                  	;nop
+   133                                  	;jmp	short waitforkey
+   134                                  getkey:
+   135 0000003C 30E4                    	xor	ah, ah
+   136 0000003E CD32                    	int	32h
+   137                                  
+   138 00000040 663D032E                	cmp	ax, 2E03h
+   139 00000044 74DC                    	je	short terminate
+   140 00000046 3C1B                    	cmp	al, 1Bh ; ESC key
+   141 00000048 74D8                    	je	short terminate	
+   142                                  
+   143 0000004A 3C2B                    	cmp	al, '+'
+   144 0000004C 7508                    	jne	short _1
+   145                                  	
+   146 0000004E FE05[74030000]          	inc	byte [color]
+   147 00000054 EBE1                    	jmp	short _0
+   148                                  _1:
+   149 00000056 3C2D                    	cmp	al, '-'
+   150 00000058 7508                    	jne	short _2
+   151                                  
+   152 0000005A FE0D[74030000]          	dec	byte [color]
+   153 00000060 EBD5                    	jmp	short _0
+   154                                  _2:
+   155 00000062 3C20                    	cmp	al, 20h  ; space
+   156 00000064 7509                    	jne	short _3
+   157 00000066 8005[74030000]08        	add	byte [color], 8 	
+   158 0000006D EBC8                    	jmp	short _0
+   159                                  _3:
+   160 0000006F 80FC4B                  	cmp	ah, 4Bh
+   161 00000072 7507                    	jne	short _5
+   162                                  	; left arrow
+   163                                  _4:
+   164 00000074 E8DA000000              	call	beep
+   165 00000079 EBC1                    	jmp	waitforkey
+   166                                  _5:
+   167 0000007B 80FC4D                  	cmp	ah, 4Dh
+   168 0000007E 7502                    	jne	short _6
+   169                                  
+   170                                  	; right arrow
+   171 00000080 EBF2                    	jmp	short _4
+   172                                  _6:
+   173 00000082 80FC50                  	cmp	ah, 50h
+   174 00000085 7502                    	jne	short _7
+   175                                  	; down arrow
+   176 00000087 EBEB                    	jmp	short _4
+   177                                  _7:
+   178 00000089 80FC48                  	cmp	ah, 48h
+   179 0000008C 7502                    	jne	short _8
+   180                                  	; up arrow
+   181 0000008E EBE4                    	jmp	short _4
+   182                                  _8:	
+   183 00000090 663D0D1C                	cmp	ax, 1C0Dh
+   184 00000094 750E                    	jne	short _9
+   185 00000096 E8B8000000              	call	beep
+   186 0000009B 8005[74030000]04        	add	byte [color], 4
+   187 000000A2 EB93                    	jmp	short _0
+   188                                  _9:	
+   189 000000A4 E8AA000000              	call	beep
+   190 000000A9 EB91                    	jmp	waitforkey
+   191                                  
+   192                                  print_msg:
+   193 000000AB B40E                    	mov	ah, 0Eh
+   194 000000AD BB07000000              	mov	ebx, 7
+   195                                  	;mov	bl, 7 ; char attribute & color
+   196                                  p_next_chr:
+   197 000000B2 AC                      	lodsb
+   198 000000B3 08C0                    	or	al, al
+   199 000000B5 7404                    	jz	short p_retn ; retn	
+   200 000000B7 CD31                    	int	31h
+   201 000000B9 EBF7                    	jmp	short p_next_chr
+   202                                  p_retn:
+   203 000000BB C3                      	retn
+   204                                  
+   205                                  drawsinewave:
+   206                                  	; INPUT:
+   207                                  	;	sinustable
+   208                                  	;
+   209                                  	; Modified registers: esi, edi, eax, ecx, ebx, edx
+   210                                  
+   211                                  	; fill _fx table by using sine wave table
+   212                                  	; x = 0 to 319
+   213                                  	; y = +99 to -99
+   214                                  	; +99 --> 197 -> screen row position = 198-197 = 1
+   215                                  	; -99 --> 0 -> screen row position = 198-0 = 198
+   216                                  
+   217 000000BC BE[32020000]            	mov	esi, sinustable
+   218 000000C1 BF[7C030000]            	mov	edi, _fx
+   219 000000C6 31C0                    	xor	eax, eax
+   220 000000C8 29DB                    	sub	ebx, ebx ; 0 ; x 
+   221 000000CA 31ED                    	xor	ebp, ebp ; pixel count
+   222 000000CC AC                      	lodsb 
+   223 000000CD EB43                    	jmp	short _dsw_5
+   224                                  _dsw_0:
+   225 000000CF AC                      	lodsb	; al = 198-y value
+   226                                  	;
+   227 000000D0 38C8                    	cmp	al, cl ; [prevy]
+   228 000000D2 743E                    	je	short _dsw_5
+   229 000000D4 7217                    	jb	short _dsw_3
+   230                                  _dsw_1:
+   231 000000D6 FEC1                    	inc	cl ; previous 198-y
+   232 000000D8 38C8                    	cmp	al, cl
+   233 000000DA 7636                    	jna	short _dsw_5
+   234                                  	; ebx = x
+   235                                  	; eax = 198 - y
+   236 000000DC E819000000              	call	_dsw_4
+   237 000000E1 EBF3                    	jmp	short _dsw_1
+   238                                  _dsw_2:
+   239 000000E3 50                      	push	eax
+   240 000000E4 E859000000              	call	getpixeloffset
+   241 000000E9 AB                      	stosd
+   242 000000EA 58                      	pop	eax
+   243 000000EB 45                      	inc	ebp ; increase pixel count
+   244 000000EC C3                      	retn
+   245                                  _dsw_3:
+   246 000000ED FEC9                    	dec	cl ; previous 198-y
+   247 000000EF 38C8                    	cmp	al, cl
+   248 000000F1 731F                    	jnb	short _dsw_5
+   249                                  	; ebx = x
+   250                                  	; eax = 198 - y
+   251 000000F3 E802000000              	call	_dsw_4
+   252 000000F8 EBF3                    	jmp	short _dsw_3
+   253                                  _dsw_4:
+   254 000000FA 53                      	push	ebx
+   255 000000FB 8B1D[78030000]          	mov	ebx, [prevx]
+   256 00000101 86C1                    	xchg	al, cl ; [prevy]
+   257 00000103 E8DBFFFFFF              	call	_dsw_2
+   258 00000108 86C8                    	xchg	cl, al
+   259 0000010A 5B                      	pop	ebx
+   260 0000010B FF05[78030000]          	inc	dword [prevx]
+   261 00000111 C3                      	retn
+   262                                  _dsw_5:
+   263 00000112 891D[78030000]          	mov	[prevx], ebx ; previous x value 
+   264 00000118 88C1                    	mov	cl, al  ; 0 ; previous 198-y value
+   265 0000011A E8C4FFFFFF              	call	_dsw_2
+   266 0000011F 43                      	inc	ebx
+   267 00000120 81FB40010000            	cmp	ebx, 320
+   268 00000126 72A7                    	jb	short _dsw_0
+   269                                  
+   270 00000128 BE[7C030000]            	mov	esi, _fx
+   271                                  	;mov	edx, ebp
+   272                                  	;
+   273                                  	; edx = pixel count
+   274                                  	; esi = user's single color pixel buffer address
+   275                                  	sys	_video, 0305h, [color], ebp
+   275                              <1> 
+   275                              <1> 
+   275                              <1> 
+   275                              <1> 
+   275                              <1>  %if %0 >= 2
+   275 0000012D BB05030000          <1>  mov ebx, %2
+   275                              <1>  %if %0 >= 3
+   275 00000132 8B0D[74030000]      <1>  mov ecx, %3
+   275                              <1>  %if %0 = 4
+   275 00000138 89EA                <1>  mov edx, %4
+   275                              <1>  %endif
+   275                              <1>  %endif
+   275                              <1>  %endif
+   275 0000013A B81F000000          <1>  mov eax, %1
+   275                              <1> 
+   275 0000013F CD40                <1>  int 40h
+   276                                  
+   277 00000141 C3                      	retn
+   278                                  	
+   279                                  getpixeloffset:
+   280                                  	; ebx = x position
+   281                                  	; eax = 198 - y position
+   282 00000142 BAC6000000              	mov	edx, 198
+   283 00000147 29C2                    	sub	edx, eax
+   284 00000149 B840010000              	mov	eax, 320 ; screen width
+   285 0000014E F7E2                    	mul	edx
+   286 00000150 01D8                     	add	eax, ebx ; add x to y*320
+   287                                  	; eax = pixel offset on display page
+   288 00000152 C3                      	retn
+   289                                  beep:
+   290                                  	; call beep function (16/64 second, 886Hz)
+   291                                  	sys	_audio, 16, 1331
+   291                              <1> 
+   291                              <1> 
+   291                              <1> 
+   291                              <1> 
+   291                              <1>  %if %0 >= 2
+   291 00000153 BB10000000          <1>  mov ebx, %2
+   291                              <1>  %if %0 >= 3
+   291 00000158 B933050000          <1>  mov ecx, %3
+   291                              <1>  %if %0 = 4
+   291                              <1>  mov edx, %4
+   291                              <1>  %endif
+   291                              <1>  %endif
+   291                              <1>  %endif
+   291 0000015D B820000000          <1>  mov eax, %1
+   291                              <1> 
+   291 00000162 CD40                <1>  int 40h
+   292 00000164 C3                      	retn
+   293                                  
+   294                                  set_text_mode:
+   295 00000165 30E4                    	xor    ah, ah
+   296 00000167 B003                    	mov    al, 3                        
+   297                                   	;int   10h ; al = 03h text mode, int 10 video
+   298 00000169 CD31                    	int    31h ; TRDOS 386 - Video interrupt
+   299 0000016B C3                      	retn
+   300                                  		
+   301                                  program_msg:
+   302 0000016C 5452444F5320333836-     	db "TRDOS 386 v2.0.3 - ('sysvideo') Test Program - Draw Sine Wave"
+   302 00000175 2076322E302E33202D-
+   302 0000017E 202827737973766964-
+   302 00000187 656F27292054657374-
+   302 00000190 2050726F6772616D20-
+   302 00000199 2D2044726177205369-
+   302 000001A2 6E652057617665     
+   303 000001A9 0D0A                    	db 0Dh, 0Ah
+   304 000001AB 6279204572646F6761-     	db "by Erdogan Tan - 19/02/2021"
+   304 000001B4 6E2054616E202D2031-
+   304 000001BD 392F30322F32303231 
+   305                                  	;db 0Dh, 0Ah, 0
+   306 000001C6 0D0A0D0A                	db 0Dh, 0Ah, 0Dh, 0Ah
+   307                                  
+   308 000001CA 557365205350414345-     	db "Use SPACE,ENTER,'+','-' keys to change COLOR .."		
+   308 000001D3 2C454E5445522C272B-
+   308 000001DC 272C272D27206B6579-
+   308 000001E5 7320746F206368616E-
+   308 000001EE 676520434F4C4F5220-
+   308 000001F7 2E2E               
+   309 000001F9 0D0A                    	db 0Dh, 0Ah
+   310 000001FB 507265737320455343-     	db "Press ESC to exit .."
+   310 00000204 20746F206578697420-
+   310 0000020D 2E2E               
+   311 0000020F 0D0A                    	db 0Dh, 0Ah
+   312 00000211 0D0A                    	db 0Dh, 0Ah
+   313 00000213 507265737320616E79-     	db "Press any key to continue .."
+   313 0000021C 206B657920746F2063-
+   313 00000225 6F6E74696E7565202E-
+   313 0000022E 2E                 
+   314                                  nextline:
+   315 0000022F 0D0A00                  	db 0Dh, 0Ah, 0
+   316                                  
+   317                                  sinustable: ; sine wave table (x=0 to 319, y= +99 to -99)
+   318                                  	; 19/02/2021
+   319                                  	; https://daycounter.com/Calculators/Sine-Generator-Calculator2.phtml
+   320                                  	; 320x198 (x= 0 to 319, y = 0 to 197)
+   321 00000232 636466686A6C6E7072-     	db 99,100,102,104,106,108,110,112,114,116,118,120,121,123,125,127
+   321 0000023B 747678797B7D7F     
+   322 00000242 81838586888A8C8D8F-     	db 129,131,133,134,136,138,140,141,143,145,147,148,150,152,153,155
+   322 0000024B 9193949698999B     
+   323 00000252 9C9E9FA1A2A4A5A7A8-     	db 156,158,159,161,162,164,165,167,168,170,171,172,173,175,176,177
+   323 0000025B AAABACADAFB0B1     
+   324 00000262 B2B3B4B5B6B7B8B9BA-     	db 178,179,180,181,182,183,184,185,186,187,188,189,190,190,191,192
+   324 0000026B BBBCBDBEBEBFC0     
+   325 00000272 C0C1C1C2C2C3C3C3C4-     	db 192,193,193,194,194,195,195,195,196,196,196,197,197,197,197,197
+   325 0000027B C4C4C5C5C5C5C5     
+   326 00000282 C5C5C5C5C5C5C4C4C4-     	db 197,197,197,197,197,197,196,196,196,195,195,195,194,194,193,193
+   326 0000028B C3C3C3C2C2C1C1     
+   327 00000292 C0C0BFBEBEBDBCBBBA-     	db 192,192,191,190,190,189,188,187,186,185,184,183,182,181,180,179
+   327 0000029B B9B8B7B6B5B4B3     
+   328 000002A2 B2B1B0AFADACABAAA8-     	db 178,177,176,175,173,172,171,170,168,167,165,164,162,161,159,158
+   328 000002AB A7A5A4A2A19F9E     
+   329 000002B2 9C9B9998969493918F-     	db 156,155,153,152,150,148,147,145,143,141,140,138,136,134,133,131
+   329 000002BB 8D8C8A88868583     
+   330 000002C2 817F7D7B7978767472-     	db 129,127,125,123,121,120,118,116,114,112,110,108,106,104,102,100
+   330 000002CB 706E6C6A686664     
+   331 000002D2 63615F5D5B59575553-     	db 99,97,95,93,91,89,87,85,83,81,79,77,76,74,72,70
+   331 000002DB 514F4D4C4A4846     
+   332 000002E2 4442403F3D3B393836-     	db 68,66,64,63,61,59,57,56,54,52,50,49,47,45,44,42
+   332 000002EB 3432312F2D2C2A     
+   333 000002F2 292726242321201E1D-     	db 41,39,38,36,35,33,32,30,29,27,26,25,24,22,21,20
+   333 000002FB 1B1A1918161514     
+   334 00000302 131211100F0E0D0C0B-     	db 19,18,17,16,15,14,13,12,11,10,9,8,7,7,6,5
+   334 0000030B 0A090807070605     
+   335 00000312 050404030302020201-     	db 5,4,4,3,3,2,2,2,1,1,1,0,0,0,0,0
+   335 0000031B 01010000000000     
+   336 00000322 000000000000010101-     	db 0,0,0,0,0,0,1,1,1,2,2,2,3,3,4,4
+   336 0000032B 02020203030404     
+   337 00000332 050506070708090A0B-     	db 5,5,6,7,7,8,9,10,11,12,13,14,15,16,17,18
+   337 0000033B 0C0D0E0F101112     
+   338 00000342 1314151618191A1B1D-     	db 19,20,21,22,24,25,26,27,29,30,32,33,35,36,38,39
+   338 0000034B 1E202123242627     
+   339 00000352 292A2C2D2F31323436-     	db 41,42,44,45,47,49,50,52,54,56,57,59,61,63,64,66
+   339 0000035B 38393B3D3F4042     
+   340 00000362 4446484A4C4D4F5153-     	db 68,70,72,74,76,77,79,81,83,85,87,89,91,93,95,97
+   340 0000036B 5557595B5D5F61     
+   341                                  bss:
+   342                                  
+   343                                  ABSOLUTE bss
+   344                                  
+   345 00000372 <res 00000002>          alignb 4
+   346                                  
+   347 00000374 <res 00000004>          color:	resd 1
+   348 00000378 <res 00000004>          prevx:	resd 1
+   349                                  ;prevy:	resd 1
+   350                                  
+   351                                  bss_start:
+   352 0000037C <res 00000500>          _fx:	resd 320 ; for every X values from 0 to 319
+   353 0000087C <res 00000B00>          	resd 1024-320 ; used for repetitive x values for continuity
+   354                                  bss_end:
