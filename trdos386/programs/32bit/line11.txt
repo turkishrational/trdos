@@ -1,0 +1,664 @@
+     1                                  ; ****************************************************************************
+     2                                  ; line11.s - TRDOS 386 (TRDOS v2.0.3) Test Program - 'sysvideo' pixel w/r tests
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ;
+     5                                  ; 07/03/2021
+     6                                  ;
+     7                                  ; ****************************************************************************
+     8                                  ; nasm line11.s -l line11.txt -o LINE11.PRG -Z error.txt
+     9                                  ; (modified from 'line5.s', 12/02/2021)
+    10                                  
+    11                                  ; Draw lines by using 'sysvideo' bh=020Eh (VESA VBE mode version)
+    12                                  
+    13                                  ; 14/07/2020
+    14                                  ; 31/12/2017
+    15                                  ; TRDOS 386 (v2.0) system calls
+    16                                  _ver 	equ 0
+    17                                  _exit 	equ 1
+    18                                  _fork 	equ 2
+    19                                  _read 	equ 3
+    20                                  _write	equ 4
+    21                                  _open	equ 5
+    22                                  _close 	equ 6
+    23                                  _wait 	equ 7
+    24                                  _create	equ 8
+    25                                  _rename	equ 9
+    26                                  _delete	equ 10
+    27                                  _exec	equ 11
+    28                                  _chdir	equ 12
+    29                                  _time 	equ 13
+    30                                  _mkdir 	equ 14
+    31                                  _chmod	equ 15
+    32                                  _rmdir	equ 16
+    33                                  _break	equ 17
+    34                                  _drive	equ 18
+    35                                  _seek	equ 19
+    36                                  _tell 	equ 20
+    37                                  _memory	equ 21
+    38                                  _prompt	equ 22
+    39                                  _path	equ 23
+    40                                  _env	equ 24
+    41                                  _stime	equ 25
+    42                                  _quit	equ 26	
+    43                                  _intr	equ 27
+    44                                  _dir	equ 28
+    45                                  _emt 	equ 29
+    46                                  _ldrvt 	equ 30
+    47                                  _video 	equ 31
+    48                                  _audio	equ 32
+    49                                  _timer	equ 33
+    50                                  _sleep	equ 34
+    51                                  _msg    equ 35
+    52                                  _geterr	equ 36
+    53                                  _fpstat	equ 37
+    54                                  _pri	equ 38
+    55                                  _rele	equ 39
+    56                                  _fff	equ 40
+    57                                  _fnf	equ 41
+    58                                  _alloc	equ 42
+    59                                  _dalloc equ 43
+    60                                  _calbac equ 44
+    61                                  _dma	equ 45	
+    62                                  
+    63                                  %macro sys 1-4
+    64                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    65                                      ; 03/09/2015	
+    66                                      ; 13/04/2015
+    67                                      ; Retro UNIX 386 v1 system call.		
+    68                                      %if %0 >= 2   
+    69                                          mov ebx, %2
+    70                                          %if %0 >= 3    
+    71                                              mov ecx, %3
+    72                                              %if %0 = 4
+    73                                                 mov edx, %4   
+    74                                              %endif
+    75                                          %endif
+    76                                      %endif
+    77                                      mov eax, %1
+    78                                      ;int 30h
+    79                                      int 40h ; TRDOS 386 (TRDOS v2.0)		   
+    80                                  %endmacro
+    81                                  
+    82                                  ; Retro UNIX 386 v1 system call format:
+    83                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    84                                  
+    85                                  [BITS 32] ; We need 32-bit intructions for protected mode
+    86                                  
+    87                                  [ORG 0] 
+    88                                  
+    89                                  START_CODE:
+    90                                  	; clear bss
+    91 00000000 BF[A0050000]            	mov	edi, bss_start
+    92 00000005 B97A000000              	mov	ecx, (bss_end - bss_start)/4
+    93                                  	;xor	eax, eax
+    94 0000000A F3AB                    	rep	stosd
+    95                                  
+    96                                  	; program message
+    97 0000000C BE[FB020000]            	mov	esi, program_msg
+    98 00000011 E858010000              	call	print_msg
+    99                                  
+   100 00000016 30E4                    	xor	ah, ah
+   101                                  	;int	16h	; KEYBOARD - READ CHAR FROM BUFFER, WAIT IF EMPTY
+   102                                  			; Return: AH = scan code, AL = character
+   103 00000018 CD32                    	int	32h	; TRDOS 386 Keyboard interrupt 
+   104                                  
+   105                                  	; Get VESA VBE video bios number 
+   106                                  	;	(vbe2 or vbe3, emulator or not)  
+   107                                  	;mov	ebx, 0906h
+   108                                  	;sys	_video
+   109                                  	
+   110                                  	; get [truecolor] status (24bpp or 32bpp for VBE3 vbios)
+   111 0000001A BB09090000              	mov	ebx, 0909h
+   112                                  	sys	_video
+    64                              <1> 
+    65                              <1> 
+    66                              <1> 
+    67                              <1> 
+    68                              <1>  %if %0 >= 2
+    69                              <1>  mov ebx, %2
+    70                              <1>  %if %0 >= 3
+    71                              <1>  mov ecx, %3
+    72                              <1>  %if %0 = 4
+    73                              <1>  mov edx, %4
+    74                              <1>  %endif
+    75                              <1>  %endif
+    76                              <1>  %endif
+    77 0000001F B81F000000          <1>  mov eax, %1
+    78                              <1> 
+    79 00000024 CD40                <1>  int 40h
+   113                                  
+   114 00000026 B912010000              	mov	ecx, 112h ; VESA VBE video mode	(640x480, 24bpp)
+   115                                  	
+   116                                  	;cmp	ah, 3
+   117                                  	;je	short set_vmode
+   118                                  	;cmp	ah, 2
+   119                                  	;;jne	terminate ; invalid !?
+   120                                  	;jne	short set_vmode
+   121                                  	;and	al, al
+   122                                  	;jz	short set_vmode ; invalid !? (AL must be >= C0h.)
+   123                                  	
+   124 0000002B 3C20                    	cmp	al, 32
+   125 0000002D 7402                    	je	short set_vmode
+   126                                  	
+   127                                  	; VBE2 bios or default truecolor bpp is 24 bpp	
+   128                                  	; so, we are using video mode 142h 
+   129                                  	; (TRDOS 386 running in emulator or very old hardware!)
+   130                                  	
+   131                                  	; BOCHS/QEMU/VBOX emulator 
+   132 0000002F B142                    	mov	cl, 42h ; Bochs/Plex86 video mode 142h
+   133                                  			; (640*480, 32bpp) 		
+   134                                  
+   135                                  	; Set Video Mode to 112h ; 640x480, 32 bit true colors
+   136                                  	;
+   137                                  	; NOTE: NVIDIA GEFORCE FX 5500 VIDEO BIOS uses 32bpp 
+   138                                  	;       instead of 24bpp for same VBE video mode numbers. 
+   139                                  	;       So, 112h is 640*480, 24bpp for BOCHS/QEMU emulator
+   140                                  	;	but, it is 640*480, 32 bpp for real computer 
+   141                                  	;	with NVIDIA graphics card and video bios. 
+   142                                  	; (Also it is -it must be- 32bpp for other new hardware.)	  	
+   143                                  
+   144                                  	;sys	_video, 08FFh, 112h
+   145                                  set_vmode:
+   146                                  	; ecx = VESA VBE video mode
+   147                                  	sys	_video, 08FFh
+    64                              <1> 
+    65                              <1> 
+    66                              <1> 
+    67                              <1> 
+    68                              <1>  %if %0 >= 2
+    69 00000031 BBFF080000          <1>  mov ebx, %2
+    70                              <1>  %if %0 >= 3
+    71                              <1>  mov ecx, %3
+    72                              <1>  %if %0 = 4
+    73                              <1>  mov edx, %4
+    74                              <1>  %endif
+    75                              <1>  %endif
+    76                              <1>  %endif
+    77 00000036 B81F000000          <1>  mov eax, %1
+    78                              <1> 
+    79 0000003B CD40                <1>  int 40h
+   148 0000003D 09C0                    	or	eax, eax
+   149                                  	;jz	short terminate
+   150                                  	;mov	[LFB_ADDR], edx ; pointer to LFB info table/structure
+   151 0000003F 750E                    	jnz	short set_vesa_mode_112h_ok
+   152                                  
+   153                                  terminate:
+   154 00000041 E824020000              	call	set_text_mode
+   155                                  	sys	_exit
+    64                              <1> 
+    65                              <1> 
+    66                              <1> 
+    67                              <1> 
+    68                              <1>  %if %0 >= 2
+    69                              <1>  mov ebx, %2
+    70                              <1>  %if %0 >= 3
+    71                              <1>  mov ecx, %3
+    72                              <1>  %if %0 = 4
+    73                              <1>  mov edx, %4
+    74                              <1>  %endif
+    75                              <1>  %endif
+    76                              <1>  %endif
+    77 00000046 B801000000          <1>  mov eax, %1
+    78                              <1> 
+    79 0000004B CD40                <1>  int 40h
+   156                                  halt:
+   157 0000004D EBFE                    	jmp	short halt
+   158                                  
+   159                                  set_vesa_mode_112h_ok:
+   160 0000004F C705[A0050000]0000-     	mov	dword [color], 0FF0000h ; initial pixel color
+   160 00000057 FF00               
+   161                                  
+   162                                  	; initializing position difference parameters
+   163                                  	;mov	al, [maxdx]
+   164                                  	;shr	al, 1
+   165                                  	;mov	[posdx], al
+   166                                  	;mov	al, [maxdy]
+   167                                  	;shr	al, 1
+   168                                  	;mov	[posdy], al
+   169                                  
+   170                                  next_phase:
+   171 00000059 E821010000              	call	drawrect
+   172                                  waitforkey:
+   173 0000005E B401                    	mov	ah, 1
+   174 00000060 CD32                    	int	32h
+   175 00000062 740C                    	jz	short getkey
+   176 00000064 66FF05[A6050000]        	inc	word [counter]
+   177 0000006B 90                      	nop
+   178 0000006C 90                      	nop
+   179 0000006D 90                      	nop
+   180 0000006E EBEE                    	jmp	short waitforkey
+   181                                  getkey:
+   182 00000070 30E4                    	xor	ah, ah
+   183 00000072 CD32                    	int	32h
+   184                                  
+   185 00000074 663D032E                	cmp	ax, 2E03h
+   186 00000078 74C7                    	je	short terminate
+   187 0000007A 3C1B                    	cmp	al, 1Bh ; ESC key
+   188 0000007C 74C3                    	je	short terminate	
+   189                                  
+   190 0000007E 3C2B                    	cmp	al, '+'
+   191 00000080 7509                    	jne	short _1
+   192                                  
+   193 00000082 8305[A0050000]20        	add	dword [color], 20h
+   194 00000089 EBCE                    	jmp	short next_phase
+   195                                  _1:
+   196 0000008B 3C2D                    	cmp	al, '-'
+   197 0000008D 7509                    	jne	short _2
+   198                                  
+   199 0000008F 832D[A0050000]20        	sub	dword [color], 20h
+   200 00000096 EBC1                    	jmp	short next_phase
+   201                                  _2:
+   202 00000098 3C20                    	cmp	al, 20h  ; space
+   203 0000009A 750C                    	jne	short _3
+   204 0000009C 8105[A0050000]2020-     	add	dword [color], 2020h	
+   204 000000A4 0000               
+   205 000000A6 EBB1                    	jmp	short next_phase
+   206                                  _3:
+   207 000000A8 80FC4B                  	cmp	ah, 4Bh
+   208 000000AB 7509                    	jne	short _4
+   209                                  	; left arrow
+   210 000000AD C605[A5050000]01        	mov	byte [direction], 1
+   211 000000B4 EBA3                    	jmp	next_phase
+   212                                  _4:
+   213 000000B6 80FC4D                  	cmp	ah, 4Dh
+   214 000000B9 7509                    	jne	short _5
+   215                                  	; right arrow
+   216 000000BB C605[A5050000]02        	mov	byte [direction], 2
+   217 000000C2 EB95                    	jmp	next_phase
+   218                                  _5:
+   219 000000C4 80FC50                  	cmp	ah, 50h
+   220 000000C7 7509                    	jne	short _6
+   221                                  	; down arrow
+   222 000000C9 C605[A5050000]03        	mov	byte [direction], 3
+   223 000000D0 EB87                    	jmp	next_phase
+   224                                  _6:
+   225 000000D2 80FC48                  	cmp	ah, 48h
+   226 000000D5 750C                    	jne	short _7
+   227                                  	; up arrow
+   228 000000D7 C605[A5050000]04        	mov	byte [direction], 4
+   229 000000DE E976FFFFFF              	jmp	next_phase
+   230                                  _7:
+   231 000000E3 80FC47                  	cmp	ah, 47h ; Home key
+   232 000000E6 750C                    	jne	short _9
+   233                                  _8:
+   234 000000E8 C605[A4050000]00        	mov	byte [phase], 0
+   235 000000EF E965FFFFFF              	jmp	next_phase
+   236                                  _9:
+   237 000000F4 80FC4F                  	cmp	ah, 4Fh ; End key
+   238 000000F7 750C                    	jne	short _10
+   239 000000F9 C705[A0050000]0000-     	mov	dword [color], 0FF0000h
+   239 00000101 FF00               
+   240 00000103 EBE3                    	jmp	short _8
+   241                                  _10:	
+   242 00000105 663D0D1C                	cmp	ax, 1C0Dh
+   243 00000109 7520                    	jne	short _12
+   244                                  	
+   245 0000010B FE05[A4050000]          	inc	byte [phase]
+   246 00000111 803D[A4050000]05        	cmp	byte [phase], 5
+   247 00000118 7705                    	ja	short _11
+   248 0000011A E93AFFFFFF              	jmp	next_phase
+   249                                  _11:
+   250 0000011F C605[A4050000]00        	mov	byte [phase], 0
+   251 00000126 E92EFFFFFF              	jmp	next_phase
+   252                                  _12:	
+   253 0000012B 80FC49                  	cmp	ah, 49h  ; Page UP
+   254 0000012E 751A                    	jne	short _14
+   255 00000130 FE0D[A4050000]          	dec	byte [phase]
+   256 00000136 790D                    	jns	short _13
+   257 00000138 E81B010000              	call	beep
+   258 0000013D FE05[A4050000]          	inc	byte [phase]
+   259 00000143 EB24                    	jmp	short _15
+   260                                  _13:
+   261 00000145 E90FFFFFFF              	jmp	next_phase
+   262                                  _14:
+   263 0000014A 80FC51                  	cmp	ah, 51h  ; Page Down
+   264 0000014D 751A                    	jne	short _15
+   265 0000014F FE05[A4050000]          	inc	byte [phase]
+   266 00000155 803D[A4050000]05        	cmp	byte [phase], 5
+   267 0000015C 76E7                    	jna	short _13
+   268 0000015E E8F5000000              	call	beep
+   269 00000163 FE0D[A4050000]          	dec	byte [phase]
+   270                                  _15:
+   271 00000169 E9F0FEFFFF              	jmp	waitforkey
+   272                                  
+   273                                  print_msg:
+   274 0000016E B40E                    	mov	ah, 0Eh
+   275 00000170 BB07000000              	mov	ebx, 7
+   276                                  	;mov	bl, 7 ; char attribute & color
+   277                                  p_next_chr:
+   278 00000175 AC                      	lodsb
+   279 00000176 08C0                    	or	al, al
+   280 00000178 7404                    	jz	short p_retn ; retn	
+   281 0000017A CD31                    	int	31h
+   282 0000017C EBF7                    	jmp	short p_next_chr
+   283                                  p_retn:
+   284 0000017E C3                      	retn
+   285                                  
+   286                                  drawrect:
+   287                                  	; draw rectangles
+   288 0000017F 803D[A4050000]03        	cmp	byte [phase], 3
+   289 00000186 7321                    	jnb	short dr_x
+   290 00000188 31C0                    	xor	eax, eax
+   291 0000018A 3805[A5050000]          	cmp	byte [direction], al ; 0
+   292 00000190 7617                    	jna	short dr_x
+   293 00000192 8705[A0050000]          	xchg	eax, [color]
+   294 00000198 50                      	push	eax
+   295 00000199 E80B000000              	call	dr_x
+   296 0000019E 58                      	pop	eax
+   297 0000019F A3[A0050000]            	mov	[color], eax
+   298 000001A4 E8C8000000              	call	change_positions
+   299                                  dr_x:
+   300 000001A9 803D[A4050000]00        	cmp	byte [phase], 0
+   301 000001B0 772F                    	ja	short dr_2
+   302                                  	; position 1 rectangles
+   303 000001B2 BE[B6030000]            	mov	esi, positions1
+   304 000001B7 BF[A8050000]            	mov	edi, rectbuffer1
+   305                                  dr_0:
+   306 000001BC B914000000              	mov	ecx, 20 ; 20 lines, 5 rectangles
+   307 000001C1 57                      	push	edi 
+   308                                  dr_1:
+   309 000001C2 AD                      	lodsd
+   310 000001C3 AB                      	stosd	; position
+   311 000001C4 AD                      	lodsd	; 
+   312 000001C5 AB                      	stosd	; length (and type, h/v)
+   313 000001C6 E2FA                    	loop	dr_1
+   314 000001C8 5E                      	pop	esi
+   315                                  
+   316                                  	; BL bit 5 = 1 -> write lines via user buffer
+   317                                  	sys	_video, 022Eh, [color], 20
+    64                              <1> 
+    65                              <1> 
+    66                              <1> 
+    67                              <1> 
+    68                              <1>  %if %0 >= 2
+    69 000001C9 BB2E020000          <1>  mov ebx, %2
+    70                              <1>  %if %0 >= 3
+    71 000001CE 8B0D[A0050000]      <1>  mov ecx, %3
+    72                              <1>  %if %0 = 4
+    73 000001D4 BA14000000          <1>  mov edx, %4
+    74                              <1>  %endif
+    75                              <1>  %endif
+    76                              <1>  %endif
+    77 000001D9 B81F000000          <1>  mov eax, %1
+    78                              <1> 
+    79 000001DE CD40                <1>  int 40h
+   318 000001E0 C3                      	retn
+   319                                  dr_2:
+   320 000001E1 803D[A4050000]01        	cmp	byte [phase], 1
+   321 000001E8 770C                    	ja	short dr_3
+   322                                  	; position 2 rectangles
+   323 000001EA BE[56040000]            	mov	esi, positions2
+   324 000001EF BF[48060000]            	mov	edi, rectbuffer2
+   325 000001F4 EBC6                    	jmp	short dr_0
+   326                                  dr_3:
+   327 000001F6 803D[A4050000]02        	cmp	byte [phase], 2
+   328 000001FD 770C                    	ja	short dr_4
+   329                                  	; position 3 rectangles
+   330 000001FF BE[F6040000]            	mov	esi, positions3
+   331 00000204 BF[E8060000]            	mov	edi, rectbuffer3
+   332 00000209 EBB1                    	jmp	short dr_0
+   333                                  dr_4:
+   334 0000020B 803D[A4050000]03        	cmp	byte [phase], 3
+   335 00000212 771C                    	ja	short dr_6
+   336                                  	; delete position 1 rectangles
+   337 00000214 BE[A8050000]            	mov	esi, rectbuffer1
+   338                                  dr_5:
+   339                                  	; clear previous positions (by using black color)
+   340                                  	; BL bit 5 = 1 -> write lines via user buffer
+   341                                  	sys	_video, 022Eh, 0, 20
+    64                              <1> 
+    65                              <1> 
+    66                              <1> 
+    67                              <1> 
+    68                              <1>  %if %0 >= 2
+    69 00000219 BB2E020000          <1>  mov ebx, %2
+    70                              <1>  %if %0 >= 3
+    71 0000021E B900000000          <1>  mov ecx, %3
+    72                              <1>  %if %0 = 4
+    73 00000223 BA14000000          <1>  mov edx, %4
+    74                              <1>  %endif
+    75                              <1>  %endif
+    76                              <1>  %endif
+    77 00000228 B81F000000          <1>  mov eax, %1
+    78                              <1> 
+    79 0000022D CD40                <1>  int 40h
+   342 0000022F C3                      	retn			
+   343                                  dr_6:	  
+   344 00000230 803D[A4050000]04        	cmp	byte [phase], 4
+   345 00000237 7707                    	ja	short dr_7
+   346                                  	; delete position 2 rectangles
+   347 00000239 BE[48060000]            	mov	esi, rectbuffer2
+   348 0000023E EBD9                    	jmp	short dr_5
+   349                                  dr_7:
+   350 00000240 803D[A4050000]05        	cmp	byte [phase], 5
+   351 00000247 7707                    	ja	short dr_8
+   352                                  	; delete position 2 rectangles
+   353 00000249 BE[E8060000]            	mov	esi, rectbuffer3
+   354 0000024E EBC9                    	jmp	short dr_5
+   355                                  dr_8:
+   356 00000250 C605[A4050000]00        	mov	byte [phase], 0
+   357 00000257 C3                      	retn
+   358                                  	
+   359                                  beep:
+   360                                  	; call beep function (16/64 second, 886Hz)
+   361                                  	sys	_audio, 16, 1331
+    64                              <1> 
+    65                              <1> 
+    66                              <1> 
+    67                              <1> 
+    68                              <1>  %if %0 >= 2
+    69 00000258 BB10000000          <1>  mov ebx, %2
+    70                              <1>  %if %0 >= 3
+    71 0000025D B933050000          <1>  mov ecx, %3
+    72                              <1>  %if %0 = 4
+    73                              <1>  mov edx, %4
+    74                              <1>  %endif
+    75                              <1>  %endif
+    76                              <1>  %endif
+    77 00000262 B820000000          <1>  mov eax, %1
+    78                              <1> 
+    79 00000267 CD40                <1>  int 40h
+   362 00000269 C3                      	retn
+   363                                  
+   364                                  set_text_mode:
+   365 0000026A 30E4                    	xor    ah, ah
+   366 0000026C B003                    	mov    al, 3                        
+   367                                   	;int   10h	; al = 03h text mode, int 10 video
+   368 0000026E CD31                    	int    31h ; TRDOS 386 - Video interrupt
+   369 00000270 C3                      	retn
+   370                                  
+   371                                  change_positions:
+   372 00000271 B93C000000              	mov	ecx, 60 ; 60 lines, 15 rectangles
+   373 00000276 803D[A5050000]02        	cmp	byte [direction], 2
+   374 0000027D 7749                    	ja	short chgpos3 ; scroll down/up
+   375 0000027F 8A25[96050000]          	mov	ah, [maxdx]
+   376 00000285 A0[9A050000]            	mov	al, [posdx]
+   377 0000028A BE[B6030000]            	mov	esi, positions1 ; start address 
+   378 0000028F 7422                    	je	short chgpos1 ; slide to right
+   379                                  	; slide to left
+   380 00000291 20C0                    	and	al, al
+   381 00000293 7611                    	jna	short chgpos_beep
+   382 00000295 FEC8                    	dec	al
+   383 00000297 A2[9A050000]            	mov	[posdx], al
+   384                                  	; (horizontal positions) -L-
+   385                                  chgpos0:
+   386 0000029C 66FF0E                  	dec	word [esi]
+   387 0000029F 83C608                  	add	esi, 8
+   388 000002A2 E2F8                    	loop	chgpos0
+   389 000002A4 EB05                    	jmp	short chgpos_retn
+   390                                  chgpos_beep:
+   391 000002A6 E8ADFFFFFF              	call	beep
+   392                                  chgpos_retn:
+   393 000002AB C605[A5050000]00        	mov	byte [direction], 0
+   394 000002B2 C3                      	retn
+   395                                  chgpos1:
+   396 000002B3 38E0                    	cmp	al, ah ; right (dx) limit ?
+   397 000002B5 73EF                    	jnb	short chgpos_beep
+   398 000002B7 FEC0                    	inc	al
+   399 000002B9 A2[9A050000]            	mov	[posdx], al
+   400                                  	; (horizontal positions) -R-
+   401                                  chgpos2:
+   402 000002BE 66FF06                  	inc	word [esi]
+   403 000002C1 83C608                  	add	esi, 8
+   404 000002C4 E2F8                    	loop	chgpos2
+   405 000002C6 EBE3                    	jmp	short chgpos_retn
+   406                                  chgpos3:
+   407 000002C8 8A25[98050000]          	mov	ah, [maxdy]
+   408 000002CE A0[9C050000]            	mov	al, [posdy]
+   409 000002D3 BE[B8030000]            	mov	esi, positions1+2 ; start address 
+   410 000002D8 803D[A5050000]03        	cmp	byte [direction], 3
+   411 000002DF 770D                    	ja	short chgpos4 ; scroll up
+   412                                  	; scroll down
+   413 000002E1 38E0                    	cmp	al, ah ; down (dy) limit ?
+   414 000002E3 73C1                    	jnb	short chgpos_beep
+   415 000002E5 FEC0                    	inc	al
+   416 000002E7 A2[9C050000]            	mov	[posdy], al
+   417                                  	; (vertical positions) -D-
+   418 000002EC EBD0                    	jmp	short chgpos2
+   419                                  chgpos4:
+   420                                  	; scroll up
+   421 000002EE 08C0                    	or	al, al
+   422 000002F0 76B4                    	jna	short chgpos_beep
+   423 000002F2 FEC8                    	dec	al
+   424 000002F4 A2[9C050000]            	mov	[posdy], al
+   425                                  	; (vertical positions) -U-
+   426 000002F9 EBA1                    	jmp	short chgpos0
+   427                                  		
+   428                                  program_msg:
+   429 000002FB 5452444F5320333836-     	db "TRDOS 386 v2.0.3 - ('sysvideo') Test Program - Draw Lines"
+   429 00000304 2076322E302E33202D-
+   429 0000030D 202827737973766964-
+   429 00000316 656F27292054657374-
+   429 0000031F 2050726F6772616D20-
+   429 00000328 2D2044726177204C69-
+   429 00000331 6E6573             
+   430 00000334 0D0A                    	db 0Dh, 0Ah
+   431 00000336 6279204572646F6761-     	db "by Erdogan Tan - 07/03/2021"
+   431 0000033F 6E2054616E202D2030-
+   431 00000348 372F30332F32303231 
+   432                                  	;db 0Dh, 0Ah, 0
+   433 00000351 0D0A0D0A                	db 0Dh, 0Ah, 0Dh, 0Ah
+   434 00000355 507265737320454E54-     	db "Press ENTER to draw SQUAREs .."
+   434 0000035E 455220746F20647261-
+   434 00000367 772053515541524573-
+   434 00000370 202E2E             
+   435 00000373 0D0A                    	db 0Dh, 0Ah
+   436 00000375 507265737320535041-     	db "Press SPACE to change COLOR .."
+   436 0000037E 434520746F20636861-
+   436 00000387 6E676520434F4C4F52-
+   436 00000390 202E2E             
+   437 00000393 0D0A                    	db 0Dh, 0Ah
+   438 00000395 0D0A                    	db 0Dh, 0Ah
+   439 00000397 507265737320616E79-     	db "Press any key to continue .."
+   439 000003A0 206B657920746F2063-
+   439 000003A9 6F6E74696E7565202E-
+   439 000003B2 2E                 
+   440                                  nextline:
+   441 000003B3 0D0A00                  	db 0Dh, 0Ah, 0	
+   442                                  
+   443                                  positions1:
+   444                                  	; rectangle 1
+   445 000003B6 30003C0024000000        	dw 48,60,36,0
+   446 000003BE 53003C0024100000        	dw 83,60,4096+36,0
+   447 000003C6 30005F0024000000        	dw 48,95,36,0
+   448 000003CE 30003C0024100000        	dw 48,60,4096+36,0 
+   449                                  	; rectangle 2 
+   450 000003D6 280178009C000000        	dw 296,120,156,0
+   451 000003DE C301780078100000        	dw 451,120,4096+120,0
+   452 000003E6 2801EF009C000000        	dw 296,239,156,0
+   453 000003EE 2801780078100000        	dw 296,120,4096+120,0
+   454                                  	; rectangle 3 
+   455 000003F6 E801600018000000        	dw 488,96,24,0
+   456 000003FE FF01600018100000        	dw 511,96,4096+24,0
+   457 00000406 E801770018000000        	dw 488,119,24,0
+   458 0000040E E801600018100000        	dw 488,96,4096+24,0
+   459                                  	; rectangle 4 
+   460 00000416 D80050016C000000        	dw 216,336,108,0
+   461 0000041E 430150010C100000        	dw 323,336,4096+12,0
+   462 00000426 D8005B016C000000        	dw 216,347,108,0
+   463 0000042E D80050010C100000        	dw 216,336,4096+12,0
+   464                                  	; rectangle 5 	
+   465 00000436 180246010C000000        	dw 536,326,12,0
+   466 0000043E 230246013C100000        	dw 547,326,4096+60,0
+   467 00000446 180281010C000000        	dw 536,385,12,0
+   468 0000044E 180246013C100000        	dw 536,326,4096+60,0
+   469                                  positions2:
+   470                                  	; rectangle 6
+   471 00000456 EC00CC0018000000        	dw 236,204,24,0	     ; line 1, x1, y1, h
+   472 0000045E 0301CC0054100000        	dw 259,204,4096+84,0 ; line 2, x2, y1, v 
+   473 00000466 EC001F0118000000        	dw 236,287,24,0	     ; line 3, x1, y2, h 	
+   474 0000046E EC00CC0054100000        	dw 236,204,4096+84,0 ; line 4, x1, y1, v 
+   475                                  	; rectangle 7 
+   476 00000476 54002C0160000000        	dw 84,300,96,0
+   477 0000047E B3002C0154100000        	dw 179,300,4096+84,0
+   478 00000486 54007F0160000000        	dw 84,383,96,0
+   479 0000048E 54002C0154100000        	dw 84,300,4096+84,0
+   480                                  	; rectangle 8 
+   481 00000496 F801220118000000        	dw 504,290,24,0
+   482 0000049E 0F02220118100000        	dw 527,290,4096+24,0
+   483 000004A6 F801390118000000        	dw 504,313,24,0
+   484 000004AE F801220118100000        	dw 504,290,4096+24,0
+   485                                  	; rectangle 9 
+   486 000004B6 2801480048000000        	dw 296,72,72,0
+   487 000004BE 6F01480018100000        	dw 367,72,4096+24,0
+   488 000004C6 28015F0048000000        	dw 296,95,72,0
+   489 000004CE 2801480018100000        	dw 296,72,4096+24,0
+   490                                  	; rectangle 10 	
+   491 000004D6 5C01140130000000        	dw 348,276,48,0
+   492 000004DE 8B01140124100000        	dw 395,276,4096+36,0
+   493 000004E6 5C01370130000000        	dw 348,311,48,0
+   494 000004EE 5C01140124100000        	dw 348,276,4096+36,0
+   495                                  positions3:
+   496                                  	; rectangle 11 
+   497 000004F6 D001480018000000        	dw 464,72,24,0
+   498 000004FE E701480018100000        	dw 487,72,4096+24,0
+   499 00000506 D0015F0018000000        	dw 464,95,24,0
+   500 0000050E D001480018100000        	dw 464,72,4096+24,0 
+   501                                  	; rectangle 12 
+   502 00000516 84006C0048000000        	dw 132,108,72,0
+   503 0000051E CB006C0048100000        	dw 203,108,4096+72,0
+   504 00000526 8400B30048000000        	dw 132,179,72,0
+   505 0000052E 84006C0048100000        	dw 132,108,4096+72,0
+   506                                  	; rectangle 13 
+   507 00000536 0002780030000000        	dw 512,120,48,0
+   508 0000053E 2F02780024100000        	dw 559,120,4096+36,0
+   509 00000546 00029B0030000000        	dw 512,155,48,0
+   510 0000054E 0002780024100000        	dw 512,120,4096+36,0
+   511                                  	; rectangle 14 
+   512 00000556 980108010C000000        	dw 408,264,12,0
+   513 0000055E A301080118100000        	dw 419,264,4096+24,0
+   514 00000566 98011F010C000000        	dw 408,287,12,0
+   515 0000056E 9801080118100000        	dw 408,264,4096+24,0
+   516                                  	; rectangle 15 	
+   517 00000576 A401460148000000        	dw 420,326,72,0
+   518 0000057E EB0146013C100000        	dw 491,326,4096+60,0
+   519 00000586 A401810148000000        	dw 420,385,72,0
+   520 0000058E A40146013C100000        	dw 420,326,4096+60,0
+   521                                  
+   522 00000596 6000                    maxdx:	dw 96 	
+   523 00000598 6000                    maxdy:	dw 96	
+   524 0000059A 3000                    posdx:	dw 48
+   525 0000059C 3000                    posdy:	dw 48
+   526                                  
+   527                                  bss:
+   528                                  
+   529                                  ABSOLUTE bss
+   530                                  
+   531 0000059E ????                    alignb 4
+   532                                  
+   533                                  bss_start:
+   534 000005A0 ????????                	color:	resd 1
+   535 000005A4 ??                      	phase:  resb 1
+   536 000005A5 ??                      	direction: resb 1
+   537 000005A6 ????                    	counter: resw 1
+   538                                  	;posdx:	resw 1
+   539                                  	;posdy:	resw 1
+   540                                  
+   541                                  rectbuffer1:
+   542 000005A8 <res A0h>               	resd	40
+   543                                  rectbuffer2:
+   544 00000648 <res A0h>               	resd	40
+   545                                  rectbuffer3:
+   546 000006E8 <res A0h>               	resd	40
+   547                                  
+   548                                  bss_end:
