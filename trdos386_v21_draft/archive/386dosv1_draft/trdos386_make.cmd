@@ -1,0 +1,1 @@
+nasm trdos386.s -l trdos386.txt -o TRDOS386.SYS -Z error.txt
