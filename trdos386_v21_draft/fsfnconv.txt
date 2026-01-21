@@ -1,0 +1,859 @@
+     1                                  ; ****************************************************************************
+     2                                  ; fsfnconv.s (TRDOS 386 v2.1 test - singlix fs filename to shortname convert)
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; FSFNCONV.PRG ! TEST program !
+     5                                  ;
+     6                                  ; 23/05/2024
+     7                                  ;
+     8                                  ; Derived from 'args386.s' source code for TRDOS 386 v2.0 (11/05/2016)
+     9                                  ;
+    10                                  ; [ Last Modification: 27/05/2025 ]
+    11                                  ;
+    12                                  ; ****************************************************************************
+    13                                  
+    14                                  ; 20/10/2024
+    15                                  ; 20/08/2024 ; TRDOS 386 v2.0.9
+    16                                  ; TRDOS 386 system calls
+    17                                  _ver 	equ 0
+    18                                  _exit 	equ 1
+    19                                  _fork 	equ 2
+    20                                  _read 	equ 3
+    21                                  _write	equ 4
+    22                                  _open	equ 5
+    23                                  _close 	equ 6
+    24                                  _wait 	equ 7
+    25                                  _creat 	equ 8
+    26                                  _rename equ 9
+    27                                  _delete equ 10
+    28                                  _exec	equ 11
+    29                                  _chdir	equ 12
+    30                                  _time 	equ 13
+    31                                  _mkdir 	equ 14
+    32                                  _chmod	equ 15
+    33                                  _rmdir	equ 16
+    34                                  _break	equ 17
+    35                                  _drive	equ 18
+    36                                  _seek	equ 19
+    37                                  _tell 	equ 20
+    38                                  _mem	equ 21
+    39                                  _prompt	equ 22
+    40                                  _path	equ 23
+    41                                  _env	equ 24
+    42                                  _stime	equ 25
+    43                                  _quit	equ 26
+    44                                  _intr	equ 27
+    45                                  _dir	equ 28
+    46                                  _emt 	equ 29
+    47                                  _ldvrt 	equ 30
+    48                                  _video 	equ 31
+    49                                  _audio	equ 32
+    50                                  _timer	equ 33
+    51                                  _sleep	equ 34
+    52                                  _msg    equ 35
+    53                                  _geterr	equ 36
+    54                                  _fpsave	equ 37
+    55                                  _pri	equ 38
+    56                                  _rele	equ 39
+    57                                  _fff	equ 40
+    58                                  _fnf	equ 41
+    59                                  _alloc	equ 42
+    60                                  _dalloc equ 43
+    61                                  _calbac equ 44
+    62                                  _dma	equ 45
+    63                                  _stdio  equ 46	;  TRDOS 386 v2.0.9
+    64                                  
+    65                                  %macro sys 1-4
+    66                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)
+    67                                      ; 03/09/2015
+    68                                      ; 13/04/2015
+    69                                      ; Retro UNIX 386 v1 system call.
+    70                                      %if %0 >= 2
+    71                                          mov ebx, %2
+    72                                          %if %0 >= 3
+    73                                              mov ecx, %3
+    74                                              %if %0 = 4
+    75                                                 mov edx, %4
+    76                                              %endif
+    77                                          %endif
+    78                                      %endif
+    79                                      mov eax, %1
+    80                                      ;int 30h
+    81                                      int 40h ; TRDOS 386 (TRDOS v2.0)
+    82                                  %endmacro	   
+    83                                  
+    84                                  ; Retro UNIX 386 v1 system call format:
+    85                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    86                                  
+    87                                  [BITS 32] ; 32-bit intructions
+    88                                  
+    89                                  [ORG 0] 
+    90                                  
+    91                                  START_CODE:
+    92                                  	sys	_msg, version, 255, 0Ah
+    66                              <1> 
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1>  %if %0 >= 2
+    71 00000000 BB[70030000]        <1>  mov ebx, %2
+    72                              <1>  %if %0 >= 3
+    73 00000005 B9FF000000          <1>  mov ecx, %3
+    74                              <1>  %if %0 = 4
+    75 0000000A BA0A000000          <1>  mov edx, %4
+    76                              <1>  %endif
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79 0000000F B823000000          <1>  mov eax, %1
+    80                              <1> 
+    81 00000014 CD40                <1>  int 40h
+    93 00000016 89E6                    	mov	esi, esp
+    94 00000018 AD                      	lodsd
+    95 00000019 21C0                    	and	eax, eax
+    96 0000001B 7447                    	jz	short terminate
+    97 0000001D 83F803                  	cmp	eax, 3	; number of arguments
+    98 00000020 724B                    	jb	short show_usage
+    99 00000022 89C5                    	mov	ebp, eax
+   100 00000024 AD                      	lodsd	; skip program file name
+   101 00000025 4D                      	dec	ebp
+   102                                  nextarg:
+   103 00000026 AD                      	lodsd	; number address
+   104                                  	;call	convert_to_formal_str
+   105 00000027 E899000000              	call	convert_to_fdt_number
+   106                                  
+   107 0000002C BF[32040000]            	mov	edi, fs_name ; fs (long) file name
+   108 00000031 B940000000              	mov	ecx, 64	; file name limit
+   109 00000036 4D                      	dec	ebp
+   110                                  next_word:
+   111 00000037 AD                      	lodsd
+   112 00000038 E8D5000000              	call	move_file_name
+   113 0000003D 67E303                  	jcxz	put_zero
+   114 00000040 4D                      	dec	ebp
+   115 00000041 75F4                    	jnz	short next_word
+   116                                  put_zero:
+   117 00000043 31C0                    	xor	eax, eax
+   118 00000045 AA                      	stosb
+   119                                  
+   120 00000046 BE[32040000]            	mov	esi, fs_name
+   121 0000004B BA0C000000              	mov	edx, 12 ; max. 12 bytes
+   122 00000050 BF[90040000]            	mov	edi, target_name
+   123 00000055 A1[73040000]            	mov	eax, [fdt_number]
+   124                                  
+   125 0000005A E8F8000000              	call	convert_name_from_trfs
+   126                                  
+   127 0000005F E821000000              	call	print_short_name
+   128                                  terminate: 
+   129                                  	sys	_exit
+    66                              <1> 
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1>  %if %0 >= 2
+    71                              <1>  mov ebx, %2
+    72                              <1>  %if %0 >= 3
+    73                              <1>  mov ecx, %3
+    74                              <1>  %if %0 = 4
+    75                              <1>  mov edx, %4
+    76                              <1>  %endif
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79 00000064 B801000000          <1>  mov eax, %1
+    80                              <1> 
+    81 00000069 CD40                <1>  int 40h
+   130                                  halt:
+   131 0000006B EBFE                    	jmp	short halt
+   132                                  
+   133                                  show_usage:
+   134                                  	sys	_msg, usage, 255, 0Fh
+    66                              <1> 
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1>  %if %0 >= 2
+    71 0000006D BB[DA030000]        <1>  mov ebx, %2
+    72                              <1>  %if %0 >= 3
+    73 00000072 B9FF000000          <1>  mov ecx, %3
+    74                              <1>  %if %0 = 4
+    75 00000077 BA0F000000          <1>  mov edx, %4
+    76                              <1>  %endif
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79 0000007C B823000000          <1>  mov eax, %1
+    80                              <1> 
+    81 00000081 CD40                <1>  int 40h
+   135 00000083 EBDF                    	jmp	short terminate
+   136                                  
+   137                                  print_short_name:
+   138                                  	sys	_msg, nexline, 2, 07h
+    66                              <1> 
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1>  %if %0 >= 2
+    71 00000085 BB[20040000]        <1>  mov ebx, %2
+    72                              <1>  %if %0 >= 3
+    73 0000008A B902000000          <1>  mov ecx, %3
+    74                              <1>  %if %0 = 4
+    75 0000008F BA07000000          <1>  mov edx, %4
+    76                              <1>  %endif
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79 00000094 B823000000          <1>  mov eax, %1
+    80                              <1> 
+    81 00000099 CD40                <1>  int 40h
+   139                                  	sys	_msg, edi, 255, 0Fh
+    66                              <1> 
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1>  %if %0 >= 2
+    71 0000009B 89FB                <1>  mov ebx, %2
+    72                              <1>  %if %0 >= 3
+    73 0000009D B9FF000000          <1>  mov ecx, %3
+    74                              <1>  %if %0 = 4
+    75 000000A2 BA0F000000          <1>  mov edx, %4
+    76                              <1>  %endif
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79 000000A7 B823000000          <1>  mov eax, %1
+    80                              <1> 
+    81 000000AC CD40                <1>  int 40h
+   140                                  	sys	_msg, nexline, 2, 07h
+    66                              <1> 
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1>  %if %0 >= 2
+    71 000000AE BB[20040000]        <1>  mov ebx, %2
+    72                              <1>  %if %0 >= 3
+    73 000000B3 B902000000          <1>  mov ecx, %3
+    74                              <1>  %if %0 = 4
+    75 000000B8 BA07000000          <1>  mov edx, %4
+    76                              <1>  %endif
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79 000000BD B823000000          <1>  mov eax, %1
+    80                              <1> 
+    81 000000C2 CD40                <1>  int 40h
+   141 000000C4 C3                      	retn
+   142                                  
+   143                                  ; 23/05/2025
+   144                                  %if 0
+   145                                  convert_to_formal_str:
+   146                                  	; eax = FDT (or DDT) number text
+   147                                  	push	esi
+   148                                  	mov	ecx, 12
+   149                                  	mov	esi, eax
+   150                                  	mov	edi, formal_number
+   151                                  ctfstr_@:
+   152                                  	lodsb
+   153                                  	cmp	al, '9'
+   154                                  	ja	short ctfstr_ok
+   155                                  	cmp	al, '0'
+   156                                  	jb	short ctfstr_ok
+   157                                  	stosb
+   158                                  	loop	ctfstr_@
+   159                                  ctfstr_ok:
+   160                                  	mov	al, ']'
+   161                                  	stosb
+   162                                  	sub	eax, eax
+   163                                  	stosb
+   164                                  	pop	esi
+   165                                  	retn
+   166                                  %endif
+   167                                  
+   168                                  convert_to_fdt_number:
+   169                                  	; eax = FDT (or DDT) number text
+   170 000000C5 56                      	push	esi
+   171 000000C6 B90C000000              	mov	ecx, 12
+   172 000000CB 89C6                    	mov	esi, eax
+   173 000000CD 31C0                    	xor	eax, eax ; 0
+   174 000000CF A3[73040000]            	mov	[fdt_number], eax
+   175                                  cfdtnum_1:
+   176 000000D4 AC                      	lodsb
+   177 000000D5 3C39                    	cmp	al, '9'
+   178 000000D7 772B                    	ja	short cfdtnum_2
+   179 000000D9 3C30                    	cmp	al, '0'
+   180 000000DB 7227                    	jb	short cfdtnum_2
+   181 000000DD 2C30                    	sub	al, '0'
+   182 000000DF 89C3                    	mov	ebx, eax
+   183 000000E1 B00A                    	mov	al, 10
+   184 000000E3 F725[73040000]          	mul	dword [fdt_number]
+   185 000000E9 09D2                    	or	edx, edx
+   186                                  	;jnz	short cfdtnum_2
+   187 000000EB 7519                    	jnz	short cfdtnum_3
+   188 000000ED A3[73040000]            	mov	[fdt_number], eax
+   189 000000F2 031D[73040000]          	add	ebx, [fdt_number]
+   190                                  	;jc	short cfdtnum_2
+   191 000000F8 720C                    	jc	short cfdtnum_3
+   192 000000FA 891D[73040000]          	mov	[fdt_number], ebx
+   193 00000100 31C0                    	xor	eax, eax
+   194 00000102 E2D0                    	loop	cfdtnum_1
+   195                                  cfdtnum_2:
+   196 00000104 5E                      	pop	esi
+   197 00000105 C3                      	retn
+   198                                  cfdtnum_3:
+   199 00000106 C705[73040000]FFFF-     	mov	dword [fdt_number], 0FFFFFFFFh
+   199 0000010E FFFF               
+   200 00000110 EBF2                    	jmp	short cfdtnum_2
+   201                                  
+   202                                  move_file_name:
+   203                                  	; eax = argument, fs file name text
+   204                                  	; ecx = remain byte count
+   205 00000112 56                      	push	esi
+   206 00000113 89C6                    	mov	esi, eax
+   207                                  mfn_@:
+   208 00000115 AC                      	lodsb
+   209 00000116 3C20                    	cmp	al, 20h
+   210 00000118 7203                    	jb	short mfn_skip
+   211 0000011A AA                      	stosb
+   212 0000011B E2F8                    	loop	mfn_@
+   213                                  	; ecx = 0
+   214                                  	;xor	eax, eax
+   215                                  	;stosb
+   216                                  mfn_skip:
+   217 0000011D 5E                      	pop	esi
+   218 0000011E C3                      	retn
+   219                                  
+   220                                  convert_invalid_chars_@:
+   221                                  	; 27/05/2025 - TRDOS 386 v2.0.10
+   222                                  
+   223 0000011F 3C2E                    	cmp	al, '.'
+   224 00000121 7504                    	jne	short convert_invalid_chars
+   225 00000123 88C4                    	mov	ah, al
+   226 00000125 EB28                    	jmp	short cic_2
+   227                                  
+   228                                  convert_invalid_chars:
+   229                                  	; 27/05/2025
+   230                                  	; 20/05/2025 - TRDOS 386 v2.0.10
+   231                                  	;
+   232                                  	; INPUT:
+   233                                  	;  al = character
+   234                                  	; OUTPUT:
+   235                                  	;  al = converted character
+   236                                  	;  ah = uppercase of AL input
+   237                                  	;  (invalid char will be converted to '_')
+   238                                  	;  (lowercase char will be converted to uppercase)
+   239                                  	;
+   240                                  	; Modified registers: EAX
+   241                                  
+   242 00000127 88C4                    	mov	ah, al
+   243                                  
+   244 00000129 3C80                    	cmp	al, 128
+   245 0000012B 7324                    	jnb	short cic_3
+   246                                  
+   247                                  	;cmp	al, 20h
+   248                                  	;jb	short cic_3
+   249                                  
+   250                                  	;cmp	al, 'A'
+   251 0000012D 3C40                    	cmp	al, '@'
+   252 0000012F 720C                    	jb	short cic_1
+   253 00000131 3C5A                    	cmp	al, 'Z'
+   254 00000133 761C                    	jna	short cic_3
+   255 00000135 3C61                    	cmp	al, 'a'
+   256 00000137 7204                    	jb	short cic_1
+   257 00000139 3C7A                    	cmp	al, 'z'
+   258 0000013B 7615                    	jna	short cic_4 ; convert to upper case
+   259                                  cic_1:
+   260 0000013D 57                      	push	edi
+   261 0000013E 51                      	push	ecx
+   262                                  	;mov	edi, invalid_fname_chars_@
+   263                                   	;mov	ecx, sizeInvFnChars@
+   264                                  	; 27/05/2025
+   265 0000013F BF[61030000]            	mov	edi, invalid_fname_chars
+   266 00000144 B90F000000               	mov	ecx, sizeInvFnChars
+   267 00000149 F2AE                    	repne	scasb
+   268 0000014B 59                      	pop	ecx
+   269 0000014C 5F                      	pop	edi
+   270 0000014D 7502                    	jnz	short cic_3 ; 27/05/2025
+   271                                  	; invalid char
+   272                                  cic_2:
+   273 0000014F B05F                    	mov	al, '_'
+   274                                  cic_3:
+   275 00000151 C3                      	retn
+   276                                  cic_4:
+   277                                  	; simple ucase
+   278 00000152 24DF                    	and	al, 0DFh
+   279                                  	;and	al, 5Fh
+   280 00000154 88C4                    	mov	ah, al
+   281 00000156 C3                      	retn
+   282                                  
+   283                                  convert_name_from_trfs:
+   284                                  	; 27/05/2025
+   285                                  	; 25/05/2025
+   286                                  	; 24/05/2025
+   287                                  	; 23/05/2025
+   288                                  	; 21/05/2025
+   289                                  	; 20/05/2025
+   290                                  	;
+   291                                  	; INPUT:
+   292                                  	;	ESI = long file name (singlix fs, asciiz format)
+   293                                  	; 	      (max. 64 chars)
+   294                                  	;	EDX = (max.) number of the target format chars
+   295                                  	;	      (space: min. 12 chars + trailing NUL)
+   296                                  	;	EDI = target file name address
+   297                                  	;
+   298                                  	; OUTPUT:
+   299                                  	;	ECX = length of the asciiz file name
+   300                                  	;		 (except NUL tail)
+   301                                  	;	EDI = target file name address
+   302                                  	;	EAX = 0 if the name does not contain FDT number
+   303                                  	;	    = FDT number (if > 0)
+   304                                  	;
+   305                                  	; Modified registers: EAX, EBX, ECX
+   306                                  
+   307                                  	; 21/05/2025
+   308 00000157 A3[73040000]            	mov	[fdt_number], eax
+   309 0000015C 8915[77040000]          	mov	[f_name_limit], edx
+   310                                  	;mov	[f_base_start], edi
+   311 00000162 893D[7B040000]          	mov	[f_target], edi
+   312 00000168 31DB                    	xor	ebx, ebx
+   313 0000016A 891D[7F040000]          	mov	[f_base_count], ebx ; 0
+   314 00000170 891D[83040000]          	mov	[f_ext_start], ebx ; 0
+   315 00000176 891D[87040000]          	mov	[f_ext_count], ebx ; 0
+   316                                  	; 24/05/2025
+   317                                  	;mov	[f_name_count], ebx ; 0
+   318 0000017C 891D[8B040000]          	mov	[formal_size], ebx ; 0
+   319 00000182 881D[8F040000]          	mov	[insert_fdtnum], bl ; 0
+   320                                  
+   321                                  	; temporary name space on bss section
+   322                                  	; 25/05/2025
+   323 00000188 BF[9D040000]            	mov	edi, temp_name ; max. 64 bytes + zero
+   324                                  
+   325 0000018D B940000000              	mov	ecx, 64
+   326                                  
+   327                                  	;xor	ebx, ebx
+   328                                  
+   329                                  	; remove spaces at first
+   330                                  	; and save the last dot position
+   331                                  
+   332 00000192 57                      	push	edi ; *
+   333                                  	;mov	[f_base_start], edi
+   334                                  conv_f_fs_0:	; remove_spaces
+   335 00000193 AC                      	lodsb
+   336 00000194 3C20                    	cmp	al, 20h
+   337 00000196 7409                    	je	short conv_f_fs_2 ; rms_next
+   338 00000198 7209                    	jb	short conv_f_fs_3 ; end_rm_space
+   339 0000019A 3C2E                    	cmp	al, '.'
+   340 0000019C 7502                    	jne	short conv_f_fs_1 ; not_dot
+   341 0000019E 89FB                    	mov	ebx, edi ; the last dot
+   342                                  conv_f_fs_1:	; not_dot
+   343 000001A0 AA                      	stosb
+   344                                  conv_f_fs_2:	; rms_next
+   345 000001A1 E2F0                    	loop	conv_f_fs_0 ; remove spaces
+   346                                  conv_f_fs_3:	; end_rm_space
+   347 000001A3 5E                      	pop	esi ; *
+   348 000001A4 89F9                    	mov	ecx, edi
+   349                                  
+   350                                  	; zero tail
+   351 000001A6 30C0                    	xor	al, al ; 0
+   352 000001A8 AA                      	stosb
+   353                                  
+   354                                  	; ebx = the last dot position
+   355                                  
+   356                                  	; 24/05/2025
+   357 000001A9 29F1                    	sub	ecx, esi ; number of chars
+   358                                  	 	 ; (without spaces)
+   359 000001AB 0F84F3000000            	jz	nul_name
+   360                                  
+   361                                  	; 24/05/2025
+   362                                  	;mov	[f_name_count], ecx
+   363 000001B1 890D[7F040000]          	mov	[f_base_count], ecx
+   364                                  
+   365                                  	; 25/05/2025
+   366 000001B7 8B3D[7B040000]          	mov	edi, [f_target] ; (*)
+   367                                  
+   368 000001BD 21DB                    	and	ebx, ebx
+   369 000001BF 0F8487000000            	jz	conv_f_fs_6 ; ecx > 0 ; not dot
+   370                                  
+   371                                  	;sub	ebx, esi ; chars before the last DOT
+   372                                  	;jz	dot_first ; name starts with '.'
+   373                                  
+   374                                  	; 24/05/2025
+   375 000001C5 803E2E                  	cmp	byte [esi], '.'
+   376 000001C8 7465                    	je	dot_first ; name starts with '.'
+   377                                  
+   378 000001CA 89D8                    	mov	eax, ebx ; the last DOT position
+   379 000001CC 40                      	inc	eax
+   380                                  
+   381                                  	; check the 1st char after the dot
+   382 000001CD 803800                  	cmp	byte [eax], 0
+   383 000001D0 766B                    	jna	dot_last ; name ends with '.' !
+   384                                  
+   385 000001D2 29F3                    	sub	ebx, esi
+   386 000001D4 881D[7F040000]          	mov	[f_base_count], bl
+   387                                  
+   388 000001DA A3[83040000]            	mov	[f_ext_start], eax
+   389                                  
+   390 000001DF 29D9                    	sub	ecx, ebx ; > 1
+   391                                  		; total name size - base name size
+   392 000001E1 49                      	dec	ecx ; except '.'
+   393                                  
+   394 000001E2 80F904                  	cmp	cl, 4	; .ext size limit is 4 (.html)
+   395 000001E5 7608                    	jna	short conv_f_fs_4
+   396 000001E7 FE05[8F040000]          	inc	byte [insert_fdtnum] ; not exact name
+   397 000001ED B104                    	mov	cl, 4
+   398                                  conv_f_fs_4:
+   399 000001EF 890D[87040000]          	mov	[f_ext_count], ecx
+   400 000001F5 89D0                    	mov	eax, edx ; = [f_name_limit] ; >= 12
+   401 000001F7 29C8                    	sub	eax, ecx ; ecx <= 4
+   402 000001F9 48                      	dec	eax ; '.'
+   403 000001FA 3B05[7F040000]          	cmp	eax, [f_base_count]
+   404 00000200 734F                    	jnb	short conv_f_fs_7 ; proper
+   405                                  	; (for example: [f_base_count] > 7)
+   406 00000202 FE05[8F040000]          	inc	byte [insert_fdtnum] ; not exact name
+   407 00000208 80F903                  	cmp	cl, 3
+   408 0000020B 7618                    	jna	short conv_f_fs_5
+   409 0000020D 49                      	dec	ecx
+   410 0000020E EBDF                    	jmp	short conv_f_fs_4
+   411                                  
+   412                                  	; 24/05/2025
+   413                                  check_fn_limit:
+   414 00000210 3915[7F040000]          	cmp	[f_base_count], edx ; limit (minimum 12)
+   415 00000216 760C                    	jna	short cfnl_ok
+   416 00000218 FE05[8F040000]          	inc	byte [insert_fdtnum]
+   417 0000021E 8915[7F040000]          	mov	[f_base_count], edx
+   418                                  cfnl_ok:
+   419 00000224 C3                      	retn
+   420                                  
+   421                                  conv_f_fs_5:
+   422                                  	; minimum 1 byte base name is needed
+   423 00000225 FE0D[7F040000]          	dec	byte [f_base_count]
+   424 0000022B 75C2                    	jnz	short conv_f_fs_4 ; ok
+   425                                  
+   426                                  	; 24/05/2025
+   427 0000022D EB3B                    	jmp	short conv_f_fs_10
+   428                                  
+   429                                  	; 23/05/2025
+   430                                  dot_first:
+   431                                  	; 25/05/2025
+   432                                  	;mov	edi, [f_target] ; (*)
+   433 0000022F A4                      	movsb	; skip '.'
+   434 00000230 FE05[8F040000]          	inc	byte [insert_fdtnum]
+   435 00000236 E8D5FFFFFF              	call	check_fn_limit
+   436                                  	;dec	ecx
+   437                                  	;jmp	short conv_f_fs_8
+   438 0000023B EB2B                    	jmp	short conv_f_fs_9
+   439                                  
+   440                                  	; 23/05/2025
+   441                                  dot_last:
+   442 0000023D C60300                  	mov	byte [ebx], 0 ; clear the last '.'
+   443                                  	; 24/05/2025
+   444                                  	;mov	ecx, [f_base_count]
+   445                                  	;dec	ecx ; without DOT
+   446                                  	;mov	[f_base_count], ecx
+   447 00000240 FF0D[7F040000]          	dec	dword [f_base_count]
+   448 00000246 FE05[8F040000]          	inc	byte [insert_fdtnum]
+   449                                  
+   450                                  conv_f_fs_6:	; not dot
+   451                                  	; esi = [f_target] = [f_base_start]
+   452                                  	;;ecx = [f_base_count] = [f_name_count]
+   453                                  	; edx = [f_name_limit]
+   454                                  
+   455                                  	; check file name limit and
+   456                                  	; change/descrease if it is required
+   457 0000024C E8BFFFFFFF              	call	check_fn_limit
+   458                                  
+   459                                  conv_f_fs_7:
+   460                                  	; 25/05/2025
+   461                                  	;mov	edi, [f_target] ; (*)
+   462 00000251 8B0D[7F040000]          	mov	ecx, [f_base_count]
+   463                                  conv_f_fs_8:
+   464 00000257 AC                      	lodsb
+   465                                  	;call	convert_invalid_chars
+   466                                  	; 27/05/2025
+   467 00000258 E8C2FEFFFF              	call	convert_invalid_chars_@
+   468 0000025D AA                      	stosb
+   469 0000025E 38C4                    	cmp	ah, al
+   470 00000260 7406                    	je	short conv_f_fs_9
+   471 00000262 FE05[8F040000]          	inc	byte [insert_fdtnum]
+   472                                  conv_f_fs_9:
+   473 00000268 E2ED                    	loop	conv_f_fs_8
+   474                                  
+   475                                  conv_f_fs_10:
+   476 0000026A 8B0D[87040000]          	mov	ecx, [f_ext_count]
+   477 00000270 E322                    	jecxz	conv_f_fs_13
+   478                                  
+   479 00000272 B02E                    	mov	al, '.'
+   480 00000274 AA                      	stosb
+   481                                  
+   482 00000275 8B35[83040000]          	mov	esi, [f_ext_start]
+   483 0000027B 893D[83040000]          	mov	[f_ext_start], edi
+   484                                  conv_f_fs_11:
+   485 00000281 AC                      	lodsb
+   486                                  	;call	convert_invalid_chars
+   487                                  	; 27/05/2025
+   488 00000282 E898FEFFFF              	call	convert_invalid_chars_@
+   489 00000287 AA                      	stosb
+   490 00000288 38C4                    	cmp	ah, al
+   491 0000028A 7406                    	je	short conv_f_fs_12
+   492 0000028C FE05[8F040000]          	inc	byte [insert_fdtnum]
+   493                                  conv_f_fs_12:
+   494 00000292 E2ED                    	loop	conv_f_fs_11
+   495                                  
+   496                                  conv_f_fs_13:
+   497 00000294 C60700                  	mov	byte [edi], 0
+   498                                  
+   499 00000297 803D[8F040000]00        	cmp	byte [insert_fdtnum], 0
+   500 0000029E 0F868E000000            	jna	conv_f_fs_ok
+   501                                  
+   502                                  nul_name: ; 24/05/2025 ; [f_base_count] = 0
+   503                                  
+   504 000002A4 A1[73040000]            	mov	eax, [fdt_number]
+   505                                  
+   506 000002A9 BF[23040000]            	mov	edi, formal_string ; space = 13 bytes
+   507                                  
+   508                                  	; "[numbertext]" = fdt number which will inserted
+   509                                  	;		between '[' and ']'
+   510                                  
+   511 000002AE E886000000              	call	convert_num_to_formalstr
+   512                                  
+   513                                  	; ecx = formal string length ("[....]" char count)
+   514 000002B3 890D[8B040000]          	mov	[formal_size], ecx
+   515                                  
+   516                                  	;mov	esi, formal_string
+   517 000002B9 89FE                    	mov	esi, edi ; semi-raw short name address
+   518 000002BB 8B3D[7B040000]          	mov	edi, [f_target] ; = [f_base_start]
+   519                                  
+   520                                  	; 25/05/2025
+   521                                  conv_f_fs_14:
+   522                                  	; 24/05/2025
+   523 000002C1 8B15[77040000]          	mov	edx, [f_name_limit] ; max. length
+   524 000002C7 A1[87040000]            	mov	eax, [f_ext_count]
+   525 000002CC 09C0                    	or	eax, eax
+   526 000002CE 7403                    	jz	short conv_f_fs_15
+   527 000002D0 29C2                    	sub	edx, eax  ; - extension length
+   528 000002D2 4A                      	dec	edx ; except DOT
+   529                                  	;jz	short use_only_formal_str ; fdt only
+   530                                  conv_f_fs_15:
+   531                                  	; 25/05/2025
+   532 000002D3 29CA                    	sub	edx, ecx
+   533 000002D5 7716                    	ja	short conv_f_fs_16 ; edx > 0
+   534                                  		 ; min. 1 base name char at the beginning
+   535                                  
+   536                                  	; there is not base name space for a base name char
+   537                                  	; (check name ext. and decrease it to 3 if it is 4)
+   538                                  	; ((start with a base name char would be better))
+   539                                  
+   540 000002D7 3C04                    	cmp	al, 4 ; [f_ext_count]
+   541 000002D9 7249                    	jb	short conv_f_fs_18 ; edx <= 0
+   542                                  
+   543 000002DB FF0D[87040000]          	dec	dword [f_ext_count] ; 4 -> 3
+   544                                  
+   545                                  	; put zero after the 3th extension char
+   546                                  	; (the nul was after the 4th extension char)
+   547 000002E1 8B15[83040000]          	mov	edx, [f_ext_start]
+   548 000002E7 C6420300                	mov	byte [edx+3], 0
+   549                                  
+   550 000002EB EBD4                    	jmp	short conv_f_fs_14 ; check again
+   551                                  
+   552                                  conv_f_fs_16:
+   553                                  	; edx = number of base name chars
+   554                                  	;	before formal string (*)
+   555                                  
+   556 000002ED A1[7F040000]            	mov	eax, [f_base_count]
+   557                                  
+   558                                  	;and	eax, eax
+   559                                  	;jz	short insert_formal_str
+   560                                  
+   561 000002F2 39C2                    	cmp	edx, eax
+   562 000002F4 7602                    	jna	short conv_f_fs_17
+   563 000002F6 89C2                    	mov	edx, eax
+   564                                  conv_f_fs_17:
+   565 000002F8 01D7                    	add	edi, edx
+   566                                  
+   567                                  insert_formal_str:
+   568                                  	; 24/05/2025
+   569                                  	; edi = [f_target] + edx (*)
+   570                                  	; esi = formal_string address
+   571                                  	; ecx = [formal_size] ; string length
+   572 000002FA 8B1D[83040000]          	mov	ebx, [f_ext_start] ; extension start
+   573                                  	; ebx = the 1st byte addr after the last DOT
+   574 00000300 09DB                    	or	ebx, ebx
+   575 00000302 7424                    	jz	short add_formal_str ; not a name.ext
+   576                                  
+   577 00000304 31D2                    	xor	edx, edx ; 0
+   578                                  ins_formal_1:
+   579 00000306 8A03                    	mov	al, [ebx]
+   580 00000308 50                      	push	eax
+   581 00000309 20C0                    	and	al, al
+   582 0000030B 7404                    	jz	short ins_formal_2 ; end of the name
+   583 0000030D 43                      	inc	ebx
+   584 0000030E 42                      	inc	edx
+   585 0000030F EBF5                    	jmp	short ins_formal_1
+   586                                  
+   587                                  ins_formal_2:
+   588                                  	; place [#] formal string to in the name
+   589 00000311 F3A4                    	rep	movsb
+   590 00000313 B02E                    	mov	al, '.' ; and the DOT
+   591 00000315 AA                      	stosb
+   592 00000316 89FB                    	mov	ebx, edi
+   593 00000318 01D3                    	add	ebx, edx
+   594                                  ins_formal_3:
+   595                                  	; add the extension (and a nul at the end)
+   596                                  	; (by moving backward, from end to start)
+   597 0000031A 58                      	pop	eax
+   598 0000031B 8803                    	mov	[ebx], al
+   599 0000031D 39FB                    	cmp	ebx, edi
+   600 0000031F 760C                    	jna	short ins_formal_4 ; ok.
+   601 00000321 4B                      	dec	ebx
+   602 00000322 EBF6                    	jmp	short ins_formal_3
+   603                                  
+   604                                  conv_f_fs_18:
+   605                                  	; 25/05/2025
+   606                                  	; edx <= 0  (from sub edx, ecx)
+   607 00000324 09D2                    	or	edx, edx
+   608 00000326 74D2                    	jz	short insert_formal_str
+   609                                  	; edx < 0
+   610                                  	;jmp	short use_only_formal_str
+   611                                  
+   612                                  	; 24/05/2025
+   613                                  add_formal_str:
+   614                                  	; edi = [f_target] + edx (*)
+   615                                  use_only_formal_str:
+   616                                  	; 21/05/2025
+   617                                  	; edi = [f_target] = [f_base_start]
+   618                                  	; esi = formal_string address
+   619                                   	; ecx = [formal_size]
+   620 00000328 F3A4                    	rep	movsb
+   621 0000032A 30C0                    	xor	al, al
+   622 0000032C AA                      	stosb
+   623                                  ins_formal_4:
+   624 0000032D A1[73040000]            	mov	eax, [fdt_number] ; return value
+   625                                  conv_f_fs_ok:
+   626                                  	; 23/05/2025
+   627 00000332 8B3D[7B040000]          	mov	edi, [f_target]
+   628 00000338 C3                      	retn
+   629                                  
+   630                                  convert_num_to_formalstr:
+   631                                  	; 20/05/2025 - TRDOS 386 v2.0.10
+   632                                  	; Singlix FS short name specific procedure
+   633                                  	;
+   634                                  	; INPUT:
+   635                                  	;  eax = number (FDT/DDT number)
+   636                                  	;  edi = [#], formal string address
+   637                                  	;	 has minimum 12 bytes size/space
+   638                                  	; OUTPUT:
+   639                                  	;  [.......] = max. 10 digits between '[' & ']'
+   640                                  	;  ecx = formal string size including '[' & ']'
+   641                                  
+   642                                  	;
+   643                                  	; Modified registers: eax, ecx, edx
+   644                                  
+   645 00000339 55                      	push	ebp ; *
+   646 0000033A 57                      	push	edi ; **
+   647 0000033B C6075B                  	mov	byte [edi],'['
+   648 0000033E 47                      	inc	edi
+   649 0000033F 89E5                    	mov	ebp, esp
+   650 00000341 B90A000000              	mov	ecx, 10
+   651                                  cntfs_next:
+   652 00000346 31D2                    	xor	edx, edx
+   653 00000348 F7F1                    	div	ecx
+   654 0000034A 52                      	push	edx ; *#*
+   655 0000034B 21C0                    	and	eax, eax
+   656 0000034D 75F7                    	jnz	short cntfs_next
+   657                                  
+   658 0000034F B102                    	mov	cl, 2 ; '[' & ']'
+   659                                  cntfs_@:
+   660 00000351 58                      	pop	eax ; *#*
+   661 00000352 0430                    	add	al, '0' ; convert to numeric char
+   662 00000354 AA                      	stosb
+   663 00000355 41                      	inc	ecx
+   664 00000356 39EC                    	cmp	esp, ebp
+   665 00000358 72F7                    	jb	short cntfs_@
+   666 0000035A B05D                    	mov	al, ']'
+   667 0000035C AA                      	stosb
+   668                                  	;xor	al, al
+   669                                  	;stosb
+   670 0000035D 5F                      	pop	edi ; **
+   671 0000035E 5D                      	pop	ebp ; *	
+   672 0000035F C3                      	retn
+   673                                  
+   674                                  
+   675                                  ; 20/05/2025 - TRDOS 386 v2.0.10
+   676                                  ; Ref: https://en.wikipedia.org/wiki/8.3_filename#Directory_table
+   677                                  ; 
+   678                                  ; DOS filenames include the following:
+   679                                  ;  UpperCase letters A-Z
+   680                                  ;  Numbers 0-9
+   681                                  ;  Space (20h)
+   682                                  ;  !, #, $, %, &, ', (, ), -, @, ^, _, `, {, }, ~
+   683                                  ;  Values 128–255
+   684                                  ;
+   685                                  ; This excludes the following ASCII characters:
+   686                                  ;  ", *, +, ,, /, :, ;, <, =, >, ?, \, [, ], |
+   687                                  ;  . (DOT) within name and extension fields,
+   688                                  ;			 except in . and .. entries
+   689                                  ;  Lowercase letters a–z, stored as A–Z on FAT12/FAT16/FAT32
+   690                                  ;  Control characters 0–31
+   691                                  ;  Value 127 (DEL)
+   692                                  
+   693                                  	; 20/05/2025
+   694                                  invalid_fname_chars_@:
+   695                                  	;db 20h ; SPACE
+   696 00000360 2E                      	db 2Eh ; .
+   697                                  	; 20/05/2025
+   698                                  invalid_fname_chars:
+   699                                  	;   "   *   +   ,   /   :   ;   <   =   >   ?   \   [   ]   |
+   700 00000361 222A2B2C2F3A3B3C3D-     	db 22h,2Ah,2Bh,2Ch,2Fh,3Ah,3Bh,3Ch,3Dh,3Eh,3Fh,5Ch,5Bh,5Dh,7Ch
+   700 0000036A 3E3F5C5B5D7C       
+   701                                  
+   702                                  sizeInvFnChars  equ ($ - invalid_fname_chars)
+   703                                  
+   704                                  sizeInvFnChars@  equ ($ - invalid_fname_chars_@) ; 20/05/2025
+   705                                  
+   706                                  
+   707                                  version:
+   708 00000370 0D0A                    	db 0Dh, 0Ah
+   709 00000372 546573742050726F67-     	db 'Test Program for Singlix FS file name to TRDOS 386 short name conversion'
+   709 0000037B 72616D20666F722053-
+   709 00000384 696E676C6978204653-
+   709 0000038D 2066696C65206E616D-
+   709 00000396 6520746F205452444F-
+   709 0000039F 53203338362073686F-
+   709 000003A8 7274206E616D652063-
+   709 000003B1 6F6E76657273696F6E 
+   710 000003BA 0D0A                    	db 0Dh, 0Ah
+   711 000003BC 6279204572646F6761-     	db 'by Erdogan Tan - 27/05/2025'
+   711 000003C5 6E2054616E202D2032-
+   711 000003CE 372F30352F32303235 
+   712 000003D7 0D0A00                  	db 0Dh, 0Ah, 0
+   713                                  usage:
+   714 000003DA 0D0A                    	db 0Dh, 0Ah
+   715 000003DC 55736167653A206673-     	db 'Usage: fsfnconv <decimal fdt number> <test file name, max. 64 bytes>'
+   715 000003E5 666E636F6E76203C64-
+   715 000003EE 6563696D616C206664-
+   715 000003F7 74206E756D6265723E-
+   715 00000400 203C74657374206669-
+   715 00000409 6C65206E616D652C20-
+   715 00000412 6D61782E2036342062-
+   715 0000041B 797465733E         
+   716                                  nexline:
+   717 00000420 0D0A00                  	db 0Dh, 0Ah, 0
+   718                                  
+   719                                  formal_string:
+   720 00000423 5B                      	db '['
+   721                                  formal_number:
+   722 00000424 00<rep Ch>              	times 12 db 0
+   723 00000430 5D                      	db ']'
+   724 00000431 00                      	db 0
+   725                                  
+   726                                  fs_name:
+   727 00000432 00<rep 40h>             	times 64 db 0
+   728 00000472 00                      	db 0
+   729                                  
+   730                                  bss:
+   731                                  
+   732                                  ABSOLUTE bss
+   733                                  
+   734 00000473 ????????                fdt_number:	resd 1
+   735 00000477 ????????                f_name_limit:	resd 1
+   736                                  ;f_base_start:	resd 1
+   737 0000047B ????????                f_target:	resd 1
+   738 0000047F ????????                f_base_count:	resd 1
+   739 00000483 ????????                f_ext_start:	resd 1
+   740 00000487 ????????                f_ext_count:	resd 1
+   741                                  ;f_name_count:	resd 1
+   742 0000048B ????????                formal_size:	resd 1
+   743 0000048F ??                      insert_fdtnum:	resb 1
+   744 00000490 <res Dh>                target_name:	resb 13
+   745 0000049D <res 41h>               temp_name:	resb 65
