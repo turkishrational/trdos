@@ -32,13 +32,13 @@ set_run_sequence:
 	;	[u.pri] = priority of present process
 	;
 	;	DL = priority (queue)
-	;	     0 = background (low) ; run on background 
+	;	     0 = background (low) ; run on background
 	;	     1 = regular (normal) ; run as regular
 	;	     2 = event (high)     ; run for event
 	;
 	;	1) If the requested process is already running:
-	;	   a) If present priority is high ([u.pri]=2) 
-	;	      and requested priority is also high, 
+	;	   a) If present priority is high ([u.pri]=2)
+	;	      and requested priority is also high,
 	;	      there is nothing to do! Because it has been
 	;	      done already (before this attempt).
 	;	   b) If present priority is high ([u.pri]=2)
@@ -261,7 +261,7 @@ int34h: ; #IOCTL# (I/O port access support for ring 3)
 	;	; 12/10/2017
 	;	AH = 6 -> read port (physical IO port) twice -byte-
 	;	AH = 7 -> write port (physical IO port) twice -byte-
-	;		BX = data word	
+	;		BX = data word
 	;
 	;	DX = Port number (<= 0FFFFh)
 	;
@@ -434,7 +434,7 @@ comm_int:
 	; Interrupt identification register
 	mov	dx, 2FAh ; COM2
 	;
-	cmp 	al, 8 
+	cmp 	al, 8
 	ja 	short com_i0
 	;
 	; 20/11/2015
@@ -774,7 +774,7 @@ sp_setp: ; Set serial port communication parameters
 	;		 'invalid parameter !'
 	;		 	 or
 	;		 'device not ready !' error
-	;	
+	;
 	;  (*) Communication parameters (except BAUD RATE):
 	;	Bit	4	3	2	1	0
 	;		-PARITY--   STOP BIT  -WORD LENGTH-
@@ -787,12 +787,12 @@ sp_setp: ; Set serial port communication parameters
 	;		------------------------
 	;	value	0    0    0  | Default (Divisor = 1)
 	;		0    0    1  | 9600 (12)
-	;		0    1    0  | 19200 (6) 
-	;		0    1	  1  | 38400 (3) 
+	;		0    1    0  | 19200 (6)
+	;		0    1	  1  | 38400 (3)
 	;		1    0	  0  | 14400 (8)
 	;		1    0	  1  | 28800 (4)
 	;		1    1    0  | 57600 (2)
-	;		1    1    1  | 115200 (1) 
+	;		1    1    1  | 115200 (1)
 	;
 	; (COM1 base port address = 3F8h, COM1 Interrupt = IRQ 4)
 	; (COM2 base port address = 2F8h, COM1 Interrupt = IRQ 3)
@@ -1157,7 +1157,7 @@ get_file_name:
 	; 25/08/2024 (TRDOS 386 Kernel v2.0.9)
 	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 15/10/2016 - TRDOS 386 (TRDOS v2.0)
-	; Convert file name 
+	; Convert file name
 	;	from directory entry format
 	; 	to (8.3) dot file name format
 	;
@@ -1249,7 +1249,7 @@ set_hardware_int_vector:
 	;	AL = IRQ number (0 to 15)
 	;	AH > 0 -> set
 	;	AH = 0 -> reset
-	;	
+	;
 	; Modified registers: eax, ebx, edx, edi
 	;
 
@@ -1270,7 +1270,7 @@ shintv_2:
 	; 03/03/2017
 	shl	al, 1 ; IRQ number * 8
 	; 18/03/2017
-	movzx	edi, al 
+	movzx	edi, al
 	add	edi, idt + (8*32) ; IRQ 0 offset = idt + 256
 
 	mov	eax, edx ; IRQ handler address
@@ -1281,7 +1281,7 @@ shintv_2:
 	mov	bx, ax
 	mov	eax, ebx ; /* selector = 0x0008 = cs */
        		         ; /* interrupt gate - dpl=0, present */
-	stosd	; selector & offset bits 0-15 	
+	stosd	; selector & offset bits 0-15
 	mov	[edi], edx ; attributes & offset bits 16-23
 
 	retn
@@ -1594,7 +1594,7 @@ IRQsrv_7:
 ;	; device with kernel device names and
 ;	; installable device names. If names match,
 ;	; the relevant device index (entry) number
-;	; will be returned the caller (sysopen) 
+;	; will be returned the caller (sysopen)
 ;	; for the requested device.
 ;	;
 ;	; NOTE: Installable device drivers must
@@ -3075,7 +3075,7 @@ snd_stop_1:
 	jne	short snd_stop_2
 	jmp	sb16_stop
 snd_stop_2:
-	;cmp	al, 2 
+	;cmp	al, 2
 	;;je	short ac97_stop
 	; 30/07/2022
 	;jne	short snd_stop_3
@@ -3222,7 +3222,7 @@ snd_vol_1:
 	;ja	hda_volume
 	; 30/07/2022
 	jmp	vt8233_volume
-snd_vol_2:	
+snd_vol_2:
 	; Sound Blaster 16
 	cmp	al, 1 ; SB 16
 	;je	sb16_volume
@@ -3238,7 +3238,7 @@ snd_vol_3:
 	;jmp	hda_volume
 
 soundc_disable:
-	; FUNCTION = 12 
+	; FUNCTION = 12
 	; Disable audio device (and unlink DMA memory)
 	; 23/08/2024
 	; 04/06/2024

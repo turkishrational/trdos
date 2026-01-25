@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/01/2026 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 25/01/2026 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -5874,11 +5874,10 @@ msftdf_retn:
 	retn
 
 copy_source_file_to_destination_file:
+	; 25/01/2026
 	; 02/01/2026
 	; 01/01/2026
-	; 17/12/2025
-	; 15/12/2025
-	; 01/12/2025
+	; 01/12/2025, 15/12/2025, 17/12/2025
 	; 11/11/2025, 13/11/2025
 	; 09/11/2025, 10/11/2025
 	; 07/11/2025
@@ -6707,7 +6706,9 @@ csftdf2_set_sf_percentage:
 	;	values from LD_BPB as in FAT file system.
 	;	[esi+LD_BPB+SecPerClust] is 1 for Singlix FS.
 	;
-	movzx	ecx, byte [esi+LD_BPB+SecPerClust]
+	;movzx	ecx, byte [esi+LD_BPB+SecPerClust]
+	; 25/01/2026
+	mov	cl, [esi+LD_BPB+SecPerClust]
 	;mov	[SourceFile_SecPerClust], cl
 	; 11/10/2025
 	mov	[csftdf_sf_spc], cl

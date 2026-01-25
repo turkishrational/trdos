@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 18/01/2026  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 25/01/2026  (Previous: 27/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1997,6 +1997,7 @@ syscreat_2:
 %endif
 
 sysopen: ;<open file>
+	; 25/01/2026
 	; 17/01/2026
 	; 16/01/2026
 	; 02/01/2026
@@ -2117,10 +2118,13 @@ sysopen_0:
 	jnc	short sysopen_1
 
 syscreat_err: ; ecx = file attributes (for 'syscreat')
-	pop	ecx ; open mode	and	eax, eax  ; 0 -> Bad Path!
+	pop	ecx ; open mode
+	and	eax, eax  ; 0 -> Bad Path!
 	jnz	short sysopen_err
 	; eax = 0
-	mov	eax, ERR_DIR_NOT_FOUND ; Directory not found !
+	;mov	eax, ERR_DIR_NOT_FOUND ; Directory not found !
+	; 25/01/2026
+	mov	al, ERR_DIR_NOT_FOUND
 sysopen_err:
 	mov	[u.r0], eax
 	mov	[u.error], eax
