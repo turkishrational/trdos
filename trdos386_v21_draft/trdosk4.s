@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 25/01/2026 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 26/01/2026 (Previous: 03/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -5874,6 +5874,7 @@ msftdf_retn:
 	retn
 
 copy_source_file_to_destination_file:
+	; 26/01/2026
 	; 25/01/2026
 	; 02/01/2026
 	; 01/01/2026
@@ -5944,7 +5945,7 @@ copy_source_file_to_destination_file:
 	;
 	;	31/08/2024 - TRDOS v2.0.9 ; (*)
 	; obsolete ;CL > 0 if there is file reading error before EOF
-	;          ;	        (incomplete copy) 
+	;          ;	        (incomplete copy)
 	;          ;CH > 0 if file is (full) loaded at memory
 	;
 	;	cf = 1 -> Error code in AL (EAX) ; (*)
@@ -6794,6 +6795,7 @@ csftdf2_enable_percentage_display:
 
 	; 11/10/2025 - TRDOS 386 v2.0.10
 csftdf2_load_file:
+	; 26/01/2026
 	; 01/01/2026
 	; 17/12/2025
 	; 13/05/2016
@@ -6988,6 +6990,8 @@ csftdf2_write_fat_file_1:
 	; 15/12/2025
 	mov	[csftdf_transfercount], ecx
 
+; 26/01/2026
+%if 0
 	; 11/11/2025
 	cmp	byte [csftdf_percentage], 0
 	jna	short csftdf2_load_fat_file_2
@@ -7001,6 +7005,9 @@ csftdf2_write_fat_file_1:
 	;call	_int10h
 
 	jmp	csftdf2_load_fat_file_next
+%endif
+	; 26/01/2026
+	jmp	short csftdf2_load_fat_file_next
 
 csftdf2_write_fat_file_3: ; 11/11/2025
 	; set to file size
@@ -7057,6 +7064,7 @@ csftdf2_load_fat_file_ok:
 	; 29/07/2022
 	ja	short csftdf2_2
 	jmp	csftdf2_save_file
+
 csftdf2_2:
 	; "Reading... 100%"
 	; 11/10/2025
