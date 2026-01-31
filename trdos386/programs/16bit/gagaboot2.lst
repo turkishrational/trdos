@@ -1,0 +1,266 @@
+     1                                  ; ****************************************************************************
+     2                                  ; GAGABOOT2.ASM - GAGABOOT v2 for video bios hacking by Erdogan Tan
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; Special fd boot sector for int 10h video hacking (reverse vbios engineering)
+     5                                  ; ((for TRDOS 386 v2 project, for video bios functions in protected mode))
+     6                                  ; ----------------------------------------------------------------------------
+     7                                  ; Beginning & Last Update: 09/11/2020
+     8                                  ; ----------------------------------------------------------------------------
+     9                                  ; Assembler: NASM version 2.15
+    10                                  ; ----------------------------------------------------------------------------
+    11                                  ; nasm gagaboot2.s -l gagaboot2.lst -o GAGABOO2.BIN -Z error.txt
+    12                                  ; ----------------------------------------------------------------------------
+    13                                  ; Assembled/Compiled boot sector must be copied to fd0 sector 0 (bootable fd)
+    14                                  ; ****************************************************************************
+    15                                  
+    16                                  ; Modified from gagaboot.s (02/11/2020) - GAGABOOT v1 -
+    17                                  
+    18                                  
+    19                                  		[BITS 16]
+    20                                  		[ORG 7C00h]
+    21                                  
+    22 00000000 EB01                    		jmp	short BS_01
+    23 00000002 90                      		nop
+    24                                  BS_01:
+    25 00000003 8CC8                    		mov	ax, cs
+    26 00000005 8ED8                    		mov	ds, ax
+    27 00000007 8EC0                    		mov	es, ax
+    28                                  		
+    29 00000009 FA                      		cli
+    30 0000000A 8ED0                    		mov	ss, ax
+    31 0000000C BCFEFF                  		mov     sp, 0FFFEh
+    32 0000000F FB                      		sti
+    33                                  
+    34                                  		; Display program name and version !
+    35 00000010 BE[6001]                		mov	si, program_info
+    36 00000013 E8B500                  		call	print_msg
+    37                                  BS_02:
+    38 00000016 30E4                    		xor	ah, ah
+    39 00000018 CD16                    		int	16h
+    40 0000001A 3C0D                    		cmp	al, 13 ; ENTER
+    41 0000001C 7409                    		je	short BS_04
+    42 0000001E 3C1B                    		cmp	al, 27 ; ESC
+    43 00000020 7400                    		je	short BS_03
+    44                                  BS_03:
+    45 00000022 E89D00                  		call	beep
+    46 00000025 EBEF                    		jmp	short BS_02
+    47                                  BS_04:	
+    48 00000027 BB0010                  		mov	bx, 1000h
+    49 0000002A 8EC3                    		mov	es, bx ; buffer segment
+    50                                  
+    51 0000002C BE[2301]                		mov	si, writing_vectors
+    52 0000002F E89900                  		call	print_msg
+    53                                  
+    54                                  		; copy interrupt vectors (0 to 127)
+    55                                  		; to the buffer
+    56                                  		;push	ds
+    57 00000032 31F6                    		xor	si, si
+    58                                  		;mov	ds, si
+    59 00000034 29FF                    		sub	di, di
+    60 00000036 FA                      		cli
+    61 00000037 B90001                  		mov	cx, 256
+    62 0000003A F3A5                    		rep	movsw
+    63 0000003C FB                      		sti
+    64                                  		;pop	ds
+    65                                  
+    66 0000003D B80100                  		mov	ax, 1
+    67 00000040 31DB                    		xor	bx, bx
+    68                                  		; es = buffer segment, 1000h
+    69 00000042 E8A300                  		call	fd_write
+    70 00000045 7312                    		jnc	short BS_07
+    71                                  BS_05:
+    72                                  		; error
+    73 00000047 BE[0B01]                		mov     si, error_msg
+    74 0000004A E87E00                                  call    print_msg
+    75                                  BS_06:
+    76 0000004D BE[D401]                		mov     si, reboot_msg
+    77 00000050 E87800                                  call    print_msg
+    78                                  
+    79 00000053 31C0                                    xor	ax, ax
+    80 00000055 CD16                    		int	16h			; BIOS Service func ( ah ) = 0
+    81                                  						; Read next kbd char
+    82                                  						; AH-scan code AL-char code
+    83 00000057 CD19                    		int	19h			; Reboot
+    84                                  BS_07:
+    85 00000059 BE[F101]                		mov	si, msg_ok
+    86 0000005C E86C00                  		call	print_msg
+    87                                  
+    88                                  		; copy video bios (64KB)
+    89                                  		; to the buffer
+    90 0000005F 1E                      		push	ds
+    91 00000060 BE00C0                  		mov	si, 0C000h
+    92 00000063 8EDE                    		mov	ds, si
+    93 00000065 31F6                    		xor	si, si
+    94 00000067 31FF                    		xor	di, di
+    95 00000069 B90080                  		mov	cx, 32768
+    96 0000006C F3A5                    		rep	movsw 
+    97 0000006E 1F                      		pop	ds
+    98                                  
+    99 0000006F BE[4501]                		mov	si, writing_vbios
+   100 00000072 E85600                  		call	print_msg
+   101                                  
+   102 00000075 31DB                    		xor	bx, bx
+   103 00000077 B80200                  		mov	ax, 2  ; sector 2 
+   104 0000007A B180                    		mov	cl, 128 ; 128 sectors 
+   105                                  BS_08:
+   106 0000007C E86900                  		call	fd_write
+   107 0000007F 72C6                    		jc	short BS_05
+   108 00000081 FEC9                    		dec	cl
+   109 00000083 7407                    		jz	short BS_09
+   110 00000085 81C30002                		add	bx, 512
+   111 00000089 40                      		inc	ax
+   112 0000008A EBF0                    		jmp	short BS_08
+   113                                  BS_09:
+   114                                  		;mov	si, msg_ok
+   115                                  		;call	print_msg
+   116                                  
+   117                                  		; 09/11/2020
+   118                                  		; writing video parameters
+   119 0000008C 31DB                    		xor	bx, bx
+   120 0000008E 8EDB                    		mov	ds, bx
+   121 00000090 BBA804                  		mov	bx, 04A8h  ; video parameters table
+   122 00000093 C537                    		lds	si, [bx]
+   123 00000095 C534                    		lds	si, [si] 	
+   124                                  		;mov	bx, 1000h
+   125                                  		;mov	es, bx
+   126 00000097 29FF                    		sub	di, di
+   127 00000099 B90004                  		mov	cx, 2048/2
+   128 0000009C F3A5                    		rep	movsw
+   129 0000009E 0E                      		push	cs
+   130 0000009F 1F                      		pop	ds
+   131                                  
+   132 000000A0 B88200                  		mov	ax, 130	; sector 130 
+   133 000000A3 B104                    		mov	cl, 4	; 4 sectors 
+   134 000000A5 31DB                    		xor	bx, bx
+   135                                  BS_13:
+   136 000000A7 E83E00                  		call	fd_write
+   137 000000AA 720B                    		jc	short BS_14
+   138 000000AC FEC9                    		dec	cl
+   139 000000AE 7407                    		jz	short BS_14
+   140 000000B0 FEC7                    		inc	bh
+   141 000000B2 FEC7                    		inc	bh
+   142 000000B4 40                      		inc	ax
+   143 000000B5 EBF0                    		jmp	short BS_13	
+   144                                  BS_14:
+   145 000000B7 BE[F101]                		mov	si, msg_ok
+   146 000000BA E80E00                  		call	print_msg
+   147                                  
+   148 000000BD E80200                  		call	beep
+   149                                  
+   150 000000C0 EB8B                    		jmp	short BS_06
+   151                                  
+   152                                  beep:
+   153 000000C2 B007                    		mov	al, 07h
+   154 000000C4 B40E                    		mov	ah, 0Eh
+   155 000000C6 B700                    		mov	bh, 0
+   156 000000C8 CD10                    		int	10h
+   157 000000CA C3                      		retn
+   158                                  
+   159                                  print_msg:
+   160 000000CB AC                      		lodsb				; Load byte at DS:SI to AL
+   161 000000CC 20C0                                    and     al, al            
+   162 000000CE 7417                                    jz	short BS_11		; If AL = 0 then stop
+   163                                  
+   164 000000D0 B40E                                    mov     ah, 0Eh
+   165 000000D2 BB0700                                  mov     bx, 07h             
+   166 000000D5 CD10                    		int	10h			; BIOS Service func ( ah ) = 0Eh
+   167                                  						; Write char as TTY
+   168                                  						; AL-char BH-page BL-color
+   169 000000D7 EBF2                                    jmp     short print_msg
+   170                                  
+   171                                  BS_10:         
+   172 000000D9 FE0E[0A01]                              dec	byte [RetryCount]
+   173 000000DD 7408                    		jz	short BS_11 ; cf = 1
+   174                                  
+   175                                  		; Reset disk system
+   176 000000DF 50                      		push	ax
+   177 000000E0 30E4                    		xor	ah, ah
+   178                                                  ;mov	dl, 0
+   179 000000E2 CD13                    		int     13h
+   180 000000E4 58                                      pop	ax
+   181 000000E5 7306                    		jnc	short BS_12
+   182                                  BS_11:
+   183 000000E7 C3                      		retn
+   184                                   
+   185                                  fd_write:
+   186                                                  ; Only for FAT12 Floppy Disks
+   187                                                  
+   188 000000E8 C606[0A01]07                            mov     byte [RetryCount], 7
+   189                                  BS_12:
+   190 000000ED 51                                      push    cx
+   191 000000EE 50                                      push    ax                      ; PHYSICAL ADDRESS CALCULATION
+   192 000000EF B112                    		mov	cl, 18                  ; Sectors per track
+   193 000000F1 F6F1                    		div     cl                      
+   194 000000F3 88E1                                    mov     cl, ah                  ; Sector (zero based)
+   195 000000F5 FEC1                                    inc     cl                      ; To make it 1 based
+   196                                                                                  ; AL=cyl, AH=head, CL=sector
+   197 000000F7 29D2                    		sub	dx, dx
+   198 000000F9 D0E8                    		shr	al, 1
+   199 000000FB 80D600                  		adc	dh, 0
+   200 000000FE 88C5                                    mov     ch, al            
+   201                                  
+   202 00000100 B80103                                  mov     ax, 0301h
+   203 00000103 CD13                    		int	13h			; BIOS Service func ( ah ) = 3
+   204                                  						; Write disk sectors
+   205                                  						; AL-sec num CH-track CL-sec
+   206                                  						; DH-head DL-drive ES:BX-buffer
+   207                                  						; CF-flag AH-stat AL-sec read
+   208 00000105 58                      		pop	ax			
+   209 00000106 59                                      pop     cx
+   210 00000107 72D0                                    jc      short BS_10
+   211 00000109 C3                         		retn
+   212                                  RetryCount:
+   213 0000010A 07                      		db	07h  ; Filler
+   214                                  error_msg:
+   215 0000010B 0D0A                                    db      0Dh, 0Ah
+   216 0000010D 4469736B2057726974-                     db      "Disk Writing Error!"
+   216 00000116 696E67204572726F72-
+   216 0000011F 21                 
+   217 00000120 0D0A00                  		db	0Dh, 0Ah, 0
+   218                                  
+   219                                  writing_vectors:
+   220 00000123 0D0A                    		db      0Dh, 0Ah
+   221 00000125 57726974696E672069-     		db      "Writing interrupt vectors ..."
+   221 0000012E 6E7465727275707420-
+   221 00000137 766563746F7273202E-
+   221 00000140 2E2E               
+   222 00000142 0D0A00                                  db      0Dh, 0Ah, 0
+   223                                  
+   224                                  writing_vbios:
+   225 00000145 0D0A                    		db      0Dh, 0Ah
+   226 00000147 57726974696E672076-     		db      "Writing video bios ..."
+   226 00000150 6964656F2062696F73-
+   226 00000159 202E2E2E           
+   227 0000015D 0D0A00                                  db      0Dh, 0Ah, 0
+   228                                  
+   229                                  program_info:
+   230 00000160 0D0A                    		db	0Dh, 0Ah
+   231 00000162 47414741424F4F5420-     		db	"GAGABOOT v2 for video bios hacking by Erdogan Tan [09/11/2020]"
+   231 0000016B 763220666F72207669-
+   231 00000174 64656F2062696F7320-
+   231 0000017D 6861636B696E672062-
+   231 00000186 79204572646F67616E-
+   231 0000018F 2054616E205B30392F-
+   231 00000198 31312F323032305D   
+   232 000001A0 0D0A                    		db	0Dh, 0Ah
+   233 000001A2 0D0A                    		db	0Dh, 0Ah
+   234 000001A4 507265737320454E54-     		db 	"Press ENTER to continue or press ESC to exit."
+   234 000001AD 455220746F20636F6E-
+   234 000001B6 74696E7565206F7220-
+   234 000001BF 707265737320455343-
+   234 000001C8 20746F20657869742E 
+   235 000001D1 0D0A00                  		db	0Dh, 0Ah, 0
+   236                                  
+   237 000001D4 0D0A                    reboot_msg:	db      0Dh, 0Ah
+   238 000001D6 507265737320616E79-     		db	"Press any key to reboot."
+   238 000001DF 206B657920746F2072-
+   238 000001E8 65626F6F742E       
+   239 000001EE 0D0A00                                  db	0Dh, 0Ah, 0
+   240                                  
+   241 000001F1 0D0A                    msg_ok:		db	0Dh, 0Ah
+   242 000001F3 4F4B2E                  		db	"OK."
+   243 000001F6 0D0A00                  		db	0Dh, 0Ah, 0
+   244                                  
+   245 000001F9 00<rept>                		times	510 - ($ - $$) db 0
+   246                                  
+   247 000001FE 55AA                    bootsignature:  db      55h, 0AAh
