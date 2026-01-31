@@ -1,0 +1,830 @@
+     1                                  ; ****************************************************************************
+     2                                  ; bsrestor.s (BSRESTOR.COM) - TRDOS 386 Harddisk Boot Sector Restoring Utility
+     3                                  ; 						      (for MSDOS/WINDOWS)
+     4                                  ; ****************************************************************************
+     5                                  ; Last Update: 10/10/2020
+     6                                  ; ----------------------------------------------------------------------------
+     7                                  ; Beginning: 05/10/2020
+     8                                  ; ----------------------------------------------------------------------------
+     9                                  ; Assembler: NASM version 2.15
+    10                                  ; ----------------------------------------------------------------------------
+    11                                  ; Turkish Rational DOS
+    12                                  ; Operating System Project v2.0 by ERDOGAN TAN (Beginning: 04/01/2016)
+    13                                  ; ----------------------------------------------------------------------------
+    14                                  ; Purpose:
+    15                                  ;	BSRESTOR.COM is used to restore previous boot sector of a primary
+    16                                  ;	dos partition. (BSRESTOR.COM is used after BSSAVE.COM. It uses boot
+    17                                  ;	sector backup file which will be created by BSSAVE.COM utility.)
+    18                                  ;	((For example: BSSAVE is used before modifying windows boot sector
+    19                                  ;	by using TRHDBOOT.COM, for TRDOS386 hard disk boot test. Then, 
+    20                                  ;	BSRESTOR is used to restore windows boot sector after the test.))
+    21                                  ; Backup File format: 
+    22                                  ;	Binary file which contains MBR and Bootsector
+    23                                  ;	of primary dos partition. First 512 bytes is the MBR of a harddisk
+    24                                  ;	and remain 512 bytes (FAT fs) or 1024 bytes (FAT32 fs)
+    25                                  ;	is the boot sector of same hard disk.					
+    26                                  ; ****************************************************************************
+    27                                  ; nasm bsrestor.s -l bsrestor.lst -o BSRESTOR.COM
+    28                                  ; ----------------------------------------------------------------------------
+    29                                  ; Derived from: bssave.s (BSSAVE.COM) by Erdogan Tan, 03/10/2020
+    30                                  
+    31                                  ; DTA (PSP+80h= Offset 128)
+    32                                  DTA_Attrib equ 149 ; PDP+21
+    33                                  DTA_Time equ 150 ; PSP+22
+    34                                  DTA_Date equ 152 ; PSP 24
+    35                                  DTA_FileSize equ 154 ; PSP + 26
+    36                                  DTA_FileName equ 158 ; PSP + 30
+    37                                  
+    38                                  ; Masterboot / Partition Table at Beginning+1BEh
+    39                                  ptBootable      equ 0
+    40                                  ptBeginHead     equ 1
+    41                                  ptBeginSector   equ 2
+    42                                  ptBeginCylinder equ 3
+    43                                  ptFileSystemID	equ 4
+    44                                  ptEndHead       equ 5
+    45                                  ptEndSector     equ 6
+    46                                  ptEndCylinder   equ 7
+    47                                  ptStartSector   equ 8
+    48                                  ptSectors       equ 12
+    49                                  
+    50                                  ; BIOS INT 13h Extensions (LBA extensions)
+    51                                  ; Just After DP Data (DPDiskNumber+)
+    52                                  DAP_PacketSize equ 10h  ; If extensions present, this byte will be >=10h
+    53                                  DAP_Reserved1 equ 11h   ; Reserved Byte 
+    54                                  DAP_NumOfBlocks equ 12h ; Value of this byte must be 0 to 127
+    55                                  DAP_Reserved2 equ 13h   ; Reserved Byte
+    56                                  DAP_Destination equ 14h ; Address of Transfer Buffer as SEGMENT:OFFSET
+    57                                  DAP_LBA_Address equ 18h ; LBA=(C1*H0+H1)*S0+S1-1
+    58                                                          ; C1= Selected Cylinder Number
+    59                                                          ; H0= Number Of Heads (Maximum Head Number + 1)
+    60                                                          ; H1= Selected Head Number
+    61                                                          ; S0= Maximum Sector Number
+    62                                                          ; S1= Selected Sector Number
+    63                                                          ; QUAD WORD
+    64                                  ; DAP_Flat_Destination equ 20h ; 64 bit address, if value in 4h is FFFF:FFFFh
+    65                                                               ; QUAD WORD (Also, value in 0h must be 18h) 
+    66                                                               ; TR-DOS will not use 64 bit Flat Address
+    67                                  
+    68                                  pTableOffset equ 1BEh ; 446
+    69                                  
+    70                                  [BITS 16]
+    71                                  [ORG 100h]
+    72                                  
+    73                                  	;;cli
+    74                                  	;;cld
+    75                                  	;;push	cs
+    76                                  	;;pop	ss
+    77                                  	;;mov	sp, 0FFFEh
+    78                                  	;;sti
+    79                                  	;
+    80                                  	;;mov	bx, SizeOfFile+100
+    81                                  	;
+    82                                  	;mov	bx, bss_end
+    83                                  	;
+    84                                          ;add	bx, 15
+    85                                          ;shr	bx, 1
+    86                                          ;shr	bx, 1
+    87                                  	;shr	bx, 1
+    88                                  	;shr	bx, 1
+    89                                          ;mov	ah, 4Ah ; modify memory allocation
+    90                                          ;;push	cs
+    91                                          ;;pop	es
+    92                                          ;int	21h
+    93                                  
+    94                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    95                                  ; clear BSS
+    96                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    97                                  
+    98                                  	;mov	cx, bss_clear_end
+    99                                  	;
+   100                                  	;mov	di, bss_start
+   101                                  	;sub	cx, di
+   102                                  	;;inc	cx
+   103                                  	;shr	cx, 1
+   104                                  	;xor	ax, ax
+   105                                  	;rep	stosw 
+   106                                  
+   107                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   108                                  ; get command arguments (command tail)
+   109                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   110                                  
+   111 00000000 BE8000                  	mov	si, 80h			; PSP command tail
+   112 00000003 AC                       	lodsb
+   113 00000004 08C0                    	or	al, al 			; command tail length                            
+   114 00000006 7421                    	jz	short _03		; jump if zero
+   115                                  _01:
+   116 00000008 AC                      	lodsb
+   117 00000009 3C20                    	cmp	al, ' '			; is it SPACE ?
+   118 0000000B 74FB                    	je	short _01 		
+   119 0000000D 721A                    	jb	short _03
+   120                                  
+   121                                  	; check disk name
+   122                                  
+   123 0000000F 3C68                    	cmp	al, 'h'
+   124 00000011 7516                    	jne	short _03	
+   125 00000013 803C64                  	cmp	byte [si], 'd'
+   126 00000016 7511                    	jne	short _03
+   127 00000018 46                      	inc	si
+   128 00000019 AC                      	lodsb
+   129 0000001A 3C30                    	cmp	al, '0'
+   130 0000001C 7406                    	je	short _02
+   131 0000001E 7209                    	jb	short _03
+   132 00000020 3C33                    	cmp	al, '3'
+   133 00000022 7705                    	ja	short _03
+   134                                  _02:
+   135 00000024 803C20                  	cmp	byte [si], ' '
+   136 00000027 7406                    	je	short _04
+   137                                  _03:
+   138 00000029 BE[6702]                	mov	si, TrDOS_Welcome
+   139 0000002C E9F001                  	jmp	_43
+   140                                  _04:
+   141 0000002F 46                      	inc	si
+   142 00000030 0450                    	add	al, 80h - '0'
+   143 00000032 A2[6502]                	mov	[DrvNum], al	; 80h .. 83h
+   144                                  _05:
+   145 00000035 AC                      	lodsb
+   146 00000036 3C20                    	cmp	al, ' '
+   147 00000038 74FB                    	je	short _05
+   148 0000003A 72ED                    	jb	short _03
+   149                                  
+   150                                  	; check backup file name
+   151                                  _06:
+   152 0000003C BF[2006]                       	mov	di, bs_file_name
+   153 0000003F AA                      	stosb
+   154                                  _07:
+   155 00000040 AC                      	lodsb
+   156                                  	;cmp	al, 0Dh ; ENTER (CR) key
+   157 00000041 3C20                    	cmp	al, 20h ; ' '
+   158 00000043 760C                    	jna	short _08
+   159 00000045 AA                      	stosb
+   160 00000046 81FF[2C06]              	cmp	di, bs_file_name + 12
+   161 0000004A 72F4                    	jb	short _07
+   162 0000004C 803C20                  	cmp	byte [si], 20h 
+   163 0000004F 7742                    	ja	short _14
+   164                                  _08:
+   165 00000051 28C0                    	sub	al, al
+   166 00000053 AA                      	stosb
+   167                                  
+   168                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   169                                  ; File name capitalization
+   170                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   171                                  
+   172 00000054 BE[2006]                	mov	si, bs_file_name
+   173 00000057 89F7                    	mov	di, si
+   174 00000059 89F3                    	mov	bx, si
+   175                                  _09:
+   176 0000005B AC                      	lodsb
+   177 0000005C 3C61                    	cmp	al, 'a'
+   178 0000005E 730D                    	jnb	short _11
+   179 00000060 20C0                    	and	al, al
+   180 00000062 7412                    	jz	short _12
+   181 00000064 3C2E                    	cmp	al, '.'
+   182 00000066 7502                    	jne	short _10
+   183 00000068 89FB                    	mov	bx, di ; dot position	
+   184                                  _10:
+   185 0000006A AA                      	stosb
+   186 0000006B EBEE                    	jmp	short _09 		
+   187                                  _11:
+   188 0000006D 3C7A                    	cmp	al, 'z'
+   189 0000006F 77F9                    	ja	short _10
+   190 00000071 24DF                    	and	al, 0DFh ; NOT 32
+   191 00000073 AA                      	stosb
+   192 00000074 EBE5                    	jmp	short _09	
+   193                                  _12:
+   194 00000076 8805                    	mov	[di], al
+   195 00000078 4F                      	dec	di
+   196 00000079 39FB                    	cmp	bx, di
+   197 0000007B 7316                    	jnb	short _14
+   198 0000007D 29DF                    	sub	di, bx
+   199 0000007F 81EB[2006]              	sub	bx, bs_file_name
+   200 00000083 83FF03                  	cmp	di, 3
+   201 00000086 7606                    	jna	short _13
+   202 00000088 21DB                    	and	bx, bx
+   203 0000008A 7507                    	jnz	short _14
+   204 0000008C EB0B                    	jmp	short _15		
+   205                                  _13:
+   206 0000008E 83FB08                  	cmp	bx, 8
+   207 00000091 7606                    	jna	short _15
+   208                                  _14:
+   209 00000093 BE[0104]                	mov	si, msg_inv_file_name
+   210 00000096 E98601                  	jmp	_43
+   211                                  
+   212                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   213                                  ; Find boot sector backup file
+   214                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   215                                  	
+   216                                  _15:
+   217 00000099 BA[2006]                	mov	dx, bs_file_name
+   218 0000009C B93F00                  	mov	cx, 3Fh ; File Attributes
+   219 0000009F B44E                    	mov	ah, 4Eh ; MS-DOS Function = Find First File
+   220 000000A1 CD21                    	int	21h
+   221 000000A3 7306                    	jnc	short _16
+   222                                  
+   223                                  	; bs backup file not found in working/current directory
+   224 000000A5 BE[F704]                	mov	si, msg_file_notfound
+   225 000000A8 E97401                  	jmp	_43
+   226                                  
+   227                                  _16:
+   228                                  
+   229                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   230                                  ; Check bs backup file features
+   231                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   232                                  
+   233 000000AB BE9500                  	mov	si, DTA_Attrib
+   234 000000AE 8A04                    	mov	al, [si]
+   235                                  	;and	al, 1Fh ; directory, volume label, system, hidden, read only
+   236 000000B0 241E                    	and	al, 1Eh ; directory, volume label, system, hidden
+   237 000000B2 751D                    	jnz	short _18     
+   238 000000B4 BE9A00                  	mov	si, DTA_FileSize
+   239 000000B7 AD                      	lodsw
+   240 000000B8 8B14                    	mov	dx, [si]
+   241 000000BA 09C0                    	or	ax, ax 
+   242 000000BC 7413                    	jz	short _18 ; zero file size (invalid backup file)
+   243                                  
+   244 000000BE 21D2                    	and	dx, dx	
+   245 000000C0 750F                    	jnz	short _18 ; wrong file size (>1536 bytes)
+   246                                  
+   247 000000C2 3D0004                  	cmp	ax, 1024
+   248 000000C5 7410                    	je	short _19 ; correct file size (for FAT16 & FAT12 boot sector)
+   249                                  
+   250 000000C7 C606[6602]01            	mov	byte [fat32], 1
+   251                                  
+   252 000000CC 3D0006                  	cmp	ax, 1536
+   253 000000CF 7406                    	je	short _19 ; correct file size (only for FAT32 boot sectors)	
+   254                                  
+   255                                  	; invalid backup file !
+   256                                  _18:
+   257 000000D1 BE[6C05]                	mov	si, msg_inv_backup_file
+   258 000000D4 E94801                  	jmp	_43
+   259                                  
+   260                                  _19:
+   261                                  
+   262                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   263                                  ; Next line
+   264                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   265                                  
+   266                                  	;mov	si, CRLF
+   267                                  	;call	print_msg
+   268                                  
+   269                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   270                                  ; Read	masterboot sector (MBR)
+   271                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   272                                  
+   273 000000D7 BF0500                  	mov	di, 5
+   274                                  
+   275                                  	;mov	ax, 0201h		; read disk
+   276 000000DA BB[3E06]                	mov	bx, MasterBootBuff	; location of masterboot code
+   277                                  
+   278 000000DD B90100                  	mov	cx, 1			; cylinder = 0
+   279                                  					; sector = 1
+   280 000000E0 B600                    	mov	dh, 0			; head = 0
+   281 000000E2 8A16[6502]              	mov	dl, [DrvNum]		; drive number, 80h .. 83h
+   282                                  _20:
+   283 000000E6 B80102                  	mov	ax, 0201h
+   284 000000E9 CD13                    	int	13h
+   285 000000EB 730D                    	jnc	short _21		; read masterboot sector, OK
+   286                                  	
+   287                                   	; reset hard disk(s)
+   288 000000ED 30E4                    	xor	ah, ah
+   289                                  	;mov	dl, [drv]
+   290 000000EF CD13                    	int	13h
+   291                                  
+   292                                  	;dec	byte [RetryCount]
+   293 000000F1 4F                      	dec	di
+   294 000000F2 75F2                    	jnz	short _20
+   295                                  
+   296                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   297                                  ; write disk error message and terminate
+   298                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   299                                  
+   300 000000F4 BE[2C05]                	mov	si, msg_disk_not_ready_error
+   301 000000F7 E92501                  	jmp	_43
+   302                                  _21:
+   303                                  
+   304                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   305                                  ; Check MBR then read MBR & BS
+   306                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   307                                  
+   308 000000FA 813E[3C08]55AA          	cmp 	word [MBIDCode], 0AA55h
+   309 00000100 7418                    	je	short _24 ; Valid MBR	
+   310                                  
+   311                                  	; invalid MBR !
+   312                                  
+   313 00000102 BE[7604]                	mov	si, msg_inv_mbr
+   314 00000105 E91701                  	jmp	_43
+   315                                  _22:
+   316                                  	; Check fat32 boot sectors flag (for backup file)
+   317 00000108 803E[6602]01            	cmp	byte [fat32], 1 ; 2 boot sectors for FAT32 fs
+   318 0000010D 72C2                    	jb	short _18  ; Invalid bs backup file !
+   319 0000010F EB3E                    	jmp	short _29
+   320                                  _23:
+   321                                  	; Check fat32 boot sector(s) flag (for backup file)
+   322 00000111 803E[6602]01            	cmp	byte [fat32], 1 ; 1 bs for FAT16 & FAT12 fs
+   323 00000116 73B9                    	jnb	short _18  ; Invalid bs backup file !
+   324 00000118 EB35                    	jmp	short _29
+   325                                  _24:
+   326                                  	; check if MBR contains primary DOS partition or not
+   327 0000011A BE[FC07]                	mov	si, MasterBootBuff+pTableOffset
+   328                                  _25:
+   329 0000011D 8A4404                  	mov	al, [si+ptFileSystemID]
+   330                                  	;xor	ah, ah	; LBA = 0
+   331 00000120 3C0B                    	cmp	al, 0Bh ; FAT32 CHS
+   332 00000122 7215                    	jb	short _27
+   333 00000124 74E2                    	je	short _22
+   334                                  	;inc	ah	; LBA = 1
+   335 00000126 3C0C                    	cmp	al, 0Ch ; FAT32 LBA
+   336 00000128 74DE                    	je	short _22
+   337 0000012A 3C0E                    	cmp	al, 0Eh ; FAT16 LBA
+   338 0000012C 74E3                    	je	short _23
+   339                                  _26:
+   340 0000012E 81FE[3C08]              	cmp	si, MasterBootBuff+pTableOffset+64
+   341 00000132 7315                    	jnb	short _28
+   342 00000134 83C610                  	add	si, 16
+   343 00000137 EBE4                    	jmp	short _25
+   344                                  _27:
+   345 00000139 3C06                    	cmp	al, 06h ; FAT16 CHS big
+   346 0000013B 77F1                    	ja	short _26
+   347 0000013D 74D2                    	je	short _23
+   348 0000013F 3C04                    	cmp	al, 04h	; FAT16 CHS
+   349 00000141 74CE                    	je	short _23
+   350 00000143 3C01                    	cmp	al, 01h	; FAT12	
+   351 00000145 75E7                    	jne	short _26
+   352 00000147 EBC8                    	jmp	short _23	
+   353                                  _28:
+   354                                  	; MBR does not contain primary DOS partition
+   355 00000149 BE[4304]                	mov	si, msg_dosp_notfound
+   356 0000014C E9D000                  	jmp	_43
+   357                                  _29:
+   358                                  	;mov	[fsID], al ; file system type
+   359                                  
+   360                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   361                                  ; copy partition table row which is for primary dos partition
+   362                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   363                                  
+   364 0000014F BF[2E06]                	mov	di, PTrow
+   365                                  	;mov	cx, 8 
+   366 00000152 B108                    	mov	cl, 8
+   367 00000154 F3A5                    	rep	movsw
+   368                                  
+   369                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   370                                  ; read MBR in the backup file and compare it with disk's MBR
+   371                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   372                                  
+   373 00000156 B8003D                  	mov	ax, 3D00h ; open file for read
+   374 00000159 BA[2006]                	mov	dx, bs_file_name
+   375 0000015C CD21                    	int	21h
+   376 0000015E 7215                    	jc	short _31
+   377                                  _30:
+   378                                  	;mov	[bs_file_handle], ax
+   379 00000160 89C3                    	mov	bx, ax
+   380 00000162 8B0E9A00                	mov	cx, [DTA_FileSize] ; read all bytes of the file
+   381                                  	;mov	ax, 3F00h ; read from file
+   382 00000166 B43F                    	mov	ah, 3Fh
+   383 00000168 BA[3E06]                	mov	dx, MasterBootBuff 
+   384 0000016B CD21                    	int	21h
+   385                                  
+   386 0000016D 9C                      	pushf
+   387 0000016E B43E                    	mov	ah, 3Eh ; close file
+   388                                  	;mov	bx, [bs_file_handle]
+   389 00000170 CD21                    	int	21h
+   390 00000172 9D                      	popf
+   391 00000173 7306                    	jnc	short _32
+   392                                  _31:
+   393 00000175 BE[1305]                	mov	si, msg_file_read_error
+   394 00000178 E9A400                  	jmp	_43
+   395                                  _32:
+   396                                  	; Check file's MBR
+   397                                  	
+   398 0000017B 813E[3C08]55AA          	cmp 	word [MBIDCode], 0AA55h
+   399 00000181 7406                    	je	short _34 ; Valid MBR	
+   400                                  _33:
+   401                                  	; invalid MBR !
+   402 00000183 BE[B705]                	mov	si, msg_inv_file_mbr
+   403 00000186 E99600                  	jmp	_43
+   404                                  _34:
+   405                                  	;mov	al, [fsID]
+   406                                  
+   407 00000189 BE[2E06]                	mov	si, PTrow
+   408 0000018C BF[FC07]                	mov	di, MasterBootBuff+pTableOffset
+   409                                  	
+   410 0000018F 8A4404                  	mov	al, [si+ptFileSystemID]
+   411 00000192 3A4504                  	cmp	al, [di+ptFileSystemID]
+   412 00000195 75EC                    	jne	short _33
+   413                                  
+   414                                  	; Check boot sector signature
+   415                                  
+   416 00000197 BB[3E08]                	mov	bx, BootSectorBuff
+   417                                  
+   418 0000019A 81BFFE0155AA            	cmp	word [bx+510], 0AA55h
+   419 000001A0 7405                    	je	short _35
+   420                                  
+   421                                    	; Invalid boot sector in file
+   422 000001A2 BE[F505]                	mov	si, msg_inv_file_bs
+   423 000001A5 EB78                    	jmp	short _43
+   424                                  
+   425                                  _35:
+   426 000001A7 8B4508                  	mov	ax, [di+ptStartSector]
+   427 000001AA 8B550A                  	mov	dx, [di+ptStartSector+2]
+   428                                  
+   429 000001AD 3B4408                  	cmp	ax, [si+ptStartSector]
+   430 000001B0 75D1                    	jne	short _33
+   431                                  
+   432 000001B2 3B540A                  	cmp	dx, [si+ptStartSector+2]
+   433 000001B5 75CC                    	jne	short _33
+   434                                  
+   435                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   436                                  ; Disk write (bs overwrite) question and get the answer (Y/N/ESC)
+   437                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   438                                  
+   439 000001B7 BE[8804]                	mov	si, msg_overwrite_question
+   440 000001BA E89A00                  	call	print_msg
+   441                                  _36:
+   442 000001BD 31C0                    	xor	ax, ax
+   443 000001BF CD16                    	int	16h			; wait for keyboard command
+   444 000001C1 3C79                    	cmp	al, 'y'
+   445 000001C3 7419                    	je	short _38		; retry
+   446 000001C5 3C59                    	cmp	al, 'Y'
+   447 000001C7 7415                    	je	short _38
+   448 000001C9 3C6E                    	cmp	al, 'n'
+   449 000001CB 740C                    	je	short _37 		; exit
+   450 000001CD 3C4E                    	cmp	al, 'N'
+   451 000001CF 7408                    	je	short _37
+   452 000001D1 3C03                    	cmp	al, 'C'-40h
+   453 000001D3 7442                    	je	short _41              
+   454 000001D5 3C1B                    	cmp	al, 27
+   455 000001D7 75E4                    	jne	short _36
+   456                                  _37:
+   457 000001D9 BE[B804]                	mov	si, _NO
+   458 000001DC EB41                    	jmp	short _43
+   459                                  _38:
+   460 000001DE BE[B204]                	mov	si, _YES
+   461 000001E1 E87300                  	call	print_msg
+   462                                  
+   463 000001E4 BE[BD04]                	mov	si, msg_writing_bs
+   464 000001E7 E86D00                  	call	print_msg
+   465                                  
+   466 000001EA 8B4508                  	mov	ax, [di+ptStartSector]
+   467                                  	;mov	dx, [di+ptStartSector+2]
+   468 000001ED BB[3E08]                	mov	bx, BootSectorBuff
+   469                                  _39:
+   470                                  
+   471                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   472                                  ; Write boot sector(s) to disk
+   473                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   474                                  
+   475 000001F0 E83600                  	call	lba_write
+   476 000001F3 7217                    	jc	short _40
+   477                                  
+   478 000001F5 803E[6602]01            	cmp	byte [fat32], 1
+   479 000001FA 7520                    	jne	short _42
+   480 000001FC 83C002                  	add	ax, 2	; Second part of 1024 bytes boot sector
+   481 000001FF 83D200                  	adc	dx, 0	; just after FSINFO sector  
+   482 00000202 BB[3E0A]                	mov	bx, BootSectorBuff+512
+   483 00000205 C606[6602]02            	mov	byte [fat32], 2
+   484 0000020A EBE4                    	jmp	short _39
+   485                                  _40:
+   486                                  	; disk write error
+   487 0000020C BE[F404]                	mov	si, CRLF
+   488 0000020F E84500                  	call	print_msg
+   489 00000212 BE[5505]                	mov	si, msg_disk_write_error
+   490 00000215 EB08                    	jmp	short _43
+   491                                  _41:
+   492                                  	; nothing to do !
+   493 00000217 BE[F404]                	mov	si, CRLF 
+   494 0000021A EB03                    	jmp	short _43
+   495                                  _42:
+   496                                  	; disk (bs) writing is OK.
+   497 0000021C BE[F004]                	mov	si, msg_OK
+   498                                  _43:
+   499 0000021F E83500                  	call	print_msg
+   500                                  
+   501                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   502                                  ; Exit
+   503                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   504                                  
+   505 00000222 B8004C                  	mov	ax, 4C00h		; terminate
+   506 00000225 CD21                    	int	21h
+   507                                  _44:
+   508 00000227 EBFE                    	jmp	short _44
+   509                                  
+   510                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   511                                  ; LBA read (read one sector)
+   512                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   513                                  
+   514                                  ;lba_read:
+   515                                  ;	mov	[rw], 42h
+   516                                  ;	jmp	short lba_rw
+   517                                  
+   518                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   519                                  ; LBA write (write one sector)
+   520                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   521                                  
+   522                                  lba_write:
+   523                                  	;mov	byte [rw], 43h
+   524                                  	;jmp	short lba_rw
+   525                                  
+   526                                  ;lba_read:
+   527                                  lba_rw:
+   528 00000229 BF0500                  	mov	di, 5
+   529                                  lba_rw_1:
+   530                                  	;pusha				; db 60h
+   531 0000022C 60                      	db	60h
+   532                                  	;push 	0                       ; db 6Ah, 00h
+   533 0000022D 6A00                    	db	6Ah, 0
+   534                                  	;push	0                       ; db 6Ah, 00h
+   535 0000022F 6A00                    	db	6Ah, 0
+   536 00000231 52                      	push    dx
+   537 00000232 50                      	push    ax
+   538 00000233 06                      	push    es
+   539 00000234 53                      	push    bx
+   540                                  	;push	1			; db 6Ah, 01h
+   541 00000235 6A01                    	db	6Ah, 01h                     
+   542                                  	;push	10h                     ; db 6Ah, 10h
+   543 00000237 6A10                    	db	6Ah, 10h
+   544                                  
+   545 00000239 89E6                    	mov     si, sp
+   546 0000023B 8A16[6502]              	mov     dl, [DrvNum]
+   547 0000023F 30C0                    	xor	al, al	; verify off (for LBA write)
+   548                                  lba_rw_2:
+   549                                  	;mov	ah, [rw] ; LBA read/write
+   550                                  	;xor	al, al	; verify off
+   551 00000241 B443                    	mov	ah, 43h
+   552 00000243 CD13                    	int     13h
+   553                                  
+   554                                  	;mov	[error], ah
+   555 00000245 730D                    	jnc     short lba_rw_3
+   556                                  
+   557 00000247 4F                      	dec	di                 
+   558 00000248 740A                    	jz	short lba_rw_3 
+   559                                          
+   560 0000024A 30E4                    	xor	ah, ah                   
+   561                                  	;mov	dl, [DrvNum]
+   562 0000024C CD13                    	int	13h	; BIOS Service func (ah) = 0
+   563                                  			; Reset disk system
+   564                                  
+   565                                  	;mov	word [si+2], 1 ; set r/w count to 1 again
+   566 0000024E C6440201                	mov	byte [si+2], 1
+   567                                  
+   568 00000252 EBED                    	jmp	short lba_rw_2
+   569                                  
+   570                                  lba_rw_3:
+   571                                  	;popa
+   572 00000254 61                      	db	61h
+   573                                  	;popa
+   574 00000255 61                      	db	61h
+   575                                  
+   576                                  _retn:
+   577 00000256 C3                      	retn
+   578                                  
+   579                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   580                                  ; print message
+   581                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   582                                  
+   583                                  print_msg:
+   584 00000257 AC                      	lodsb				; Load byte at DS:SI to AL
+   585 00000258 20C0                    	and	al, al            
+   586 0000025A 74FA                    	jz	short _retn      
+   587 0000025C B40E                    	mov	ah, 0Eh			
+   588 0000025E BB0700                  	mov	bx, 07h             
+   589 00000261 CD10                    	int	10h			; BIOS Service func ( ah ) = 0Eh
+   590                                  					; Write char as TTY
+   591                                  					; AL-char BH-page BL-color
+   592 00000263 EBF2                    	jmp     short print_msg          
+   593                                  
+   594                                  ;=============================================================================
+   595                                  ;        	initialized data
+   596                                  ;=============================================================================
+   597                                  
+   598                                  ;rw:	db	42h	; LBA read (default)
+   599                                  
+   600                                  DrvNum:
+   601 00000265 00                      	db	0
+   602                                  fat32:
+   603 00000266 00                      	db	0
+   604                                  
+   605                                  ;align 2
+   606                                  
+   607                                  ;bs_file_handle:
+   608                                  ;	dw	0
+   609                                  
+   610                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   611                                  ;  Messages
+   612                                  ;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+   613                                  
+   614                                  TrDOS_Welcome:
+   615 00000267 0D0A                    	db	0Dh, 0Ah
+   616 00000269 5072696D6172792044-     	db	"Primary DOS Partition Boot Sector Restore Utility for TR-DOS 386"
+   616 00000272 4F5320506172746974-
+   616 0000027B 696F6E20426F6F7420-
+   616 00000284 536563746F72205265-
+   616 0000028D 73746F726520557469-
+   616 00000296 6C69747920666F7220-
+   616 0000029F 54522D444F53203338-
+   616 000002A8 36                 
+   617 000002A9 0D0A                    	db	0Dh, 0Ah
+   618 000002AB 76312E302E31303130-     	db	"v1.0.101020 (c) Erdogan TAN 2020"
+   618 000002B4 323020286329204572-
+   618 000002BD 646F67616E2054414E-
+   618 000002C6 2032303230         
+   619 000002CB 0D0A                    	db	0Dh, 0Ah
+   620 000002CD 0D0A                    	db	0Dh, 0Ah
+   621 000002CF 55736167653A206273-     	db	"Usage: bsrestor <disk drive name> <backup file name>"
+   621 000002D8 726573746F72203C64-
+   621 000002E1 69736B206472697665-
+   621 000002EA 206E616D653E203C62-
+   621 000002F3 61636B75702066696C-
+   621 000002FC 65206E616D653E     
+   622 00000303 0D0A                    	db	0Dh, 0Ah
+   623 00000305 0D0A                    	db	0Dh, 0Ah
+   624 00000307 4469736B2064726976-     	db	"Disk drive names: "
+   624 00000310 65206E616D65733A20 
+   625 00000319 0D0A                    	db	0Dh, 0Ah
+   626 0000031B 0D0A                    	db	0Dh, 0Ah
+   627 0000031D 20686430202E2E666F-     	db	" hd0 ..for primary dos partition on 1st disk "
+   627 00000326 72207072696D617279-
+   627 0000032F 20646F732070617274-
+   627 00000338 6974696F6E206F6E20-
+   627 00000341 317374206469736B20 
+   628 0000034A 0D0A                    	db	0Dh, 0Ah
+   629 0000034C 20686431202E2E666F-     	db	" hd1 ..for primary dos partition on 2nd disk "
+   629 00000355 72207072696D617279-
+   629 0000035E 20646F732070617274-
+   629 00000367 6974696F6E206F6E20-
+   629 00000370 326E64206469736B20 
+   630 00000379 0D0A                    	db	0Dh, 0Ah
+   631 0000037B 20686432202E2E666F-     	db	" hd2 ..for primary dos partition on 3rd disk "
+   631 00000384 72207072696D617279-
+   631 0000038D 20646F732070617274-
+   631 00000396 6974696F6E206F6E20-
+   631 0000039F 337264206469736B20 
+   632 000003A8 0D0A                    	db	0Dh, 0Ah
+   633 000003AA 20686433202E2E666F-     	db	" hd3 ..for primary dos partition on 4th disk "
+   633 000003B3 72207072696D617279-
+   633 000003BC 20646F732070617274-
+   633 000003C5 6974696F6E206F6E20-
+   633 000003CE 347468206469736B20 
+   634 000003D7 0D0A0D0A                	db	0Dh, 0Ah, 0Dh, 0Ah
+   635 000003DB 4578616D706C653A20-     	db	"Example: bsrestor hd0 bsbackup.bin "
+   635 000003E4 6273726573746F7220-
+   635 000003ED 686430206273626163-
+   635 000003F6 6B75702E62696E20   
+   636 000003FE 0D0A00                  	db	0Dh, 0Ah, 0
+   637                                  
+   638                                  msg_inv_file_name: 
+   639 00000401 0D0A                    	db	0Dh, 0Ah
+   640 00000403 496E76616C69642066-     	db	"Invalid file name !", 0Dh, 0Ah
+   640 0000040C 696C65206E616D6520-
+   640 00000415 210D0A             
+   641 00000418 2846696C65206E616D-     	db	"(File name must fit to 8.3 DOS format) !"
+   641 00000421 65206D757374206669-
+   641 0000042A 7420746F20382E3320-
+   641 00000433 444F5320666F726D61-
+   641 0000043C 74292021           
+   642 00000440 0D0A00                  	db	0Dh, 0Ah, 0
+   643                                  
+   644                                  msg_dosp_notfound:
+   645 00000443 0D0A                    	db	0Dh, 0Ah
+   646 00000445 4D425220646F657320-     	db	"MBR does not contain a primary DOS partition !"	
+   646 0000044E 6E6F7420636F6E7461-
+   646 00000457 696E2061207072696D-
+   646 00000460 61727920444F532070-
+   646 00000469 6172746974696F6E20-
+   646 00000472 21                 
+   647 00000473 0D0A                    	db	0Dh, 0Ah
+   648 00000475 00                      	db	0
+   649                                  
+   650                                  msg_inv_mbr:
+   651 00000476 0D0A                    	db	0Dh, 0Ah
+   652 00000478 496E76616C6964204D-     	db	"Invalid MBR !"	
+   652 00000481 42522021           
+   653 00000485 0D0A00                  	db	0Dh, 0Ah, 0
+   654                                  
+   655                                  msg_overwrite_question:
+   656 00000488 0D0A                    	db	0Dh, 0Ah
+   657 0000048A 446F20796F75207761-     	db	"Do you want to overwrite boot sector ? "
+   657 00000493 6E7420746F206F7665-
+   657 0000049C 72777269746520626F-
+   657 000004A5 6F7420736563746F72-
+   657 000004AE 203F20             
+   658 000004B1 00                      	db	0
+   659                                  
+   660 000004B2 594553                  _YES:	db	"YES"
+   661 000004B5 0D0A00                  	db	0Dh, 0Ah, 0
+   662                                  
+   663 000004B8 4E4F                    _NO:	db	"NO"
+   664 000004BA 0D0A00                  	db	0Dh, 0Ah, 0
+   665                                  
+   666                                  msg_writing_bs:
+   667 000004BD 0D0A                    	db	0Dh, 0Ah
+   668 000004BF 57726974696E672070-     	db	"Writing primary dos partition's boot sector ... "
+   668 000004C8 72696D61727920646F-
+   668 000004D1 732070617274697469-
+   668 000004DA 6F6E277320626F6F74-
+   668 000004E3 20736563746F72202E-
+   668 000004EC 2E2E20             
+   669 000004EF 00                      	db	0
+   670                                  msg_OK:
+   671 000004F0 204F4B2E                	db	' OK.'
+   672                                  CRLF:
+   673 000004F4 0D0A00                  	db	0Dh, 0Ah, 0
+   674                                  
+   675                                  msg_file_notfound:
+   676 000004F7 0D0A                    	db	0Dh, 0Ah
+   677 000004F9 4261636B7570206669-     	db	"Backup file not found !"
+   677 00000502 6C65206E6F7420666F-
+   677 0000050B 756E642021         
+   678 00000510 0D0A00                  	db	0Dh, 0Ah, 0
+   679                                  
+   680                                  msg_file_read_error:
+   681 00000513 0D0A                    	db	0Dh, 0Ah
+   682 00000515 46696C652072656164-     	db	"File reading error !"
+   682 0000051E 696E67206572726F72-
+   682 00000527 2021               
+   683 00000529 0D0A00                  	db	0Dh, 0Ah, 0
+   684                                  
+   685                                  msg_disk_not_ready_error:
+   686 0000052C 0D0A                    	db	0Dh, 0Ah
+   687 0000052E 4469736B2072656164-     	db	"Disk read error or drive not ready !"
+   687 00000537 206572726F72206F72-
+   687 00000540 206472697665206E6F-
+   687 00000549 742072656164792021 
+   688 00000552 0D0A00                  	db	0Dh, 0Ah, 0
+   689                                  
+   690                                  msg_disk_write_error:
+   691 00000555 0D0A                    	db	0Dh, 0Ah
+   692 00000557 4469736B2077726974-     	db	"Disk write error !"
+   692 00000560 65206572726F722021 
+   693 00000569 0D0A00                  	db	0Dh, 0Ah, 0
+   694                                  
+   695                                  msg_inv_backup_file:
+   696 0000056C 0D0A                    	db	0Dh, 0Ah
+   697 0000056E 496E76616C69642062-     	db	"Invalid backup file !", 0Dh, 0Ah
+   697 00000577 61636B75702066696C-
+   697 00000580 6520210D0A         
+   698 00000585 28496D70726F706572-     	db	"(Improper file attributes or wrong file size) !"
+   698 0000058E 2066696C6520617474-
+   698 00000597 72696275746573206F-
+   698 000005A0 722077726F6E672066-
+   698 000005A9 696C652073697A6529-
+   698 000005B2 2021               
+   699 000005B4 0D0A00                  	db	0Dh, 0Ah, 0
+   700                                  
+   701                                  msg_inv_file_mbr:
+   702 000005B7 0D0A                    	db	0Dh, 0Ah
+   703 000005B9 496E76616C69642062-     	db	"Invalid backup file !", 0Dh, 0Ah
+   703 000005C2 61636B75702066696C-
+   703 000005CB 6520210D0A         
+   704 000005D0 28496D70726F706572-     	db	"(Improper/Different/Invalid MBR) !"	
+   704 000005D9 2F446966666572656E-
+   704 000005E2 742F496E76616C6964-
+   704 000005EB 204D4252292021     
+   705 000005F2 0D0A00                  	db	0Dh, 0Ah, 0
+   706                                  
+   707                                  msg_inv_file_bs:
+   708 000005F5 0D0A                    	db	0Dh, 0Ah
+   709 000005F7 496E76616C69642062-     	db	"Invalid backup file !", 0Dh, 0Ah
+   709 00000600 61636B75702066696C-
+   709 00000609 6520210D0A         
+   710 0000060E 28496E76616C696420-     	db	"(Invalid BS) !"	
+   710 00000617 4253292021         
+   711 0000061C 0D0A00                  	db	0Dh, 0Ah, 0
+   712                                  
+   713                                  SizeOfFile equ $-100
+   714                                  
+   715                                  ;=============================================================================
+   716                                  ;        	uninitialized data
+   717                                  ;=============================================================================
+   718                                  
+   719                                  bss_start:
+   720                                  
+   721                                  ABSOLUTE bss_start
+   722                                  
+   723 0000061F ??                      alignb 2
+   724                                  
+   725                                  bs_file_name:  
+   726 00000620 <res Dh>                	resb	13
+   727 0000062D ??                      	resb	1 ; word alignment
+   728                                  
+   729                                  bss_clear_end:
+   730                                  
+   731                                  PTrow:
+   732 0000062E <res 10h>               	resb	16
+   733                                  
+   734                                  ;alignb 2
+   735                                  
+   736                                  ; Masterboot sector (MBR)
+   737                                  
+   738                                  MasterBootBuff:
+   739                                  MasterBootCode: 
+   740 0000063E <res 1BEh>              	resb	446 
+   741                                  PartitionTable:
+   742 000007FC <res 40h>               	resb	64
+   743                                  MBIDCode:
+   744 0000083C ????                    	resw	1
+   745                                  
+   746                                  BootSectorBuff:
+   747 0000083E <res 200h>              	resb	512
+   748                                  BootSectorBuff2:
+   749 00000A3E <res 200h>              	resb	512	; FAT32 fs boot sector buffer, 2nd part
+   750                                  
+   751                                  bss_end:	 	
