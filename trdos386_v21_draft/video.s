@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.10 - video.s
 ; ----------------------------------------------------------------------------
-; Last Update: 22/12/2025 (Previous: 29/11/2023 - Kernel v2.0.7)
+; Last Update: 10/02/2026 (Previous: 29/11/2023 - Kernel v2.0.7)
 ; ----------------------------------------------------------------------------
 ; Beginning: 16/01/2016
 ; ----------------------------------------------------------------------------
@@ -210,6 +210,26 @@ M1:	dd	SET_MODE	; TABLE OF ROUTINES WITHIN VIDEO I/O
 	dd	WRITE_STRING	; 23/06/2016 (TRDOS 386)
 M1L	EQU	$ - M1
 
+; 10/02/2026 - TRDOS 386 v2.0.10
+; BugFix note:
+; cr3 is changed to Kernel's Page Directory address in int 31h.
+; Because, 'transfer_to_user_buffer' uses 'get_physical_addr_x'
+; uses 'get_pde' uses 'get_pde' .. and 'get_pde' causes
+; page fault error because of "mov eax, [edx]" code in it while
+; edx contains an address at the beyond of the 1st 4MB.
+; (Before this Bugfix, 'VGA_func_std' part of int 31h was running
+; with user's page directry in cr3. (That was no problem if
+; all page tables would be in the 1st 4MB. But if the RAM is larger
+; than 2.5GB, page tables extent at the beyond of the 1st 4MB.)
+; As result of the BugFix today, size of 4GB-LFBaddress RAM will be
+; available to use.
+;
+;; Note: [cr3prev] is used for int 31h video interrupt and [cr3reg]
+;; is used for timer -or RTC- interrupt. 
+;; (This separation is needed because timer interrupt can occur
+;;  while video interrupt handler is in progress.)
+  
+ 
 ; 22/12/2025
 ; 21/12/2025 - TRDOS 386 v2.0.10
 ; 29/11/2023 - TRDOS 386 v2.0.7
@@ -218,7 +238,7 @@ M1L	EQU	$ - M1
 ;	((Addresses of kernel page tables and PMI videobios address
 ;	  must be < 4MB or cr3 register must contain kernel's page dir
 ;	  during video interrupt. Save-change-restore cr3 register
-;	  content here is a bugfix method to prevent page faults 
+;	  content here is a bugfix method to prevent page faults
 ;	  for -real- computers with >2.5GB main memory.))
 ;	 {INT 31h was not changing cr3 while it contains user's
 ;	  page directory addr and accessing beyond of the 1st 4MB was
@@ -266,6 +286,12 @@ VGA_func: ; 26/11/2020
 	mov	ax, KDATA 		; POINT DS: TO DATA SEGMENT
 	mov	ds, ax
 	mov	es, ax
+
+	; 10/02/2026 - !!! BugFix !!!
+	mov	eax, cr3
+	mov	[cr3prev], eax ; save current cr3 register value/content
+	mov	eax, [k_page_dir]
+	mov	cr3, eax
 
 	; 26/11/2020
 	pop	eax ; +
@@ -449,13 +475,16 @@ VBE_func:
 	; (every function must restore and set
 	; registers except esp, esi, es, ds)
 
+	; 10/02/2026 - TRDOS 386 v2.0.10
+	; cr3 = [k_page_dir] ; kernel's cr3
+	; [cr3prev] = previous (user's) cr3
 	; 29/11/2023 - TRDOS 386 v2.0.7
-	mov	esi, cr3
-	push	esi ; *****
-	;cmp	esi, [k_page_dir]
-	;je	short VBE_func_x
-	mov	esi, [k_page_dir]
-	mov	cr3, esi
+	;mov	esi, cr3
+	;push	esi ; *****
+	;;cmp	esi, [k_page_dir]
+	;;je	short VBE_func_x
+	;mov	esi, [k_page_dir]
+	;mov	cr3, esi
 ;VBE_func_x:
 	cmp	byte [vbe3], 2
 	ja	short VESA_VBE3_PMI_CALL ; VBE3 video bios ('PMID')
@@ -492,10 +521,12 @@ VBE_func_1:
 
 VBE_bios_return:
 	cli
+	; 10/02/2026 - TRDOS 386 v2.0.10
+	mov	esi, [cr3prev] ; restore pðrevious (user's) cr3
 	; 29/11/2023 - TRDOS 386 v2.0.7
-	pop	esi ; *****
-	;cmp	esi, [k_page_dir]
-	;je	short VBE_bios_return_x
+	;pop	esi ; *****
+	;;cmp	esi, [k_page_dir]
+	;;je	short VBE_bios_return_x
 	mov	cr3, esi
 ;VBE_bios_return_x:
 	pop	esi ; ****
@@ -949,17 +980,18 @@ vesa_vbe3_pmi:
 	; Only 'set mode' will be redirected to vbe3 video bios
 	; (by setting mode 3 multiscreen parameters before and after)
 
+	; 10/02/2026 - TRDOS 386 v2.0.10
 	; 29/11/2023 - TRDOS 386 v2.0.7
-	push	eax
-	mov	eax, cr3
-	xchg	eax, [esp] ; **!**
-	push	eax
-	;cmp	esi, [k_page_dir]
-	;je	short vesa_vbe3_pmi_x
-	mov	eax, [k_page_dir]
-	mov	cr3, eax
-;vesa_vbe3_pmi_x:
-	pop	eax
+	;push	eax
+	;mov	eax, cr3
+	;xchg	eax, [esp] ; **!**
+	;push	eax
+	;;cmp	esi, [k_page_dir]
+	;;je	short vesa_vbe3_pmi_x
+	;mov	eax, [k_page_dir]
+	;mov	cr3, eax
+;;vesa_vbe3_pmi_x:
+	;pop	eax
 
 	; 06/12/2020
 	and	ah, ah	; 0 = set mode function
@@ -1158,12 +1190,15 @@ vbe3_pmi_8:
 	;(TRDOS 386 v2.0.3, INT 31h, ah=0 return)
 	xor	eax, eax  ; eax = 0 -> succesful
 vesa_vbe3_pmi_retn:
+	; 10/02/2026 - TRDOS 386 v2.0.10
+	push	eax
+	mov	eax, [cr3prev] ; restore previous (user's) cr3
 	; 29/11/2023 - TRDOS 386 v2.0.7
-	xchg	eax, [esp] ; **!**
-	;cmp	eax, [k_page_dir]
-	;je	short vesa_vbe3_pmi_retn_x
+	;xchg	eax, [esp] ; **!**
+	;;cmp	eax, [k_page_dir]
+	;;je	short vesa_vbe3_pmi_retn_x
 	mov	cr3, eax
-;vesa_vbe3_pmi_retn_x:
+;;vesa_vbe3_pmi_retn_x:
 	pop	eax
 	;
 	pop	es  ; **
@@ -1560,6 +1595,11 @@ M15:	; VIDEO_RETURN_C
 	;;15/01/2017
 	; 02/01/2017
 	;;mov	byte [intflg], 0
+	;
+	; 10/02/2026 - TRDOS 386 v2.0.10
+	; 	restore previous (user's) cr3
+	mov	ecx, [cr3prev]
+	mov	cr3, ecx
 	;
 	pop	ecx ; **** ; 26/11/2020
 	pop	edx ; ***
@@ -2602,6 +2642,12 @@ read_cursor_2:
 	pop	ebx
 	pop	eax  ; DISCARD SAVED CX AND DX
 	pop	eax
+	;
+	; 10/02/2026 - TRDOS 386 v2.0.10
+	; restore previous (user's) cr3
+	mov	eax, [cr3prev]
+	mov	cr3, eax
+	;	
 	mov	eax, [video_eax] ; 12/05/2016
 	;;15/01/2017
 	;;mov	byte [intflg], 0 ; 07/01/2017

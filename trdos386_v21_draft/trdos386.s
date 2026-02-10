@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.10 (v2.1.0 pre-work)
 ; ----------------------------------------------------------------------------
-; Last Update: 26/01/2026 (Previous: 28/01/2025)
+; Last Update: 10/02/2026 (Previous: 28/01/2025)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -572,8 +572,9 @@ memory_init:
 	or	dx, dx
 	jz	short mi_0
 
+; 09/02/2026
 ; 04/12/2023
-%if 1
+%if 0
 	; 02/12/2023 - temporary (2816MB limit)
 	;cmp	dx, 44800 ; 0AF00h
 	cmp	dx, 40704	; (2560MB limit)
@@ -2628,6 +2629,14 @@ cpu_except:	; CPU Exceptions
 	jnz	short cpu_except_pf
 	jmp	iiretp
 cpu_except_pf:	; 24/07/2022
+
+; 09/02/2026 - temporary
+cmp al, ERR_MAJOR_PF + ERR_MINOR_RO
+jne short bunugec
+mov al, 0FFh
+jmp short cpu_except_nfp
+bunugec:
+
 	mov	al, 0Eh ; 14
 cpu_except_nfp:
 	; 23/08/2016
@@ -3782,7 +3791,7 @@ starting_msg:
 	;;;db "Turkish Rational DOS v2.0 [29/12/2024] ...", 0
 	;;db "Turkish Rational DOS v2.0 [28/01/2025] ...", 0
 	;db "Turkish Rational DOS v2.0 [24/04/2025] ...", 0
-	db "Turkish Rational DOS v2.1 [26/01/2026] ...", 0
+	db "Turkish Rational DOS v2.1 [10/02/2026] ...", 0
 
 NextLine:
 	db 0Dh, 0Ah, 0
@@ -3847,7 +3856,7 @@ kernel_version_msg: ; 17/04/2021
 ;;;db	"TRDOS (386) Kernel v2.0.8 by Erdogan Tan" ; 16/05/2024
 ;;db	"TRDOS (386) Kernel v2.0.9 by Erdogan Tan" ; 20/08/2024
 ;db	"TRDOS (386) Kernel v2.0.10 by Erdogan Tan" ; 11/01/2025
-db	"TRDOS (386) Kernel v2.1.0 by Erdogan Tan" ; 26/01/2026
+db	"TRDOS (386) Kernel v2.1.0 by Erdogan Tan" ; 10/02/2026
 db	0
 
 ; 20/02/2017

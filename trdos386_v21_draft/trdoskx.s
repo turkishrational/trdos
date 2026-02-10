@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 16/01/2026 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 10/02/2026 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -17,6 +17,10 @@
 ; DRV_FAT.ASM  [07/07/2009] Last update: 21/08/2011
 
 alignb 4
+
+; 10/02/2026 - TRDOS 386 v2.0.10
+cr3prev: resd 1 ; for saving and restoring previous (user's) cr3
+	       ; (page directory address) -video.s-
 
 ; MAINPROG.ASM
 MainProgCfg_FileSize:   resd 1 ; 14/04/2016
