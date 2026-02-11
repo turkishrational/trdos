@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 19/12/2025 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 10/02/2026 (Previous: 01/09/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -17,6 +17,10 @@
 ; DRV_FAT.ASM  [07/07/2009] Last update: 21/08/2011
 
 alignb 4
+
+; 10/02/2026 - TRDOS 386 v2.0.10
+cr3prev: resd 1 ; for saving and restoring previous (user's) cr3
+	       ; (page directory address) -video.s-
 
 ; MAINPROG.ASM
 MainProgCfg_FileSize:   resd 1 ; 14/04/2016
@@ -714,7 +718,7 @@ DEV_INT_HNDLR:	resd 16		; Device Interrupt Handler addr, if > 0
 ; 26/02/2017 ; IRQ Callback parameters ('syscalbac')
 ;Index: ; 0 to 8
 ;	0 = IRQ3, 1 = IRQ4, 2 = IRQ5, 3 = IRQ7
-;	4 = IRQ9, 5 = IRQ10, 6 = IRQ11, 7 = IRQ12, 8 = IRQ13  
+;	4 = IRQ9, 5 = IRQ10, 6 = IRQ11, 7 = IRQ12, 8 = IRQ13
 IRQ.owner:	resb 9		; owner, 0 = free, >0 = [u.uno]
 IRQ.dev:	resb 9		; 0 = default/kernel, >0 = device number
 IRQ.method:	resb 9 		; 0 = Signal Response Byte, 1 = Callback
