@@ -2629,14 +2629,6 @@ cpu_except:	; CPU Exceptions
 	jnz	short cpu_except_pf
 	jmp	iiretp
 cpu_except_pf:	; 24/07/2022
-
-; 09/02/2026 - temporary
-cmp al, ERR_MAJOR_PF + ERR_MINOR_RO
-jne short bunugec
-mov al, 0FFh
-jmp short cpu_except_nfp
-bunugec:
-
 	mov	al, 0Eh ; 14
 cpu_except_nfp:
 	; 23/08/2016
