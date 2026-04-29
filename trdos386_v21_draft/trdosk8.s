@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk8.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.1.0) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 07/07/2025  (Previous: 29/12/2024)
+; Last Update: 29/04/2026  (Previous: 07/07/2025, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1154,86 +1154,74 @@ loc_rwp_return:
 	retn
 
 get_file_name:
-	; 25/08/2024 (TRDOS 386 Kernel v2.0.9)
-	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
-	; 15/10/2016 - TRDOS 386 (TRDOS v2.0)
-	; Convert file name
-	;	from directory entry format
-	; 	to (8.3) dot file name format
-	;
-	; TRDOS v1.0 (DIR.ASM, "get_file_name")
-	; 2005 - 09/10/2011
-	; INPUT:
-	;	DS:SI -> Directory Entry Format File Name
-	;       ES:DI -> DOS Dot File Name Address
-	; OUTPUT:
-	;	DS:SI -> DOS Dot File Name Address
-	;	ES:DI -> Directory Entry Format File Name
-	;
-	; TRDOS 386 (15/10/2016)
-	; INPUT:
-	;	ESI = File name addr in dir entry format
-	;	EDI = Dot file name address (destination)
-	; OUTPUT:
-	;	File name is converted and moved
-	;	to destination (as 8.3 dot filename)
-	;
-	; Modified registers: EAX, ECX
+		; 29/04/2026 (TRDOS 386 Kernel v2.0.11)
+		;	BugFix!
+		; 25/08/2024 (TRDOS 386 Kernel v2.0.9)
+		; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
+		; 15/10/2016 - TRDOS 386 (TRDOS v2.0)
+		; Convert file name 
+		;	from directory entry format
+                ; 	to (8.3) dot file name format
+		;
+		; TRDOS v1.0 (DIR.ASM, "get_file_name")
+                ; 2005 - 09/10/2011
+		; INPUT: 
+		;	DS:SI -> Directory Entry Format File Name
+		;       ES:DI -> DOS Dot File Name Address
+		; OUTPUT:
+		;	DS:SI -> DOS Dot File Name Address
+                ;	ES:DI -> Directory Entry Format File Name
+		;	
+		; TRDOS 386 (15/10/2016)
+		; INPUT:
+		;	ESI = File name addr in dir entry format
+		;	EDI = Dot file name address (destination)
+		; OUTPUT: 
+		;	File name is converted and moved
+		;	to destination (as 8.3 dot filename)
+		;  
+		; Modified registers: EAX, ECX
 
-	; 2005 (TRDOS 8086) - 2016 (TRDOS 386)
+                ; 2005 (TRDOS 8086) - 2016 (TRDOS 386)
 
-	push	edi
-	push	esi
-	lodsb
-	; 25/08/2024
-	xor	ecx, ecx ; 0
-	cmp	al, 20h
-	jna	short pass_gfn_ext
-	; 25/08/2024
-	;push	esi
-	stosb
-	; 25/08/2024
-	; 29/07/2022
-	;xor	ecx, ecx
-	; ecx <= 128 ; 25/08/2024
-	mov	cl, 7
-	; 25/08/2024
-	add	esi, ecx ; add esi, 7
-	push	esi ; (*)
-loc_gfn_next_char:
-	lodsb
-	cmp	al, 20h
-	jna	short pass_gfn_fn
-	stosb
-	loop	loc_gfn_next_char
-pass_gfn_fn:
-	;pop	esi
-	;add	esi, 7
-	; 25/08/2024
-	pop	esi ; (*)
-
-	lodsb
-	cmp	al, 20h
-	jna	short pass_gfn_ext
-	mov	ah, '.'
-	xchg	ah, al
-	stosw
-	lodsb
-	cmp	al, 20h
-	jna	short pass_gfn_ext
-	stosb
-	lodsb
-	cmp	al, 20h
-	jna	short pass_gfn_ext
-	stosb
-pass_gfn_ext:
-	xor	al, al
-	stosb
-	pop	esi
-	pop	edi
-	; 25/08/2024
-	; ecx <= 7
-	retn
+		push	edi
+		push	esi
+		; 25/08/2024
+		xor	ecx, ecx ; 0
+		; 29/04/2026
+		mov	cl, 8
+gfn_basename:
+		lodsb
+		cmp	al, 20h
+		ja	short gfn_nextchar
+		add	esi, ecx
+		dec	esi
+		jmp	short gfn_chk_ext
+gfn_nextchar:
+		stosb		; ?*
+		loop	gfn_basename
+gfn_chk_ext:
+		cmp	byte [esi], 20h
+		jna	short gfn_ok
+		mov	al, '.' ; ?*.
+		stosb
+		movsb		; .?
+		lodsb
+		cmp	al, 20h
+		jna	short gfn_ok
+		stosb		; .??
+		lodsb
+		cmp	al, 20h
+		jna	short gfn_ok
+		stosb		; .???
+gfn_ok:
+		xor	al, al
+		stosb
+		pop	esi
+		pop	edi
+		; 25/08/2024
+		; ecx <= 7
+		retn
 
 set_hardware_int_vector:
 	; 18/03/2017
