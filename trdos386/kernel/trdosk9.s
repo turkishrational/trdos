@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - INITIALIZED DATA : trdosk9.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - INITIALIZED DATA : trdosk9.s
 ; ----------------------------------------------------------------------------
-; Last Update: 10/02/2026 (Previous: 29/12/2024 - Kernel v2.0.9)
+; Last Update: 29/04/2026 (Previous: 10/02/2026 - Kernel v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -31,7 +31,7 @@ Magic_Bytes:
 		db 1
 mainprog_Version:
 		db 7
-		db "[TRDOS] Main Program v2.0.10 (10/02/2026)"
+		db "[TRDOS] Main Program v2.0.11 (29/04/2026)"
 		db 0Dh, 0Ah
 		db "(c) Erdogan Tan 2005-2026"
 		db 0Dh, 0Ah, 0

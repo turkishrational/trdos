@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 10/01/2026  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 29/04/2026  (Previous: 10/01/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -14786,6 +14786,8 @@ tfub_2:
 ;	jmp	short tfub_3
 
 sysfff: ; <Find First File>
+	; 29/04/2026 (TRDOS 386 Kernel v2.0.11)
+	;	- major modification -
 	; 25/08/2024 (TRDOS 386 Kernel v2.0.9)
 	; 08/08/2022
 	; 30/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -14818,23 +14820,71 @@ sysfff: ; <Find First File>
 	; 15/10/2016
 	;
         ; INPUT ->
-        ;	   CL = File attributes
+        ;	*  CL = File attributes
 	;     	      bit 0 (1) - Read only file (R)
 	;             bit 1 (1) - Hidden file (H)
         ;             bit 2 (1) - System file (R)
 	;             bit 3 (1) - Volume label/name (V)
         ;             bit 4 (1) - Subdirectory (D)
 	;	      bit 5 (1) - File has been archived (A)
-	;	   CH = 0 -> Return basic parameters (24 bytes)
-	;	   CH > 0 -> Return FindFile structure/table (128 bytes)
-        ;          EBX = Pointer to filename (ASCIIZ) -path-
+	;	*  CH = 0 -> Return basic parameters (24 bytes)
+	;;;	   CH > 0 -> Return FindFile structure/table (128 bytes)
+        ;	   29/04/2026
+	;	*  CH = 1 -> Return msdos/FAT directory entry
+	;	*  CH = 2 -> Return msdos/FAT directory entry (32 bytes)
+	;		+ UNICODE LongName
+        ;			(max. 130 bytes for current version)
+	;	   Note: The user buffer for the UNICODE long name
+        ;                should be 260 bytes and it should be located
+        ;                immediately after the 32-byte FAT directory
+        ;                entry (contiguous). -New version of the kernel will
+	;                be able to return 260 bytes UNICODE long name.-
+	;	      If the file does not have a long name,
+	;	      the 1st 4 bytes of the long name field will be zero.
+	;
+	;	   Total user buffer length: 292 bytes
+        ;
+	;	*  CH = 3 -> Return msdos/FAT directory entry (32 bytes)
+	;		+ ASCIIZ LongName (130+1+1 bytes)
+	;               (The kernel performs UNICODE to ASCII conversion
+	;                 based on the country code set 
+	;			-for later kernel versions-)
+	;		((The default UNICODE to ASCIIZ conversion
+        ;                method for the current kernel version:
+        ;                The high byte of the Unicode char is not used.))
+	;		
+	;	   Total user buffer length: 164 bytes
+	;
+	;		Byte 130 is always 0.
+	;		Byte 131 of the long name field is Long Name Length
+	;		value excluding the NULL tail.
+	;
+	;	   If the file has no long name,
+	;		ASCIIZ short name of the file is located
+	;		in long name field.
+	;		.. And Byte 131 of the long name field is ZERO.
+	;
+	;	*  CH = 4 -> Return complete FindFile parameters/table
+	;	      -not valid sub function for current kernel version-
+	;
+	;          EBX = Pointer to filename (ASCIIZ) -path-
 	;	   EDX = File parameters buffer address
 	;		(buffer size = 24 bytes if CH input = 0)
-	;		(buffer size = 128 bytes if CH input > 0)
+	;;;		(buffer size = 128 bytes if CH input > 0)
+	;	        (buffer size = 32 bytes for CH input = 1)
+	;		(buffer size = 292 bytes for ch input = 2)
+	;		  -The current kernel will fill in 162 bytes.-
+	;		  -The new version will use 292 bytes.-
+	;		(buffer size = 164 bytes for ch input = 3)
+	;		  -The current kernel will fill in 99 bytes.-
+	;		  -The new version will use 164 bytes.-
 	;
 	; OUTPUT ->
-	;	   EAX = 0 if CH input > 0
-	;	   EAX = First cluster number of file if CH input = 0
+	;;;	   EAX = 0 if CH input > 0
+	;;;	   EAX = First cluster number of file if CH input = 0
+	;	   29/04/2026 (TRDOS 386 v2.0.11) ((and v2.1.0))
+	;	   If CF = 0 ->
+	;	   EAX = First cluster number of file
 	;	   EDX = File parameters table/structure address
 	;	   Basic Parameters:
 	;		Offset  Description
@@ -14849,9 +14899,9 @@ sysfff: ; <Find First File>
 	;		10	Short Filename (ASCIIZ, max. 13 bytes)
 	;		23	Longname Length (1-255) if existing
 	;
-	;          cf = 1 -> Error code in AL
+	;          If CF = 1 -> EAX (AL) = Error code
 	;
-	; Modified Registers: EAX (at the return of system call)
+	; Modified Registers: EAX (at the return of this system call)
 	;
 	; TR-DOS FindFile (FFF) Structure (128 bytes):
 	; 09/10/2011 (DIR.ASM) - 10/02/2016 (trdoskx.s)
@@ -14873,6 +14923,22 @@ sysfff: ; <Find First File>
 	; 126		FindFile_Reserved	1 word
    	; (*) MS-DOS, FAT 12-16-32 classic directory entry (32 bytes)
 
+	; 29/04/2026
+	mov	byte [FFF_Valid], 0	; will be used by sysfnf
+
+	; 29/04/2026
+	; ch = 4 is not valid for current kernel version
+	cmp	ch, 3
+	jna	short sysfff_@
+
+sysfff_invp:
+	; invalid sub function (invalid syscall parameter)
+	mov	eax, ERR_INV_PARAMETER  ; 23
+	mov	[u.r0], eax
+	mov	[u.error], eax
+	jmp	error
+
+sysfff_@:
 	;mov	[u.namep], ebx
 	; 16/10/2016
 	mov	[FFF_UBuffer], edx
@@ -14957,10 +15023,21 @@ sysfff_3:
 	jmp	short sysfff_3
 
 sysfff_4:
-	and	ch, ch ; [FFF_RType]
+	; 29/04/2026
+	mov	ax, [esi+DirEntry_FstClusHI] ; 20
+	shl	eax, 16
+	mov	ax, [esi+DirEntry_FstClusLO] ; 26
+	mov	[u.r0], eax ; First Cluster
+
+	inc	ch ; 0 -> 1, 3 -> 4
+	mov	byte [FFF_Valid], ch ; 1 to 4
+
+	;and	ch, ch ; [FFF_RType]
+	; 29/04/2026
+	dec	ch
 	;jz	short sysfff_5
 	; 25/08/2024
-	jnz	short sysfff_7
+	jnz	short sysfff_7 ; > 0
 
 	;mov	ecx, 128 ; ; transfer length
 	; 30/07/2022
@@ -14971,6 +15048,7 @@ sysfff_4:
 	;mov	byte [FFF_Valid], 128 ; (*)
 	;jmp	short sysfff_7 ; sysfnf_11
 
+	; Return Basic Parameters (ch input = 0)
 sysfff_5:
 	;;mov	esi, FindFile_DirEntry
 	;mov	ecx, 24  ; transfer length
@@ -14978,27 +15056,31 @@ sysfff_5:
 	;sub	ecx, ecx
 	;mov	cl, 24
 	;mov	[FFF_Valid], cl
-	mov	byte [FFF_Valid], 24 ; (*)
+	;mov	byte [FFF_Valid], 24 ; (*)
+	; 29/04/2026
+	;mov	byte [FFF_Valid], 1 ; basic parameters
 sysfnf_12:
 	mov	edi, DTA ; FFF data transfer address
 	;mov	al, [esi+DirEntry_Attr] ; 11
 	mov	al, bl ; File/Dir Attributes
-	mov	[edi+23], bh ; Longname length (0= none)
+	mov	[edi+23], bh ; Longname length (0 = none)
 	stosb
 	mov	al, dl ; DL is for '?'
 	add	al, dh ; DH is for '*'
 	; AL > 0 if ambiguous file name wildcards are used
 	stosb
-	mov	eax, [esi+DirEntry_WrtTime] ; 22
-        stosd	; DirEntry_WrtTime & DirEntry_WrtDate
-        mov	eax, [esi+DirEntry_FileSize] ; 28
-        stosd
-	mov	ax, [esi+DirEntry_FstClusHI] ; 20
-	;shl	ax, 16
-	; 23/07/2022 (BugFix)
-	shl	eax, 16 
-	mov	ax, [esi+DirEntry_FstClusLO] ; 26
-	mov	[u.r0], eax ; First Cluster
+	mov	eax, [esi+DirEntry_WrtTime]  ; 22
+	stosd	; DirEntry_WrtTime & DirEntry_WrtDate
+	mov	eax, [esi+DirEntry_FileSize] ; 28
+	stosd
+
+	; 29/04/2026
+	;mov	ax, [esi+DirEntry_FstClusHI] ; 20
+	;;shl	ax, 16
+	;; 23/07/2022 (BugFix)
+	;shl	eax, 16 
+	;mov	ax, [esi+DirEntry_FstClusLO] ; 26
+	;mov	[u.r0], eax ; First Cluster
 
         ;mov	esi, FindFile_DirEntry
 	call	get_file_name
@@ -15008,31 +15090,148 @@ sysfnf_12:
 	;mov	cl, [FFF_Valid] ; (*)
        	mov	esi, DTA ; FFF data transfer address
 
-sysfff_6:
 	; 25/08/2024
-	;sub	ecx, ecx
-	mov	cl, [FFF_Valid] ; (*) ecx <= 128
+	;;sub	ecx, ecx
+	;mov	cl, [FFF_Valid] ; (*) ecx <= 128
+	; 29/04/2026
+	mov	cl, 24	; basic parameters buffer size
 
+sysfff_6:	; 29/04/2026
 	mov	edi, [FFF_UBuffer] ; user's buffer address (edx)
 	call	transfer_to_user_buffer
 
-	mov	[u.r0], ecx ; actual transfer count
+	;;mov	[u.r0], ecx ; actual transfer count
         call 	reset_working_path
 	jmp	sysret
 
 sysfff_7:
+sysfnf_11: ; 29/04/2026
 	; 25/08/2024
-	mov	byte [FFF_Valid], 128 ; (*)
-sysfnf_11:
-	; ecx = 128
-	; 25/08/2024 (bugfix)
-	; 08/08/2022
-	mov	esi, FindFile_Drv
-	; 25/08/2024
-	sub	ecx, ecx ; 0
+	;;mov	byte [FFF_Valid], 128 ; (*)
+	; 29/04/2026
+	cmp	ch, 1
+	ja	short sysfff_8
+	; Return msdos/FAT directory entry (ch input = 1)
+	; ESI = Directory Entry (FindFile_DirEntry) Location
+	mov	ecx, 32
+	;mov	byte [FFF_Valid], 2 ; return directory entry
+	; [u.r0] = First Cluster number
 	jmp	short sysfff_6
 
+	; 29/04/2026
+sysfff_8:
+	cmp	ch, 2
+	ja	short sysfff_11
+	; Return 32 byte directory entry (ch input = 2)
+	;	+ 260 bytes UNICODE long file name
+	; 29/04/2026
+	;mov	byte [FFF_Valid], 3 ; dir entry + unicode LFN
+
+	cmp	byte [LongNameFound], 0	; 1 ?
+	jna	short sysfff_9
+
+	push	esi
+	; input: file name addr in 11-byte DOS dir entry format
+	call	calculate_checksum
+	; al = shortname checksum
+	pop	esi
+
+	cmp	[LFN_CheckSum], al
+	je	short sysfff_9
+
+	mov	byte [LongNameFound], 0
+
+sysfff_9:
+	mov	ecx, 32
+	; ESI = Directory Entry (FindFile_DirEntry) Address
+	mov	edi, [FFF_UBuffer] ; user's buffer address (edx)
+	add	[FFF_UBuffer], ecx ; LFN field of the buffer
+	call	transfer_to_user_buffer
+
+	mov	esi, LongFileName
+
+	cmp	byte [LongNameFound], 0
+	ja	short sysfff_10
+
+	mov	dword [esi], 0	; set 1st 4 bytes of the LFN to 0
+	mov	ecx, 4
+	jmp	short sysfff_6
+
+sysfff_10:
+	;mov	ecx, 292	; v2.1.0
+	mov	ecx, 164	; v2.0.11
+	jmp	short sysfff_6
+
+sysfff_11:
+	; 29/04/2026
+	; Return 32 byte directory entry (ch input = 3)
+	;	+ LFN length byte
+	;	+ max. 131 bytes asciiz long file name
+	;
+	; If the file doesn't have a long file name,
+	; a short name is used. The LFN length is set to 0.
+
+	;mov	byte [FFF_Valid], 4 ; dir entry + asciiz LFN
+
+	mov	edi, LongFileName
+
+	cmp	byte [LongNameFound], 0	; 1 ?
+	jna	short sysfff_12
+
+	push	esi
+	; input: file name addr in 11-byte DOS dir entry format
+	call	calculate_checksum
+	; al = shortname checksum
+	pop	esi
+
+	; edi = unicode LongFileName (source) address
+
+	cmp	[LFN_CheckSum], al
+	je	short sysfff_13
+
+sysfff_12:
+	; copy short name to long name field of the user buffer
+	mov	byte [edi], 0
+	mov	al, 0
+	stosb			; set LFN length to 0
+				; (short name sign)
+
+	;mov	esi, FindFile_DirEntry
+	call	get_file_name
+
+	;mov	ecx, 45	; 32+13
+	mov	cl, 45
+
+	jmp	sysfff_6
+
+sysfff_13:
+	; 29/04/2026
+	xor	ecx, ecx
+	mov	esi, edi ; LongFileName
+	mov	ebx, esi
+	inc	edi
+sysfff_14:
+	lodsw	; UNICODE char
+	stosb	; ascii char (default character map)
+	or	al, al
+	jz	short sysfff_15
+	inc	ecx
+	;cmp	ecx, 65  ; v2.0.11
+	;cmp	ecx, 130 ; v2.1.0
+	cmp	cl, 65
+	jna	short sysfff_14
+	sub	al, al
+	stosb
+sysfff_15:
+	mov	[ebx], cl ; LFN length
+	;add	ecx, 32
+	add	cl, 32	; 35-99 bytes
+	; ecx = transfer count (bytes)
+	jmp	sysfff_6
+
 sysfnf: ; <Find Next File>
+	; 29/04/2026 (TRDOS 386 Kernel v2.0.11)
+	;	- major modification -
 	; 19/12/2025 (TRDOS 386 v2.0.10)
 	; 25/08/2024 (TRDOS 386 Kernel v2.0.9)
 	; 29/08/2023 (TRDOS 386 Kernel v2.0.6)
@@ -15064,27 +15263,44 @@ sysfnf: ; <Find Next File>
 	;
         ; INPUT ->
        	; 	   none
+	;	   29/04/2026
+	;	   Note: The [FFF_Valid] byte
+	;		 is set by the FFF just before this FNF.
 	; OUTPUT ->
-	;	   EAX = 0 if CH input of 'Find First File' > 0
+	;;;	   EAX = 0 if CH input of 'Find First File' > 0
 	;	   EAX = First cluster number of file
-	;		 if CH input of 'Find First File' = 0
 	;	   EDX = File parameters table/structure address
 	;
 	;          cf = 1 -> Error code in AL
 	;
  	; Modified Registers: EAX (at the return of system call)
 
+	;;; Note: If byte [FFF_Valid] = 0
+	;;;	'sysfnf' will return with 'no more files' error.
+	;;;	If byte [FFF_Valid] = 24
+	;;;	'sysfnf' will return with 24 bytes basic parameters
+	;;;	at the address which is in EDX.
+	;;;	If byte [FFF_Valid] = 128
+	;;;	'sysfnf' will return with 128 bytes Find File
+	;;;	Structure/Table at the address which is in EDX.
+
+	; 29/04/2026
 	; Note: If byte [FFF_Valid] = 0
-	;	'sysfnf' will return with 'no more files' error.
-	;	If byte [FFF_Valid] = 24
-	;	'sysfnf' will return with 24 bytes basic parameters
+	;	   'sysfnf' will return with 'no more files' error.
+	;	If byte [FFF_Valid] = 1
+	;	   'sysfnf' will return with 24 bytes basic parameters
 	;	at the address which is in EDX.
-	;	If byte [FFF_Valid] = 128
-	;	'sysfnf' will return with 128 bytes Find File
-	;	Structure/Table at the address which is in EDX.
+	;	If byte [FFF_Valid] = 2
+	;	   'sysfnf' will return Directory Entry (32 bytes)
+	;	If byte [FFF_Valid] = 3
+	;	   'sysfnf' will return Directory Entry (32 bytes)
+	;	   + unicode LFN (132 bytes, total 164 bytes)
+	;	If byte [FFF_Valid] = 4
+	;	   'sysfnf' will return Directory Entry (32 bytes)
+	;	   + asciiz LFN (67 bytes, total 99 bytes)
 
 	cmp	byte [FFF_Valid], 0
-	ja	short stsfnf_0
+	ja	short sysfnf_0
  	; 'no more files !' error
 	;mov	eax, ERR_NO_MORE_FILES ; 12
 	; 30/07/2022
@@ -15094,30 +15310,30 @@ sysfnf: ; <Find Next File>
 	mov	[u.error], eax
 	jmp	error
 
-stsfnf_0:
+sysfnf_0:
 	;cmp	byte [FFF_Valid], 128
-	;je	short stsfnf_1
+	;je	short sysfnf_1
 	;cmp	byte [FFF_Valid], 24
-	;je	short stsfnf_1
+	;je	short sysfnf_1
 	;mov	[FFF_Valid], 24 ; Default
-stsfnf_1:
+sysfnf_1:
 	movzx	ebx, byte [Current_Drv]
 	mov	[SWP_DRV], bx
 	mov	dl, [FindFile_Drv]
 	cmp	dl, bl
-	jne	short stsfnf_2
+	jne	short sysfnf_5
 	xchg	bh, bl
 	mov	esi, Logical_DOSDisks
 	add	esi, ebx
-	jmp	short sysfnf_3
+	jmp	short sysfnf_6
 
-sysfnf_8:
+sysfnf_2:
 	call	load_FAT_sub_directory
 	jc	short sysfnf_err_1 ; read error (no FNF stop)
 
-sysfnf_9:
+sysfnf_3:
 	call	find_next_file
-	jc	short sysfnf_5
+	jc	short sysfnf_8
 	; 25/08/2024
 	; esi = Directory Entry (FindFile_DirEntry) Location
 	;; 08/08/2022
@@ -15125,36 +15341,40 @@ sysfnf_9:
 
 	mov	al, [FFF_Attrib]
 	;or	al, al
-	;jz	short sysfnf_10 ; 0 = No filter
+	;jz	short sysfnf_4 ; 0 = No filter
 	xor	al, 0FFh
 	and	al, bl
-	jnz	short sysfnf_9 ; search for next file until
+	jnz	short sysfnf_3 ; search for next file until
 			       ; an error return from
 			       ; find_next_file procedure
-sysfnf_10:
+sysfnf_4:
         ;movzx	ecx, byte [FFF_Valid]
 	;cmp	cl, 128 ; complete FindFile structure/table
 	;je	sysfnf_11
-	;;cmp	cl, 24  ; basic parameters
+	;;cmp	cl, 24	; basic parameters
 	;;je	sysfnf_12
 	;jmp	sysfnf_12
 	; 30/07/2022
 	;movzx	ecx, byte [FFF_Valid]
 	; 25/08/2024
-	;cmp	cl, 128
-	cmp	byte [FFF_Valid], 128 
+	;;cmp	cl, 128
+	;cmp	byte [FFF_Valid], 128 
+	; 29/04/2026
+	mov	ch, [FFF_Valid]
+	cmp	ch, 1	; basic parameters	
 	;jne	short sysfnf_12
 	;jmp	short sysfnf_11 (*)
 	;; 08/08/2022
-	;;je	short sysfnf_6 ; esi = FindFile_Drv
+	;;je	short sysfnf_9 ; esi = FindFile_Drv
 	; 29/08/2023 (BugFix)
 	;je	short sysfff_6 ; esi = FindFile_Drv
 	; 25/08/2024 (BugFix of BugFix) (*)
-	je	short sysfnf_11 ; esi <> FindFile_Drv
-	
+	ja	sysfnf_11 ; esi <> FindFile_Drv
+
+	; ESI = Directory Entry (FindFile_DirEntry) Location
 	jmp	sysfnf_12
 
-stsfnf_2:
+sysfnf_5:
 	inc	byte [SWP_DRV_chg]
 
 	call	change_current_drive
@@ -15166,10 +15386,10 @@ stsfnf_2:
 				   ; next sysfnf system call
 				   ; may solve the problem,
 				   ; after re-placing the disk)
-sysfnf_3:
+sysfnf_6:
 	mov	eax, [FindFile_DirCluster]
 	and	eax, eax
-	jnz	short sysfnf_6
+	jnz	short sysfnf_9
 
 	cmp	byte [Current_FATType], 2
 	ja	short sysfnf_err_0 ; invalid, we neeed to stop !?
@@ -15181,24 +15401,24 @@ sysfnf_3:
 %endif
 
 	cmp	byte [DirBuff_ValidData], al ; 0
-	jna	short sysfnf_4
+	jna	short sysfnf_7
 
 	cmp	eax, [DirBuff_Cluster] ; 0 ?
-	je	short sysfnf_9
+	je	short sysfnf_3
 
 	;cmp	byte [Current_Dir_Level], 0
-        ;ja	short sysfnf_4
-        ;jna	short sysfnf_9
+        ;ja	short sysfnf_7
+        ;jna	short sysfnf_3
 
-sysfnf_4:
+sysfnf_7:
 	inc	byte [SWP_DRV_chg]
 	call 	load_FAT_root_directory
-	jnc	short sysfnf_9
+	jnc	short sysfnf_3
 	; eax = error code (17, 'drv not ready or read error')
 	jmp	short sysfnf_err_1 ; read error ! (no FNF stop)
 				   ; (if you want, try again,
 				   ;  after re-placing the disk)
-sysfnf_5:
+sysfnf_8:
 	cmp	al, 12 ; 'no more files' error
 	jne	short sysfnf_err_1 ; (no FNF stop -sysfnf will try
 				   ;  to read the directory again,
@@ -15215,26 +15435,26 @@ sysfnf_err_1:
 	call	reset_working_path
 	jmp	error
 
-sysfnf_6:
+sysfnf_9:
 	cmp	byte [DirBuff_ValidData], 0
-	jna	short sysfnf_7
+	jna	short sysfnf_10
 
 	cmp	eax, [DirBuff_Cluster]
-	;je	short sysfnf_9
+	;je	short sysfnf_3
 	; 08/08/2022
-	jne	short sysfnf_7
-	jmp	sysfnf_9
-sysfnf_7:
+	jne	short sysfnf_10
+	jmp	sysfnf_3
+sysfnf_10:
 	inc	byte [SWP_DRV_chg]
 
 ; 19/12/2025
 %if 0
 	cmp	byte [Current_FATType], 1
-	;jnb	short sysfnf_8
+	;jnb	short sysfnf_2
 	; 08/08/2022
 	jb	short sysfnf_13
 %endif
-	jmp	sysfnf_8
+	jmp	sysfnf_2
 
 ; 19/12/2025
 %if 0
@@ -15242,11 +15462,11 @@ sysfnf_13:
 	; Singlix (TRFS) File System 
 	; (access via compatibility buffer)
 	call	load_FS_sub_directory
-	;jnc	short sysfnf_9
+	;jnc	short sysfnf_3
 	;jmp	short sysfnf_err_1 ; read error (no FNF stop)
 	; 08/08/2022
 	jc	short sysfnf_err_1
-	jmp	sysfnf_9
+	jmp	short sysfnf_3
 %endif
 
 writei:
