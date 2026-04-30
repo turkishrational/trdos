@@ -15206,13 +15206,15 @@ sysfff_11:
 
 sysfff_12:
 	; copy short name to long name field of the user buffer
-	mov	byte [edi], 0
+	;mov	byte [edi], 0
 	mov	al, 0
 	stosb			; set LFN length to 0
 				; (short name sign)
 
 	;mov	esi, FindFile_DirEntry
 	call	get_file_name
+
+	mov	esi, LongFileName
 
 	;mov	ecx, 45	; 32+13
 	mov	cl, 45
@@ -15242,6 +15244,7 @@ sysfff_15:
 	;add	ecx, 32
 	add	cl, 32	; 35-99 bytes
 	; ecx = transfer count (bytes)
+	mov	esi, ebx
 	jmp	sysfff_17
 
 sysfnf: ; <Find Next File>
