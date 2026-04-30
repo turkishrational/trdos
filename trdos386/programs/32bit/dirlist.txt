@@ -1,0 +1,588 @@
+     1                                  ; ****************************************************************************
+     2                                  ; dirlist.s (TRDOS 386, TRDOS v2.0.11 - sample binary file, 'dirlist.prg')
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; DIRLIST.PRG ! 'sysfff' and 'sysfnf' TEST program for TRDOS 386 !
+     5                                  ;
+     6                                  ; 30/04/2026
+     7                                  ;
+     8                                  ; [ Last Modification: 30/04/2026 ]
+     9                                  ;
+    10                                  ; ****************************************************************************
+    11                                  ; ref: 'flist.s' (17/10/2026) 
+    12                                  
+    13                                  ; 30/04/2026
+    14                                  ; 14/07/2020
+    15                                  ; 31/12/2017
+    16                                  ; TRDOS 386 (v2.0) system calls
+    17                                  _ver 	equ 0
+    18                                  _exit 	equ 1
+    19                                  _fork 	equ 2
+    20                                  _read 	equ 3
+    21                                  _write	equ 4
+    22                                  _open	equ 5
+    23                                  _close 	equ 6
+    24                                  _wait 	equ 7
+    25                                  _create	equ 8
+    26                                  _rename	equ 9
+    27                                  _delete	equ 10
+    28                                  _exec	equ 11
+    29                                  _chdir	equ 12
+    30                                  _time 	equ 13
+    31                                  _mkdir 	equ 14
+    32                                  _chmod	equ 15
+    33                                  _rmdir	equ 16
+    34                                  _break	equ 17
+    35                                  _drive	equ 18
+    36                                  _seek	equ 19
+    37                                  _tell 	equ 20
+    38                                  _memory	equ 21
+    39                                  _prompt	equ 22
+    40                                  _path	equ 23
+    41                                  _env	equ 24
+    42                                  _stime	equ 25
+    43                                  _quit	equ 26
+    44                                  _intr	equ 27
+    45                                  _dir	equ 28
+    46                                  _emt 	equ 29
+    47                                  _ldrvt 	equ 30
+    48                                  _video 	equ 31
+    49                                  _audio	equ 32
+    50                                  _timer	equ 33
+    51                                  _sleep	equ 34
+    52                                  _msg    equ 35
+    53                                  _geterr	equ 36
+    54                                  _fpstat	equ 37
+    55                                  _pri	equ 38
+    56                                  _rele	equ 39
+    57                                  _fff	equ 40
+    58                                  _fnf	equ 41
+    59                                  _alloc	equ 42
+    60                                  _dalloc equ 43
+    61                                  _calbac equ 44
+    62                                  _dma	equ 45
+    63                                  _stdio	equ 46
+    64                                  
+    65                                  %macro sys 1-4
+    66                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)	
+    67                                      ; 03/09/2015	
+    68                                      ; 13/04/2015
+    69                                      ; Retro UNIX 386 v1 system call.		
+    70                                      %if %0 >= 2   
+    71                                          mov ebx, %2
+    72                                          %if %0 >= 3    
+    73                                              mov ecx, %3
+    74                                              %if %0 = 4
+    75                                                 mov edx, %4   
+    76                                              %endif
+    77                                          %endif
+    78                                      %endif
+    79                                      mov eax, %1
+    80                                      ;int 30h
+    81                                      int 40h ; TRDOS 386 (TRDOS v2.0)		   
+    82                                  %endmacro
+    83                                  
+    84                                  DirEntry_Name equ 0
+    85                                  DirEntry_Attr equ 11
+    86                                  DirEntry_NTRes equ 12
+    87                                  DirEntry_CrtTimeTenth equ 13
+    88                                  DirEntry_CrtTime equ 14
+    89                                  DirEntry_CrtDate equ 16
+    90                                  DirEntry_LastAccDate equ 18
+    91                                  DirEntry_FstClusHI equ 20
+    92                                  DirEntry_WrtTime equ 22
+    93                                  DirEntry_WrtDate equ 24
+    94                                  DirEntry_FstClusLO equ 26
+    95                                  DirEntry_FileSize equ 28
+    96                                  
+    97                                  ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
+    98                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    99                                  
+   100                                  [BITS 32] ; 32-bit intructions
+   101                                  
+   102                                  [ORG 0] 
+   103                                  
+   104                                  START_CODE:
+   105 00000000 89E6                    	mov	esi, esp
+   106 00000002 AD                      	lodsd
+   107 00000003 83F802                  	cmp	eax, 2 ; two arguments (program file name & text file name)
+   108 00000006 7271                    	jb	short terminate ; nothing top do
+   109 00000008 AD                      	lodsd ; program file name address 
+   110 00000009 AD                      	lodsd ; text file name address
+   111                                  	; EAX = arg2 ; file name address
+   112                                  
+   113                                  	; EBX = EAX = file name or path address
+   114                                  	; CL = file attributes (archive = 20h, read only = 01h)
+   115                                  	;	(21h = Archived & Read Only files are included)
+   116                                  	; CH = 0 = basic parameters (24 bytes)
+   117                                  	; EDX = DTA = buffer address (24 bytes for basic parameters)
+   118                                  	; EAX = _fff = 'Find First File' system call for TRDOS 386
+   119                                  
+   120 0000000A 50                      	push	eax
+   121                                  
+   122 0000000B BE[D7020000]            	mov	esi, msg_program
+   123 00000010 E8F0010000              	call	print_msg
+   124                                  
+   125 00000015 30E4                    	xor	ah, ah
+   126 00000017 CD32                    	int	32h
+   127                                  
+   128 00000019 29C0                    	sub	eax, eax
+   129                                  
+   130                                  	;mov	byte [RowCounter], 16
+   131                                  
+   132                                  	;mov 	[File_Count], eax ; 0
+   133                                  	;mov	[Dir_Count], eax ; 0
+   134                                  	;mov 	[Total_FSize], eax ; 0
+   135 0000001B BF[D8030000]            	mov	edi, File_Count
+   136 00000020 AB                      	stosd
+   137 00000021 AB                      	stosd
+   138 00000022 AB                      	stosd
+   139                                  
+   140 00000023 58                      	pop	eax
+   141                                  
+   142                                  	; Find First File
+   143                                  	sys	_fff, eax, 013Fh, DTA
+    66                              <1> 
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1>  %if %0 >= 2
+    71 00000024 89C3                <1>  mov ebx, %2
+    72                              <1>  %if %0 >= 3
+    73 00000026 B93F010000          <1>  mov ecx, %3
+    74                              <1>  %if %0 = 4
+    75 0000002B BA[B8030000]        <1>  mov edx, %4
+    76                              <1>  %endif
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79 00000030 B828000000          <1>  mov eax, %1
+    80                              <1> 
+    81 00000035 CD40                <1>  int 40h
+   144                                  _0:
+   145                                  	;jc	short terminate	 ; terminate if there is 
+   146 00000037 7231                    	jc	short dirlist_ok ; file not found error or another error
+   147                                  _@@:
+   148 00000039 B401                    	mov	ah, 1
+   149 0000003B CD32                    	int	32h
+   150 0000003D 7406                    	jz	short _@
+   151 0000003F B400                    	mov	ah, 0
+   152 00000041 CD32                    	int	32h
+   153 00000043 EBF4                    	jmp	short _@@
+   154                                  _@:
+   155 00000045 E842000000              	call	print_dir_entry
+   156                                  
+   157 0000004A FE0D[B4030000]          	dec	byte [RowCounter]
+   158 00000050 750F                    	jnz	short direntry_p_ok
+   159                                  
+   160                                  pause_dir_scroll:
+   161 00000052 28E4                    	sub	ah, ah
+   162 00000054 CD32                    	int	32h
+   163 00000056 3C1B                    	cmp	al, 1Bh
+   164 00000058 7410                    	je	short dirlist_ok
+   165 0000005A C605[B4030000]14        	mov	byte [RowCounter], 20 ; Reset counter
+   166                                  direntry_p_ok:
+   167                                  _1:
+   168                                  	; Find Next File
+   169                                  	sys	_fnf	; if the first file is not proper file
+    66                              <1> 
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1>  %if %0 >= 2
+    71                              <1>  mov ebx, %2
+    72                              <1>  %if %0 >= 3
+    73                              <1>  mov ecx, %3
+    74                              <1>  %if %0 = 4
+    75                              <1>  mov edx, %4
+    76                              <1>  %endif
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79 00000061 B829000000          <1>  mov eax, %1
+    80                              <1> 
+    81 00000066 CD40                <1>  int 40h
+   170                                  			; check for next file
+   171 00000068 EBCD                    	jmp	short _0
+   172                                  
+   173                                  dirlist_ok:
+   174 0000006A BE[2F030000]            	mov	esi, nextline
+   175 0000006F E891010000              	call	print_msg
+   176                                  
+   177 00000074 E89C010000              	call	dir_summary
+   178                                  terminate:
+   179 00000079 BE[2F030000]            	mov	esi, nextline
+   180                                  	;mov	ebx, 07h	; Light Gray	
+   181                                  	;call	print_msg_@
+   182 0000007E E882010000              	call	print_msg
+   183                                  
+   184                                  	sys 	_exit		; INT 40h
+    66                              <1> 
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1>  %if %0 >= 2
+    71                              <1>  mov ebx, %2
+    72                              <1>  %if %0 >= 3
+    73                              <1>  mov ecx, %3
+    74                              <1>  %if %0 = 4
+    75                              <1>  mov edx, %4
+    76                              <1>  %endif
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79 00000083 B801000000          <1>  mov eax, %1
+    80                              <1> 
+    81 00000088 CD40                <1>  int 40h
+   185                                  here:
+   186 0000008A EBFE                    	jmp	short here
+   187                                  
+   188                                  	; ref: 'trdosk3.s', "print_directory:", 27/07/2022
+   189                                  print_dir_entry:
+   190 0000008C BE[B8030000]            	mov	esi, DTA
+   191                                  
+   192 00000091 8B461C                  	mov	eax, [esi+DirEntry_FileSize]
+   193                                  
+   194 00000094 8A5E0B                  	mov	bl, [esi+DirEntry_Attr]
+   195                                  
+   196 00000097 F6C310                  	test	bl, 10h  ; Is it a directory?
+   197 0000009A 741A                    	jz	short not_dir
+   198                                  
+   199 0000009C FF05[DC030000]          	inc	dword [Dir_Count]
+   200 000000A2 89F2                    	mov	edx, esi
+   201 000000A4 BE[3C030000]             	mov	esi, Type_Dir	; '<DIR>     '
+   202 000000A9 BF[53030000]            	mov	edi, Dir_Or_FileSize
+   203                                  	; move 10 bytes
+   204 000000AE A5                      	movsd
+   205 000000AF A5                      	movsd
+   206 000000B0 66A5                    	movsw
+   207 000000B2 89D6                    	mov	esi, edx
+   208 000000B4 EB59                    	jmp     short dir_attribute
+   209                                  
+   210                                  not_dir:
+   211 000000B6 80FB08                  	cmp	bl, 08h	; volume name
+   212 000000B9 751F                    	jne	short direntry_file
+   213 000000BB BE[32030000]            	mov	esi, Type_Volume
+   214 000000C0 BF[53030000]            	mov	edi, Dir_Or_FileSize
+   215                                  	; move 10 bytes
+   216 000000C5 A5                      	movsd
+   217 000000C6 A5                      	movsd
+   218 000000C7 66A5                    	movsw
+   219 000000C9 BE[B8030000]            	mov	esi, DTA
+   220 000000CE C705[5E030000]2020-     	mov	dword [File_Attribute], 20202020h
+   220 000000D6 2020               
+   221 000000D8 EB78                    	jmp     short dir_file_name
+   222                                  
+   223                                  direntry_file:
+   224 000000DA FF05[D8030000]          	inc	dword [File_Count]
+   225 000000E0 0105[E0030000]          	add	[Total_FSize], eax
+   226                                  
+   227 000000E6 B90A000000              	mov	ecx, 10  ; 32 bit divisor
+   228 000000EB 89CF                    	mov	edi, ecx
+   229 000000ED 81C7[53030000]          	add	edi, Dir_Or_FileSize
+   230                                  dir_rdivide:
+   231 000000F3 29D2                    	sub	edx, edx
+   232 000000F5 F7F1                    	div	ecx 	 ; remainder in dl (< 10)
+   233 000000F7 80C230                  	add     dl, '0'	 ; to make visible (ascii)
+   234 000000FA 4F                      	dec	edi
+   235 000000FB 8817                    	mov     [edi], dl
+   236 000000FD 21C0                    	and	eax, eax
+   237 000000FF 75F2                    	jnz	short dir_rdivide
+   238                                  
+   239                                  dir_fill_space:
+   240 00000101 81FF[53030000]          	cmp     edi, Dir_Or_FileSize
+   241 00000107 7606                    	jna     short dir_attribute
+   242 00000109 4F                      	dec     edi
+   243 0000010A C60720                  	mov     byte [edi], 20h
+   244 0000010D EBF2                    	jmp     short dir_fill_space
+   245                                  
+   246                                  dir_attribute:
+   247 0000010F C705[5E030000]2020-     	mov	dword [File_Attribute], 20202020h
+   247 00000117 2020               
+   248                                  
+   249 00000119 80FB20                  	cmp	bl, 20h  ; Is it an archive file?
+   250 0000011C 7207                    	jb	short dir_file_attribs
+   251 0000011E C605[61030000]41        	mov	byte [File_Attribute+3], 'A'
+   252                                  
+   253                                  dir_file_attribs:
+   254 00000125 80E307                  	and	bl, 7
+   255 00000128 7428                    	jz	short dir_file_name
+   256 0000012A 88DF                    	mov	bh, bl
+   257 0000012C 80E303                  	and	bl, 3
+   258 0000012F 38DF                    	cmp	bh, bl
+   259 00000131 7607                    	jna	short dir_pass_s
+   260 00000133 C605[5E030000]53        	mov	byte [File_Attribute], 'S'
+   261                                  
+   262                                  dir_pass_s:
+   263 0000013A 80E302                  	and     bl,2
+   264 0000013D 7407                    	jz      short dir_pass_h
+   265 0000013F C605[5F030000]48        	mov     byte [File_Attribute+1], 'H'
+   266                                  dir_pass_h:
+   267 00000146 80E701                  	and     bh,1
+   268 00000149 7407                    	jz      short dir_file_name
+   269 0000014B C605[60030000]52        	mov     byte [File_Attribute+2], 'R'
+   270                                  dir_file_name:
+   271                                  	;mov	bx, [esi+18h]	; Date
+   272                                  	;mov	dx, [esi+16h]	; Time
+   273 00000152 8B5E16                  	mov	ebx, [esi+16h]
+   274 00000155 89F1                    	mov	ecx, esi	; Directory Entry address
+   275 00000157 BF[46030000]            	mov     edi, File_Name
+   276                                  	; move 8 bytes
+   277 0000015C A5                      	movsd
+   278 0000015D A5                      	movsd
+   279 0000015E C60720                  	mov	byte [edi], 20h
+   280 00000161 47                      	inc	edi
+   281                                  	; move 3 bytes
+   282 00000162 66A5                    	movsw
+   283 00000164 A4                      	movsb
+   284 00000165 89CE                    	mov	esi, ecx
+   285                                  
+   286                                  Dir_Time_start:
+   287                                  	;mov	ax, dx		; Time
+   288 00000167 6689D8                  	mov	ax, bx
+   289 0000016A 66C1E805                	shr	ax, 5		; shift right 5 times
+   290 0000016E 6683E03F                	and	ax, 0000111111b	; Minute Mask
+   291 00000172 D40A                    	aam			; Q([AL]/10)->AH
+   292                                  				; R([AL]/10)->AL
+   293                                  				; [AL]+[AH]= Minute as BCD
+   294 00000174 660D3030                	or	ax, '00'	; Convert to ASCII
+   295 00000178 86E0                    	xchg	ah, al
+   296 0000017A 66A3[71030000]          	mov	[File_Minute], ax
+   297                                  
+   298                                  	;mov	al, dh
+   299 00000180 88F8                    	mov	al, bh
+   300 00000182 C0E803                  	shr	al, 3		; shift right 3 times
+   301 00000185 D40A                    	aam			; [AL]+[AH]= Hours as BCD
+   302 00000187 660D3030                	or	ax, '00'
+   303 0000018B 86E0                    	xchg	ah, al
+   304 0000018D 66A3[6E030000]          	mov     [File_Hour], ax
+   305                                  
+   306 00000193 C1EB10                  	shr	ebx, 16		; BX = Date
+   307                                  
+   308                                  Dir_Date_start:
+   309                                  	;mov	ax, bx		; Date
+   310 00000196 89D8                    	mov	eax, ebx
+   311 00000198 6683E01F                	and	ax, 00011111b	; Day Mask
+   312 0000019C D40A                    	aam			; Q([AL]/10)->AH
+   313                                  				; R([AL]/10)->AL
+   314                                  				; [AL]+[AH]= Day as BCD
+   315 0000019E 660D3030                	or	ax, '00'	; Convert to ASCII
+   316 000001A2 86C4                    	xchg	al, ah
+   317                                  
+   318 000001A4 66A3[63030000]          	mov	[File_Day], ax
+   319                                  
+   320                                  	;mov	ax, bx
+   321 000001AA 89D8                    	mov	eax, ebx
+   322                                  	;shr	ax, 5		; shift right 5 times
+   323 000001AC C1E805                  	shr	eax, 5
+   324 000001AF 6683E00F                	and	ax, 00001111b	; Month Mask
+   325 000001B3 D40A                    	aam
+   326 000001B5 660D3030                	or	ax, '00'
+   327 000001B9 86E0                    	xchg	ah, al
+   328 000001BB 66A3[66030000]          	mov	[File_Month], ax
+   329                                  
+   330                                  	;mov	ax, bx
+   331 000001C1 89D8                    	mov	eax, ebx
+   332                                  	;shr	ax, 9
+   333 000001C3 C1E809                  	shr	eax, 9
+   334 000001C6 6683E07F                	and	ax, 01111111b	; Result = Year - 1980
+   335 000001CA 6605BC07                	add	ax, 1980
+   336                                  
+   337 000001CE B10A                    	mov	cl, 10
+   338 000001D0 F6F1                    	div	cl		; Q -> AL, R -> AH 
+   339 000001D2 80CC30                  	or	ah, '0'
+   340 000001D5 8825[6C030000]          	mov	[File_Year+3], ah
+   341 000001DB D40A                    	aam
+   342 000001DD 86E0                    	xchg	ah, al
+   343 000001DF 80CC30                  	or	ah, '0'	  ; Convert to ASCII
+   344 000001E2 8825[6B030000]          	mov	[File_Year+2], ah
+   345 000001E8 D40A                    	aam
+   346 000001EA 86C4                    	xchg	al, ah
+   347 000001EC 660D3030                	or	ax, '00'
+   348 000001F0 66A3[69030000]          	mov	[File_Year], ax
+   349                                  
+   350                                  loc_show_line:
+   351 000001F6 BE[46030000]            	mov     esi, File_Name
+   352 000001FB E805000000              	call	print_msg
+   353 00000200 BE[2F030000]            	mov	esi, nextline
+   354                                  	;call	print_msg
+   355                                  	;retn
+   356                                  
+   357                                  print_msg:
+   358 00000205 BB0F000000              	mov	ebx, 0Fh       ; white characters (bl)
+   359                                  		               ; video page 0 (bh)
+   360                                  print_msg_@:
+   361 0000020A B40E                    	mov	ah, 0Eh ; teletype output (write tty)
+   362 0000020C AC                      	lodsb
+   363                                  _p_nextchar:
+   364 0000020D CD31                    	int	31h
+   365 0000020F AC                      	lodsb
+   366 00000210 20C0                    	and	al, al
+   367 00000212 75F9                    	jnz	short _p_nextchar
+   368 00000214 C3                      	retn
+   369                                  
+   370                                  dir_summary:
+   371 00000215 B90A000000              	mov     ecx, 10
+   372 0000021A A1[DC030000]            	mov	eax, [Dir_Count]
+   373 0000021F BF[87030000]            	mov	edi, Decimal_Dir_Count
+   374 00000224 39C8                    	cmp	eax, ecx
+   375 00000226 7217                    	jb	short pass_ddc
+   376 00000228 47                      	inc	edi
+   377 00000229 83F864                  	cmp	eax, 100
+   378 0000022C 7211                    	jb	short pass_ddc
+   379 0000022E 47                      	inc	edi
+   380 0000022F 3DE8030000              	cmp	eax, 1000
+   381 00000234 7209                    	jb	short pass_ddc
+   382 00000236 47                      	inc	edi
+   383 00000237 3D10270000              	cmp	eax, 10000
+   384 0000023C 7201                    	jb	short pass_ddc
+   385 0000023E 47                      	inc	edi
+   386                                  pass_ddc:
+   387 0000023F 886F01                  	mov     [edi+1], ch ; 0
+   388                                  ddc_rediv:
+   389 00000242 31D2                    	xor     edx, edx
+   390 00000244 F7F1                    	div	ecx	; 10
+   391 00000246 80C230                  	add     dl, '0'
+   392 00000249 8817                    	mov     [edi], dl
+   393 0000024B 4F                      	dec     edi
+   394 0000024C 09C0                    	or	eax, eax
+   395 0000024E 75F2                    	jnz	short ddc_rediv
+   396                                  
+   397 00000250 A1[D8030000]            	mov     eax, [File_Count]
+   398 00000255 BF[76030000]            	mov     edi, Decimal_File_Count
+   399 0000025A 39C8                    	cmp	eax, ecx ; 10
+   400 0000025C 7217                    	jb      short pass_dfc
+   401 0000025E 47                      	inc     edi
+   402 0000025F 83F864                  	cmp     eax, 100
+   403 00000262 7211                    	jb      short pass_dfc
+   404 00000264 47                      	inc     edi
+   405 00000265 3DE8030000              	cmp     eax, 1000
+   406 0000026A 7209                    	jb      short pass_dfc
+   407 0000026C 47                      	inc     edi
+   408 0000026D 3D10270000              	cmp     eax, 10000
+   409 00000272 7201                    	jb      short pass_dfc
+   410 00000274 47                      	inc     edi
+   411                                  pass_dfc:
+   412 00000275 886F01                  	mov     [edi+1], ch ; 0
+   413                                  loc_dfc_rediv:
+   414 00000278 31D2                    	xor	edx, edx
+   415 0000027A F7F1                    	div	ecx
+   416 0000027C 80C230                  	add	dl, '0'
+   417 0000027F 8817                    	mov	[edi], dl
+   418 00000281 4F                      	dec	edi
+   419 00000282 09C0                    	or	eax, eax
+   420 00000284 75F2                    	jnz	short loc_dfc_rediv
+   421                                  
+   422 00000286 BF[F2030000]            	mov     edi, TFS_Dec_End
+   423 0000028B A1[E0030000]            	mov     eax, [Total_FSize]
+   424                                  	;mov    ecx, 10
+   425                                  rediv_tfs_hex:
+   426 00000290 29D2                    	sub	edx, edx
+   427                                  	;sub	dl, dl
+   428 00000292 F7F1                    	div	ecx
+   429 00000294 80C230                  	add	dl, '0'
+   430 00000297 4F                      	dec     edi
+   431 00000298 8817                    	mov     [edi], dl
+   432 0000029A 21C0                    	and	eax, eax
+   433 0000029C 75F2                    	jnz	short rediv_tfs_hex
+   434                                  
+   435 0000029E 893D[E4030000]          	mov	[TFS_Dec_Begin], edi
+   436 000002A4 BE[74030000]            	mov	esi, Decimal_File_Count_Header
+   437 000002A9 E857FFFFFF              	call	print_msg
+   438 000002AE BE[7C030000]            	mov	esi, str_files
+   439 000002B3 E84DFFFFFF              	call	print_msg
+   440 000002B8 BE[8D030000]            	mov	esi, str_dirs
+   441 000002BD E843FFFFFF              	call	print_msg
+   442 000002C2 8B35[E4030000]          	mov	esi, [TFS_Dec_Begin]
+   443 000002C8 E838FFFFFF              	call	print_msg
+   444 000002CD BE[9E030000]            	mov	esi, str_bytes
+   445 000002D2 E92EFFFFFF              	jmp	print_msg
+   446                                  
+   447                                  ;-----------------------------------------------------------------
+   448                                  ;  messages
+   449                                  ;-----------------------------------------------------------------
+   450                                  
+   451                                  msg_program:
+   452 000002D7 0D0A                    	db 0Dh, 0Ah
+   453 000002D9 4449524C4953542E50-     	db "DIRLIST.PRG /// TRDOS 386 sysfff, sysfnf test program"
+   453 000002E2 5247202F2F2F205452-
+   453 000002EB 444F53203338362073-
+   453 000002F4 79736666662C207379-
+   453 000002FD 73666E662074657374-
+   453 00000306 2070726F6772616D   
+   454 0000030E 0D0A                    	db 0Dh, 0Ah
+   455 00000310 6279204572646F6761-     	db "by Erdogan Tan, 30/04/2026", 0Dh, 0Ah, 0Dh, 0Ah, 0
+   455 00000319 6E2054616E2C203330-
+   455 00000322 2F30342F323032360D-
+   455 0000032B 0A0D0A00           
+   456                                  nextline:
+   457 0000032F 0D0A00                  	db 0Dh, 0Ah, 0
+   458                                  
+   459                                  ;-----------------------------------------------------------------
+   460                                  
+   461 00000332 3C564F4C554D453E20-     Type_Volume:    db '<VOLUME>  ' ; 10 bytes
+   461 0000033B 20                 
+   462 0000033C 3C4449523E20202020-     Type_Dir:       db '<DIR>     ' ; 10 bytes
+   462 00000345 20                 
+   463                                  
+   464                                  File_Name:
+   465 00000346 20<rep Ch>                              times 12 db 20h
+   466 00000352 20                      		db 20h
+   467                                  Dir_Or_FileSize:
+   468 00000353 20<rep Ah>                              times 10 db 20h
+   469 0000035D 20                      		db 20h
+   470                                  File_Attribute:
+   471 0000035E 20202020                		dd 20202020h
+   472 00000362 20                      		db 20h
+   473                                  File_Day:
+   474 00000363 3030                                    db '0','0'
+   475 00000365 2F                      		db '/'
+   476                                  File_Month:
+   477 00000366 3030                                    db '0','0'
+   478 00000368 2F                      		db '/'
+   479                                  File_Year:
+   480 00000369 30303030                                db '0','0','0','0'
+   481 0000036D 20                      		db 20h
+   482                                  File_Hour:
+   483 0000036E 3030                                    db '0','0'
+   484 00000370 3A                      		db ':'
+   485                                  File_Minute:
+   486 00000371 3030                                    db '0','0'
+   487 00000373 00                      		db 0
+   488                                  
+   489                                  Decimal_File_Count_Header:
+   490 00000374 0D0A                    		db 0Dh, 0Ah
+   491                                  Decimal_File_Count:
+   492 00000376 00<rep 6h>              		times 6 db 0
+   493                                  
+   494 0000037C 2066696C6528732920-     str_files:	db " file(s) & "
+   494 00000385 2620               
+   495                                  Decimal_Dir_Count: 
+   496 00000387 00<rep 6h>              		times 6 db 0
+   497                                  str_dirs:
+   498 0000038D 206469726563746F72-     		db " directory(s) "
+   498 00000396 7928732920         
+   499 0000039B 0D0A00                  		db 0Dh, 0Ah, 0
+   500                                  
+   501 0000039E 206279746528732920-     str_bytes:	db " byte(s) in file(s)"
+   501 000003A7 696E2066696C652873-
+   501 000003B0 29                 
+   502 000003B1 0D0A00                  		db 0Dh, 0Ah, 0
+   503                                  
+   504 000003B4 10                      RowCounter:	db 16
+   505                                  
+   506                                  ;-----------------------------------------------------------------
+   507                                  ;  uninitialized data
+   508                                  ;-----------------------------------------------------------------
+   509                                  
+   510                                  bss:
+   511                                  
+   512                                  ABSOLUTE bss
+   513                                  
+   514 000003B5 ??????                  alignb 4
+   515                                  
+   516 000003B8 <res 20h>               DTA:	resb 32	; Directory Entry buffer
+   517                                  
+   518 000003D8 ????????                File_Count:	resd 1
+   519 000003DC ????????                Dir_Count:	resd 1
+   520 000003E0 ????????                Total_FSize:	resd 1
+   521 000003E4 ????????                TFS_Dec_Begin:	resd 1
+   522 000003E8 <res Ah>                                resb 10
+   523 000003F2 ??                      TFS_Dec_End:	resb 1
+   524 000003F3 ??                      		resb 1
