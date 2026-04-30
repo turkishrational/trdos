@@ -15098,11 +15098,18 @@ sysfnf_12:
 
 sysfff_6:	; 29/04/2026
 	mov	edi, [FFF_UBuffer] ; user's buffer address (edx)
+sysfff_16:
 	call	transfer_to_user_buffer
 
 	;;mov	[u.r0], ecx ; actual transfer count
         call 	reset_working_path
 	jmp	sysret
+
+sysfff_17:
+	mov	edi, [FFF_UBuffer] ; user's buffer address (edx)
+sysfff_18:
+	add	edi, 32
+	jmp	short sysfff_16
 
 sysfff_7:
 sysfnf_11: ; 29/04/2026
@@ -15145,8 +15152,9 @@ sysfff_9:
 	mov	ecx, 32
 	; ESI = Directory Entry (FindFile_DirEntry) Address
 	mov	edi, [FFF_UBuffer] ; user's buffer address (edx)
-	add	[FFF_UBuffer], ecx ; LFN field of the buffer
 	call	transfer_to_user_buffer
+
+	;add	edi, 32
 
 	mov	esi, LongFileName
 
@@ -15155,12 +15163,14 @@ sysfff_9:
 
 	mov	dword [esi], 0	; set 1st 4 bytes of the LFN to 0
 	mov	ecx, 4
-	jmp	short sysfff_6
+	;jmp	short sysfff_16
+	jmp	short sysfff_18
 
 sysfff_10:
-	;mov	ecx, 292	; v2.1.0
-	mov	ecx, 164	; v2.0.11
-	jmp	short sysfff_6
+	;mov	ecx, 260	; v2.1.0
+	mov	ecx, 132	; v2.0.11
+	;jmp	short sysfff_16
+	jmp	short sysfff_18
 
 sysfff_11:
 	; 29/04/2026
@@ -15172,6 +15182,11 @@ sysfff_11:
 	; a short name is used. The LFN length is set to 0.
 
 	;mov	byte [FFF_Valid], 4 ; dir entry + asciiz LFN
+
+	mov	ecx, 32
+	; ESI = Directory Entry (FindFile_DirEntry) Address
+	mov	edi, [FFF_UBuffer] ; user's buffer address (edx)
+	call	transfer_to_user_buffer
 
 	mov	edi, LongFileName
 
@@ -15202,7 +15217,7 @@ sysfff_12:
 	;mov	ecx, 45	; 32+13
 	mov	cl, 45
 
-	jmp	sysfff_6
+	jmp	sysfff_17
 
 sysfff_13:
 	; 29/04/2026
@@ -15227,7 +15242,7 @@ sysfff_15:
 	;add	ecx, 32
 	add	cl, 32	; 35-99 bytes
 	; ecx = transfer count (bytes)
-	jmp	sysfff_6
+	jmp	sysfff_17
 
 sysfnf: ; <Find Next File>
 	; 29/04/2026 (TRDOS 386 Kernel v2.0.11)
