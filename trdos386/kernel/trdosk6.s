@@ -15372,22 +15372,24 @@ sysfnf_4:
 	; 30/07/2022
 	;movzx	ecx, byte [FFF_Valid]
 	; 25/08/2024
-	;;cmp	cl, 128
+	;cmp	cl, 128
 	;cmp	byte [FFF_Valid], 128 
-	; 29/04/2026
-	mov	ch, [FFF_Valid]
-	cmp	ch, 1	; basic parameters	
 	;jne	short sysfnf_12
 	;jmp	short sysfnf_11 (*)
 	;; 08/08/2022
-	;;je	short sysfnf_9 ; esi = FindFile_Drv
+	;;je	short sysfnf_6 ; esi = FindFile_Drv
 	; 29/08/2023 (BugFix)
 	;je	short sysfff_6 ; esi = FindFile_Drv
 	; 25/08/2024 (BugFix of BugFix) (*)
-	ja	sysfnf_11 ; esi <> FindFile_Drv
+	;je	short sysfnf_11 ; esi <> FindFile_Drv
+
+	; 29/04/2026 (TRDOS 386 v2.0.11)
+	mov	ch, [FFF_Valid]	
+	dec	ch
+	jnz	sysfnf_11 ; directory entry (+ LFN)
 
 	; ESI = Directory Entry (FindFile_DirEntry) Location
-	jmp	sysfnf_12
+	jmp	sysfnf_12 ; basic parameters	
 
 sysfnf_5:
 	inc	byte [SWP_DRV_chg]
