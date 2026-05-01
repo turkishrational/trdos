@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 29/04/2026  (Previous: 10/01/2026, v2.0.10)
+; Last Update: 01/05/2026  (Previous: 10/01/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -129,17 +129,20 @@ sysent1:
 	;jnb	short badsys
 		; bhis badsys / yes, bad system call
 	cmc
-	pushf
-	push	eax
- 	mov 	ebp, [u.sp] ; Kernel stack at the beginning of sys call
-	mov	al, 0FEh ; 11111110b
-	adc	al, 0 ; al = al + cf
-	and	[ebp+8], al ; flags (reset carry flag)
-		; bic $341,20.(sp) / set users processor priority to 0
-				 ; / and clear carry bit
-	pop	ebp ; eax
-	popf
+	; 01/05/2026 (CF -return- has already been cleared above))
+	;pushf
+	;push	eax
+ 	;mov 	ebp, [u.sp] ; Kernel stack at the beginning of sys call
+	;mov	al, 0FEh ; 11111110b
+	;adc	al, 0 ; al = al + cf
+	;and	[ebp+8], al ; flags (reset carry flag)
+	;	; bic $341,20.(sp) / set users processor priority to 0
+	;			 ; / and clear carry bit
+	;pop	ebp ; eax
+	;popf
         jc      short badsys ; 23/07/2022
+	; 01/05/2026
+	mov	ebp, eax
 	mov	eax, [u.r0]
 	; system call registers: EAX, EDX, ECX, EBX, ESI, EDI
 	jmp	dword [ebp+syscalls]
@@ -17383,17 +17386,36 @@ sysldrvt: ; Get copy of Logical DOS Drive Description Table
 	jmp	short sysdir_ok
 
 systime: ; Get System Date&Time
+	; 01/05/2026 (TRDOS 386 v2.0.11)
 	; 30/12/2017 (TRDOS 386 = TRDOS v2.0)
-	;	
+	;
         ; INPUT -> BL =
 	;	    0 = Get Date&Time in Unix/Epoch format
 	;	    1 = Get Time in MSDOS format
-	;	    2 = Get Date in MSDOS format
-	;	    3 = Get Date&Time in MSDOS format
-	;	    4 & other values =
+	;	    2 = Get Date in MSDOS format (1980->1980)
+	;	    3 = Get Date&Time in MSDOS format (1980->1980)
+	;	01/05/2026
+	;	    4 = Get/Return System Timer Ticks (18.2 Hz)
+	;		Note: If the system timer frequency is 100 Hz
+	;	             (18.2 Hz for the current kernel version),
+	; 		     the carry flag will be set on return.
+	;		-However, even if the system is running at 100 Hz,
+	;		 the number of ticks converted to 18.2 Hz will
+        ;		 be returned-
+	;		100Hz to 18.2Hz conversion: int(timerticks*182/1000)
+	;	    5 = Get/Return System Timer Ticks (100 Hz)
+	;		Note: carry flag will be set at return
+	;		      if system timer frequency is NOT 100 Hz
+	;		(it is 18.2 Hz for current kernel version)
+	;		-However, even if the system is running at 18.2 Hz,
+	;		 the number of ticks converted to 100 Hz will
+        ;		 be returned-
+	;		18.2Hz to 100Hz conversion: int(timerticks*1000/182)
+	;	    6 = Get Date&Time in MSDOS packed (direntry) format
+	;		(1980->0)
+	;	    7 & other values (>7) =
 	;		System timer ticks will be returned
 	;		in EAX and Carry Flag will be set.
-	;		(CF will not be set if BL = 4)
 	; OUTPUT ->
 	;	For BL input = 3
 	;          EAX = Current Time (RTC)
@@ -17407,9 +17429,9 @@ systime: ; Get System Date&Time
 	;
 	;	For BL input = 2
 	;	   EAX = Current System Date (RTC)
-	;		DL = Day (DL in MSDOS)
-	;		DH = Month (DH in MSDOS)
-	;		HW of EDX = Year (CX in MSDOS)
+	;		AL = Day (DL in MSDOS)
+	;		AH = Month (DH in MSDOS)
+	;		HW of EAX = Year (CX in MSDOS)
 	;
 	;	For BL input = 1
 	;          EAX = Current Time (RTC)
@@ -17420,11 +17442,40 @@ systime: ; Get System Date&Time
 	;	For BL input = 0
 	;          EAX = Unix (Epoch) Time Ticks/Seconds
 	;
-	;	For BL input  = 4
-	;	   EAX = System timer ticks
+	;	01/05/2026
+	;	For BL input = 4
+	;	   EAX = System timer tick count (18.2 Hz)
+	;	   if CF = 1 -> system is running at 100 Hz
+	;	      and tick count is converted to 18.2 Hz
+	;	      Conversion: int(timerticks*182/1000)
+	;	   0 = midnight, 00:00:00:00
+	;          if CF = 0 -> system timer is running at 18.2 Hz
+	;	      and tick count is actual on the system side
 	;
-	;	If CF = 1 (for other values of BL input)
-	;	   EAX = System timer ticks (no error code!)
+	;	For BL input = 5
+	;	   EAX = System timer tick count (100 Hz)
+	;	   if CF = 1 -> system is running at 18.2 Hz
+	;	      and tick count is converted to 100 Hz
+	;	      Conversion: int(timerticks*1000/182)
+	;	   0 = midnight, 00:00:00:00
+	;          if CF = 0 -> system timer is running at 100 Hz
+	;	      and tick count is actual on the system side
+	;
+	;	For BL input = 6
+	;	   EAX = Date&Time in MSDOS/direntry (packed) format
+	;		AX (time) bits = hhhhhmmmmmmsssss
+	;			bits 0-4: seconds divided by 2, 0-28
+	;			bits 5-10: minute (0-59)
+	;			bits 11-15: hour (0-23) 
+	;		HW of EAX (date) bits = yyyyyyymmmmddddd
+	;			bit 0-4: day of the month (1-31)
+	;			bit 5-8: Month (1-12)
+	;			bit 9-15: Year (0-127) [Year-1980]
+	;
+	;	For BL input = 7 (or BL input > 7)
+	;	    CF = 1 (always.. for current kernel version)
+	;	    EAX = System timer ticks (no error code!)
+	;
 	;
 	; Modified Registers: EAX, (EDX)
 	;		 (at the return of system call)
@@ -17437,7 +17488,10 @@ systime_0:
 	mov	[u.r0], eax
 	jmp	sysret
 systime_1:
-	cmp	bl, 4
+	;cmp	bl, 4
+	;jb	short systime_2
+	; 01/05/2026
+	cmp	bl, 7
 	jb	short systime_2
 	mov	eax, [TIMER_LH] ; 18.2 Hz timer ticks
 				; Note: [TIMER_LH] may be set
@@ -17446,11 +17500,18 @@ systime_1:
 				; (This value must not be
 				; accepted as [TIMER_LH]/18.2
 				; seconds since the midnight.)
-	jna	short systime_0
+	;jna	short systime_0
 	mov	[u.r0], eax
 	jmp	error ; cf = 1 & [u.r0] = eax = timer ticks
 
 systime_2:
+	; 01/05/2026
+	cmp	bl, 4
+	ja	short systime_5
+	;;;;
+
+	; return system/current date&time
+
 	;push	ebx
 	call	get_rtc_date_time
 	;pop	ebx
@@ -17489,7 +17550,45 @@ systime_4:
 	mov	[ebp+20], esi ; return to user with EDX value
 	jmp	short systime_0
 
+	; 01/05/2026
+systime_5:
+	cmp	bl, 6
+	je	short systime_6
+	mov	eax, [TIMER_LH]
+	cmp	bl, 4
+	;je	short systime_0 ; return 18.2 Hz timer ticks
+	jne	short convert_to_100hz
+	jmp	systime_0
+
+	;call convert_to_100hz
+convert_to_100hz:
+	; eax = timer tick count (18.2 Hz)
+	mov	ecx, 1000
+	mul	ecx
+	mov	ecx, 182
+        div	ecx
+	; eax = quotient, edx = remainder
+	cmp	edx, 91
+	jb	short cnv_to_100hz_ok
+	inc	eax
+cnv_to_100hz_ok:
+	; eax = timer tick count (100 Hz)
+	;retn
+	jmp	systime_0
+
+	; 01/05/2026
+systime_6:
+	; convert current RTC date & time
+	;	to msdos/direntry (packed) format
+	call	convert_current_date_time
+	; OUTPUT -> DX = Date in dos dir entry format
+        ; 	    AX = Time in dos dir entry format
+	mov	[u.r0+2], dx
+	mov	[u.r0], ax
+	jmp	sysret
+
 sysstime: ; Set System Date&Time
+	; 01/05/2026 (TRDOS 386 v2.0.11)
 	; 31/12/2017
 	; 30/12/2017 (TRDOS 386 = TRDOS v2.0)
 	;
@@ -17498,14 +17597,31 @@ sysstime: ; Set System Date&Time
 	;	    1 = Set Time in MSDOS format
 	;	    2 = Set Date in MSDOS format
 	;	    3 = Set Date&Time in MSDOS format
-	;	    4 = Set System Timer (Ticks)
+	;	    4 = Set System Timer (Ticks) - 18.2 Hz -
 	;	    5 = Convert/Save current time to/as
 	;		18.2 Hz system timer ticks
 	;	    6 = Convert MSDOS Date&Time to UNIX format
 	;		without setting system date&time ; (test)
 	;	    7 = Convert UNIX Date&Time to MSDOS format
 	;		without setting system date&time ; (test)
-	;	   8-0FFh = invalid !
+	;	01/05/2026
+	;	    8 = Convert packed MSDOS Date&Time to UNIX format
+	;		without setting system date&time ; (test)
+	;		ECX = packed MSDOS date&time
+	;		ECX (time) bits = hhhhhmmmmmmsssss
+	;			bits 0-4: seconds divided by 2, 0-28
+	;			bits 5-10: minute (0-59)
+	;			bits 11-15: hour (0-23) 
+	;		HW of ECX (date) bits = yyyyyyymmmmddddd
+	;			bit 0-4: day of the month (1-31)
+	;			bit 5-8: Month (1-12)
+	;			bit 9-15: Year (0-127) [Year-1980]
+	;	    9 = Convert UNIX Date&Time to packed MSDOS format
+	;		without setting system date&time ; (test)
+	;		ECX = Unix Epoch Time
+	;	   10 = Set System Timer (Ticks) - 100 Hz input -
+	;		((conversion: input*182/1000))
+	;	   11-0FFh = invalid !
 	;	  ECX = Time (or Timer) value in selected format
 	;	  EDX = Date value in MSDOS format if BL=2,3,6
 	;
@@ -17522,19 +17638,6 @@ sysstime: ; Set System Date&Time
 	call	convert_from_epoch
 	call	set_rtc_date_time
 	jmp	sysret
-sysstime_0:
-	cmp	bl, 8
-	jb	short sysstime_1
-	; invalid input (>7)
-	mov	eax, [TIMER_LH] ; 18.2 Hz timer ticks
-				; Note: [TIMER_LH] may be set
-				; to wrong timer value due to
-				; program functions.
-				; (This value must not be
-				; accepted as [TIMER_LH]/18.2
-				; seconds since the midnight.)
-	mov	[u.r0], eax	
-	jmp	error ; cf = 1 & [u.r0] = eax = timer ticks
 
 sysstime_8:
 	; BL = 7
@@ -17545,38 +17648,25 @@ sysstime_8:
 	shl	eax, 16
 	mov	al, [second]
 	mov	ah, [minute]
-	jmp	short systime_3
+	jmp	systime_3
 
-sysstime_1:
-	cmp	bl, 4
-	je	short sysstime_2 ; set system timer ticks
-	cmp	bl, 5
-	jne	short sysstime_4
-	; convert current time to system timer ticks (18.2Hz)
-	call	get_rtc_date_time
-	movzx	ecx, byte [hour]
-	mov	eax, 60*60 ; 1 hour = 3600 seconds
-	mul	ecx
-	mov	ebx, eax
-	mov	cl, 60  ; 1 minute = 60 seconds
-	movzx	eax, byte [minute]
-	mul	ecx
-	add	eax, ebx
-	mov	cl, [second]
-	add	eax, ecx
-	mov	cl, 182
-	mul	ecx
-	add	eax, 9
-	adc	edx, 0
-	mov	cl, 10
-	div	ecx
-	; eax = ((182*seconds)+9)/10
-	mov	ecx, eax
-sysstime_2:
-	mov	[TIMER_LH], ecx ; 18.2 * seconds
-sysstime_3:
-	mov	[u.r0], ecx
-	jmp	sysret
+sysstime_0:
+	cmp	bl, 8
+	jb	short sysstime_1
+	; 01/05/2026
+	cmp	bl, 11
+	jb	sysstime_9
+	; invalid input (>7) ; (>10) 01/05/2026
+	mov	eax, [TIMER_LH] ; 18.2 Hz timer ticks
+				; Note: [TIMER_LH] may be set
+				; to wrong timer value due to
+				; program functions.
+				; (This value must not be
+				; accepted as [TIMER_LH]/18.2
+				; seconds since the midnight.)
+	mov	[u.r0], eax	
+	jmp	error ; cf = 1 & [u.r0] = eax = timer ticks
+
 sysstime_4:
 	cmp	bl, 6
 	ja	short sysstime_8
@@ -17603,22 +17693,168 @@ sysstime_4:
 	; BL = 3
 	call	set_rtc_date_time
 	jmp	sysret
+
+sysstime_1:
+	cmp	bl, 4
+	je	short sysstime_2 ; set system timer ticks
+	cmp	bl, 5
+	jne	short sysstime_4
+	; convert current time to system timer ticks (18.2Hz)
+	call	get_rtc_date_time
+	movzx	ecx, byte [hour]
+	mov	eax, 60*60 ; 1 hour = 3600 seconds
+	mul	ecx
+	mov	ebx, eax
+	mov	cl, 60  ; 1 minute = 60 seconds
+	movzx	eax, byte [minute]
+	mul	ecx
+	add	eax, ebx
+	mov	cl, [second]
+	add	eax, ecx
+	mov	cl, 182
+	mul	ecx
+	add	eax, 9
+	adc	edx, 0
+	mov	cl, 10
+	div	ecx
+	; eax = ((182*seconds)+9)/10
+sysstime_12:	; 01/05/2026
+	mov	ecx, eax
+sysstime_2:
+	mov	[TIMER_LH], ecx ; 18.2 * seconds
+sysstime_3:
+	mov	[u.r0], ecx
+	jmp	sysret
+
 sysstime_5:
 	; BL = 1
 	call	set_time_bcd
 	call	set_rtc_time
 	jmp	sysret
-sysstime_6:
-	; BL = 2
-	call	set_date_bcd
-	call	set_rtc_date
-	jmp	sysret
+
 sysstime_7:
 	; BL = 6
 	; [year], [month], [day],
 	; [hour], [minute], [second]
 	call	convert_to_epoch
 	mov	ecx, eax ; seconds since 1/1/1970 00:00:00
+	jmp	sysstime_3
+
+sysstime_6:
+	; BL = 2
+	call	set_date_bcd
+	call	set_rtc_date
+	jmp	sysret
+
+	; 01/05/2026
+sysstime_9:
+	cmp	bl, 9
+	ja	short sysstime_10 ; set system timer ticks for
+				; 100 Hz input
+				; (at first, convert to 18.2 Hz)
+	jb	short sysstime_11
+			; convert packed msdos format to epoch 
+	; convert the given epoch to packed msdos/direntry format
+	call	convert_from_epoch
+	xor	ecx, ecx
+	mov	ax, [year]
+	sub	ax, 1980
+	;and	eax, 127
+	mov	cl, al		; 0:000000000YYYYYYYb
+	shl	ecx, 4		; 0:00000YYYYYYY0000b
+	mov	al, [month]
+	;and	al, 15
+	or	cl, al		; 0:00000YYYYYYYMMMMb
+	shl	ecx, 5		; 0:YYYYYYYMMMM00000b
+	mov	al, [day]
+	;and	al, 31
+	or	cl, al		; 0:YYYYYYYMMMMDDDDDb
+	shl	ecx, 16		; move packed date to high word
+				; YYYYYYYMMMMDDDDDb:0
+	xor	edx, edx
+	mov	dl, [hour]
+	;and	dl, 31		; 0:00000000000hhhhhb
+	shl	edx, 6		; 0:00000hhhhh000000b
+	mov	al, [minute]	;
+	;and	al, 63
+	or	dl, al		; 0:00000hhhhhmmmmmmb
+	shl	edx, 5		; 0:hhhhhmmmmmm00000b
+	mov	al, [second]
+	shr	al, 1		; seconds/2
+	;and	al, 31
+	or	dl, al		; 0:hhhhhmmmmmmsssssb
+	or	ecx, edx
+	mov	[u.r0], ecx	; return the packed date&time
+	jmp	sysret
+
+	; 01/05/2026
+sysstime_10:
+	; ecx = timer tick count in 100 Hz format
+	; convert it to 18.2 Hz
+	; (current kernel version uses 18.2 Hz timer ticks) 
+
+	;call	convert_to_18hz
+convert_to_18hz:
+	; ecx = timer tick count (100 Hz)
+	mov	eax, 182
+	mul	ecx
+	mov	ecx, 1000
+        div	ecx
+	; eax = quotient, edx = remainder
+	cmp	edx, 500
+	jb	short cnv_to_18hz_ok
+	inc	eax
+cnv_to_18hz_ok:
+	; eax = timer tick count (18.2 Hz)
+	;retn	
+
+	; eax = system timer tick count (18.2 Hz)
+	jmp	sysstime_12	; set system timer ticks
+
+	; 01/05/2026
+sysstime_11:
+	; convert msdos/direntry (packed) format
+	; date&time to unix epoch time
+	;
+	; ECX (time) bits = hhhhhmmmmmmsssss
+	;	bits 0-4: seconds divided by 2, 0-28
+	;	bits 5-10: minute (0-59)
+	;	bits 11-15: hour (0-23) 
+	; HW of ECX (date) bits = yyyyyyymmmmddddd
+	;	bit 0-4: day of the month (1-31)
+	;	bit 5-8: Month (1-12)
+	;	bit 9-15: Year (0-127) [Year-1980]
+
+	mov	al, cl
+	and	al, 31
+	shl	al, 1
+	mov	[second], al
+	shr	ecx, 5
+	mov	al, cl
+	and	al, 63
+	mov	[minute], al
+	shr	ecx, 6
+	mov	al, cl
+	and	al, 31
+	mov	[hour], al
+	shr	ecx, 5
+	mov	al, cl
+	and	al, 31
+	mov	[day], al
+	shr	ecx, 5
+	mov	al, cl
+	and	al, 15
+	mov	[month], al
+	shr	ecx, 4
+	mov	eax, ecx
+	;and	ax, 127
+	add	ax, 1980
+	mov	[year], ax
+	
+	call	convert_to_epoch
+	;mov	[u.r0], eax ; seconds since 1/1/1970 00:00:00
+	;jmp	sysret
+	mov	ecx, eax
 	jmp	sysstime_3
 
 sysrename: ; Rename File (or Directory)
