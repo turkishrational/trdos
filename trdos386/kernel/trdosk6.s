@@ -17501,6 +17501,7 @@ systime_1:
 				; accepted as [TIMER_LH]/18.2
 				; seconds since the midnight.)
 	;jna	short systime_0
+systime_7:
 	mov	[u.r0], eax
 	jmp	error ; cf = 1 & [u.r0] = eax = timer ticks
 
@@ -17555,11 +17556,8 @@ systime_5:
 	cmp	bl, 6
 	je	short systime_6
 	mov	eax, [TIMER_LH]
-	cmp	bl, 4
-	;je	short systime_0 ; return 18.2 Hz timer ticks
-	jne	short convert_to_100hz
-	jmp	systime_0
 
+	; bl = 5
 	;call convert_to_100hz
 convert_to_100hz:
 	; eax = timer tick count (18.2 Hz)
@@ -17574,7 +17572,11 @@ convert_to_100hz:
 cnv_to_100hz_ok:
 	; eax = timer tick count (100 Hz)
 	;retn
-	jmp	systime_0
+	;mov	[u.r0], eax
+	;;mov	dword [u.error], 0 ; not an actual error
+	; "100 Hz is not the system timer frequeny"
+	;jmp	error	; return with cf = 1
+	jmp	systime_7
 
 	; 01/05/2026
 systime_6:
@@ -17723,7 +17725,9 @@ sysstime_12:	; 01/05/2026
 sysstime_2:
 	mov	[TIMER_LH], ecx ; 18.2 * seconds
 sysstime_3:
+	cli
 	mov	[u.r0], ecx
+	sti
 	jmp	sysret
 
 sysstime_5:

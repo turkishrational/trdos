@@ -662,7 +662,7 @@ CMOS_HOURS	EQU	04h		; HOURS
 SET_TOD:
 	sub	eax, eax
 	mov	[TIMER_OFL], al		; RESET TIMER ROLL OVER INDICATOR
-	;mov	word [TIMER_LOW, ax	; AND TIMER COUNT
+	;mov	word [TIMER_LOW], ax	; AND TIMER COUNT
 	;mov	word [TIMER_HIGH], ax
 	mov	[TIMER_LH], eax
 	mov	al, CMOS_DIAG+NMI	; CHECK CMOS VALIDITY
@@ -725,7 +725,9 @@ UIPOFF:
 	mov	ebx, 65543
 	mul	ebx
 	add	eax, ecx
+	cli
 	mov	[TIMER_LH], eax
+	sti
 POD_DONE:
 	retn
 
