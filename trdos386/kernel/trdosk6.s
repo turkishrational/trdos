@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 01/05/2026  (Previous: 10/01/2026, v2.0.10)
+; Last Update: 02/05/2026  (Previous: 10/01/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -15231,7 +15231,15 @@ sysfff_13:
 	mov	ebx, esi
 	inc	edi
 sysfff_14:
-	lodsw	; UNICODE char
+	lodsw	; UNICODE character
+
+	; 02/05/2026
+	and	ah, ah
+	jz	short sysfff_19
+	; Replace the non-printable 
+	; Unicode character with an underscore.
+	mov	al,'_'
+sysfff_19:
 	stosb	; ascii char (default character map)
 	or	al, al
 	jz	short sysfff_15
