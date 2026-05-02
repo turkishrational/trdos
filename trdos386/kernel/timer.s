@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.5 - timer.s
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.11 - timer.s
 ; ----------------------------------------------------------------------------
-; Last Update: 08/08/2022  (Previous: 18/04/2021)
+; Last Update: 02/05/2026  (Previous: 08/08/2022, v2.0.5)
 ; ----------------------------------------------------------------------------
 ; Beginning: 17/01/2016
 ; ----------------------------------------------------------------------------
@@ -621,5 +621,138 @@ CMOS_READ:
 	retn				; RETURN WITH FLAGS RESTORED
 
 ;-------------------------------------------------------------------------------
+
+	; 02/05/2026 - TRDOS 386 v2.0.11
+	
+	; ref: IBM PC XT286 BIOS - "test4.asm"
+
+;-------------------------------------------------------------------------------
+;	THIS ROUTINE INITIALIZES THE TIMER DATA AREA IN THE ROM BIOS	       :
+;	DATA AREA.  IT IS CALLED BY THE POWER ON ROUTINES.  IT CONVERTS        :
+;	HR:MIN:SEC  FROM CMOS TO TIMER TICS. IF CMOS IS INVALID, TIMER	       :
+;	IS SET TO ZERO. 						       :
+;									       :
+; INPUT    NONE PASSED TO ROUTINE BY CALLER				       :
+;	   CMOS LOCATIONS USED FOR TIME 				       :
+;									       :
+; OUTPUT   @TIMER_LOW							       :
+;	   @TIMER_HIGH							       :
+;	   @TIMER_OFL							       :
+;	   ALL REGISTERS UNCHANGED					       :
+;-------------------------------------------------------------------------------
+
+COUNTS_SEC	EQU	18		; TIMER DATA CONVERSION EQUATES
+COUNTS_MIN	EQU	1092
+COUNTS_HOUR	EQU	7		; 65543 - 65536
+UPDATE_TIMER	EQU	10000000b	; RTC UPDATE IN PROCESS BIT MASK
+CMOS_DIAG	EQU	0Eh		; POST DIAGNOSTIC STATUS RESULTS BYTE
+NMI		EQU	10000000b	; DISABLE NMI INTERRUPTS MASK -
+					;  HIGH BIT OF CMOS LOCATION ADDRESS
+BAD_BAT 	EQU	10000000b	; DEAD BATTERY - CMOS LOST POWER
+BAD_CKSUM	EQU	01000000b	; CHECKSUM ERROR
+CMOS_CLK_FAIL	EQU	00000100b	; CMOS CLOCK NOT UPDATING OR NOT VALID
+
+CMOS_REG_A	EQU	0Ah		; STATUS REGISTER A
+CMOS_SECONDS	EQU	00h		; SECONDS
+CMOS_MINUTES	EQU	02h		; MINUTES
+CMOS_HOURS	EQU	04h		; HOURS
+
+	; 02/05/2026
+	; set time of day (re-initialize timer tick count)
+SET_TOD:
+	sub	eax, eax
+	mov	[TIMER_OFL], al		; RESET TIMER ROLL OVER INDICATOR
+	;mov	word [TIMER_LOW, ax	; AND TIMER COUNT
+	;mov	word [TIMER_HIGH], ax
+	mov	[TIMER_LH], eax
+	mov	al, CMOS_DIAG+NMI	; CHECK CMOS VALIDITY
+	call	CMOS_READ		; READ DIAGNOSTIC LOCATION IN CMOS
+	and	al, BAD_BAT+BAD_CKSUM+CMOS_CLK_FAIL
+
+	jnz	short POD_DONE		; CMOS NOT VALID -- TIMER SET TO ZERO
+	mov	ecx, 65535		; BAD BATTERY, CHKSUM ERROR, CLOCK ERROR
+UIP:
+	mov	al, CMOS_REG_A+NMI	; ACCESS REGISTER A
+	call	CMOS_READ		; READ CMOS CLOCK REGISTER A
+	test	al, UPDATE_TIMER
+	loopz	UIP			; WAIT TILL UPDATE BIT IS ON
+
+	jecxz	POD_DONE		; CMOS CLOCK STUCK IF TIMEOUT
+	mov	cx, 65535		;
+UIPOFF:
+	mov	al, CMOS_REG_A+NMI	; ACCESS REGISTER A
+	call	CMOS_READ		; READ CMOS CLOCK REGISTER A
+	test	al, UPDATE_TIMER
+	loopnz	UIPOFF			; NEXT WAIT TILL END OF UPDATE
+
+	jecxz	POD_DONE		; CMOS CLOCK STUCK IF TIMEOUT
+
+	mov	al, CMOS_SECONDS+NMI	; TIME JUST UPDATED
+	CALL	CMOS_READ		; ACCESS SECONDS VALUE IN CMOS
+	cmp	al, 59h			; ARE THE SECONDS WITHIN LIMITS?
+	ja	short TOD_ERROR		; GO IF NOT
+
+	call	CVT_BINARY		; CONVERT IT TO BINARY
+	mov	ecx, eax		; MOVE COUNT TO ACCUMULATION REGISTER
+	shr	ecx, 2			; ADJUST FOR SYSTEMATIC SECONDS ERROR
+	mov	bl, COUNTS_SEC
+	mul	bl			; COUNT FOR SECONDS
+	add	ecx, eax
+	mov	al, CMOS_MINUTES+NMI
+	call	CMOS_READ		; ACCESS MINUTES VALUE IN CMOS
+	cmp	al, 59h			; ARE THE MINUTES WITHIN LIMITS?
+	ja	short TOD_ERROR		; GO IF NOT
+	call	CVT_BINARY		; CONVERT IT TO BINARY
+	push	eax			; SAVE MINUTES COUNT
+	shr	eax, 1			; ADJUST FOR SYSTEMATIC MINUTES ERROR
+	add	ecx, eax		; ADD ADJUSTMENT TO COUNT
+	pop	eax			; RECOVER BCD MINUTES VALUE
+	mov	ebx, COUNTS_MIN
+	mul	ebx			; COUNT FOR MINUTES
+	add	ecx, eax		; ADD TO ACCUMULATED VALUE
+	mov	al, CMOS_HOURS+NMI
+	call	CMOS_READ		; ACCESS HOURS VALUE IN CMOS
+	cmp	al, 23h			; ARE THE HOURS WITHIN LIMITS?
+	ja	short TOD_ERROR		; GO IF NOT
+
+	call	CVT_BINARY		; CONVERT IT TO BINARY
+	;shl	eax, 16			; hour in hw of eax
+	;; eax = 65536 * hour
+	;mov	bl, COUNTS_HOUR
+	;mul	bl			; COUNT FOR HOURS
+	;; + (7 * hour)
+	;; eax = 65543 * hour
+	mov	ebx, 65543
+	mul	ebx
+	add	eax, ecx
+	mov	[TIMER_LH], eax
+POD_DONE:
+	retn
+
+TOD_ERROR:
+	mov	esi, E163		; DISPLAY CLOCK ERROR
+	call	print_msg
+	mov	eax, 257*(CMOS_DIAG+NMI) ; SET CLOCK ERROR IN STATUS
+	CALL	CMOS_READ		; READ DIAGNOSTIC CMOS LOCATION
+	or	al, CMOS_CLK_FAIL	; SET NEW STATUS WITH CMOS CLOCK ERROR
+	xchg	al, ah			; MOVE NEW STATUS TO WORK REGISTER
+	call	CMOS_WRITE		; UPDATE STATUS LOCATION
+	retn
+
+CVT_BINARY:
+	;mov	ah, al			; UNPACK 2 BCD DIGITS IN AL
+	;shr	ah, 4
+	;and	al, 0Fh			; RESULT IS IN AX
+	;aad				; CONVERT UNPACKED BCD TO BINARY
+	; 02/05/2026
+	db 	0D4h, 10h		; Undocumented inst. AAM
+					; AH = AL / 10h
+					; AL = AL MOD 10h
+	aad				; AL = AH * 10 + AL, AH = 0
+	retn
+
+E163:	
+	db 0Dh, 0Ah, 7
+	db "Clock not updating !", 0Dh, 0Ah, 0
 
 ; /// End Of TIMER FUNCTIONS ///

@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.11
 ; ----------------------------------------------------------------------------
-; Last Update: 01/05/2026 (Previous: 10/02/2026, v2.0.10)
+; Last Update: 02/05/2026 (Previous: 10/02/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -1981,21 +1981,28 @@ timer_int:	; IRQ 0
 	mov	cr3, ecx
 T3:
 	;sti				; INTERRUPTS BACK ON
-	INC	word [TIMER_LOW]	; INCREMENT TIME
-	JNZ	short T4		; GO TO TEST_DAY
-	INC	word [TIMER_HIGH]	; INCREMENT HIGH WORD OF TIME
-T4:					; TEST_DAY
-	CMP	word [TIMER_HIGH],018H	; TEST FOR COUNT EQUALING 24 HOURS
-	JNZ	short T5		; GO TO DISKETTE_CTL
-	CMP	word [TIMER_LOW],0B0H
-	JNZ	short T5		; GO TO DISKETTE_CTL
+	; 02/05/2026
+	;INC	word [TIMER_LOW]	; INCREMENT TIME
+	;JNZ	short T4		; GO TO TEST_DAY
+	;INC	word [TIMER_HIGH]	; INCREMENT HIGH WORD OF TIME
+	inc	dword [TIMER_LH]
+T4:	
+	; 02/05/2026			; TEST_DAY
+	;CMP	word [TIMER_HIGH],018H	; TEST FOR COUNT EQUALING 24 HOURS
+	;JNZ	short T5		; GO TO DISKETTE_CTL
+	;CMP	word [TIMER_LOW],0B0H
+	;JNZ	short T5		; GO TO DISKETTE_CTL
+	cmp	dword [TIMER_LH], 01800B0h ; 1573040
+	jne	short T5	
 
 ;-----	TIMER HAS GONE 24 HOURS
 	;;SUB	AX,AX
 	;MOV	[TIMER_HIGH],AX
 	;MOV	[TIMER_LOW],AX
-	sub	eax, eax
-	mov	[TIMER_LH], eax
+	; 02/05/2026
+	;sub	eax, eax
+	;mov	[TIMER_LH], eax
+	mov	dword [TIMER_LH], 0
 	;
 	MOV	byte [TIMER_OFL],1
 
@@ -3780,7 +3787,7 @@ starting_msg:
 	;;;db "Turkish Rational DOS v2.0 [28/01/2025] ...", 0
 	;;db "Turkish Rational DOS v2.0 [28/12/2025] ...", 0
 	;db "Turkish Rational DOS v2.0 [10/02/2026] ...", 0
-	db "Turkish Rational DOS v2.0 [01/05/2026] ...", 0
+	db "Turkish Rational DOS v2.0 [02/05/2026] ...", 0
 NextLine:
 	db 0Dh, 0Ah, 0
 

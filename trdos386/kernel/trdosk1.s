@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - SYS INIT : trdosk1.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - SYS INIT : trdosk1.s
 ; ----------------------------------------------------------------------------
-; Last Update: 26/09/2024 (Previous: 25/07/2022)
+; Last Update: 02/05/2026 (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -14,6 +14,7 @@
 ;
 
 sys_init:
+	; 02/05/2026 (TRDOS v2.0.11)
 	; 26/09/2024 (TRDOS v2.0.9)
 	; 18/04/2021 (TRDOS 386 v2.0.4)
 	; 20/01/2018  (v2.0.1)
@@ -34,7 +35,13 @@ sys_init:
 	xor	eax, eax  ; sub	al, al ; 0
 	out	40h, al ; LB
 	out	40h, al ; HB
- 	;
+
+	; 02/05/2026 (TRDOS 386 v2.0.11)
+	; Set an initial value for the timer tick count
+	; according to the Real Time Clock.
+	call	SET_TOD	; 'timer.s'
+			; ref: IBM PC XT286 BIOS 'test4.asm'
+
 	; 30/03/2016
 	; Clear Logical DOS Disk Description Tables Area
 	;xor	eax, eax
