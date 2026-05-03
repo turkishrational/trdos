@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - SYS INIT : trdosk1.s
 ; ----------------------------------------------------------------------------
-; Last Update: 02/05/2026 (Previous: 26/09/2024, v2.0.9)
+; Last Update: 03/05/2026 (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -14,6 +14,7 @@
 ;
 
 sys_init:
+	; 03/05/2026
 	; 02/05/2026 (TRDOS v2.0.11)
 	; 26/09/2024 (TRDOS v2.0.9)
 	; 18/04/2021 (TRDOS 386 v2.0.4)
@@ -39,12 +40,17 @@ sys_init:
 	; 02/05/2026 (TRDOS 386 v2.0.11)
 	; Set an initial value for the timer tick count
 	; according to the Real Time Clock.
-	call	SET_TOD	; 'timer.s'
+	;call	SET_TOD	; 'timer.s'
 			; ref: IBM PC XT286 BIOS 'test4.asm'
+	; 03/05/2026
+	; Re-initialize the tick count value
+	; using the real-time clock output (18.2 Hz).
+	call	rtc_to_tick_count
+	mov	[TIMER_LH], eax
 
 	; 30/03/2016
 	; Clear Logical DOS Disk Description Tables Area
-	;xor	eax, eax
+	xor	eax, eax
 	mov	edi, Logical_DOSDisks
 	mov	ecx, 6656/4 ; 26*256 = 6656 bytes
 	rep	stosd ; 1664 times 4 bytes
@@ -780,3 +786,31 @@ stime1:
 			     ; AL = AH * 10h + AL
 	mov 	dh, al	     ; second (BCD)
 	retn	; 30/12/2017
+
+	; 03/05/2026 (TRDOS 386 v2.0.11)
+rtc_to_tick_count:
+	; convert current time to system timer ticks (18.2Hz)
+	;
+	;   input: none (real time clock)
+	;  output: eax = tick count (18.2 Hz)
+	; modified registers: eax, ebx, ecx, edx
+	
+	call	get_rtc_date_time
+	movzx	ecx, byte [hour]
+	mov	eax, 60*60 ; 1 hour = 3600 seconds
+	mul	ecx
+	mov	ebx, eax
+	mov	cl, 60  ; 1 minute = 60 seconds
+	movzx	eax, byte [minute]
+	mul	ecx
+	add	eax, ebx
+	mov	cl, [second]
+	add	eax, ecx
+	mov	cl, 182
+	mul	ecx
+	add	eax, 9
+	adc	edx, 0
+	mov	cl, 10
+	div	ecx
+	; eax = ((182*seconds)+9)/10
+	retn

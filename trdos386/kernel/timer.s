@@ -622,6 +622,9 @@ CMOS_READ:
 
 ;-------------------------------------------------------------------------------
 
+	; 03/05/2026
+%if 0
+
 	; 02/05/2026 - TRDOS 386 v2.0.11
 	
 	; ref: IBM PC XT286 BIOS - "test4.asm"
@@ -669,7 +672,7 @@ SET_TOD:
 	call	CMOS_READ		; READ DIAGNOSTIC LOCATION IN CMOS
 	and	al, BAD_BAT+BAD_CKSUM+CMOS_CLK_FAIL
 
-	jnz	short POD_DONE		; CMOS NOT VALID -- TIMER SET TO ZERO
+	jnz	short TOD_DONE		; CMOS NOT VALID -- TIMER SET TO ZERO
 	mov	ecx, 65535		; BAD BATTERY, CHKSUM ERROR, CLOCK ERROR
 UIP:
 	mov	al, CMOS_REG_A+NMI	; ACCESS REGISTER A
@@ -728,7 +731,7 @@ UIPOFF:
 	cli
 	mov	[TIMER_LH], eax
 	sti
-POD_DONE:
+TOD_DONE:
 	retn
 
 TOD_ERROR:
@@ -756,5 +759,7 @@ CVT_BINARY:
 E163:	
 	db 0Dh, 0Ah, 7
 	db "Clock not updating !", 0Dh, 0Ah, 0
+
+%endif
 
 ; /// End Of TIMER FUNCTIONS ///
