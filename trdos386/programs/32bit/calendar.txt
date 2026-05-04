@@ -1,0 +1,738 @@
+     1                                  ; ****************************************************************************
+     2                                  ; calendar.s (TRDOS 386, TRDOS v2.0 - sample binary file, 'calendar.prg')
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; ! TEST program !
+     5                                  ;
+     6                                  ; 04/05/2026 - Erdogan Tan
+     7                                  ;
+     8                                  ; ****************************************************************************
+     9                                  ; ref: "armando.asm", by Armando Aguirre, 2017 (GitHub)
+    10                                  	;Project 1:Calender
+    11                                  	;Spring 2017
+    12                                  	;(Tasm syntax)
+    13                                  
+    14                                  	; Nasm syntax conversion: Erdogan Tan - May 2026
+    15                                  
+    16                                  	bits 32
+    17                                  	org 0x0
+    18                                  start:
+    19 00000000 B401                    	mov	ah,01h
+    20 00000002 66B90726                	mov	cx,2607h ; hide our cursor
+    21 00000006 CD31                    	int	31h	 ; int 10h
+    22                                  
+    23                                  	; Map video buffer (0B8000h) to user memory (same addr)
+    24                                  	;sys	_video, 0400h
+    25 00000008 BB00040000              	mov	ebx, 0400h
+    26 0000000D B81F000000              	mov	eax, 31 ; _video
+    27 00000012 CD40                    	int	40h	; TRDOS 386 system call
+    28                                  	
+    29                                  axz:	; our loop random name to start
+    30 00000014 833D[EC080000]01        	cmp	dword [fort],1
+    31 0000001B 7424                    	je	axt
+    32 0000001D 833D[F0080000]01        	cmp	dword [port],1
+    33 00000024 741B                    	je	axt
+    34 00000026 EB05                     	jmp	clean ;we clean our screen first	
+    35                                  
+    36                                  artl2:	; we will now draw the dates of the month	
+    37 00000028 E927040000              	jmp drawmonth ; we draw our month
+    38                                  	; cleaning my screen
+    39                                  clean:
+    40 0000002D B9A00F0000              	mov	ecx,4000
+    41 00000032 B820750000              	mov	eax,7520h
+    42 00000037 BF00800B00              	mov	edi,0B8000h
+    43 0000003C 66F3AB                  	rep	stosw
+    44                                  
+    45 0000003F EB71                    	jmp	axd
+    46                                  
+    47                                  axt:	; now we draw our first month name
+    48                                  genames: 
+    49 00000041 8B1D[D8080000]          	mov	ebx,[month]
+    50 00000047 80FB06                  	cmp	bl,6
+    51 0000004A 0F8411030000            	je	name6
+    52 00000050 7729                    	ja	genames@
+    53 00000052 80FB01                  	cmp	bl,1
+    54 00000055 0F8457020000            	je	name1
+    55 0000005B 80FB02                  	cmp	bl,2
+    56 0000005E 0F8475020000            	je	name2
+    57 00000064 80FB03                  	cmp	bl,3
+    58 00000067 0F848E020000            	je	name3
+    59 0000006D 80FB04                  	cmp	bl,4
+    60 00000070 0F84A7020000            	je	name4
+    61 00000076 E9C4020000              	jmp	name5
+    62                                  genames@:
+    63 0000007B 80FB07                  	cmp	bl,7
+    64 0000007E 0F84FF020000            	je	name7
+    65 00000084 80FB08                  	cmp	bl,8
+    66 00000087 0F8418030000            	je	name8
+    67 0000008D 80FB09                  	cmp	bl,9
+    68 00000090 0F8431030000            	je	name9
+    69 00000096 80FB0A                  	cmp	bl,10
+    70 00000099 0F844A030000            	je	name10
+    71 0000009F 80FB0B                  	cmp	bl,11
+    72 000000A2 0F8463030000            	je	name11
+    73 000000A8 E980030000              	jmp	name12
+    74                                  
+    75                                  bgenames:
+    76                                  artl:	; first we will figure out how many dates the month has
+    77                                  aac:	
+    78 000000AD E959010000              	jmp	figdays ; another jmp that needed jmp help,
+    79                                  
+    80                                  axd:	; we draw our skeleton edges,year,and line number and those stuff
+    81                                  skel:
+    82 000000B2 BB00800B00              	mov	ebx,0B8000h
+    83                                  tp:
+    84 000000B7 66C703C475              	mov	word [ebx],75C4h ; need word bcs byte is not big
+    85 000000BC C6430170                	mov	byte [ebx+1],70h 
+    86 000000C0 66C783000F0000C475      	mov	word [ebx+3840],75C4h
+    87 000000C9 C683010F000070          	mov	byte [ebx+3841],70h
+    88 000000D0 83C302                  	add	ebx,2	; increase our value
+    89 000000D3 81FBA0800B00            	cmp	ebx,0B80A0h ; 160 is the last value of our screen
+    90 000000D9 75DC                    	jne	tp
+    91 000000DB 66C70500800B00DA75      	mov	word [0B8000h],75DAh ; left corner
+    92 000000E4 C60501800B0070          	mov	byte [0B8001h],70h 
+    93 000000EB 66C7059E800B00BF75      	mov	word [0B809Eh],75BFh ; right corner
+    94 000000F4 C6059F800B0070          	mov	byte [0B809Fh],70h
+    95                                  skelpart2: ; here we are to part 2
+    96 000000FB BB00800B00              	mov	ebx,0B8000h
+    97                                  op:
+    98 00000100 66C703B375              	mov	word [ebx],75B3h
+    99 00000105 C6430170                	mov	byte [ebx+1],70h 
+   100 00000109 66C7839E000000B375      	mov	word [ebx+158],75B3h
+   101 00000112 C6839F00000070          	mov	byte [ebx+159],70h 
+   102 00000119 81C3A0000000            	add	ebx,160
+   103 0000011F 81FB008F0B00            	cmp	ebx,0B8F00h ; 0B8000h+3840
+   104 00000125 75D9                    	jne	op
+   105 00000127 BEB6820B00              	mov	esi,0B82B6h ; 0B8000h+694	
+   106 0000012C BFEE820B00              	mov	edi,0B82EEh ; 0B8000h+750
+   107 00000131 29DB                    	sub	ebx,ebx
+   108                                  upok:	;drawing the lines
+   109                                  ok:
+   110 00000133 C6065F                  	mov	byte [esi],'_'
+   111 00000136 C6460171                	mov	byte [esi+1],71h
+   112 0000013A C646025F                	mov	byte [esi+2],'_'
+   113 0000013E C6460371                	mov	byte [esi+3],71h
+   114 00000142 83C608                  	add	esi,8
+   115 00000145 39FE                    	cmp	esi,edi
+   116 00000147 75EA                    	jne	ok
+   117 00000149 83EE38                  	sub	esi,56
+   118 0000014C 81C640010000            	add	esi,320
+   119 00000152 81C740010000            	add	edi,320
+   120 00000158 43                      	inc	ebx
+   121 00000159 83FB06                  	cmp	ebx,6
+   122 0000015C 75D5                    	jne	upok	
+   123 0000015E BE76810B00              	mov	esi,0B8176h ; 0B8000h+374
+   124 00000163 29DB                    	sub	ebx,ebx ; printing our name days mo tu..etc
+   125                                  pwq:	
+   126 00000165 8A83[BA080000]          	mov	al,[ebx+namedays]
+   127 0000016B 668906                  	mov	[esi],ax
+   128 0000016E C6460171                	mov	byte [esi+1],71h
+   129 00000172 83C602                  	add	esi,2
+   130 00000175 43                      	inc	ebx
+   131 00000176 83FB1A                  	cmp	ebx,26
+   132 00000179 75EA                    	jne	pwq
+   133                                  	; printing the year
+   134                                  	; set our string index
+   135 0000017B 8B1D[FC080000]          	mov	ebx,[y]
+   136 00000181 BEF6800B00              	mov	esi,0B80F6h ; 0B8000h+246
+   137 00000186 8A83[64080000]          	mov	al,[ebx+txt]
+   138 0000018C 668906                  	mov	[esi],ax
+   139 0000018F C6460170                	mov	byte [esi+1],70h
+   140 00000193 8B1D[00090000]          	mov	ebx,[y1]
+   141 00000199 83C602                  	add	esi,2
+   142 0000019C 8A83[64080000]          	mov	al,[ebx+txt]
+   143 000001A2 668906                  	mov	[esi],ax
+   144 000001A5 C6460170                	mov	byte [esi+1],70h
+   145 000001A9 8B1D[04090000]          	mov	ebx,[y2]
+   146 000001AF 83C602                  	add	esi,2
+   147 000001B2 8A83[64080000]          	mov	al,[ebx+txt]
+   148 000001B8 668906                  	mov	[esi],ax
+   149 000001BB C6460170                	mov	byte [esi+1],70h
+   150 000001BF 8B1D[08090000]          	mov	ebx,[y3]
+   151 000001C5 83C602                          add	esi,2
+   152 000001C8 8A83[64080000]          	mov	al,[ebx+txt]
+   153 000001CE 668906                  	mov	[esi],ax
+   154 000001D1 C6460170                	mov	byte [esi+1],70h
+   155 000001D5 29DB                    	sub	ebx,ebx ; string index
+   156 000001D7 BEC48A0B00              	mov	esi,0B8AC4h ; 0B000h+2756
+   157                                  prk:
+   158 000001DC 8A83[6E080000]          	mov	al,[ebx+howto] ; mov ah,4ch maybe not needed
+   159 000001E2 668906                  	mov	[esi],ax
+   160 000001E5 C6460172                	mov	byte [esi+1],72h
+   161 000001E9 8A83[94080000]          	mov	al,[ebx+howto2]
+   162 000001EF 66898640010000          	mov	[esi+320],ax
+   163 000001F6 C6864101000072          	mov	byte [esi+321],72h
+   164 000001FD 43                      	inc	ebx
+   165 000001FE 83C602                  	add	esi,2
+   166 00000201 83FB26                  	cmp	ebx,38
+   167 00000204 75D6                    	jne	prk
+   168 00000206 E936FEFFFF              	jmp	axt
+   169                                  	; --skel ends here
+   170                                  figdays: ; we will now figure it out and store the value in daysmth
+   171 0000020B 8B1D[D8080000]          	mov	ebx,[month] ; copy our month
+   172 00000211 83FB06                  	cmp	ebx,6
+   173 00000214 7433                    	je	set30
+   174 00000216 7716                    	ja	figdays@
+   175 00000218 83FB01                  	cmp	ebx,1
+   176 0000021B 7444                    	je	set31
+   177 0000021D 83FB02                  	cmp	ebx,2
+   178 00000220 7457                    	je	set28
+   179 00000222 83FB03                  	cmp	ebx,3
+   180 00000225 743A                    	je	set31
+   181 00000227 83FB04                  	cmp	ebx,4
+   182 0000022A 741D                    	je	set30
+   183 0000022C EB33                    	jmp	set31
+   184                                  figdays@:
+   185 0000022E 83FB07                  	cmp	ebx,7
+   186 00000231 742E                    	je	set31
+   187 00000233 83FB08                  	cmp	ebx,8
+   188 00000236 7429                    	je	set31
+   189 00000238 83FB09                  	cmp	ebx,9
+   190 0000023B 740C                    	je	set30
+   191 0000023D 83FB0A                  	cmp	ebx,10
+   192 00000240 741F                    	je	set31
+   193 00000242 83FB0B                  	cmp	ebx,11
+   194 00000245 7402                    	je	set30
+   195 00000247 EB18                    	jmp	set31
+   196                                  set30:
+   197 00000249 C705[E4080000]1E00-     	mov	dword [daysmth],30
+   197 00000251 0000               
+   198 00000253 833D[F8080000]01        	cmp	dword [pre],1
+   199 0000025A 7478                    	je	prevmonth2
+   200 0000025C E9C7FDFFFF              	jmp	artl2
+   201                                  set31:
+   202 00000261 C705[E4080000]1F00-     	mov	dword [daysmth],31
+   202 00000269 0000               
+   203 0000026B 833D[F8080000]01        	cmp	dword [pre],1
+   204 00000272 7460                    	je	prevmonth2
+   205 00000274 E9AFFDFFFF              	jmp	artl2
+   206                                  set28:
+   207 00000279 833D[10090000]04        	cmp	dword [leap],4
+   208 00000280 7418                    	je	set29
+   209 00000282 C705[E4080000]1C00-     	mov	dword [daysmth],28
+   209 0000028A 0000               
+   210 0000028C 833D[F8080000]01        	cmp	dword [pre],1
+   211 00000293 743F                    	je	prevmonth2
+   212 00000295 E98EFDFFFF              	jmp	artl2
+   213                                  set29:
+   214                                  	;mov	dword [leap],0
+   215 0000029A C705[E4080000]1D00-     	mov	dword [daysmth],29
+   215 000002A2 0000               
+   216 000002A4 833D[F8080000]01        	cmp	dword [pre],1
+   217 000002AB 7427                    	je	prevmonth2
+   218 000002AD E976FDFFFF              	jmp	artl2
+   219                                  name1:	; name for january
+   220 000002B2 29DB                    	sub	ebx,ebx ; ebx=0
+   221 000002B4 BEDE800B00              	mov	esi,0B80DEh ; 0B8000h+222
+   222                                  pr1:
+   223 000002B9 8A83[DC070000]          	mov	al,[ebx+jantxt] ; mov ah,4ch maybe not needed
+   224 000002BF 668906                  	mov	[esi],ax
+   225 000002C2 C6460171                	mov	byte [esi+1],71h
+   226 000002C6 43                      	inc	ebx
+   227 000002C7 83C602                  	add	esi,2
+   228 000002CA 83FB07                  	cmp	ebx,7
+   229 000002CD 75EA                    	jne	pr1
+   230 000002CF E9D9FDFFFF              	jmp	artl
+   231                                  prevmonth2:
+   232 000002D4 E9E8030000              	jmp	prevmonth3
+   233                                  name2:	; name for february
+   234 000002D9 29DB                    	sub	ebx,ebx ; ebx=0
+   235 000002DB BEDE800B00              	mov	esi,0B80DEh ; 0B8000h+222
+   236                                  pr2:
+   237 000002E0 8A83[E3070000]          	mov	al,[ebx+febtxt] ; mov ah,4ch maybe not needed
+   238 000002E6 668906                  	mov	[esi],ax
+   239 000002E9 C6460171                	mov	byte [esi+1],71h
+   240 000002ED 43                      	inc	ebx
+   241 000002EE 83C602                  	add	esi,2
+   242 000002F1 83FB08                  	cmp	ebx,8
+   243 000002F4 75EA                    	jne	pr2
+   244 000002F6 E9B2FDFFFF              	jmp	artl
+   245                                  name3:	; name for march
+   246 000002FB 29DB                    	sub	ebx,ebx ; ebx=0
+   247 000002FD BEDE800B00              	mov	esi,0B80DEh ; 0B8000h+222
+   248                                  pr3:	
+   249 00000302 8A83[EB070000]          	mov	al,[ebx+marchtxt] 
+   250 00000308 668906                  	mov	[esi],ax
+   251 0000030B C6460171                	mov	byte [esi+1],71h
+   252 0000030F 43                      	inc	ebx
+   253 00000310 83C602                  	add	esi,2
+   254 00000313 83FB05                  	cmp	ebx,5
+   255 00000316 75EA                    	jne	pr3
+   256 00000318 E990FDFFFF              	jmp	artl
+   257                                  name4:	; name for april
+   258 0000031D 29DB                    	sub	ebx,ebx ; ebx=0
+   259 0000031F BEDE800B00              	mov	esi,0B80DEh ; 0B8000h+222
+   260                                  pr:
+   261 00000324 8A83[F0070000]          	mov	al,[ebx+apriltxt] ; mov ah,4ch maybe not needed
+   262 0000032A 668906                  	mov	[esi],ax
+   263 0000032D C6460171                	mov	byte [esi+1],71h
+   264 00000331 43                      	inc	ebx
+   265 00000332 83C602                  	add	esi,2
+   266 00000335 83FB05                  	cmp	ebx,5
+   267 00000338 75EA                    	jne	pr
+   268 0000033A E96EFDFFFF              	jmp	artl	
+   269                                  name5:	; name for may
+   270 0000033F 29DB                    	sub	ebx,ebx ; ebx=0
+   271 00000341 BEDE800B00              	mov	esi,0B80DEh ; 0B8000h+222
+   272                                  pr5:
+   273 00000346 8A83[F5070000]          	mov	al,[ebx+maytxt] ; mov ah,4ch maybe not needed
+   274 0000034C 668906                  	mov	[esi],ax
+   275 0000034F C6460171                	mov	byte [esi+1],71h
+   276 00000353 43                      	inc	ebx
+   277 00000354 83C602                  	add	esi,2
+   278 00000357 83FB03                  	cmp	ebx,3
+   279 0000035A 75EA                    	jne	pr5
+   280 0000035C E94CFDFFFF              	jmp	artl
+   281                                  name6:	; name for june
+   282 00000361 29DB                    	sub	ebx,ebx ; ebx=0
+   283 00000363 BEDE800B00              	mov	esi,0B80DEh ; 0B8000h+222
+   284                                  pr6:
+   285 00000368 8A83[F8070000]          	mov	al,[ebx+junetxt] ; mov ah,4ch maybe not needed
+   286 0000036E 668906                  	mov	[esi],ax
+   287 00000371 C6460171                	mov	byte [esi+1],71h
+   288 00000375 43                      	inc	ebx
+   289 00000376 83C602                  	add	esi,2
+   290 00000379 83FB04                  	cmp	ebx,4
+   291 0000037C 75EA                    	jne	pr6
+   292 0000037E E92AFDFFFF              	jmp	artl
+   293                                  name7:	; name for july
+   294 00000383 29DB                    	sub	ebx,ebx ; ebx=0
+   295 00000385 BEDE800B00              	mov	esi,0B80DEh ; 0B8000h+222
+   296                                  pr7:
+   297 0000038A 8A83[FC070000]          	mov	al,[ebx+julytxt] ; mov ah,4ch maybe not needed
+   298 00000390 668906                  	mov	[esi],ax
+   299 00000393 C6460171                	mov	byte [esi+1],71h
+   300 00000397 43                      	inc	ebx
+   301 00000398 83C602                  	add	esi,2
+   302 0000039B 83FB04                  	cmp	ebx,4
+   303 0000039E 75EA                    	jne	pr7
+   304 000003A0 E908FDFFFF              	jmp	artl
+   305                                  name8:	; name for august
+   306 000003A5 29DB                    	sub	ebx,ebx ; ebx=0
+   307 000003A7 BEDE800B00              	mov	esi,0B80DEh ; 0B8000h+222
+   308                                  pr8:
+   309 000003AC 8A83[00080000]          	mov	al,[ebx+augtxt] ; mov ah,4ch maybe not needed
+   310 000003B2 668906                  	mov	[esi],ax
+   311 000003B5 C6460171                	mov	byte [esi+1],71h
+   312 000003B9 43                      	inc	ebx
+   313 000003BA 83C602                  	add	esi,2
+   314 000003BD 83FB06                  	cmp	ebx,6
+   315 000003C0 75EA                    	jne	pr8
+   316 000003C2 E9E6FCFFFF              	jmp	artl
+   317                                  name9:	; name for september
+   318 000003C7 29DB                    	sub	ebx,ebx ; ebx=0
+   319 000003C9 BEDE800B00              	mov	esi,0B80DEh ; 0B8000h+222
+   320                                  pr9:
+   321 000003CE 8A83[06080000]          	mov	al,[ebx+septxt] ; mov ah,4ch maybe not needed
+   322 000003D4 668906                  	mov	[esi],ax
+   323 000003D7 C6460171                	mov	byte [esi+1],71h
+   324 000003DB 43                      	inc	ebx
+   325 000003DC 83C602                  	add	esi,2
+   326 000003DF 83FB09                  	cmp	ebx,9
+   327 000003E2 75EA                    	jne	pr9
+   328 000003E4 E9C4FCFFFF              	jmp	artl
+   329                                  name10:	; name for october
+   330 000003E9 29DB                    	sub	ebx,ebx ; ebx=0
+   331 000003EB BEDE800B00              	mov	esi,0B80DEh ; 0B8000h+222
+   332                                  pr10:
+   333 000003F0 8A83[0F080000]          	mov	al,[ebx+octtxt] ;mov ah,4ch maybe not needed
+   334 000003F6 668906                  	mov	[esi],ax
+   335 000003F9 C6460171                	mov	byte [esi+1],71h
+   336 000003FD 43                      	inc	ebx
+   337 000003FE 83C602                  	add	esi,2
+   338 00000401 83FB07                  	cmp	ebx,7
+   339 00000404 75EA                    	jne	pr10
+   340 00000406 E9A2FCFFFF              	jmp	artl
+   341                                  name11:	; name for november
+   342 0000040B 29DB                    	sub	ebx,ebx ; ebx=0
+   343 0000040D BEDE800B00              	mov	esi,0B80DEh ; 0B8000h+222
+   344                                  pr11:
+   345 00000412 8A83[16080000]          	mov	al,[ebx+novtxt] ; mov ah,4ch maybe not needed
+   346 00000418 668906                  	mov	[esi],ax
+   347 0000041B C6460171                	mov	byte [esi+1],71h
+   348 0000041F 43                      	inc	ebx
+   349 00000420 83C602                  	add	esi,2
+   350 00000423 83FB08                  	cmp	ebx,8
+   351 00000426 75EA                    	jne	pr11
+   352 00000428 E980FCFFFF              	jmp	artl
+   353                                  name12:	; name for december
+   354 0000042D 29DB                    	sub	ebx,ebx ; ebx=0
+   355 0000042F BEDE800B00              	mov	esi,0B80DEh ; 0B8000h+222
+   356                                  pr12:
+   357 00000434 8A83[1E080000]          	mov	al,[ebx+dectxt] ; mov ah,4ch maybe not needed
+   358 0000043A 668906                  	mov	[esi],ax
+   359 0000043D C6460171                	mov	byte [esi+1],71h
+   360 00000441 43                      	inc	ebx
+   361 00000442 83C602                  	add	esi,2
+   362 00000445 83FB08                  	cmp	ebx,8
+   363 00000448 75EA                    	jne	pr12
+   364 0000044A E95EFCFFFF              	jmp	artl
+   365                                  sfa:
+   366 0000044F E9C0FBFFFF              	jmp	axz
+   367                                  	; lets draw the days with the given year
+   368                                  drawmonth:
+   369 00000454 29DB                    	sub	ebx,ebx ; index of our string ebx=0
+   370 00000456 29C9                    	sub	ecx,ecx ; ecx=0 to count the days
+   371 00000458 29D2                    	sub	edx,edx ; to keep track of what day to start next
+   372 0000045A BEB6820B00              	mov	esi,0B82B6h ; 0B8000h+694 ; the start of the month
+   373 0000045F 0335[E0080000]          	add	esi,[dayweek] ; we also need to add the day it adds
+   374 00000465 8B3D[E0080000]          	mov	edi,[dayweek]
+   375 0000046B 893D[E8080000]          	mov	dword [prevdays],edi ; to save info for prev month
+   376 00000471 BFEE820B00              	mov	edi,0B82EEh  ; 0B8000h+750 ; the end of the month
+   377                                  zwrup:	; when skipping years I dont want it to draw it screen 
+   378                                  zwr:
+   379 00000476 EB03                    	jmp	rdname
+   380                                  mid845:
+   381 00000478 43                      	inc	ebx
+   382 00000479 EB35                    	jmp	abstract
+   383                                  rdname:
+   384 0000047B 833D[EC080000]01        	cmp	dword [fort],1
+   385 00000482 74F4                    	je	mid845
+   386 00000484 EB03                    	jmp	rdname1
+   387                                  mid784:
+   388 00000486 43                      	inc	ebx
+   389 00000487 EB27                    	jmp	abstract
+   390                                  rdname1:
+   391 00000489 833D[F0080000]01        	cmp	dword [port],1
+   392 00000490 74F4                    	je	mid784
+   393 00000492 8A83[26080000]          	mov	al,[ebx+daysstext]
+   394 00000498 668906                  	mov	[esi],ax
+   395 0000049B 66C746017100            	mov	word [esi+1],71h
+   396 000004A1 43                      	inc	ebx ; 1 3
+   397 000004A2 8A83[26080000]          	mov	al,[ebx+daysstext]
+   398 000004A8 66894602                	mov	[esi+2],ax
+   399 000004AC C6460371                	mov	byte [esi+3],71h
+   400                                  abstract:
+   401 000004B0 83C608                  	add	esi,8
+   402 000004B3 83C208                  	add	edx,8
+   403 000004B6 8915[E0080000]          	mov	[dayweek],edx
+   404 000004BC 43                      	inc	ebx ; 2 4
+   405 000004BD 83C101                  	add	ecx,1
+   406 000004C0 3B0D[E4080000]          	cmp	ecx,[daysmth] ; this counts the amount of days used
+   407 000004C6 7D23                    	jge	input
+   408 000004C8 39FE                    	cmp	esi,edi
+   409 000004CA 75AA                    	jne	zwr
+   410 000004CC 83EE38                  	sub	esi,56
+   411 000004CF 81C640010000            	add	esi,320
+   412 000004D5 81C740010000            	add	edi,320
+   413 000004DB 29D2                    	sub	edx,edx
+   414 000004DD 8915[E0080000]          	mov	[dayweek],edx
+   415 000004E3 3B0D[E4080000]          	cmp	ecx,[daysmth]
+   416 000004E9 7E8B                    	jle	zwrup
+   417                                  	;jmp	input
+   418                                  
+   419                                  input:	; we now read keys
+   420                                  	; before that let me check that our days is !> 56
+   421 000004EB B938000000              	mov	ecx,56
+   422 000004F0 3B0D[E0080000]          	cmp	ecx,[dayweek]
+   423 000004F6 0F8E1F010000            	jle	res
+   424                                  input2:
+   425 000004FC 833D[EC080000]01        	cmp	dword [fort],1 ; if forward is true we keep looping
+   426 00000503 0F8474020000            	je	loop10
+   427 00000509 833D[F0080000]01        	cmp	dword [port],1
+   428 00000510 0F84A0020000            	je	loop24
+   429                                  	; getchar (wait)
+   430 00000516 30E4                    	xor	ah,ah
+   431 00000518 CD32                    	int	32h
+   432 0000051A 3C1B                    	cmp	al, 27 ; esc
+   433 0000051C 0F84AC020000            	je	endz
+   434 00000522 3C71                    	cmp	al,'q' ; if q we quit
+   435 00000524 0F84A4020000            	je	endz
+   436 0000052A 3C6E                    	cmp	al,'n' ; for next month
+   437 0000052C 7425                    	je	nextmonth ; to change to next month
+   438 0000052E 3C70                    	cmp	al,'p' ; to change everything
+   439 00000530 0F8401010000            	je	pastmonth
+   440 00000536 3C66                    	cmp	al,'f' ; to forward ten years
+   441 00000538 0F84F9010000            	je	forward
+   442 0000053E 3C72                    	cmp	al,'r'
+   443 00000540 0F844F020000            	je	reverse
+   444 00000546 EBA3                    	jmp	input ; if anything else is press
+   445                                  		; pastweek
+   446                                  
+   447                                  mid1245:
+   448 00000548 833D[04090000]09        	cmp	dword [y2],9
+   449 0000054F 749A                    	je	input
+   450 00000551 EB09                    	jmp	continue456
+   451                                  
+   452                                  nextmonth:
+   453 00000553 833D[FC080000]02        ert:	cmp	dword [y],2
+   454 0000055A 74EC                    	je	mid1245
+   455                                  continue456:
+   456 0000055C 8B1D[D8080000]          	mov	ebx,[month]
+   457 00000562 43                      	inc	ebx
+   458 00000563 83FB0D                  	cmp	ebx,13
+   459 00000566 740B                    	je	th2
+   460 00000568 891D[D8080000]          	mov	[month],ebx
+   461 0000056E E9DCFEFFFF              	jmp	sfa
+   462                                  th2:
+   463 00000573 FF05[08090000]          	inc	dword [y3]
+   464 00000579 FF05[10090000]          	inc	dword [leap] ; increase our leap year
+   465 0000057F EB0A                    	jmp	end23
+   466                                  mid23:	
+   467 00000581 C705[10090000]0100-     	mov	dword [leap],1
+   467 00000589 0000               
+   468                                  end23:
+   469 0000058B 833D[10090000]05        	cmp	dword [leap],5
+   470 00000592 74ED                    	je	mid23
+   471 00000594 833D[08090000]0A        	cmp	dword [y3],10
+   472 0000059B 740F                    	je	th3
+   473 0000059D C705[D8080000]0100-     	mov	dword [month],1
+   473 000005A5 0000               
+   474 000005A7 E9A3FEFFFF              	jmp	sfa
+   475                                  th3:
+   476 000005AC C705[08090000]0000-     	mov	dword [y3],0
+   476 000005B4 0000               
+   477 000005B6 FF05[04090000]          	inc	dword [y2]
+   478 000005BC 833D[04090000]0A        	cmp	dword [y2],10
+   479 000005C3 740F                    	je	th9
+   480 000005C5 C705[D8080000]0100-     	mov	dword [month],1
+   480 000005CD 0000               
+   481 000005CF E97BFEFFFF              	jmp	sfa
+   482                                  th9:
+   483 000005D4 C705[04090000]0000-     	mov	dword [y2],0
+   483 000005DC 0000               
+   484 000005DE FF05[00090000]          	inc	dword [y1]
+   485 000005E4 833D[00090000]0A        	cmp	dword [y1],10
+   486 000005EB 740F                    	je	th78
+   487 000005ED C705[D8080000]0100-     	mov	dword [month],1
+   487 000005F5 0000               
+   488 000005F7 E953FEFFFF              	jmp	sfa
+   489                                  th78:
+   490 000005FC C705[00090000]0000-     	mov	dword [y1],0
+   490 00000604 0000               
+   491 00000606 FF05[FC080000]          	inc	dword [y]
+   492 0000060C C705[D8080000]0100-     	mov	dword [month],1
+   492 00000614 0000               
+   493 00000616 E934FEFFFF              	jmp	sfa
+   494                                  
+   495                                  res:	; to reset the days >56
+   496 0000061B 29C9                    	sub	ecx,ecx
+   497 0000061D 890D[E0080000]          	mov	[dayweek],ecx
+   498 00000623 E9D4FEFFFF              	jmp	input2 ; end for reset
+   499                                  
+   500                                  mid12456:
+   501 00000628 833D[04090000]01        	cmp	dword [y2],1
+   502 0000062F 0F84B6FEFFFF            	je	input
+   503 00000635 EB09                    	jmp	continue4567
+   504                                  
+   505                                  pastmonth: ; to go back to the prev month
+   506                                  ert34:	; if year decreases too much we do nothing
+   507 00000637 833D[FC080000]01        	cmp	dword [y],1
+   508 0000063E 74E8                    	je	mid12456
+   509                                  continue4567:
+   510 00000640 8B1D[D8080000]          	mov	ebx,[month]
+   511                                  	;sub	ebx,1
+   512                                  	;cmp	ebx,0
+   513                                  	;je	th4
+   514 00000646 4B                      	dec	ebx
+   515 00000647 7408                    	jz	th4
+   516 00000649 891D[D8080000]          	mov	[month],ebx
+   517 0000064F EB61                    	jmp	prevmonth1	
+   518                                  th4:
+   519 00000651 C705[D8080000]0C00-     	mov	dword [month],12
+   519 00000659 0000               
+   520                                  	;sub	dword [y3],1
+   521 0000065B FF0D[08090000]          	dec	dword [y3]
+   522 00000661 EB35                    	jmp	chan
+   523                                  midc:
+   524 00000663 C705[08090000]0900-     	mov	dword [y3],9
+   524 0000066B 0000               
+   525                                  	;sub	dword [y2],1
+   526 0000066D FF0D[04090000]          	dec	dword [y2]
+   527 00000673 EB1A                    	jmp	ch23
+   528                                  midc23:
+   529 00000675 C705[04090000]0900-     	mov	dword [y2],9
+   529 0000067D 0000               
+   530 0000067F C705[00090000]0900-     	mov	dword [y1],9
+   530 00000687 0000               
+   531                                  	;sub	dword [y],1
+   532 00000689 FF0D[FC080000]          	dec	dword [y]
+   533                                  ch23:
+   534 0000068F 833D[04090000]FF        	cmp	dword [y2],-1
+   535 00000696 74DD                    	je	midc23
+   536                                  chan:
+   537 00000698 833D[08090000]FF        	cmp	dword [y3],-1
+   538 0000069F 74C2                    	je	midc
+   539                                  	;sub	dword [leap],1
+   540                                  	;jmp	change2
+   541 000006A1 FF0D[10090000]          	dec	dword [leap]
+   542 000006A7 7F09                    	jg	short prevmonth1
+   543                                  mid2:
+   544 000006A9 66C705[10090000]04-     	mov	word [leap],4
+   544 000006B1 00                 
+   545                                  change2:
+   546                                  	;cmp	word [leap],0
+   547                                  	;jle	mid2
+   548                                  prevmonth1:
+   549                                  	; lets figure out the amount of days the prev month had
+   550 000006B2 C705[F8080000]0100-     	mov	dword [pre],1
+   550 000006BA 0000               
+   551 000006BC E94AFBFFFF              	jmp	figdays
+   552                                  prevmonth3:
+   553 000006C1 8B1D[E4080000]          	mov	ebx,[daysmth] ; now let's calculate when this month should start
+   554 000006C7 8B0D[E8080000]          	mov	ecx,[prevdays] ; previous info save
+   555                                  	;cmp	ecx,0
+   556                                  	;je	premonthpt2
+   557 000006CD E31A                    	jecxz	premonthpt2
+   558 000006CF 29FF                    	sub	edi,edi   ; info save
+   559 000006D1 EB04                    	jmp	loop01
+   560                                  middle01:
+   561 000006D3 83E908                  	sub	ecx,8
+   562 000006D6 47                      	inc	edi
+   563                                  loop01:
+   564 000006D7 83F900                  	cmp	ecx,0 ; let's check the previous days
+   565 000006DA 75F7                    	jne	middle01
+   566                                  		; our edi should equal to 4 or 2
+   567 000006DC B907000000              	mov	ecx,7
+   568 000006E1 29F9                    	sub	ecx,edi ; ecx=3 ecx=5
+   569 000006E3 890D[E8080000]          	mov	dword [prevdays],ecx ; save info prevdays=3 prevdays=5
+   570                                  premonthpt2:
+   571 000006E9 EB03                    	jmp	loop0
+   572                                  middle:
+   573 000006EB 83EB07                  	sub	ebx,7
+   574                                  loop0:
+   575 000006EE 83FB07                  	cmp	ebx,7
+   576 000006F1 7FF8                    	jg	middle
+   577 000006F3 B907000000              	mov	ecx,7	; our ebx should be equal to 3
+   578 000006F8 031D[E8080000]          	add	ebx,[prevdays]
+   579 000006FE C705[E8080000]0000-     	mov	dword [prevdays],0
+   579 00000706 0000               
+   580 00000708 EB03                    	jmp	change
+   581                                  mid:
+   582 0000070A 83EB07                  	sub	ebx,7
+   583                                  change:
+   584 0000070D 83FB07                  	cmp	ebx,7
+   585 00000710 7FF8                    	jg	mid
+   586 00000712 29D9                    	sub	ecx,ebx ; our ecx=4 now contains the date it will start
+   587 00000714 29DB                    	sub	ebx,ebx
+   588 00000716 29FF                    	sub	edi,edi
+   589 00000718 EB04                    	jmp	loop1 ; to add our 8
+   590                                  middle1:
+   591 0000071A 83C708                  	add	edi,8
+   592 0000071D 43                      	inc	ebx
+   593                                  loop1:
+   594 0000071E 39D9                    	cmp	ecx,ebx
+   595 00000720 75F8                    	jne	middle1
+   596                                  	          
+   597 00000722 893D[E0080000]          	mov	[dayweek],edi
+   598                                  
+   599 00000728 C705[F8080000]0000-     	mov	dword [pre],0 ; reseting the condition
+   599 00000730 0000               
+   600 00000732 E918FDFFFF              	jmp	sfa	; printing it
+   601                                  
+   602                                  forward: ; to go 3 years ahead i basically just loop my code 3 times
+   603                                  	; if the limit is near forward is diable
+   604 00000737 EB1A                    	jmp	ths
+   605                                  midw:
+   606 00000739 833D[04090000]08        	cmp	dword [y2],8
+   607 00000740 7402                    	je	midws
+   608 00000742 EB18                    	jmp	cont2
+   609                                  midws:
+   610 00000744 833D[08090000]07        	cmp	dword [y3],7
+   611 0000074B 0F849AFDFFFF            	je	input
+   612 00000751 EB09                    	jmp	cont2
+   613                                  ths:
+   614 00000753 833D[FC080000]02        	cmp	dword [y],2
+   615 0000075A 74DD                    	je	midw
+   616                                  cont2:
+   617 0000075C C705[EC080000]0100-     	mov	dword [fort],1
+   617 00000764 0000               
+   618 00000766 C705[F4080000]2400-     	mov	dword [temp],36
+   618 0000076E 0000               
+   619 00000770 EB0B                    	jmp	loop10
+   620                                  middle10:
+   621                                  	;sub	dword [temp],1
+   622 00000772 FF0D[F4080000]          	dec	dword [temp]
+   623 00000778 E9D6FDFFFF              	jmp	nextmonth
+   624                                  loop10:
+   625 0000077D 833D[F4080000]01        	cmp	dword [temp],1
+   626 00000784 75EC                    	jne	middle10
+   627 00000786 C705[EC080000]0000-     	mov	dword [fort],0
+   627 0000078E 0000               
+   628 00000790 E9BEFDFFFF              	jmp	nextmonth
+   629                                  reverse:
+   630                                  	; to go 3 years in the past
+   631 00000795 C705[F0080000]0100-     	mov	dword [port],1
+   631 0000079D 0000               
+   632 0000079F C705[F4080000]2400-     	mov	dword [temp],36
+   632 000007A7 0000               
+   633 000007A9 EB0B                    	jmp	loop24
+   634                                  middle24:
+   635                                  	;sub	dword [temp],1
+   636 000007AB FF0D[F4080000]          	dec	dword [temp]
+   637 000007B1 E981FEFFFF              	jmp	pastmonth
+   638                                  loop24:
+   639 000007B6 833D[F4080000]01        	cmp	dword [temp],1
+   640 000007BD 75EC                    	jne	middle24
+   641 000007BF C705[F0080000]0000-     	mov	dword [port],0
+   641 000007C7 0000               
+   642 000007C9 E969FEFFFF              	jmp	pastmonth
+   643                                  endz:
+   644                                  	; set mode to 03h (clear screen)
+   645 000007CE B803000000              	mov	eax, 3
+   646 000007D3 CD31                    	int	31h	
+   647                                  	
+   648                                  	; terminate the program
+   649                                  	;sys	_exit, 0
+   650                                  	;mov	ebx, 0
+   651 000007D5 B801000000              	mov	eax, 1 ; _exit
+   652 000007DA CD40                    	int	40h	; TRDOS 386 system call
+   653                                  
+   654 000007DC 4A616E75617279          jantxt:	   db "January"
+   655 000007E3 4665627275617279        febtxt:    db "February"
+   656 000007EB 4D61726368              marchtxt:  db "March"
+   657 000007F0 417072696C              apriltxt:  db "April"
+   658 000007F5 4D6179                  maytxt:	   db "May"
+   659 000007F8 4A756E65                junetxt:   db "June"
+   660 000007FC 4A756C79                julytxt:   db "July"
+   661 00000800 417567757374            augtxt:	   db "August"
+   662 00000806 53657074656D626572      septxt:    db "September"
+   663 0000080F 4F63746F626572          octtxt:    db "October"
+   664 00000816 4E6F76656D626572        novtxt:    db "November"
+   665 0000081E 446563656D626572        dectxt:    db "December"
+   666 00000826 303130323033303430-     daysstext: db "01020304050607080910111213141516171819202122232425262728293031" ; size is 61
+   666 0000082F 353036303730383039-
+   666 00000838 313031313132313331-
+   666 00000841 343135313631373138-
+   666 0000084A 313932303231323232-
+   666 00000853 333234323532363237-
+   666 0000085C 3238323933303331   
+   667 00000864 303132333435363738-     txt:	   db "0123456789" ; to print my year
+   667 0000086D 39                 
+   668 0000086E 7072657373206E3A6E-     howto:	   db  "press n:next month or  q:quit         " ; size 39 
+   668 00000877 657874206D6F6E7468-
+   668 00000880 206F722020713A7175-
+   668 00000889 697420202020202020-
+   668 00000892 2020               
+   669 00000894 707265737320663A73-     howto2:	   db "press f:skip 3 years r:go back 3 years"
+   669 0000089D 6B6970203320796561-
+   669 000008A6 727320723A676F2062-
+   669 000008AF 61636B203320796561-
+   669 000008B8 7273               
+   670 000008BA 537520204D6F202054-     namedays:  db "Su  Mo  Tu  We  Th  Fr  Sa  Su" ; size is 26
+   670 000008C3 752020576520205468-
+   670 000008CC 202046722020536120-
+   670 000008D5 205375             
+   671                                  
+   672 000008D8 01000000                month:	  dd 1 ; to keep track of our month
+   673 000008DC EA070000                year:	  dd 2026 ; to keep track of our year ; january 1, 2026 = thursday
+   674 000008E0 20000000                dayweek:  dd 4*8 ; so we will know what day we should begin our month with
+   675 000008E4 00000000                daysmth:  dd 0 ; for the days of the month
+   676 000008E8 00000000                prevdays: dd 0 ; to save info of the prev month
+   677 000008EC 00000000                fort:	  dd 0 ; if 0 forward not on if 1 true
+   678 000008F0 00000000                port:	  dd 0 ; if 0 reverse not on if 1 true
+   679 000008F4 00000000                temp:	  dd 0 ; to save for forward 10 year or less
+   680 000008F8 00000000                pre:	  dd 0 ; like a condition if it's 1 we will used info to calculate prev month
+   681 000008FC 02000000                y:	  dd 2 ; this numbers is for my year
+   682 00000900 00000000                y1:	  dd 0
+   683 00000904 02000000                y2:	  dd 2
+   684 00000908 06000000                y3:	  dd 6
+   685 0000090C 00000000                pastweek: dd 0 ; this is the variable for the previous month
+   686 00000910 02000000                leap:	  dd 2 ; this is for my leap years if it's 4 then it's a leap year
+   687                                  
+   688                                  ;bss_start:
+   689                                  
+   690                                  ;ABSOLUTE bss_start
+   691                                  
+   692                                  ;saveScr: resb 25*160
+   693                                  
+   694                                  ;bss_end:
