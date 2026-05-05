@@ -1,0 +1,545 @@
+     1                                  ; ****************************************************************************
+     2                                  ; dow.s (TRDOS 386, TRDOS v2.0.11 - sample binary file, 'dow.prg')
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; DOW.PRG ! "Day of Week" - 'systime' TEST program for TRDOS 386 !
+     5                                  ;
+     6                                  ; 05/05/2026
+     7                                  ;
+     8                                  ; [ Last Modification: 05/05/2026 ]
+     9                                  ;
+    10                                  ; ****************************************************************************
+    11                                  ; nasm dow2.asm -l dow2.txt -o DOW2.PRG
+    12                                  
+    13                                  ; 30/04/2026
+    14                                  ; 14/07/2020
+    15                                  ; 31/12/2017
+    16                                  ; TRDOS 386 (v2.0) system calls
+    17                                  _ver 	equ 0
+    18                                  _exit 	equ 1
+    19                                  _fork 	equ 2
+    20                                  _read 	equ 3
+    21                                  _write	equ 4
+    22                                  _open	equ 5
+    23                                  _close 	equ 6
+    24                                  _wait 	equ 7
+    25                                  _create	equ 8
+    26                                  _rename	equ 9
+    27                                  _delete	equ 10
+    28                                  _exec	equ 11
+    29                                  _chdir	equ 12
+    30                                  _time 	equ 13
+    31                                  _mkdir 	equ 14
+    32                                  _chmod	equ 15
+    33                                  _rmdir	equ 16
+    34                                  _break	equ 17
+    35                                  _drive	equ 18
+    36                                  _seek	equ 19
+    37                                  _tell 	equ 20
+    38                                  _memory	equ 21
+    39                                  _prompt	equ 22
+    40                                  _path	equ 23
+    41                                  _env	equ 24
+    42                                  _stime	equ 25
+    43                                  _quit	equ 26
+    44                                  _intr	equ 27
+    45                                  _dir	equ 28
+    46                                  _emt 	equ 29
+    47                                  _ldrvt 	equ 30
+    48                                  _video 	equ 31
+    49                                  _audio	equ 32
+    50                                  _timer	equ 33
+    51                                  _sleep	equ 34
+    52                                  _msg    equ 35
+    53                                  _geterr	equ 36
+    54                                  _fpstat	equ 37
+    55                                  _pri	equ 38
+    56                                  _rele	equ 39
+    57                                  _fff	equ 40
+    58                                  _fnf	equ 41
+    59                                  _alloc	equ 42
+    60                                  _dalloc equ 43
+    61                                  _calbac equ 44
+    62                                  _dma	equ 45
+    63                                  _stdio	equ 46
+    64                                  
+    65                                  %macro sys 1-4
+    66                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)
+    67                                      ; 03/09/2015
+    68                                      ; 13/04/2015
+    69                                      ; Retro UNIX 386 v1 system call.
+    70                                      %if %0 >= 2
+    71                                          mov ebx, %2
+    72                                          %if %0 >= 3
+    73                                              mov ecx, %3
+    74                                              %if %0 = 4
+    75                                                 mov edx, %4
+    76                                              %endif
+    77                                          %endif
+    78                                      %endif
+    79                                      mov eax, %1
+    80                                      ;int 30h
+    81                                      int 40h ; TRDOS 386 (TRDOS v2.0)
+    82                                  %endmacro
+    83                                  
+    84                                  [BITS 32] ; 32-bit intructions
+    85                                  
+    86                                  [ORG 0] 
+    87                                  
+    88                                  START_CODE:
+    89                                  	;mov	esi, esp
+    90                                  	;lodsd
+    91                                  	;cmp	eax, 2 ; two arguments (program file name & date)
+    92                                  	;jb	short terminate ; nothing to do
+    93                                  	;lodsd ; program file name address
+    94                                  	;lodsd ; text file name address
+    95                                  
+    96                                  	; EAX = arg2 ; date (text)
+    97                                  
+    98                                  	;push	eax
+    99                                  
+   100                                  	;mov	esi, msg_program
+   101                                  	;call	print_msg
+   102                                  
+   103                                  	;xor	ah, ah
+   104                                  	;int	32h
+   105                                  
+   106                                  	;pop	eax
+   107                                  
+   108                                  	; Get Date&Time in Unix/Epoch format
+   109                                  	sys	_time, 0
+    66                              <1> 
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1>  %if %0 >= 2
+    71 00000000 BB00000000          <1>  mov ebx, %2
+    72                              <1>  %if %0 >= 3
+    73                              <1>  mov ecx, %3
+    74                              <1>  %if %0 = 4
+    75                              <1>  mov edx, %4
+    76                              <1>  %endif
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79 00000005 B80D000000          <1>  mov eax, %1
+    80                              <1> 
+    81 0000000A CD40                <1>  int 40h
+   110                                  
+   111                                  	; EAX = Unix (Epoch) Time Ticks/Seconds
+   112 0000000C E82D010000              	call	convert_from_epoch
+   113                                  
+   114 00000011 FF35[EC020000]          	push	dword [day]
+   115 00000017 FF35[E8020000]          	push	dword [month]
+   116 0000001D FF35[E4020000]          	push	dword [year]
+   117                                  
+   118 00000023 E8D3010000              	call	DayOfWeek
+   119                                  
+   120 00000028 83C40C                  	add	esp, 12
+   121                                  
+   122 0000002B A3[FC020000]            	mov	[dow], eax
+   123                                  
+   124 00000030 BE[72020000]            	mov	esi, header
+   125 00000035 E8F4000000              	call	print_msg
+   126                                  
+   127 0000003A BE[87020000]            	mov	esi, newline
+   128 0000003F E8EA000000              	call	print_msg
+   129                                  
+   130 00000044 BF[00030000]            	mov	edi, txt_date
+   131                                  
+   132 00000049 A1[EC020000]            	mov	eax, [day]
+   133 0000004E E8AA000000              	call	bin_to_str_2
+   134                                  
+   135 00000053 C6072F                  	mov	byte [edi],'/'
+   136 00000056 47                       	inc	edi
+   137                                  
+   138 00000057 A1[E8020000]            	mov	eax, [month]
+   139 0000005C E89C000000              	call	bin_to_str_2
+   140                                  
+   141 00000061 C6072F                  	mov	byte [edi],'/'
+   142 00000064 47                       	inc	edi
+   143                                  
+   144 00000065 A1[E4020000]            	mov	eax, [year]
+   145 0000006A E887000000              	call	bin_to_str_4
+   146                                  
+   147 0000006F C60700                  	mov	byte [edi],0
+   148                                  
+   149 00000072 BE[00030000]            	mov	esi, txt_date
+   150 00000077 E8B2000000              	call	print_msg
+   151                                  
+   152 0000007C BE[8A020000]            	mov	esi, _space
+   153 00000081 E8A8000000              	call	print_msg
+   154                                  
+   155 00000086 8B1D[FC020000]          	mov	ebx, [dow]
+   156 0000008C C1E302                  	shl	ebx, 2	; * 4
+   157 0000008F 81C3[C8020000]          	add	ebx, day_names
+   158 00000095 8B33                    	mov	esi, [ebx]
+   159 00000097 E892000000              	call	print_msg
+   160                                  
+   161 0000009C BE[87020000]            	mov	esi, newline
+   162 000000A1 E888000000              	call	print_msg
+   163                                  
+   164 000000A6 BF[0C030000]            	mov	edi, txt_time
+   165                                  
+   166 000000AB A1[F0020000]            	mov	eax, [hour]
+   167 000000B0 E848000000              	call	bin_to_str_2
+   168                                  
+   169 000000B5 C6073A                  	mov	byte [edi],':'
+   170 000000B8 47                       	inc	edi
+   171                                  
+   172 000000B9 A1[F4020000]            	mov	eax, [minute]
+   173 000000BE E83A000000              	call	bin_to_str_2
+   174                                  
+   175 000000C3 C6073A                  	mov	byte [edi],':'
+   176 000000C6 47                       	inc	edi
+   177                                  
+   178 000000C7 A1[F8020000]            	mov	eax, [second]
+   179 000000CC E82C000000              	call	bin_to_str_2
+   180                                  
+   181 000000D1 C60700                  	mov	byte [edi],0
+   182                                  
+   183 000000D4 BE[0C030000]            	mov	esi, txt_time
+   184 000000D9 E850000000              	call	print_msg
+   185                                  
+   186 000000DE BE[87020000]            	mov	esi, newline
+   187 000000E3 E846000000              	call	print_msg
+   188                                  
+   189                                  	sys	_exit, 0
+    66                              <1> 
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1>  %if %0 >= 2
+    71 000000E8 BB00000000          <1>  mov ebx, %2
+    72                              <1>  %if %0 >= 3
+    73                              <1>  mov ecx, %3
+    74                              <1>  %if %0 = 4
+    75                              <1>  mov edx, %4
+    76                              <1>  %endif
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79 000000ED B801000000          <1>  mov eax, %1
+    80                              <1> 
+    81 000000F2 CD40                <1>  int 40h
+   190                                  
+   191                                  ;-----------------------------------------------------------------
+   192                                  
+   193                                  hang:
+   194 000000F4 EBFE                    	jmp	short hang
+   195                                  
+   196                                  ;-----------------------------------------------------------------
+   197                                  
+   198                                  bin_to_str_4:
+   199 000000F6 BB04000000              	mov	ebx, 4
+   200 000000FB EB05                    	jmp	short bin_to_str
+   201                                  bin_to_str_2:
+   202 000000FD BB02000000              	mov	ebx, 2
+   203                                  bin_to_str:
+   204 00000102 89E5                    	mov	ebp, esp
+   205 00000104 B90A000000              	mov	ecx, 10
+   206                                  bin2str_div:
+   207 00000109 31D2                    	xor	edx, edx
+   208 0000010B F7F1                    	div	ecx
+   209 0000010D 80C230                  	add	dl, '0'
+   210 00000110 52                      	push	edx
+   211 00000111 83F800                  	cmp	eax, 0
+   212 00000114 77F3                    	ja	short bin2str_div
+   213                                  pop_next:
+   214 00000116 58                      	pop	eax
+   215 00000117 09DB                    	or	ebx, ebx
+   216 00000119 7402                    	jz	skip_stosb
+   217 0000011B AA                      	stosb
+   218 0000011C 4B                      	dec	ebx
+   219                                  skip_stosb:
+   220 0000011D 39EC                    	cmp	esp, ebp
+   221 0000011F 72F5                    	jb	short pop_next
+   222                                  zero_prefix:
+   223 00000121 09DB                    	or	ebx, ebx
+   224 00000123 7408                    	jz	bin2str_ok
+   225 00000125 C647FF30                	mov	byte [edi-1],'0'
+   226 00000129 AA                      	stosb
+   227 0000012A 4B                      	dec	ebx
+   228 0000012B EBF4                    	jmp	zero_prefix
+   229                                  bin2str_ok:
+   230 0000012D C3                      	retn
+   231                                  
+   232                                  ;-----------------------------------------------------------------
+   233                                  
+   234                                  print_msg:
+   235 0000012E BB0F000000              	mov	ebx, 0Fh       ; white characters (bl)
+   236                                  		               ; video page 0 (bh)
+   237                                  print_msg_@:
+   238 00000133 B40E                    	mov	ah, 0Eh ; teletype output (write tty)
+   239 00000135 AC                      	lodsb
+   240                                  _p_nextchar:
+   241 00000136 CD31                    	int	31h
+   242 00000138 AC                      	lodsb
+   243 00000139 20C0                    	and	al, al
+   244 0000013B 75F9                    	jnz	short _p_nextchar
+   245 0000013D C3                      	retn
+   246                                  
+   247                                  ;-----------------------------------------------------------------
+   248                                  
+   249                                  	; ref: TRDOS 386 v2.0.11 Kernel - 'trdosk1.s'
+   250                                  convert_from_epoch:
+   251                                  	; 25/07/2022 (v2.0.5)
+   252                                  	; 18/04/2021 (v2.0.4)
+   253                                  	; 31/12/2017 (v2.0.0)
+   254                                  	; 30/12/2017 (TRDOS 386 = TRDOS v2.0)
+   255                                  	; 15/03/2015 (Retro UNIX 386 v1 - 32 bit version)
+   256                                  	; 20/06/2013 (Retro UNIX 8086 v1)
+   257                                  	; 'convert_from_epoch' procedure prototype:
+   258                                  	; 	            UNIXCOPY.ASM, 10/03/2013
+   259                                  	;
+   260                                  	; ((Modified registers: EAX, EDX, ECX, EBX))
+   261                                  	;
+   262                                  	; Derived from DALLAS Semiconductor
+   263                                  	; Application Note 31 (DS1602/DS1603)
+   264                                  	; 6 May 1998
+   265                                  	;
+   266                                  	; INPUT:
+   267                                  	; EAX = Unix (Epoch) Time
+   268                                  	;
+   269 0000013E 31D2                    	xor 	edx, edx
+   270                                  	;mov 	ecx, 60
+   271                                  	; 25/07/2022
+   272 00000140 29C9                    	sub	ecx, ecx
+   273 00000142 B13C                    	mov	cl, 60
+   274 00000144 F7F1                    	div	ecx
+   275                                  	;mov 	[imin], eax   ; whole minutes
+   276                                  			  ; since 1/1/1970
+   277 00000146 668915[F8020000]        	mov 	[second], dx  ; leftover seconds
+   278 0000014D 29D2                    	sub 	edx, edx
+   279 0000014F F7F1                    	div	ecx
+   280                                  	;mov 	[ihrs], eax   ; whole hours
+   281                                  	;		      ; since 1/1/1970
+   282 00000151 668915[F4020000]        	mov 	[minute], dx  ; leftover minutes
+   283 00000158 31D2                    	xor	edx, edx
+   284                                  	;mov 	cx, 24
+   285 0000015A B118                    	mov 	cl, 24
+   286 0000015C F7F1                    	div	ecx
+   287                                  	;mov 	[iday], ax   ; whole days
+   288                                  			     ; since 1/1/1970
+   289 0000015E 668915[F0020000]        	mov 	[hour], dx   ; leftover hours
+   290 00000165 05DB020000              	add 	eax, 365+366 ; whole day since
+   291                                  			     ; 1/1/1968
+   292                                  	;mov 	[iday], ax
+   293 0000016A 50                      	push 	eax
+   294 0000016B 29D2                    	sub	edx, edx
+   295                                  	;mov 	ecx, (4*365)+1 ; 4 years = 1461 days
+   296                                  	; 25/07/2022
+   297 0000016D 66B9B505                	mov	cx, (4*365)+1
+   298 00000171 F7F1                    	div	ecx
+   299 00000173 59                      	pop 	ecx
+   300                                  	;mov 	[lday], ax   ; count of quadyrs (4 years)
+   301                                  	;push 	dx
+   302                                  	; 18/04/2021
+   303 00000174 52                      	push	edx
+   304                                  	;mov 	[qday], dx   ; days since quadyr began
+   305 00000175 6683FA3C                	cmp 	dx, 31+29    ; if past feb 29 then
+   306 00000179 F5                      	cmc		     ; add this quadyr's leap day
+   307 0000017A 83D000                  	adc 	eax, 0	     ; to # of qadyrs (leap days)
+   308                                  	;mov 	[lday], ax   ; since 1968
+   309                                  	;mov 	cx, [iday]
+   310 0000017D 91                      	xchg 	ecx, eax     ; ECX = lday, EAX = iday
+   311 0000017E 29C8                    	sub 	eax, ecx     ; iday - lday
+   312                                  	;mov 	ecx, 365
+   313                                  	; 25/07/2022
+   314 00000180 66B96D01                	mov	cx, 365
+   315 00000184 31D2                    	xor	edx, edx
+   316                                  	; EAX = iday-lday, EDX = 0
+   317 00000186 F7F1                    	div	ecx
+   318                                  	;mov 	[iyrs], ax   ; whole years since 1968
+   319                                  	;jday = iday - (iyrs*365) - lday
+   320                                  	;mov	[jday], dx   ; days since 1/1 of current year
+   321                                  	;add	eax, 1968
+   322 00000188 6605B007                	add 	ax, 1968     ; compute year
+   323 0000018C 66A3[E4020000]          	mov 	[year], ax
+   324                                  	;mov 	cx, dx
+   325                                  	; 25/07/2022
+   326 00000192 89D1                    	mov	ecx, edx
+   327                                  	;;mov 	dx, [qday]
+   328                                  	;pop 	dx
+   329                                  	; 18/04/2021
+   330 00000194 5A                      	pop	edx
+   331 00000195 6681FA6D01              	cmp 	dx, 365	     ; if qday <= 365 and qday >= 60
+   332 0000019A 7708                    	ja 	short cfe1   ; jday = jday +1
+   333 0000019C 6683FA3C                	cmp 	dx, 60       ; if past 2/29 and leap year then
+   334 000001A0 F5                              cmc		     ; add a leap day to the # of whole
+   335                                  	;adc 	cx, 0        ; days since 1/1 of current year
+   336                                  	; 25/07/2022
+   337 000001A1 83D100                  	adc	ecx, 0
+   338                                  cfe1:
+   339                                  	;mov 	[jday], cx
+   340                                  	;mov 	bx, 12       ; estimate month
+   341                                  	; 18/04/2021
+   342 000001A4 29DB                    	sub	ebx, ebx
+   343 000001A6 B30C                    	mov	bl, 12
+   344 000001A8 66BA6E01                	mov 	dx, 366      ; mday, max. days since 1/1 is 365
+   345 000001AC 6683E003                	and 	ax, 11b      ; year mod 4 (and dx, 3)
+   346                                  cfe2:	; Month calculation  ; 0 to 11  (11 to 0)
+   347                                  	;cmp 	cx, dx       ; mday = # of days passed from 1/1
+   348                                  	; 25/07/2022
+   349 000001B0 39D1                    	cmp	ecx, edx
+   350 000001B2 731B                    	jnb 	short cfe3
+   351                                  	;dec 	bx           ; month = month - 1
+   352                                  	;shl 	bx, 1
+   353                                  	; 18/04/2021
+   354 000001B4 FECB                    	dec	bl
+   355 000001B6 D0E3                    	shl	bl, 1 
+   356 000001B8 668B93[E3010000]        	mov 	dx, [EBX+DMonth] ; # elapsed days at 1st of month
+   357                                  	; 18/04/2021
+   358                                  	;shr 	bx, 1        ; bx = month - 1 (0 to 11)
+   359 000001BF D0EB                    	shr	bl, 1
+   360                                  	;cmp	bx, 1        ; if month > 2 and year mod 4  = 0	
+   361 000001C1 80FB01                  	cmp	bl, 1
+   362 000001C4 76EA                    	jna 	short cfe2   ; then mday = mday + 1
+   363 000001C6 76E8                    	jna 	short cfe2   ; then mday = mday + 1
+   364 000001C8 08C0                    	or 	al, al       ; if past 2/29 and leap year then
+   365 000001CA 75E4                    	jnz 	short cfe2   ; add leap day (to mday)
+   366                                  	;inc 	dx           ; mday = mday + 1
+   367                                  	; 25/07/2022
+   368 000001CC 42                      	inc	edx
+   369 000001CD EBE1                    	jmp 	short cfe2
+   370                                  cfe3:
+   371                                  	;inc 	bx	     ; -> bx = month, 1 to 12
+   372                                  	; 18/04/2021
+   373 000001CF FEC3                    	inc	bl
+   374 000001D1 66891D[E8020000]        	mov 	[month], bx
+   375                                  	;sub 	cx, dx	     ; day = jday - mday + 1
+   376                                  	; 25/07/2022
+   377 000001D8 29D1                    	sub	ecx, edx
+   378                                  	;inc 	cx
+   379                                  	; 18/04/2021
+   380 000001DA FEC1                    	inc	cl
+   381                                  	;mov 	[day], cx
+   382 000001DC 880D[EC020000]          	mov	[day], cl
+   383                                  
+   384                                  	; eax, ebx, ecx, edx is changed at return
+   385                                  	; output ->
+   386                                  	; [year], [month], [day], [hour], [minute], [second]
+   387                                  
+   388 000001E2 C3                      	retn	; 31/12/2017 (TRDOS 386)
+   389                                  
+   390                                  ;-----------------------------------------------------------------
+   391                                  
+   392                                  DMonth:
+   393 000001E3 0000                    	dw 0
+   394 000001E5 1F00                    	dw 31
+   395 000001E7 3B00                    	dw 59
+   396 000001E9 5A00                    	dw 90
+   397 000001EB 7800                    	dw 120
+   398 000001ED 9700                    	dw 151
+   399 000001EF B500                    	dw 181
+   400 000001F1 D400                    	dw 212
+   401 000001F3 F300                    	dw 243
+   402 000001F5 1101                    	dw 273
+   403 000001F7 3001                    	dw 304
+   404 000001F9 4E01                    	dw 334
+   405                                  
+   406                                  ;-----------------------------------------------------------------
+   407                                  ;
+   408                                  ;-----------------------------------------------------------------
+   409                                  
+   410                                  ; Work out what the day of the week is for a given date
+   411                                  ; Speed optimized x86 assembly (PIII) by Lingo
+   412                                  ;
+   413                                  ; C Algorithm by Tomohiko Sakamoto
+   414                                  ; int dayofweek(int d, int m, int y) {
+   415                                  ;   static int t[] = { 0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4 };
+   416                                  ;   y -= m < 3;
+   417                                  ;   return ( y + y/4 - y/100 + y/400 + t[m-1] + d) % 7;
+   418                                  ; }
+   419                                  ; year  = [0, 9999+]
+   420                                  ; month = [1, 12]
+   421                                  ; day   = [1, 31]
+   422                                  
+   423                                  ;DayOfWeekL  PROTO year:DWORD, month:DWORD, day:DWORD
+   424                                  
+   425                                  DayOfWeek:
+   426 000001FB 8B4C2408                  mov  ecx, [esp+8]               ; ecx=month
+   427 000001FF 8B542404                  mov  edx, [esp+4]               ; edx=year
+   428 00000203 83F903                    cmp  ecx, 3                     ; test if month is < 3
+   429 00000206 83DA00                    sbb  edx, 0                     ; if month < 3 then dec edx->years
+   430 00000209 8B0C8D[3D020000]          mov  ecx, [monthdata + ecx*4-4] ; ecx-> monthdata[m-1]
+   431 00000210 89D0                      mov  eax, edx                   ; eax=edx=years
+   432 00000212 69D2D8A30000              imul edx, 0A3D8h                ; dividing edx=years by 100 == imul edx, 0A3D8h / shr edx, 22
+   433 00000218 034C240C                  add  ecx, [esp+12]              ; add day; ecx= monthdata[m-1] + day
+   434 0000021C 01C1                      add  ecx, eax                   ; ecx-> monthdata[m-1] + day + years
+   435 0000021E C1E802                    shr  eax, 2                     ; eax= years/4
+   436 00000221 01C8                      add  eax, ecx                   ; eax= monthdata[m-1] + day + years + years/4
+   437                                    ;mov ecx, [esp]                 ; ecx->return address
+   438                                    ;mov [esp+12], ecx              ; ecx->return address to right place
+   439 00000223 C1EA16                    shr  edx, 22                    ; end of dividing ; edx=years/100
+   440 00000226 29D0                      sub  eax, edx                   ; eax= monthdata[m-1] +day + years + years/4 - years/100
+   441 00000228 C1EA02                    shr  edx, 2                     ; edx=years/400
+   442 0000022B 01D0                      add  eax, edx                   ; eax= monthdata[m-1] +day + years + years/4 - years/100 + years/400
+   443 0000022D BA25499224                mov  edx, 24924925h             ; dividing eax by 7 == mul edx, eax ; 24924925h=dword (1/7 * 2^35)
+   444 00000232 89C1                      mov  ecx, eax                   ; ecx= monthdata[m-1]  + day + years + years/4 - years/100 + years/400
+   445 00000234 F7E2                      mul  edx                        ; dividing eax by 7 ->result in edx
+   446 00000236 89C8                      mov  eax, ecx                   ; eax= monthdata[m-1] + day + years + years/4 - years/100 + years/400
+   447 00000238 8D0C52                    lea  ecx, [edx+edx*2]           ; multiplying edx by 7 ->
+   448 0000023B 8D1491                    lea  edx, [ecx+edx*4]           ; ->result in edx
+   449                                    ;add  esp, 3*4                  ; clearing the stack from 3 dword parameters
+   450 0000023E 29D0                      sub  eax, edx                   ; eax= (monthdata[m-1] + day + years + years/4 - years/100 + years/400) % 7
+   451 00000240 C3                        retn                            ; faster return then return 3*4
+   452                                  
+   453                                  ;-----------------------------------------------------------------
+   454                                  ;
+   455                                  ;-----------------------------------------------------------------
+   456                                  
+   457 00000241 000000000300000002-     monthdata: dd 0,3,2,5,0,3,5,1,4,6,2,4
+   457 0000024A 000000050000000000-
+   457 00000253 000003000000050000-
+   457 0000025C 000100000004000000-
+   457 00000265 060000000200000004-
+   457 0000026E 000000             
+   458                                  
+   459                                  ;-----------------------------------------------------------------
+   460                                  
+   461 00000271 00                      	 db 0
+   462 00000272 0D0A                    header:	 db 0Dh, 0Ah
+   463 00000274 43757272656E742044-     	 db "Current Date&Time: "
+   463 0000027D 6174652654696D653A-
+   463 00000286 20                 
+   464 00000287 0D0A00                  newline: db 0Dh,0Ah,0
+   465 0000028A 2000                    _space:	 db " ",0
+   466                                  
+   467 0000028C 53554E44415900          _sunday:   db "SUNDAY",0
+   468 00000293 4D4F4E44415900          _monday:   db "MONDAY",0
+   469 0000029A 5455455344415900        _tuesday:  db "TUESDAY",0
+   470 000002A2 5745534E4544415900      _wesneday: db "WESNEDAY",0
+   471 000002AB 544855525344415900      _thursday: db "THURSDAY",0
+   472 000002B4 465249444159444159-     _friday:   db "FRIDAYDAY",0
+   472 000002BD 00                 
+   473 000002BE 534154555244415900      _saturday: db "SATURDAY",0
+   474                                  
+   475 000002C7 90                      align 4
+   476                                  
+   477                                  day_names:
+   478 000002C8 [8C020000]              	dd _sunday
+   479 000002CC [93020000]              	dd _monday
+   480 000002D0 [9A020000]              	dd _tuesday
+   481 000002D4 [A2020000]              	dd _wesneday
+   482 000002D8 [AB020000]              	dd _thursday
+   483 000002DC [B4020000]              	dd _friday
+   484 000002E0 [BE020000]              	dd _saturday
+   485                                  
+   486 000002E4 00000000                year:	dd 0
+   487 000002E8 00000000                month:	dd 0
+   488 000002EC 00000000                day:	dd 0
+   489 000002F0 00000000                hour:	dd 0
+   490 000002F4 00000000                minute: dd 0
+   491 000002F8 00000000                second: dd 0
+   492 000002FC 00000000                dow:	dd 0
+   493                                  
+   494                                  ;-----------------------------------------------------------------
+   495                                  ;  uninitialized data
+   496                                  ;-----------------------------------------------------------------
+   497                                  
+   498                                  bss:
+   499                                  
+   500                                  ABSOLUTE bss
+   501                                  
+   502                                  txt_date:
+   503 00000300 <res Ch>                	resb 12
+   504                                  txt_time:
+   505 0000030C <res Ah>                	resb 10
