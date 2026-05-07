@@ -8,7 +8,7 @@
 ; [ Last Modification: 07/05/2026 ]
 ;
 ; ****************************************************************************
-; nasm dow2.asm -l dow2.txt -o DOW2.PRG
+; nasm dow4.asm -l dow4.txt -o DOW4.PRG
 
 ; 30/04/2026
 ; 14/07/2020
@@ -272,6 +272,7 @@ _p_nextchar:
 
 	; ref: TRDOS 386 v2.0.11 Kernel - 'trdosk1.s'
 convert_from_epoch:
+	; 07/05/2026 (v2.0.11)
 	; 25/07/2022 (v2.0.5)
 	; 18/04/2021 (v2.0.4)
 	; 31/12/2017 (v2.0.0)
@@ -345,6 +346,17 @@ convert_from_epoch:
 	;add	eax, 1968
 	add 	ax, 1968     ; compute year
 	mov 	[year], ax
+	;;;;
+	; 07/05/2026
+	; ref: Google AI
+	; 2100 Leap Year Correction (Patch)
+	; ((The year 2100 is not a leap year
+	; because it is not divisible by 400.))
+	cmp	ax, 2100
+	jb	short cfe_fix_skip
+	inc	edx
+cfe_fix_skip:
+	;;;;
 	;mov 	cx, dx
 	; 25/07/2022
 	mov	ecx, edx
