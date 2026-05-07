@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - SYS INIT : trdosk1.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/05/2026 (Previous: 26/09/2024, v2.0.9)
+; Last Update: 07/05/2026 (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -513,6 +513,7 @@ epoch:
 	call	get_rtc_date_time ; TRDOS 386 - 30/12/2017
 
 convert_to_epoch:
+	; 07/05/2026 (v2.0.11)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 31/12/2017 (TRDOS 386 = TRDOS v2.0)
 	; 15/03/2015 (Retro UNIX 386 v1 - 32 bit modification)
@@ -548,6 +549,18 @@ convert_to_epoch:
 		; (year-1969)/4
 	add 	eax, edx
 			; + leap days since 1/1/1970
+	;;;;
+	; 07/05/2026
+	; ref: Google AI
+	; 2100 Leap Year Correction (Patch)
+	; ((The year 2100 is not a leap year
+	; because it is not divisible by 400.))
+	cmp	word [year], 2100
+	jb	short cte_fix_skip
+	dec	eax
+cte_fix_skip:
+	;;;;
+
 	cmp 	byte [month], 2	; if past february
 	jna 	short cte1
 	mov 	dx, [year]
@@ -577,7 +590,10 @@ cte1: 			; compute seconds since 1/1/1970
 	retn
 
 ;set_date_time:
+
+	; ref: TRDOS 386 v2.0.11 Kernel - 'trdosk1.s'
 convert_from_epoch:
+	; 07/05/2026 (v2.0.11)
 	; 25/07/2022 (v2.0.5)
 	; 18/04/2021 (v2.0.4)
 	; 31/12/2017 (v2.0.0)
@@ -651,6 +667,17 @@ convert_from_epoch:
 	;add	eax, 1968
 	add 	ax, 1968     ; compute year
 	mov 	[year], ax
+	;;;;
+	; 07/05/2026
+	; ref: Google AI
+	; 2100 Leap Year Correction (Patch)
+	; ((The year 2100 is not a leap year
+	; because it is not divisible by 400.))
+	cmp	ax, 2100
+	jb	short cfe_fix_skip
+	inc	edx
+cfe_fix_skip:
+	;;;;
 	;mov 	cx, dx
 	; 25/07/2022
 	mov	ecx, edx
