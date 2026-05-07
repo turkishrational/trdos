@@ -3,12 +3,12 @@
 ; ----------------------------------------------------------------------------
 ; DOW.PRG ! "Day of Week" - 'systime' TEST program for TRDOS 386 !
 ;
-; 04/05/2026
+; 07/05/2026
 ;
 ; [ Last Modification: 07/05/2026 ]
 ;
 ; ****************************************************************************
-; nasm dow1.asm -l dow1.txt -o DOW1.PRG
+; nasm dow2.asm -l dow2.txt -o DOW2.PRG
 
 ; 30/04/2026
 ; 14/07/2020
@@ -86,47 +86,38 @@ _stdio	equ 46
 [ORG 0] 
 
 START_CODE:
-	;mov	esi, esp
-	;lodsd
-	;cmp	eax, 2 ; two arguments (program file name & date)
-	;jb	short terminate ; nothing to do
-	;lodsd ; program file name address
-	;lodsd ; text file name address
+	mov	esi, esp
+	lodsd
+	cmp	eax, 2 ; two arguments (program file name & date)
+	jb	short sysdate ; use sistem date
+	lodsd ; program file name address
+	lodsd ; epoch string address
 
-	; EAX = arg2 ; date (text)
+	mov	byte [flag], 1
 
-	;push	eax
+	; EAX = arg2 ; epoch (text)
+	mov	esi, eax
+	call	str_to_epoch
+	jnc	short p_date
 
-	;mov	esi, msg_program
-	;call	print_msg
+	mov	esi, usage
+	call	print_msg
 
-	;xor	ah, ah
-	;int	32h
+	jmp	terminate
 
-	;pop	eax
+sysdate:
+	; Get Date&Time in Unix/Epoch format
+	sys	_time, 0
 
-	; Get Date&Time in MSDOS (TRDOS 386) format (1980->1980)
-	sys	_time, 3
+p_date:
+	; EAX = Unix (Epoch) Time Ticks/Seconds
+	push	eax
+	call	dword_to_hex
+	mov	esi, epoch_txt
+	call	print_msg
+	pop	eax
 
-	; EAX = Current System Time (RTC)
-	;  AL = Second (DL in MSDOS)
-	;  AH = Minute (CL in MSDOS)
-	;  HW of EAX = Hour (CH in MSDOS)
-	; EDX = Current System Date (RTC)
-	;  DL = Day (DL in MSDOS)
-	;  DH = Month (DH in MSDOS)
-	;  HW of EDX = Year (CX in MSDOS)
-
-	mov 	byte [second], al
-	mov 	byte [minute], ah
-	shr	eax, 16
-	;mov 	byte [hour], al
-	mov 	word [hour], ax
-
-	mov 	byte [day], dl
-	mov 	byte [month], dh
-	shr	edx, 16
-	mov 	word [year], dx
+	call	convert_from_epoch
 
 	push	dword [day]
 	push	dword [month]
@@ -138,9 +129,13 @@ START_CODE:
 
 	mov	[dow], eax
 
+	cmp	byte [flag], 0
+	ja	short skip_header
+
 	mov	esi, header
 	call	print_msg
 
+skip_header:
 	mov	esi, newline
 	call	print_msg
 
@@ -203,6 +198,7 @@ START_CODE:
 	mov	esi, newline
 	call	print_msg
 
+terminate:
 	sys	_exit, 0
 
 ;-----------------------------------------------------------------
@@ -212,37 +208,48 @@ hang:
 
 ;-----------------------------------------------------------------
 
+	; 06/05/2026
 bin_to_str_4:
-	mov	ebx, 4
+	mov	esi, 4
 	jmp	short bin_to_str
 bin_to_str_2:
-	mov	ebx, 2
+	mov	esi, 2
 bin_to_str:
+	xor	ecx, ecx ; 0
 	mov	ebp, esp
-	mov	ecx, 10
+	mov	ebx, 10
 bin2str_div:
 	xor	edx, edx
-	div	ecx
+	div	ebx
 	add	dl, '0'
 	push	edx
-	cmp	eax, 0
-	ja	short bin2str_div
-pop_next:
-	pop	eax
-	or	ebx, ebx
-	jz	short skip_stosb
+	inc	ecx
+	;cmp	eax, 0
+	;ja	short bin2str_div
+	and	eax, eax
+	jnz	short bin2str_div
+
+	mov	ebx, esi
+	add	esi, edi
+	sub	ebx, ecx
+	jng	short skip_zero_prefix
+	; eax = 0
+	add	al,'0'
+zero_prefix:
 	stosb
 	dec	ebx
+	jnz	short zero_prefix
+
+skip_zero_prefix:
+pop_next:
+	pop	eax
+	cmp	edi, esi
+	jnb	short skip_stosb
+	stosb
 skip_stosb:
 	cmp	esp, ebp
 	jb	short pop_next
-zero_prefix:
-	or	ebx, ebx
-	jz	short bin2str_ok
-	mov	byte [edi-1],'0'
-	stosb
-	dec	ebx
-	jmp	short zero_prefix
+
 bin2str_ok:
 	retn
 
@@ -260,6 +267,220 @@ _p_nextchar:
 	and	al, al
 	jnz	short _p_nextchar
 	retn
+
+;-----------------------------------------------------------------
+
+	; ref: TRDOS 386 v2.0.11 Kernel - 'trdosk1.s'
+convert_from_epoch:
+	; 25/07/2022 (v2.0.5)
+	; 18/04/2021 (v2.0.4)
+	; 31/12/2017 (v2.0.0)
+	; 30/12/2017 (TRDOS 386 = TRDOS v2.0)
+	; 15/03/2015 (Retro UNIX 386 v1 - 32 bit version)
+	; 20/06/2013 (Retro UNIX 8086 v1)
+	; 'convert_from_epoch' procedure prototype:
+	; 	            UNIXCOPY.ASM, 10/03/2013
+	;
+	; ((Modified registers: EAX, EDX, ECX, EBX))
+	;
+	; Derived from DALLAS Semiconductor
+	; Application Note 31 (DS1602/DS1603)
+	; 6 May 1998
+	;
+	; INPUT:
+	; EAX = Unix (Epoch) Time
+	;
+	xor 	edx, edx
+	;mov 	ecx, 60
+	; 25/07/2022
+	sub	ecx, ecx
+	mov	cl, 60
+	div	ecx
+	;mov 	[imin], eax   ; whole minutes
+			  ; since 1/1/1970
+	mov 	[second], dx  ; leftover seconds
+	sub 	edx, edx
+	div	ecx
+	;mov 	[ihrs], eax   ; whole hours
+	;		      ; since 1/1/1970
+	mov 	[minute], dx  ; leftover minutes
+	xor	edx, edx
+	;mov 	cx, 24
+	mov 	cl, 24
+	div	ecx
+	;mov 	[iday], ax   ; whole days
+			     ; since 1/1/1970
+	mov 	[hour], dx   ; leftover hours
+	add 	eax, 365+366 ; whole day since
+			     ; 1/1/1968
+	;mov 	[iday], ax
+	push 	eax
+	sub	edx, edx
+	;mov 	ecx, (4*365)+1 ; 4 years = 1461 days
+	; 25/07/2022
+	mov	cx, (4*365)+1
+	div	ecx
+	pop 	ecx
+	;mov 	[lday], ax   ; count of quadyrs (4 years)
+	;push 	dx
+	; 18/04/2021
+	push	edx
+	;mov 	[qday], dx   ; days since quadyr began
+	cmp 	dx, 31+29    ; if past feb 29 then
+	cmc		     ; add this quadyr's leap day
+	adc 	eax, 0	     ; to # of qadyrs (leap days)
+	;mov 	[lday], ax   ; since 1968
+	;mov 	cx, [iday]
+	xchg 	ecx, eax     ; ECX = lday, EAX = iday
+	sub 	eax, ecx     ; iday - lday
+	;mov 	ecx, 365
+	; 25/07/2022
+	mov	cx, 365
+	xor	edx, edx
+	; EAX = iday-lday, EDX = 0
+	div	ecx
+	;mov 	[iyrs], ax   ; whole years since 1968
+	;jday = iday - (iyrs*365) - lday
+	;mov	[jday], dx   ; days since 1/1 of current year
+	;add	eax, 1968
+	add 	ax, 1968     ; compute year
+	mov 	[year], ax
+	;mov 	cx, dx
+	; 25/07/2022
+	mov	ecx, edx
+	;;mov 	dx, [qday]
+	;pop 	dx
+	; 18/04/2021
+	pop	edx
+	cmp 	dx, 365	     ; if qday <= 365 and qday >= 60
+	ja 	short cfe1   ; jday = jday +1
+	cmp 	dx, 60       ; if past 2/29 and leap year then
+        cmc		     ; add a leap day to the # of whole
+	;adc 	cx, 0        ; days since 1/1 of current year
+	; 25/07/2022
+	adc	ecx, 0
+cfe1:
+	;mov 	[jday], cx
+	;mov 	bx, 12       ; estimate month
+	; 18/04/2021
+	sub	ebx, ebx
+	mov	bl, 12
+	mov 	dx, 366      ; mday, max. days since 1/1 is 365
+	and 	ax, 11b      ; year mod 4 (and dx, 3)
+cfe2:	; Month calculation  ; 0 to 11  (11 to 0)
+	;cmp 	cx, dx       ; mday = # of days passed from 1/1
+	; 25/07/2022
+	cmp	ecx, edx
+	jnb 	short cfe3
+	;dec 	bx           ; month = month - 1
+	;shl 	bx, 1
+	; 18/04/2021
+	dec	bl
+	shl	bl, 1 
+	mov 	dx, [EBX+DMonth] ; # elapsed days at 1st of month
+	; 18/04/2021
+	;shr 	bx, 1        ; bx = month - 1 (0 to 11)
+	shr	bl, 1
+	;cmp	bx, 1        ; if month > 2 and year mod 4  = 0	
+	cmp	bl, 1
+	jna 	short cfe2   ; then mday = mday + 1
+	jna 	short cfe2   ; then mday = mday + 1
+	or 	al, al       ; if past 2/29 and leap year then
+	jnz 	short cfe2   ; add leap day (to mday)
+	;inc 	dx           ; mday = mday + 1
+	; 25/07/2022
+	inc	edx
+	jmp 	short cfe2
+cfe3:
+	;inc 	bx	     ; -> bx = month, 1 to 12
+	; 18/04/2021
+	inc	bl
+	mov 	[month], bx
+	;sub 	cx, dx	     ; day = jday - mday + 1
+	; 25/07/2022
+	sub	ecx, edx
+	;inc 	cx
+	; 18/04/2021
+	inc	cl
+	;mov 	[day], cx
+	mov	[day], cl
+
+	; eax, ebx, ecx, edx is changed at return
+	; output ->
+	; [year], [month], [day], [hour], [minute], [second]
+
+	retn	; 31/12/2017 (TRDOS 386)
+
+;-----------------------------------------------------------------
+
+	; 07/05/2026 - Erdogan Tan
+str_to_epoch:
+	; esi = unix epoch -numeric- string (digits)
+	xor	eax, eax
+	mov	ecx, 10	; max. 10 digits
+get_digit:
+	lodsb
+	cmp	al, '0'
+	jb	short chk_eol
+	cmp	al, '9'
+	ja	short fail
+	sub	al, '0'
+	push	eax
+	mov	eax, 10
+	mul	dword [epoch]
+	mov	[epoch], eax
+	pop	eax
+	add	dword [epoch], eax
+	jc	short overflow	
+	loop	get_digit
+
+	lodsb
+chk_eol:
+	and	al, al
+	jnz	short fail
+
+	mov	eax, [epoch]
+	retn
+fail:
+	stc
+overflow:
+	retn
+
+;-----------------------------------------------------------------
+
+dword_to_hex:
+	; eax = binary number
+	mov	ebx, eax
+	mov	ecx, 8
+	mov	edi, epoch_hex
+dd2hex:
+	rol	ebx, 4
+	mov	dl, bl
+	and	edx, 15
+	add	edx, hex_digits
+	mov	al, [edx]
+	stosb
+	loop	dd2hex	
+	retn
+
+hex_digits:
+	db '0123456789ABCDEF'
+
+;-----------------------------------------------------------------
+
+DMonth:
+	dw 0
+	dw 31
+	dw 59
+	dw 90
+	dw 120
+	dw 151
+	dw 181
+	dw 212
+	dw 243
+	dw 273
+	dw 304
+	dw 334
 
 ;-----------------------------------------------------------------
 ;
@@ -316,6 +537,21 @@ monthdata: dd 0,3,2,5,0,3,5,1,4,6,2,4
 
 ;-----------------------------------------------------------------
 
+usage:
+	db "TRDOS 386 v2 'systime' system call test program", 0Dh, 0Ah
+	db  "by Erdogan Tan [May 2026]", 0Dh, 0Ah
+	db  0Dh, 0Ah
+	db  "Usage: dow unix_epoch_time_digits", 0Dh, 0Ah, 0 
+
+epoch_txt:
+	db  0Dh, 0Ah
+	db  "Epoch: "
+epoch_hex:
+	dd  0
+	dd  0
+	db "h"
+	db 0Dh, 0Ah, 0				
+
 	 db 0
 header:	 db 0Dh, 0Ah
 	 db "Current Date&Time: "
@@ -330,6 +566,8 @@ _thursday: db "THURSDAY",0
 _friday:   db "FRIDAY",0
 _saturday: db "SATURDAY",0
 
+flag:	db 0	; epoch input flag
+
 align 4
 
 day_names:
@@ -341,6 +579,16 @@ day_names:
 	dd _friday
 	dd _saturday
 
+year:	dd 0
+month:	dd 0
+day:	dd 0
+hour:	dd 0
+minute: dd 0
+second: dd 0
+dow:	dd 0
+
+epoch:	dd 0
+
 ;-----------------------------------------------------------------
 ;  uninitialized data
 ;-----------------------------------------------------------------
@@ -349,15 +597,8 @@ bss:
 
 ABSOLUTE bss
 
-alignb 4
-
-year:	resd 1
-month:	resd 1
-day:	resd 1
-hour:	resd 1
-minute: resd 1
-second: resd 1
-dow:	resd 1
+epoch_str:
+	resb 10
 
 txt_date:
 	resb 12

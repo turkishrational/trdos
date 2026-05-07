@@ -3,12 +3,12 @@
 ; ----------------------------------------------------------------------------
 ; DOW.PRG ! "Day of Week" - 'systime' TEST program for TRDOS 386 !
 ;
-; 04/05/2026
+; 06/05/2026
 ;
 ; [ Last Modification: 07/05/2026 ]
 ;
 ; ****************************************************************************
-; nasm dow1.asm -l dow1.txt -o DOW1.PRG
+; nasm dow3.asm -l dow3.txt -o DOW3.PRG
 
 ; 30/04/2026
 ; 14/07/2020
@@ -86,25 +86,24 @@ _stdio	equ 46
 [ORG 0] 
 
 START_CODE:
-	;mov	esi, esp
-	;lodsd
-	;cmp	eax, 2 ; two arguments (program file name & date)
-	;jb	short terminate ; nothing to do
-	;lodsd ; program file name address
-	;lodsd ; text file name address
+	mov	esi, esp
+	lodsd
+	cmp	eax, 2 ; two arguments (program file name & date)
+	jb	short sysdate ; use sistem date
+	lodsd ; program file name address
+	lodsd ; date string address
 
 	; EAX = arg2 ; date (text)
+	mov	esi, eax
+	call	str_to_date
+	jnc	short p_date
 
-	;push	eax
+	mov	esi, usage
+	call	print_msg
 
-	;mov	esi, msg_program
-	;call	print_msg
+	jmp	terminate
 
-	;xor	ah, ah
-	;int	32h
-
-	;pop	eax
-
+sysdate:
 	; Get Date&Time in MSDOS (TRDOS 386) format (1980->1980)
 	sys	_time, 3
 
@@ -128,6 +127,7 @@ START_CODE:
 	shr	edx, 16
 	mov 	word [year], dx
 
+p_date:
 	push	dword [day]
 	push	dword [month]
 	push	dword [year]
@@ -138,9 +138,13 @@ START_CODE:
 
 	mov	[dow], eax
 
+	cmp	byte [separator], 0
+	ja	short skip_header
+
 	mov	esi, header
 	call	print_msg
 
+skip_header:
 	mov	esi, newline
 	call	print_msg
 
@@ -175,6 +179,9 @@ START_CODE:
 	mov	esi, [ebx]
 	call	print_msg
 
+	cmp	byte [separator], 0
+	ja	short skip_time
+
 	mov	esi, newline
 	call	print_msg
 
@@ -200,9 +207,11 @@ START_CODE:
 	mov	esi, txt_time
 	call	print_msg
 
+skip_time:
 	mov	esi, newline
 	call	print_msg
 
+terminate:
 	sys	_exit, 0
 
 ;-----------------------------------------------------------------
@@ -212,37 +221,48 @@ hang:
 
 ;-----------------------------------------------------------------
 
+	; 06/05/2026
 bin_to_str_4:
-	mov	ebx, 4
+	mov	esi, 4
 	jmp	short bin_to_str
 bin_to_str_2:
-	mov	ebx, 2
+	mov	esi, 2
 bin_to_str:
+	xor	ecx, ecx ; 0
 	mov	ebp, esp
-	mov	ecx, 10
+	mov	ebx, 10
 bin2str_div:
 	xor	edx, edx
-	div	ecx
+	div	ebx
 	add	dl, '0'
 	push	edx
-	cmp	eax, 0
-	ja	short bin2str_div
-pop_next:
-	pop	eax
-	or	ebx, ebx
-	jz	short skip_stosb
+	inc	ecx
+	;cmp	eax, 0
+	;ja	short bin2str_div
+	and	eax, eax
+	jnz	short bin2str_div
+
+	mov	ebx, esi
+	add	esi, edi
+	sub	ebx, ecx
+	jng	short skip_zero_prefix
+	; eax = 0
+	add	al,'0'
+zero_prefix:
 	stosb
 	dec	ebx
+	jnz	short zero_prefix
+
+skip_zero_prefix:
+pop_next:
+	pop	eax
+	cmp	edi, esi
+	jnb	short skip_stosb
+	stosb
 skip_stosb:
 	cmp	esp, ebp
 	jb	short pop_next
-zero_prefix:
-	or	ebx, ebx
-	jz	short bin2str_ok
-	mov	byte [edi-1],'0'
-	stosb
-	dec	ebx
-	jmp	short zero_prefix
+
 bin2str_ok:
 	retn
 
@@ -259,6 +279,174 @@ _p_nextchar:
 	lodsb
 	and	al, al
 	jnz	short _p_nextchar
+	retn
+
+;-----------------------------------------------------------------
+
+	; 06/05/2026 - Erdogan Tan
+str_to_date:
+	; esi = date string (dd/mm/yyyy or dd-mm-yyyy format)
+	xor	eax, eax
+	lodsb
+	cmp	al, '0'
+	jb	short _fail
+	cmp	al, '9'
+	ja	short _fail_stc
+	mov	cl, al
+	sub	al, '0'
+	mov	[day], eax
+	lodsb
+	cmp	al, '0'
+	jb	short s2d1
+	cmp	al, '9'
+	ja	short _fail_stc
+	cmp	cl, '3'
+	ja	short _fail_stc
+	jb	short s2d0
+	cmp	al, '1'
+	;ja	short _fail_stc
+	jna	short s2d0
+_fail_stc:
+	stc
+_fail:
+	retn
+s2d0:
+	mov	cl, al
+	sub	cl, '0'
+	mov	al, 10
+	mul	byte [day]
+	mov	[day], al
+	add	[day], cl
+	lodsb
+s2d1:
+	cmp	al, '-'
+	je	short s2d2
+	cmp	al, '/'
+	jne	short fail
+s2d2:
+	cmp	byte [day], 1
+	jb	short _fail
+
+	mov	[separator], al
+	;
+	lodsb
+	cmp	al, '0'
+	jb	short fail
+	cmp	al, '9'
+	ja	short fail_stc
+	mov	cl, al
+	sub	al, '0'
+	mov	[month], eax
+	lodsb
+	cmp	al, '0'
+	jb	short s2d4
+	cmp	al, '9'
+	ja	short fail_stc
+	cmp	cl, '1'
+	ja	short fail_stc
+	jb	short s2d3
+	cmp	al, '2'
+	ja	short fail_stc
+s2d3:
+	mov	cl, al
+	sub	cl, '0'
+	mov	al, 10
+	mul	byte [month]
+	mov	[month], al
+	add	[month], cl
+	lodsb
+s2d4:
+	cmp	al, [separator]
+	jne	short fail_stc
+	;
+	cmp	byte [month], 1
+	jb	short fail
+
+	mov	edx, mdays-1
+	add	edx, [month]
+	mov	cl, [day]
+	cmp	cl, [edx]
+	jna	short s2d5
+
+fail_stc:
+	stc
+fail:
+	retn
+
+s2d5:
+	lodsb
+	cmp	al, '0'
+	jb	short fail
+	cmp	al, '9'
+	ja	short fail_stc
+	sub	al, '0'
+	mov	[year], eax
+	xor	ebx, ebx
+	lodsb
+	cmp	al, '0'
+	jb	short s2d6
+	cmp	al, '9'
+	ja	short fail_stc
+	sub	al, '0'
+	mov	ecx, eax
+	mov	al, 10
+	mul	byte [year]
+	mov	[year], al
+	add	[year], cl
+	inc	ebx
+	lodsb
+	cmp	al, '0'
+	jb	short s2d6
+	cmp	al, '9'
+	ja	short fail_stc
+	sub	al, '0'
+	mov	ecx, eax
+	mov	al, 10
+	mul	dword [year]
+	mov	[year], eax
+	add	[year], ecx
+	inc	ebx
+	xor 	eax, eax
+	lodsb
+	cmp	al, '0'
+	jb	short s2d6
+	cmp	al, '9'
+	ja	short fail_stc
+	sub	al, '0'
+	mov	ecx, eax
+	mov	al, 10
+	mul	dword [year]
+	mov	[year], eax
+	add	[year], ecx
+	inc	ebx
+	lodsb
+s2d6:
+	and	al, al
+	jnz	short fail_stc
+	;
+
+	; dd/mm/yy to dd/mm/20yy
+	; correction
+	cmp	bl, 1
+	jne	short s2d7
+
+	add	dword [year], 2000
+s2d7:
+	cmp	byte [month], 2
+	ja	short s2d9
+	jb	short s2d8
+
+	test	byte [year], 3
+	jz	short s2d8
+
+	cmp	byte [day], 29
+s2d8:
+	cmc
+s2d9:
+	; if cf = 0
+	    ; [day] = day
+	    ; [month] = month
+	    ; [year] = year
 	retn
 
 ;-----------------------------------------------------------------
@@ -316,6 +504,14 @@ monthdata: dd 0,3,2,5,0,3,5,1,4,6,2,4
 
 ;-----------------------------------------------------------------
 
+separator: db 0
+
+usage:
+	db "TRDOS 386 v2 'systime' system call test program", 0Dh, 0Ah
+	db  "by Erdogan Tan [May 2026]", 0Dh, 0Ah
+	db  0Dh, 0Ah
+	db  "Usage: dow dd/mm/yyyy", 0Dh, 0Ah, 0 	
+
 	 db 0
 header:	 db 0Dh, 0Ah
 	 db "Current Date&Time: "
@@ -340,6 +536,8 @@ day_names:
 	dd _thursday
 	dd _friday
 	dd _saturday
+
+mdays:	db 31,29,31,30,31,30,31,31,30,31,30,31
 
 ;-----------------------------------------------------------------
 ;  uninitialized data

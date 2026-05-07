@@ -5,7 +5,7 @@
 ;
 ; 05/05/2026
 ;
-; [ Last Modification: 05/05/2026 ]
+; [ Last Modification: 07/05/2026 ]
 ;
 ; ****************************************************************************
 ; nasm dow2.asm -l dow2.txt -o DOW2.PRG
@@ -213,7 +213,7 @@ bin2str_div:
 pop_next:
 	pop	eax
 	or	ebx, ebx
-	jz	skip_stosb
+	jz	short skip_stosb
 	stosb
 	dec	ebx
 skip_stosb:
@@ -221,11 +221,11 @@ skip_stosb:
 	jb	short pop_next
 zero_prefix:
 	or	ebx, ebx
-	jz	bin2str_ok
+	jz	short bin2str_ok
 	mov	byte [edi-1],'0'
 	stosb
 	dec	ebx
-	jmp	zero_prefix
+	jmp	short zero_prefix
 bin2str_ok:
 	retn
 
@@ -467,9 +467,9 @@ _space:	 db " ",0
 _sunday:   db "SUNDAY",0
 _monday:   db "MONDAY",0
 _tuesday:  db "TUESDAY",0
-_wesneday: db "WESNEDAY",0
+_wednesday: db "WEDNESDAY",0
 _thursday: db "THURSDAY",0
-_friday:   db "FRIDAYDAY",0
+_friday:   db "FRIDAY",0
 _saturday: db "SATURDAY",0
 
 align 4
@@ -478,7 +478,7 @@ day_names:
 	dd _sunday
 	dd _monday
 	dd _tuesday
-	dd _wesneday
+	dd _wednesday
 	dd _thursday
 	dd _friday
 	dd _saturday
