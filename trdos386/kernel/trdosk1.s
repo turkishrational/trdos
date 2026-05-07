@@ -566,6 +566,12 @@ cte_fix_skip:
 	mov 	dx, [year]
 	and 	dx, 3 ; year mod 4
 	jnz 	short cte1
+	;;;;
+	; 07/05/2026
+    	; 2100 year exception check
+	cmp	dx, 2100
+	je	short cte1
+	;;;;
 			; and if leap year
 	;add 	eax, 1 	; add this year's leap day (february 29)
 	; 25/07/2022
@@ -591,7 +597,6 @@ cte1: 			; compute seconds since 1/1/1970
 
 ;set_date_time:
 
-	; ref: TRDOS 386 v2.0.11 Kernel - 'trdosk1.s'
 convert_from_epoch:
 	; 07/05/2026 (v2.0.11)
 	; 25/07/2022 (v2.0.5)
