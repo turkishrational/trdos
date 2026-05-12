@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - SYS INIT : trdosk1.s
 ; ----------------------------------------------------------------------------
-; Last Update: 07/05/2026 (Previous: 26/09/2024, v2.0.9)
+; Last Update: 12/05/2026 (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -226,7 +226,7 @@ clear_screen:
 cls1:
 	;mov	bh, bl
 	;mov	bl, 7
-	cmp	ah, [CRT_MODE] ; current video mode ? 
+	cmp	ah, [CRT_MODE] ; current video mode ?
 	je	short cls2 ; yes (current video mode = 3)
 	;;call	set_mode_3 ; set video mode to 3 (& clear screen)
 	;;retn
@@ -252,7 +252,7 @@ cls2:
 	;xor 	dx, dx
 	; 25/07/2022
 	xor	edx, edx
-	;call	_set_cpos ; 24/01/2016 
+	;call	_set_cpos ; 24/01/2016
 	;;retn
 	; 03/12/2020
 	jmp	_set_cpos ; returns to the caller of this proc
@@ -401,7 +401,7 @@ get_rtc_date_time:
 	; 30/12/2017 (TRDOS 386 = TRDOS v2.0)
 	; 15/03/2015 (Retro UNIX 386 v1 - 32 bit version)
 	; 09/04/2013 (Retro UNIX 8086 v1 - UNIX.ASM)
-	; 'epoch' procedure prototype: 
+	; 'epoch' procedure prototype:
 	; 	            UNIXCOPY.ASM, 10/03/2013
 	; 14/11/2012
 	; unixboot.asm (boot file configuration)
@@ -598,6 +598,7 @@ cte1: 			; compute seconds since 1/1/1970
 ;set_date_time:
 
 convert_from_epoch:
+	; 12/05/2026 -BugFix!-
 	; 07/05/2026 (v2.0.11)
 	; 25/07/2022 (v2.0.5)
 	; 18/04/2021 (v2.0.4)
@@ -705,7 +706,7 @@ cfe1:
 	mov	bl, 12
 	mov 	dx, 366      ; mday, max. days since 1/1 is 365
 	and 	ax, 11b      ; year mod 4 (and dx, 3)
-cfe2:	; Month calculation  ; 0 to 11  (11 to 0)
+cfe2:	; Month calculation  ; 0 to 11 (11 to 0)
 	;cmp 	cx, dx       ; mday = # of days passed from 1/1
 	; 25/07/2022
 	cmp	ecx, edx
@@ -714,14 +715,13 @@ cfe2:	; Month calculation  ; 0 to 11  (11 to 0)
 	;shl 	bx, 1
 	; 18/04/2021
 	dec	bl
-	shl	bl, 1 
+	shl	bl, 1
 	mov 	dx, [EBX+DMonth] ; # elapsed days at 1st of month
 	; 18/04/2021
 	;shr 	bx, 1        ; bx = month - 1 (0 to 11)
 	shr	bl, 1
-	;cmp	bx, 1        ; if month > 2 and year mod 4  = 0	
+	;cmp	bx, 1        ; if month > 2 and year mod 4 = 0
 	cmp	bl, 1
-	jna 	short cfe2   ; then mday = mday + 1
 	jna 	short cfe2   ; then mday = mday + 1
 	or 	al, al       ; if past 2/29 and leap year then
 	jnz 	short cfe2   ; add leap day (to mday)
@@ -739,9 +739,11 @@ cfe3:
 	sub	ecx, edx
 	;inc 	cx
 	; 18/04/2021
-	inc	cl
-	;mov 	[day], cx
-	mov	[day], cl
+	;inc	cl
+	; 12/05/2026
+	inc	ecx
+	mov 	[day], cx
+	;mov	[day], cl
 
 	; eax, ebx, ecx, edx is changed at return
 	; output ->
@@ -750,6 +752,7 @@ cfe3:
 	retn	; 31/12/2017 (TRDOS 386)
 
 set_rtc_date_time:
+	; 12/05/2026 (v2.0.11) -BugFix!-
 	; 31/12/2017 (v2.0.0)
 	; 30/12/2017 (TRDOS 386)
 	; 15/03/2015 (Retro UNIX 386 v1 - 32 bit version)
@@ -763,6 +766,8 @@ set_rtc_date_time:
 
 ; 31/12/2017
 set_date_bcd:
+	; 12/05/2026 - BugFix !
+%if 0
         mov     al, [year+1]
 	aam 	; ah = al / 10, al = al mod 10
 	db 	0D5h, 10h    ; Undocumented inst. AAD
@@ -785,10 +790,79 @@ set_date_bcd:
 	; 18/04/2021
 	mov 	dl, al ; day (BCD)
 	retn	; 30/12/2017
+%else
+	; 12/05/2026
+	; ref: Google AI
+	;movzx	eax, word [year] ; EAX = 2026
+
+	;xor	edx, edx
+
+	;mov	ecx, 100
+
+	;div	ecx		; EAX = 20 (Century), EDX = 26 (Year)
+
+
+
+	; Convert Century yo BCD yap (20 -> 0x20)
+	;mov	al, al
+
+	;aam
+
+	;shl	ah, 4
+
+	;or	al, ah
+	;mov	ch, al		; CH = 0x20 (BCD Century)
+
+
+	; Convert Year to BCD (26 -> 0x26)
+
+	;mov	al, dl
+	;aam
+	;shl	ah, 4
+
+	;or	al, ah
+	;mov	cl, al           ; CL = 0x26 (BCD Year)
+
+	mov	ax, [year]	; 2026
+	mov	cl, 100
+	div	cl		; al = 20 (century)
+				; ah = 26 (year)
+	mov	cl, ah
+	; Convert century to BCD (20 -> 20h)
+	aam			; ah = al / 10, al = al mod 10
+	;shl	ah, 4
+	;or	al, ah
+	db 	0D5h, 10h	; Undocumented inst. AAD
+				; AL = AH * 10h + AL
+	mov	ch, al	; century (BCD)
+
+	; Convert Year to BCD (26 -> 26h)
+
+	mov	al, cl
+	aam
+	db 	0D5h, 10h	; Undocumented inst. AAD
+				; AL = AH * 10h + AL
+	mov	cl, al	; year (BCD)
+
+	; Convert Month to BCD
+        mov 	al, [month]
+	aam 	; ah = al / 10, al = al mod 10
+	db 	0D5h, 10h    ; Undocumented inst. AAD
+			     ; AL = AH * 10h + AL
+	mov 	dh, al	; month (BCD)
+
+	; Convert Day to BCD
+	mov 	al, [day]
+	aam 	; ah = al / 10, al = al mod 10
+	db 	0D5h, 10h    ; Undocumented inst. AAD
+			     ; AL = AH * 10h + AL
+	mov 	dl, al ; day (BCD)
+	retn
+%endif
 
 ; 31/12/2017
 set_time_bcd:
-        ; Read real-time clock time 
+        ; Read real-time clock time
 	; (get day light saving time bit status)
  	cli
 	call	UPD_IPR 		; CHECK FOR UPDATE IN PROCESS
@@ -801,7 +875,7 @@ stime1:
 	and	al, 00000001b		; MASK FOR VALID DSE BIT
 	mov	dl, al			; SET [DL] TO ZERO FOR NO DSE BIT
 	; DL = 1 or 0 (day light saving time)
-	
+
 	mov 	al, [hour]
 	aam 	; ah = al / 10, al = al mod 10
 	db 	0D5h,10h     ; Undocumented inst. AAD
@@ -826,7 +900,7 @@ rtc_to_tick_count:
 	;   input: none (real time clock)
 	;  output: eax = tick count (18.2 Hz)
 	; modified registers: eax, ebx, ecx, edx
-	
+
 	call	get_rtc_date_time
 	movzx	ecx, byte [hour]
 	mov	eax, 60*60 ; 1 hour = 3600 seconds

@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 03/05/2026  (Previous: 10/01/2026, v2.0.10)
+; Last Update: 12/05/2026  (Previous: 10/01/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -17588,12 +17588,13 @@ systime_6:
 	jmp	systime_0	; bl = 3 (return date & time)
 
 sysstime: ; Set System Date&Time
+	; 12/05/2026
 	; 03/05/2026
 	; 01/05/2026 (TRDOS 386 v2.0.11)
 	; 31/12/2017
 	; 30/12/2017 (TRDOS 386 = TRDOS v2.0)
 	;
-        ; INPUT -> BL =
+	; INPUT -> BL =
 	;	    0 = Set Date&Time in Unix/Epoch format
 	;	    1 = Set Time in MSDOS format
 	;	    2 = Set Date in MSDOS format
@@ -17649,7 +17650,7 @@ sysstime: ; Set System Date&Time
 	and	bl, bl ; 0
 	jnz	short sysstime_6
 	mov	eax, ecx
-	mov	[u.r0], eax	; 03/05/2026
+	;mov	[u.r0], eax	; 03/05/2026
 	call	convert_from_epoch
 sysstime_0:
 	call	set_rtc_date_time

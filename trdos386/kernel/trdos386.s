@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.11
 ; ----------------------------------------------------------------------------
-; Last Update: 07/05/2026 (Previous: 10/02/2026, v2.0.10)
+; Last Update: 12/05/2026 (Previous: 10/02/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -1410,7 +1410,7 @@ _VBE3PMI_fcall:
 	;dd	1020
 	;dw	VBE3SS
 
-	align 2	
+	align 2
 
 pminit_return_addr16:
 	; 02/12/2020
@@ -1451,7 +1451,7 @@ pminit_return_addr32:
 
 	sti
 
-	; top of stack = return address 
+	; top of stack = return address
 	; ('pminit_ok' for PMinit)
 
 	retn
@@ -2032,7 +2032,7 @@ T5:
 					; bit 4-7 = motor running bits
 	MOV	DX,03F2H		; FDC CTL PORT
 	OUT	DX,AL			; TURN OFF THE MOTOR
-T6:	
+T6:
 	;inc	word [CS:wait_count]	; 22/12/2014 (byte -> word)
 					; TIMER TICK INTERRUPT
 	;;inc	word [wait_count] ;;27/02/2015
@@ -2320,7 +2320,7 @@ rtc_int_return: ; 19/05/2016
 	; 22/02/2015 - dsectpm.s
 	; [ source: http://wiki.osdev.org/RTC ]
 	; read status register C to complete procedure
-	;(it is needed to get a next IRQ 8) 
+	;(it is needed to get a next IRQ 8)
 	mov	al, 0Ch ; 
 	out	70h, al ; select register C
 	nop
@@ -2985,7 +2985,7 @@ real_mem_16m_64k:
 			; because if system memory is larger than
 			; 3 GB and if a VESA VBE video bios
 			; is detected, 'mem_16m_64K' may be
-			; decreased to reserve LFB space 
+			; decreased to reserve LFB space
 			; at the end of system memory.)
 			; Upper memory space from LFB base address
 			; to 4GB will not be included by M.A.T.
@@ -3787,7 +3787,7 @@ starting_msg:
 	;;;db "Turkish Rational DOS v2.0 [28/01/2025] ...", 0
 	;;db "Turkish Rational DOS v2.0 [28/12/2025] ...", 0
 	;db "Turkish Rational DOS v2.0 [10/02/2026] ...", 0
-	db "Turkish Rational DOS v2.0 [07/05/2026] ...", 0
+	db "Turkish Rational DOS v2.0 [12/05/2026] ...", 0
 NextLine:
 	db 0Dh, 0Ah, 0
 
@@ -4003,7 +4003,7 @@ RTC_WAIT_FLAG: resb 1
 USER_FLAG:     resb 1
 ; 19/05/2016
 ;RTC_second:
-RTC_2Hz:       resb 1 ;  from 2Hz interrupt to 1Hz timer event function	
+RTC_2Hz:       resb 1	; from 2Hz interrupt to 1Hz timer event function
 
 %include 'diskbss.s'	; UNINITIALIZED DISK (BIOS) DATA
 
@@ -4138,9 +4138,9 @@ v_end:		resd 1	; window end (end+1) adress ('sysvideo')
 ;maskbuff:     ;resd 1	; user's bitmask buffer addr ('sysvideo')
 maskcolor:	resd 1	; VGA/SVGA pixel mask color ('sysvideo')
 ; 27/02/2021
-pixcount:	resd 1	; pixel count ('sysvideo' window ops) 
+pixcount:	resd 1	; pixel count ('sysvideo' window ops)
 ; 02/02/2021
-buffer8:	resd 2	; 8 bytes small buffer for 'sysvideo'  
+buffer8:	resd 2	; 8 bytes small buffer for 'sysvideo'
 
 bss_end:
 

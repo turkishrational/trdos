@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk8.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 28/01/2025  (Previous: 29/12/2024)
+; Last Update: 29/04/2026  (Previous: 28/01/2025, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1113,6 +1113,8 @@ loc_rwp_return:
 		retn
 
 get_file_name:
+		; 29/04/2026 (TRDOS 386 Kernel v2.0.11)
+		;	BugFix!
 		; 25/08/2024 (TRDOS 386 Kernel v2.0.9)
 		; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 		; 15/10/2016 - TRDOS 386 (TRDOS v2.0)
@@ -1143,49 +1145,35 @@ get_file_name:
 
 		push	edi
 		push	esi
-		lodsb
 		; 25/08/2024
 		xor	ecx, ecx ; 0
-		cmp	al, 20h
-		jna	short pass_gfn_ext
-		; 25/08/2024
-		;push	esi
-		stosb
-		; 25/08/2024
-		; 29/07/2022
-		;xor	ecx, ecx
-		; ecx <= 128 ; 25/08/2024
-		mov	cl, 7
-		; 25/08/2024
-		add	esi, ecx ; add esi, 7
-		push	esi ; (*)
-loc_gfn_next_char:
+		; 29/04/2026
+		mov	cl, 8
+gfn_basename:
 		lodsb
 		cmp	al, 20h
-		jna	short pass_gfn_fn
+		ja	short gfn_nextchar
+		add	esi, ecx
+		dec	esi
+		jmp	short gfn_chk_ext
+gfn_nextchar:
+		stosb		; ?*
+		loop	gfn_basename
+gfn_chk_ext:
+		cmp	byte [esi], 20h
+		jna	short gfn_ok
+		mov	al, '.' ; ?*.
 		stosb
-		loop	loc_gfn_next_char
-pass_gfn_fn:
-		;pop	esi
-		;add	esi, 7
-		; 25/08/2024
-		pop	esi ; (*)
-
+		movsb		; .?
 		lodsb
 		cmp	al, 20h
-		jna	short pass_gfn_ext
-		mov	ah, '.'
-		xchg	ah, al
-		stosw
+		jna	short gfn_ok
+		stosb		; .??
 		lodsb
 		cmp	al, 20h
-		jna	short pass_gfn_ext
-		stosb
-		lodsb
-		cmp	al, 20h
-		jna	short pass_gfn_ext
-		stosb
-pass_gfn_ext:
+		jna	short gfn_ok
+		stosb		; .???
+gfn_ok:
 		xor	al, al
 		stosb
 		pop	esi
