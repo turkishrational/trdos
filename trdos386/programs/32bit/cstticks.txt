@@ -1,0 +1,303 @@
+     1                                  ; ****************************************************************************
+     2                                  ; cstticks.s (TRDOS 386, TRDOS v2.0.11 - sample binary file, 'cstticks.prg')
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; CSTTICKS.PRG ! 'sysstime' TEST program for TRDOS 386 !
+     5                                  ;
+     6                                  ; 14/05/2026
+     7                                  ;
+     8                                  ; [ Last Modification: 14/05/2026 ]
+     9                                  ;
+    10                                  ; ****************************************************************************
+    11                                  ; nasm cstticks.s -l cstticks.txt -o cstticks.PRG
+    12                                  
+    13                                  ; 30/04/2026
+    14                                  ; 14/07/2020
+    15                                  ; 31/12/2017
+    16                                  ; TRDOS 386 (v2.0) system calls
+    17                                  _ver 	equ 0
+    18                                  _exit 	equ 1
+    19                                  _fork 	equ 2
+    20                                  _read 	equ 3
+    21                                  _write	equ 4
+    22                                  _open	equ 5
+    23                                  _close 	equ 6
+    24                                  _wait 	equ 7
+    25                                  _create	equ 8
+    26                                  _rename	equ 9
+    27                                  _delete	equ 10
+    28                                  _exec	equ 11
+    29                                  _chdir	equ 12
+    30                                  _time 	equ 13
+    31                                  _mkdir 	equ 14
+    32                                  _chmod	equ 15
+    33                                  _rmdir	equ 16
+    34                                  _break	equ 17
+    35                                  _drive	equ 18
+    36                                  _seek	equ 19
+    37                                  _tell 	equ 20
+    38                                  _memory	equ 21
+    39                                  _prompt	equ 22
+    40                                  _path	equ 23
+    41                                  _env	equ 24
+    42                                  _stime	equ 25
+    43                                  _quit	equ 26
+    44                                  _intr	equ 27
+    45                                  _dir	equ 28
+    46                                  _emt 	equ 29
+    47                                  _ldrvt 	equ 30
+    48                                  _video 	equ 31
+    49                                  _audio	equ 32
+    50                                  _timer	equ 33
+    51                                  _sleep	equ 34
+    52                                  _msg    equ 35
+    53                                  _geterr	equ 36
+    54                                  _fpstat	equ 37
+    55                                  _pri	equ 38
+    56                                  _rele	equ 39
+    57                                  _fff	equ 40
+    58                                  _fnf	equ 41
+    59                                  _alloc	equ 42
+    60                                  _dalloc equ 43
+    61                                  _calbac equ 44
+    62                                  _dma	equ 45
+    63                                  _stdio	equ 46
+    64                                  
+    65                                  %macro sys 1-4
+    66                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)
+    67                                      ; 03/09/2015
+    68                                      ; 13/04/2015
+    69                                      ; Retro UNIX 386 v1 system call.
+    70                                      %if %0 >= 2
+    71                                          mov ebx, %2
+    72                                          %if %0 >= 3
+    73                                              mov ecx, %3
+    74                                              %if %0 = 4
+    75                                                 mov edx, %4
+    76                                              %endif
+    77                                          %endif
+    78                                      %endif
+    79                                      mov eax, %1
+    80                                      ;int 30h
+    81                                      int 40h ; TRDOS 386 (TRDOS v2.0)
+    82                                  %endmacro
+    83                                  
+    84                                  [BITS 32] ; 32-bit intructions
+    85                                  
+    86                                  [ORG 0] 
+    87                                  
+    88                                  START_CODE:
+    89 00000000 BE[EE000000]            	mov	esi, program
+    90 00000005 E891000000              	call	print_msg
+    91                                  getchar:
+    92                                  	; TRDOS 386 keyboard input interrupt
+    93                                  	; (ROMBIOS INT 16h simulation)
+    94 0000000A 30E4                    	xor	ah, ah
+    95 0000000C CD32                    	int	32h
+    96                                  
+    97 0000000E 3C1B                    	cmp	al, 27	; ESC (1Bh)
+    98 00000010 7456                    	je	short p_nextline
+    99 00000012 3C0D                    	cmp	al, 13	; ENTER/CR (0Dh)
+   100 00000014 75F4                    	jne	short getchar
+   101                                  	
+   102                                  	; Convert/Save current time to/as
+   103                                  	; 18.2 Hz system timer ticks (bl = 5)
+   104                                  	sys	_stime, 5
+    66                              <1> 
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1>  %if %0 >= 2
+    71 00000016 BB05000000          <1>  mov ebx, %2
+    72                              <1>  %if %0 >= 3
+    73                              <1>  mov ecx, %3
+    74                              <1>  %if %0 = 4
+    75                              <1>  mov edx, %4
+    76                              <1>  %endif
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79 0000001B B819000000          <1>  mov eax, %1
+    80                              <1> 
+    81 00000020 CD40                <1>  int 40h
+   105 00000022 7244                    	jc	short p_nextline
+   106                                  
+   107                                  	; eax = (new/current) tick count
+   108 00000024 A3[B4010000]            	mov	[tick_count], eax
+   109                                  
+   110                                  	; print/display current tick count
+   111 00000029 BE[8E010000]            	mov	esi, ticks_label
+   112 0000002E E868000000              	call	print_msg
+   113                                  
+   114 00000033 A1[B4010000]            	mov	eax, [tick_count]
+   115 00000038 BF[B8010000]            	mov	edi, ticks_txt
+   116 0000003D E83E000000              	call	bin_to_str
+   117 00000042 C60720                  	mov	byte [edi], 20h ; space
+   118                                  	
+   119 00000045 BE[B8010000]            	mov	esi, ticks_txt
+   120 0000004A E84C000000              	call	print_msg
+   121                                  
+   122 0000004F A1[B4010000]            	mov	eax, [tick_count]
+   123 00000054 BF[A6010000]            	mov	edi, ticks_hex
+   124 00000059 E84D000000              	call	dword_to_hex
+   125                                  	
+   126 0000005E BE[A5010000]            	mov	esi, ticks_hex_str
+   127 00000063 E833000000              	call	print_msg
+   128                                  
+   129                                  p_nextline:
+   130 00000068 BE[8B010000]            	mov	esi, newline
+   131 0000006D E829000000              	call	print_msg
+   132                                  
+   133                                  terminate:
+   134                                  	sys	_exit, 0
+    66                              <1> 
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1>  %if %0 >= 2
+    71 00000072 BB00000000          <1>  mov ebx, %2
+    72                              <1>  %if %0 >= 3
+    73                              <1>  mov ecx, %3
+    74                              <1>  %if %0 = 4
+    75                              <1>  mov edx, %4
+    76                              <1>  %endif
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79 00000077 B801000000          <1>  mov eax, %1
+    80                              <1> 
+    81 0000007C CD40                <1>  int 40h
+   135                                  
+   136                                  ;-----------------------------------------------------------------
+   137                                  
+   138                                  hang:
+   139 0000007E EBFE                    	jmp	short hang
+   140                                  
+   141                                  ;-----------------------------------------------------------------
+   142                                  
+   143                                  bin_to_str:
+   144 00000080 89E5                    	mov	ebp, esp
+   145 00000082 B90A000000              	mov	ecx, 10
+   146                                  bin2str_div:
+   147 00000087 31D2                    	xor	edx, edx
+   148 00000089 F7F1                    	div	ecx
+   149 0000008B 80C230                  	add	dl, '0'
+   150 0000008E 52                      	push	edx
+   151 0000008F 83F800                  	cmp	eax, 0
+   152 00000092 77F3                    	ja	short bin2str_div
+   153                                  pop_next:
+   154 00000094 58                      	pop	eax
+   155 00000095 AA                      	stosb
+   156                                  skip_stosb:
+   157 00000096 39EC                    	cmp	esp, ebp
+   158 00000098 72FA                    	jb	short pop_next
+   159                                  bin2str_ok:
+   160 0000009A C3                      	retn
+   161                                  
+   162                                  ;-----------------------------------------------------------------
+   163                                  
+   164                                  print_msg:
+   165 0000009B BB0F000000              	mov	ebx, 0Fh       ; white characters (bl)
+   166                                  		               ; video page 0 (bh)
+   167                                  print_msg_@:
+   168 000000A0 B40E                    	mov	ah, 0Eh ; teletype output (write tty)
+   169 000000A2 AC                      	lodsb
+   170                                  _p_nextchar:
+   171 000000A3 CD31                    	int	31h
+   172 000000A5 AC                      	lodsb
+   173 000000A6 20C0                    	and	al, al
+   174 000000A8 75F9                    	jnz	short _p_nextchar
+   175 000000AA C3                      	retn
+   176                                  
+   177                                  ;-----------------------------------------------------------------
+   178                                  
+   179                                  dword_to_hex:
+   180                                  	; eax = binary number
+   181                                  	; edi = hexadecimal string buffer (8 bytes)
+   182 000000AB 89C3                    	mov	ebx, eax
+   183 000000AD B908000000              	mov	ecx, 8
+   184                                  dd2hex:
+   185 000000B2 C1C304                  	rol	ebx, 4
+   186 000000B5 88DA                    	mov	dl, bl
+   187 000000B7 83E20F                  	and	edx, 15
+   188 000000BA 81C2[C6000000]          	add	edx, hex_digits
+   189 000000C0 8A02                    	mov	al, [edx]
+   190 000000C2 AA                      	stosb
+   191 000000C3 E2ED                    	loop	dd2hex
+   192 000000C5 C3                      	retn
+   193                                  
+   194                                  ;-----------------------------------------------------------------
+   195                                  ; data
+   196                                  ;-----------------------------------------------------------------
+   197                                  
+   198                                  hex_digits:
+   199 000000C6 303132333435363738-     	db '0123456789ABCDEF'
+   199 000000CF 39414243444546     
+   200                                  
+   201                                  ;-----------------------------------------------------------------
+   202                                  
+   203                                  DMonth:
+   204 000000D6 0000                    	dw 0
+   205 000000D8 1F00                    	dw 31
+   206 000000DA 3B00                    	dw 59
+   207 000000DC 5A00                    	dw 90
+   208 000000DE 7800                    	dw 120
+   209 000000E0 9700                    	dw 151
+   210 000000E2 B500                    	dw 181
+   211 000000E4 D400                    	dw 212
+   212 000000E6 F300                    	dw 243
+   213 000000E8 1101                    	dw 273
+   214 000000EA 3001                    	dw 304
+   215 000000EC 4E01                    	dw 334
+   216                                  
+   217                                  ;-----------------------------------------------------------------
+   218                                  
+   219                                  program:
+   220 000000EE 5452444F5320333836-     	db "TRDOS 386 v2 'sysstime' system call test program",0Dh,0Ah
+   220 000000F7 207632202773797373-
+   220 00000100 74696D652720737973-
+   220 00000109 74656D2063616C6C20-
+   220 00000112 746573742070726F67-
+   220 0000011B 72616D0D0A         
+   221 00000120 6279204572646F6761-     	db "by Erdogan Tan [May 2026]",0Dh,0Ah
+   221 00000129 6E2054616E205B4D61-
+   221 00000132 7920323032365D0D0A 
+   222 0000013B 0D0A                    	db 0Dh,0Ah
+   223                                  confirm:
+   224 0000013D 507265737320454E54-     	db "Press ENTER to convert/save current time as tick count",0Dh,0Ah
+   224 00000146 455220746F20636F6E-
+   224 0000014F 766572742F73617665-
+   224 00000158 2063757272656E7420-
+   224 00000161 74696D652061732074-
+   224 0000016A 69636B20636F756E74-
+   224 00000173 0D0A               
+   225 00000175 6F7220707265737320-     	db "or press ESC to cancel"
+   225 0000017E 45534320746F206361-
+   225 00000187 6E63656C           
+   226                                  newline:
+   227 0000018B 0D0A00                  	db 0Dh,0Ah,0
+   228                                  
+   229                                  ticks_label:
+   230 0000018E 0D0A                    	db 0Dh,0Ah
+   231 00000190 43757272656E742054-     	db "Current Tick Count: ",0
+   231 00000199 69636B20436F756E74-
+   231 000001A2 3A2000             
+   232                                  ticks_hex_str:
+   233 000001A5 28                      	db "("
+   234                                  ticks_hex:
+   235 000001A6 30303030                	dd 30303030h
+   236 000001AA 30303030                	dd 30303030h
+   237 000001AE 68290D0A00              	db "h)", 0Dh, 0Ah, 0
+   238                                  
+   239                                  ;-----------------------------------------------------------------
+   240                                  ; uninitialized data
+   241                                  ;-----------------------------------------------------------------
+   242                                  
+   243                                  bss:
+   244                                  
+   245                                  ABSOLUTE bss
+   246                                  
+   247 000001B3 ??                      alignb 4
+   248                                  
+   249                                  tick_count:
+   250 000001B4 ????????                	resd 1
+   251                                  
+   252                                  ticks_txt:
+   253 000001B8 <res Ah>                	resb 10
