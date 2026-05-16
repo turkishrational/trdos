@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - SYS INIT : trdosk1.s
 ; ----------------------------------------------------------------------------
-; Last Update: 12/05/2026 (Previous: 26/09/2024, v2.0.9)
+; Last Update: 16/05/2026 (Previous: 26/09/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -893,6 +893,8 @@ stime1:
 	mov 	dh, al	     ; second (BCD)
 	retn	; 30/12/2017
 
+	; 15/05/2026
+	; 14/05/2026
 	; 03/05/2026 (TRDOS 386 v2.0.11)
 rtc_to_tick_count:
 	; convert current time to system timer ticks (18.2Hz)
@@ -912,11 +914,54 @@ rtc_to_tick_count:
 	add	eax, ebx
 	mov	cl, [second]
 	add	eax, ecx
-	mov	cl, 182
-	mul	ecx
-	add	eax, 9
-	adc	edx, 0
-	mov	cl, 10
-	div	ecx
+	;mov	cl, 182
+	;mul	ecx
+	;add	eax, 9
+	;adc	edx, 0
+	;mov	cl, 10
+	;div	ecx
 	; eax = ((182*seconds)+9)/10
+	; 14/05/2026
+	; (18.2065 Hz) ((1193182Hz/65536))
+	mov	ecx, 36413
+	mul	ecx
+	;add	eax, 1999
+	;adc	edx, 0
+	; 15/05/2026
+	add	eax, 1000
+	adc	edx, 0
+	mov	ecx, 2000
+	div	ecx	; (36413/2000 = 18.2065)
+dow_err:
 	retn
+
+	; 16/05/2026 (TRDOS 386 v2.0.11)
+get_day_of_week:
+	; input: none
+	; output: AL = day of week (1 = sunday, 7 = saturday)
+	;        (if cf = 1 -> error)
+	; modified registers: eax, ecx
+	xor	ecx, ecx ; ecx = 0
+set_day_of_week:
+	; input: CL = day of week (1 = sunday, 7 = saturday)
+	; output: none
+	;	 (if cf = 1 -> error)
+	; modified registers: eax
+
+	call	UPD_IPR			; CHECK FOR UPDATE IN PROCESS
+	;jnc	short sdow_@		; GO AROUND IF NO ERROR
+	;retn
+	jc	short dow_err
+sdow_@:
+	mov	al, CMOS_DAY_WEEK	; ADDRESS OF DAY OF WEEK BYTE
+	and	ecx, ecx
+	jz	short gdow_@
+	mov	ah, cl
+	;call	CMOS_WRITE
+	;retn
+	jmp	CMOS_WRITE
+
+gdow_@:
+	;call	CMOS_READ
+	;retn
+	jmp	CMOS_READ

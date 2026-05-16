@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 12/05/2026  (Previous: 10/01/2026, v2.0.10)
+; Last Update: 16/05/2026  (Previous: 10/01/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -28,8 +28,8 @@ sysent: ; < enter to system call >
 	; 16/04/2015 - 19/10/2015 (Retro UNIX 386 v1)
 	; 10/04/2013 - 18/01/2014 (Retro UNIX 8086 v1)
 	;
-	; 'unkni' or 'sysent' is sytem entry from various traps. 
-	; The trap type is determined and an indirect jump is made to 
+	; 'unkni' or 'sysent' is sytem entry from various traps.
+	; The trap type is determined and an indirect jump is made to
 	; the appropriate system call handler. If there is a trap inside
 	; the system a jump to panic is made. All user registers are saved
 	; and u.sp points to the end of the users stack. The sys (trap)
@@ -63,7 +63,7 @@ sysent: ; < enter to system call >
 	pushad  ; eax, ecx, edx, ebx, esp -before pushad-, ebp, esi, edi
 	;
 	; ESPACE = [ss:u.sp] - esp ; 4*12 = 48 ; 17/09/2015 ; 06/06/2016
-	; 	(ESPACE is size of space in kernel stack 
+	; 	(ESPACE is size of space in kernel stack
 	;	for saving/restoring user registers.)
 	;
 	push	eax ; 01/07/2015
@@ -103,7 +103,7 @@ sysent0:
 	jna	short sysent1
 	jmp	sysrele
 		; mov $s.syst+2,clockp
-		; mov r0,-(sp) / save user registers 
+		; mov r0,-(sp) / save user registers
 		; mov sp,u.r0 / pointer to bottom of users stack
 			   ; / in u.r0
 		; mov r1,-(sp)
@@ -395,7 +395,7 @@ sysret: ; < return from system call>
 	;
 	; Calling sequence:
 	;	jump table or 'br sysret'
-	; Arguments: 
+	; Arguments:
 	;	-
 	; ...............................................................
 	;
@@ -665,7 +665,7 @@ intrct0:
 		; cmp u.intr,$core / should control be
 				; / transferred to loc core?
 		; blo 1f
-		; jmp *u.intr / user to do rti yes, 
+		; jmp *u.intr / user to do rti yes,
 				; / transfer to loc core
 	; 1:
 		; sys 1 / exit
@@ -762,7 +762,7 @@ sysexit_0:
 	sub	al, al ; 0
 	out	40h, al ; LB
 	out	40h, al ; HB
- 	; 
+ 	;
 	movzx	ebx, byte [u.uno]
 	;mov	bl, [u.uno] ; process number of dying process
 	cmp	byte [ebx+p.timer-1], al ; 0
@@ -773,7 +773,7 @@ sysexit_0:
  	;jz	short sysexit_12 ; no timer events
 	;mov	cl, al
 	mov	cl, [timer_events] ; 14/11/2017
-	;cli	; disable interrupts 
+	;cli	; disable interrupts
 	mov	ah, 16 ; number of available timer events
 	mov	esi, timer_set ; beginning address of timer events
 sysexit_7:
@@ -785,7 +785,7 @@ sysexit_7:
 sysexit_8:
 	dec	cl
 	jz	short sysexit_11
-	; 08/01/2026 (BugFix) 
+	; 08/01/2026 (BugFix)
 	mov	al, 0
 sysexit_9:
 	dec	ah
@@ -990,7 +990,7 @@ sysexit_5: ; 3:
 	cmp	al, 1 ; SRUN
 	je	short sysexit_6
 	;cmp	al, 2
-		; cmp r2,$2 / is the parent waiting for 
+		; cmp r2,$2 / is the parent waiting for
 			  ; / this child to die
 	;jne	short sysexit_6	
 		; bne 2f / yes, notify parent not to wait any more
@@ -1130,7 +1130,7 @@ syswait_1: ; 1:
 	; 20/08/2024
 	mov	ax, [esi+p.pid-2]
 	mov	[u.r0], eax
-		; mov p.pid-2(r2),*u.r0 
+		; mov p.pid-2(r2),*u.r0
 			      ; / put childs process name in (u.r0)
 	;
 	; Retro UNIX 386 v1 modification ! (17/09/2015)
@@ -1181,7 +1181,7 @@ syswait_3: ; 3:
 	jmp	error
 syswait_4:
 	mov	bl, [u.uno]
-		; movb u.uno,r1 / there are children so put 
+		; movb u.uno,r1 / there are children so put
 			      ; / parent process number in r1
 	inc	byte [ebx+p.stat-1] ; 2, SWAIT, 05/02/2014
 		; incb p.stat-1(r1) / it is waiting for
@@ -1253,8 +1253,8 @@ sysfork: ; < create a new process >
 	; Inputs: -
 	; Outputs: *u.r0 - child process name
 	; ...............................................................
-	;	
-	; Retro UNIX 8086 v1 modification: 
+	;
+	; Retro UNIX 8086 v1 modification:
 	;	AX = r0 = PID (>0) (at the return of 'sysfork')
 	;	= process id of child a parent process returns
 	;	= process id of parent when a child process returns
@@ -1279,7 +1279,7 @@ sysfork: ; < create a new process >
 	;	In UNIX v7x86 (386) by Robert Nordier (1999)
 	;		// pid = fork();
 	;		//
-	;		// pid == 0 in child process; 
+	;		// pid == 0 in child process;
 	;		// pid == -1 means error return
 	;		// in child, 
 	;		//	parents id is in par_uid if needed
@@ -1424,13 +1424,13 @@ sysfork_3:
 	; 23/07/2022
 	shl	esi, 1
 	;shl	si, 1
-		; asl r1 / multiply r1 by 2 to get index 
+		; asl r1 / multiply r1 by 2 to get index
 		       ; / into p.pid table
 	inc	word [mpid]
 		; inc mpid / increment m.pid; get a new process name
 	mov	ax, [mpid]
 	mov	[esi+p.pid-2], ax
-		;mov mpid,p.pid-2(r1) / put new process name 
+		;mov mpid,p.pid-2(r1) / put new process name
 				    ; / in child process' name slot
 	pop	edx  ; * return address for the child process
 		     ; * Retro UNIX 8086 v1 feature only !
@@ -1455,7 +1455,7 @@ sysfork_3:
 	mov	[ebp], edx ; *, CS:EIP -> EIP
 			   ; * return address for the child process
 		; mov $sysret1,-(sp) /
-		; mov sp,u.usp / contents of sp at the time when 
+		; mov sp,u.usp / contents of sp at the time when
 			      ; / user is swapped out
 		; mov $sstack,sp / point sp to swapping stack space
 	; 04/09/2015 - 01/09/2015
@@ -1537,7 +1537,7 @@ sysfork_5: ; 2:
 
 syscreat: ; < create file >
 	; 29/08/2024
-	; 25/08/2024 - TRDOS 386 v2.0.9	
+	; 25/08/2024 - TRDOS 386 v2.0.9
 	; 08/08/2022
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 13/11/2017
@@ -1577,7 +1577,7 @@ syscreat: ; < create file >
 	;	name - name of the file to be created
 	;	mode - mode of the file to be created
 	; Inputs: (arguments)
-	; Outputs: *u.r0 - index to u.fp list 
+	; Outputs: *u.r0 - index to u.fp list
 	;		   (the file descriptor of new file)
 	; ...............................................................
 	;
@@ -1587,14 +1587,14 @@ syscreat: ; < create file >
 	;	* 2nd argument, mode is in CX register
 	;
 	;	AX register (will be restored via 'u.r0') will return
-	;	to the user with the file descriptor/number 
+	;	to the user with the file descriptor/number
 	;	(index to u.fp list).
 	;
 	;call	arg2
 	; * name - 'u.namep' points to address of file/path name
 	;          in the user's program segment ('u.segmnt')
 	;          with offset in BX register (as sysopen argument 1).
-	; * mode - sysopen argument 2 is in CX register 
+	; * mode - sysopen argument 2 is in CX register
 	;          which is on top of stack.
 	;
 	; TRDOS 386 (10/10/2016)
@@ -1614,7 +1614,7 @@ syscreat: ; < create file >
 	;          cf = 1 -> Error code in AL
 	;
 	; Modified Registers: EAX (at the return of system call)
-	; 
+	;
 	; Note: If the file is existing and it has not any one
 	;	of S,H,R,V,D attributes, it will be truncated
 	;	to zero length; otherwise, access error will be
@@ -1636,7 +1636,7 @@ syscreat_0:
 	;mov	ax, 1
 	;mov	[FFF_Valid], ah ; 0 ; reset ; 17/10/2016
 	;call	set_working_path 
-	call	set_working_path_x ; 17/10/2016	
+	call	set_working_path_x ; 17/10/2016
 	;jc	short syscreat_err
 	; 23/07/2022
 	jnc	short syscreat_3
@@ -1782,7 +1782,7 @@ syscreat_2:
 		; EAX = New file's first cluster
 		; ESI = Logical Dos Drv Descr. Table Addr.
 		; EBX = offset CreateFile_Size
-		; ECX = Sectors per cluster (<256) 
+		; ECX = Sectors per cluster (<256)
 		; EDX = Directory entry index/number (<65536)
 		; 29/08/2024
 		; EBX = File Size (0 for a new, empty file)
@@ -1815,7 +1815,7 @@ syscreat_2:
 	; If "syscreat" will return with that error,
 	; (the file has been created but it could not be opened)
 	; the user must retry to open this file again
-	; or must close another file before using 
+	; or must close another file before using
 	; "sysopen" system call.
 
 	mov	dl, 1 ; open file for writing
@@ -1939,7 +1939,7 @@ sysopen_0:
 	jnc	short sysopen_1
 
 syscreat_err: ; ecx = file attributes (for 'syscreat')
-	pop	ecx ; open mode  
+	pop	ecx ; open mode
 	and	eax, eax  ; 0 -> Bad Path!
 	jnz	short sysopen_err
 	; eax = 0
@@ -2196,7 +2196,7 @@ sysopen_7:
 ;OF_OPENCOUNT:	resb OPENFILES  ; Open counts of open files
 ;OF_POINTER:	resd OPENFILES	; File seek/read/write pointer
 ;OF_SIZE:	resd OPENFILES	; File sizes of open files (in bytes)
-;OF_DIRFCLUSTER: resd OPENFILES  ; Directory First Clusters of open files
+;OF_DIRFCLUSTER: resd OPENFILES ; Directory First Clusters of open files
 ;OF_DIRCLUSTER:	resd OPENFILES  ; Directory (Entry) Clusters of open files
 ;OF_VOLUMEID:	resd OPENFILES  ; Vol ID for removable drives of open files
 ;OF_CCLUSTER:	resd OPENFILES  ; Current clusters of open files
@@ -2304,7 +2304,7 @@ sysmkdir: ; < make directory >
 	; pointed to by arg 1. The mode of the directory is arg 2.
 	; The special entries '.' and '..' are not present.
 	; Errors are indicated if the directory already exists or
-	; user is not the super user. 
+	; user is not the super user.
 	;
 	; Calling sequence:
 	;	sysmkdir; name; mode
@@ -2313,11 +2313,11 @@ sysmkdir: ; < make directory >
 	;	mode - mode of the directory
 	; Inputs: (arguments)
 	; Outputs: -
-	;    (sets 'directory' flag to 1; 
+	;    (sets 'directory' flag to 1;
 	;    'set user id on execution' and 'executable' flags to 0)
 	; ...............................................................
 	;
-	; Retro UNIX 8086 v1 modification: 
+	; Retro UNIX 8086 v1 modification:
 	;       'sysmkdir' system call has two arguments; so,
 	;	* 1st argument, name is pointed to by BX register
 	;	* 2nd argument, mode is in CX register
@@ -2364,10 +2364,10 @@ sysmkdir_1:
 	;jmp	sysmkdir_0
 	; 23/07/2022
 	jmp	short sysmkdir_3 ; jump to head of 'syscreat'
-sysmkdir_2: 
+sysmkdir_2:
 	; jump from 'syscreat' ; from 'syscreat_1'
 	;  CL = Directory attributes/flags
-	mov	esi, FindFile_Name 
+	mov	esi, FindFile_Name
 	call	make_sub_directory
 	;jc	sysopen_err       ; NOTE: Old type (TRDOS 8086)
 				  ; error codes must be modified
@@ -2476,7 +2476,7 @@ sysread: ; < read from file >
 	; Calling sequence:
 	;	sysread; buffer; nchars
 	; Arguments:
-	;	buffer - location of contiguous bytes where 
+	;	buffer - location of contiguous bytes where
 	;		 input will be placed.
 	;	nchars - number of bytes or characters to be read.
 	; Inputs: *u.r0 - file descriptor (& arguments)
@@ -2506,7 +2506,7 @@ sysread: ; < read from file >
 	;
 
 	; EBX = File descriptor
-	call	getf1 
+	call	getf1
 	jc	short device_read ; read data from device
 
 	; EAX = First cluster of the file
@@ -2517,7 +2517,7 @@ sysread: ; < read from file >
 sysrw_err:	; 03/09/2024
 	mov	[u.r0], eax ; error code
 	jmp	error
-	 
+
 sysread_0:
 	call	readi
 	jmp	short rw0
@@ -2564,7 +2564,7 @@ syswrite: ; < write to file >
 	; Outputs: *u.r0 - number of bytes written.
 	; ...............................................................
 	;
-	; Retro UNIX 8086 v1 modification: 
+	; Retro UNIX 8086 v1 modification:
 	;       'syswrite' system call has three arguments; so,
 	;	* 1st argument, file descriptor is in BX register
 	;	* 2nd argument, buffer address/offset in CX register
@@ -2718,7 +2718,7 @@ rw7:
 
 	mov	[u.base], ecx 	; buffer address/offset 
 				;(in the user's virtual memory space)
-	mov	[u.count], edx 
+	mov	[u.count], edx
         mov	dword [u.error], 0 ; reset the last error code
 	retn
 
@@ -2736,7 +2736,7 @@ rw2:
 	;jmp	short rw4
 
 	; 03/09/2024
-rw3: 
+rw3:
 ;	mov	eax, ERR_FILE_ACCESS ; permission denied !
 ;	stc
 
@@ -2782,13 +2782,13 @@ systimer:
 	;
 	;	NOTE: If callback (user service) method is used,
 	;	    EDX will point to the return address (of service
-	;	    procedure) in user's space instead of signal 
+	;	    procedure) in user's space instead of signal
 	;	    response byte address. (TRDOS 386 kernel will
 	;	    direct the cpu to that address -in user's space-
 	;	    at the return of system call or interrupt 
 	;	    just after the adjusted count/time is elapsed.)
 	;	    User's sevice routine must be ended with a
-	;	    'iret'. Normal return addresses from system 
+	;	    'iret'. Normal return addresses from system
 	;	    calls or and interrupts will be kept same except
 	;	    the timer returns.
      	;
@@ -2954,7 +2954,7 @@ systimer_7:
 	;
 	; edi = address of empty timer event area
 	mov	al, [u.uno]
-	cli 	; disable interrupts 
+	cli 	; disable interrupts
 	stosb	; process number
 	mov	al, [tcallback] ; timer callback flag
 	stosb 	; 1= callback method, 0= signal response byte method
@@ -3079,16 +3079,16 @@ systimer_21:	; 23/07/2022
 	shl	dl, 4 ; * 16
 	movzx	edi, dl
 	add	edi, esi ; timer_set 
-	
+
 	cmp	al, [edi] ; process number
         ;jne	systimer_4
 	; 23/07/2022
 	jne	short systimer_20 ; jmp systimer_4
-	
+
 	; same process ID
 	cli	; disable interrupts
  	; 10/06/2016 ; 02/01/2017
-	;mov	byte [edi], 0 
+	;mov	byte [edi], 0
 	mov	word [edi], 0 ; clear
 	;mov	dword [edi+12], 0 ; clear
 	dec	byte [timer_events]
@@ -3132,7 +3132,7 @@ sysvideo: ; VIDEO DATA TRANSFER FUNCTIONS
 	; Inputs:
 	;		; 07/02/2021
 	;	BH = 0 = VIDEO BIOS Mode 3, tty/text mode data transfers
-	;	     BL = 
+	;	     BL =
 	;		Bits 0&1, Transfer direction
 	;	     	 	0 - System to system
 	;			1 - User to system
@@ -3143,7 +3143,7 @@ sysvideo: ; VIDEO DATA TRANSFER FUNCTIONS
 	;	     		1 - Display page window (col,row) transfer
 	;		; 28/01/2021
 	;		Bits 3..7 - Reserved, undefined (must be 0)
-	;	        ; 28/01/2021	
+	;	        ; 28/01/2021
 	;	     /// BL = 0 -> System to system (display page) transfer
 	;		 CL = Source page (0FFh = current video page)
 	;		 DL = Destination page (0FFh = current video page)
@@ -3155,7 +3155,7 @@ sysvideo: ; VIDEO DATA TRANSFER FUNCTIONS
 	;		 ECX = User's buffer address
 	;		 DL = Video page (0FFh = current video page)
 	;		 EDI = Swap address in user's memory (must be > 0)
-	;	     /// BL = 5&6&7 -> user to system, system to user transfer 
+	;	     /// BL = 5&6&7 -> user to system, system to user transfer
 	;		(system window is in current/active display page)
 	;		 ESI = User's buffer address
 	;		 ECX Low 16 bits = Top left column (X1 position)
@@ -3333,15 +3333,15 @@ sysvideo: ; VIDEO DATA TRANSFER FUNCTIONS
 	;		      ECX = color (16 bit and true colors)
 	;	   	      EDX = count of blocks (not bytes)
 	;			    (limit: 2048 blocks)
-	;		      ESI = user's buffer address 
+	;		      ESI = user's buffer address
 	;			  contains 64 bits block data
 	;			  BLOCK ADDRESS - (row, col), dword
 	;			  (first 32 bits)
 	;			  BLOCK SIZE - (rows, cols), dword
 	;			  (second 32 bits)
 	;		; 10/02/2021
-	;		0Eh: WRITE LINE(s) -full screen- 
-	;		   -If BL bit 5 is 0-	
+	;		0Eh: WRITE LINE(s) -full screen-
+	;		   -If BL bit 5 is 0-
 	; 		    CL = color (8 bit, 256 colors)
 	; 		   ECX = color (16 bit and true colors)
 	; 		    DX = low 12 bits - size (length)
@@ -3355,7 +3355,7 @@ sysvideo: ; VIDEO DATA TRANSFER FUNCTIONS
 	;		     CL = color (8 bit, 256 colors)
 	;		    ECX = color (16 bit and true colors)
 	;		     DX = number of lines (in user buffer)
-	;			   (limit: 2048 lines)	
+	;			   (limit: 2048 lines)
 	;		    ESI = user's buffer
 	;		          contains 64 bit data for lines
 	;			   START POINT: 32 bit (row, col)
@@ -3433,7 +3433,7 @@ sysvideo: ; VIDEO DATA TRANSFER FUNCTIONS
 	;	     	2 = swap pixel colors
 	;		3 = mix pixel colors
 	;	     29/01/2021	
-	;		4 = read pixels from user defined positions 
+	;		4 = read pixels from user defined positions
 	;		5 = write single color pixels to user defined positions
 	;		6 = write multi color pixels to user defined positions 
 	;
@@ -3446,7 +3446,7 @@ sysvideo: ; VIDEO DATA TRANSFER FUNCTIONS
 	;	     EDX = Offset from start of video memory (0A0000h)
 	;		   or start of linear frame buffer
 	;
-	;	     07/02/2021	
+	;	     07/02/2021
 	;	     .. for BL = 4
 	;	     EDI = user's destination buffer address for pixel colors
 	;	     29/01/2021
@@ -3462,7 +3462,7 @@ sysvideo: ; VIDEO DATA TRANSFER FUNCTIONS
 	;
 	; Note:
 	;	Pixel read/write will be performed in current video mode.
-	;	If [CRT_MODE] < 0FFh, 0A0000h will be used 
+	;	If [CRT_MODE] < 0FFh, 0A0000h will be used
 	;	   as video memory and limit will be 65536
 	;	   (new/mix pixel color will be in CL)
 	;	if [CRT_MODE] = 0FFh (VESA VBE video mode)
@@ -3494,7 +3494,7 @@ sysvideo: ; VIDEO DATA TRANSFER FUNCTIONS
 	;		Page directory & page tables of the user's
 	;		program will be updated to direct access to
 	;		0A0000h (64K) video (VGA) memory; if there is not
-	;		a permission conflict or lock!  
+	;		a permission conflict or lock!
 	;	        (User's program/process will have permission to
 	;		access locked display memory if the owner is
 	;		it's parent.)
@@ -3579,7 +3579,7 @@ sysvideo: ; VIDEO DATA TRANSFER FUNCTIONS
 	;
 	;		ECX = Pixel resolution
 	;		      CX = Width (320, 640, 800, 1024, 1366, 1920)
-	;		      High 16 bits of ECX = Height  
+	;		      High 16 bits of ECX = Height
 	;
 	;	NOTE: Each process will have it's own frame buffer
 	;	      address and resolution parameters in 'u' area.
@@ -3631,7 +3631,7 @@ sysvideo: ; VIDEO DATA TRANSFER FUNCTIONS
 	;
 	; 10/12/2020
 	; SET VIDEO MODE (& RETURN LFB INFO for VESA VBE VIDEO MODES)
-	;	
+	;
 	;	BH = 8 = Set Video Mode
 	;
 	;		BL = Requested Video Mode (method)
@@ -3754,7 +3754,7 @@ sysvideo: ; VIDEO DATA TRANSFER FUNCTIONS
 	;		ECX byte 1 - Red (6 bit)
 	;		ECX byte 2 - Green (6 bit)
 	;		ECX byte 3 - Blue (6 bit)
-	;	   (BL>3 Alternative method for BMP files etc.)	
+	;	   (BL>3 Alternative method for BMP files etc.)
 	;	   BL = 4 : Read all DAC color registers (256 colors)
 	;	       (8 bit colors, in BGR order, bit 0&1 is 0)
 	;	   BL = 5 : Set all DAC color registers (256 colors)
@@ -4089,7 +4089,7 @@ sysvideo_2_2:
 	; bl = 3 (exchange/swap) complete display page
 	; esi = video page start address
 	; edx = user's buffer address
-	
+
 	;mov	ecx, 4096
 	mov	edi, esi ; video page start address
 	mov	esi, edx ; user's (new page) buffer address
@@ -4391,7 +4391,7 @@ sysvideo_9_3:
 	pop	esi ; ****
 
 	inc	bh  ; row count
-	
+
 	;mov	edx, 80*2
 	mov	dl, 80*2  ; bytes per row
 	;
@@ -4416,7 +4416,7 @@ sysvideo_9_4:
 	call	transfer_to_user_buffer ; fast transfer
 	jc	short sysvideo_9_5
 	; ecx = actual transfer count (must be same with input)
-	add	esi, edx ; next row address of (video page) window 
+	add	esi, edx ; next row address of (video page) window
 	add	edi, ecx ; next row address of user's window
 		; Note: ecx may be less than row length of video page
 		; user's window uses offset according to window width
@@ -4448,7 +4448,7 @@ sysvideo_10:
 	;jmp	sysret
 sysvideo_9_6:
 	jmp	sysret
-	
+
 sysvideo_11:
 	; system to user video/display page window transfer (mode 0)
 	xchg	edi, esi
@@ -4458,7 +4458,7 @@ sysvideo_12:
 	call	transfer_to_user_buffer ; fast transfer
 	;jc	sysret
 	; 23/07/2022
-	jc	short sysvideo_9_6 ; jmp sysret	
+	jc	short sysvideo_9_6 ; jmp sysret
 
 	; ecx = actual transfer count (must be same with input)
 	add	[u.r0], ecx
@@ -4532,7 +4532,7 @@ sysvideo_15_17:	; 23/07/2022
 	; 25/12/2020
 	; resolution table entry will be saved into EBP register
 
-	cmp	byte [vbe3], 2 ; VESA VBE 3 video bios 
+	cmp	byte [vbe3], 2 ; VESA VBE 3 video bios
 			  ; or BOCHS/QEMU/VIRTUALBOX emu video bios
 	jb	short sysvideo_15_4 ; no, nothing to do !
 	ja	short sysvideo_15_0 ; yes
@@ -4853,7 +4853,7 @@ pix_op_cpy:
 	;        (HW = row, CX = column)
 	;  EDX = size (rows, colums)
 	;        (HW = rows, DX = columns)
-	;	 (0 -> invalid 	
+	;	 (0 -> invalid)
 	;        (1 -> horizontal or vertical line)
 	;  If bit 4 of BL or [v_ops] = 0 -full screen-
 	;     ECX and EDX will not be used
@@ -5765,7 +5765,7 @@ pix_op_new_w:
 
 	test	byte [v_ops], 20h ; masked color change ?
 	jz	short pix_op_new_w_0 ; no
-	jmp	m_pix_op_new_w 
+	jmp	m_pix_op_new_w
 			; window chg color except mask color
 pix_op_new_w_0:
 	; ecx = bytes per row (to be applied)
@@ -5894,7 +5894,7 @@ pix_op_not_w:
 
 	test	byte [v_ops], 20h ; masked color 'not' ?
 	jz	short pix_op_not_w_0 ; no
-	jmp	m_pix_op_not_w 
+	jmp	m_pix_op_not_w
 			; window 'not' color except mask color
 pix_op_not_w_0:
 	; ecx = bytes per row (to be applied)
@@ -5996,7 +5996,7 @@ pix_op_neg_w:
 
 	test	byte [v_ops], 20h ; masked negate color ?
 	jz	short pix_op_neg_w_0 ; no
-	jmp	m_pix_op_neg_w 
+	jmp	m_pix_op_neg_w
 			; window 'neg' color except mask color
 pix_op_neg_w_0:
 	; ecx = bytes per row (to be applied)
@@ -6439,7 +6439,7 @@ pix_op_lin_retn:
 
 pix_op_lin_vh:
 	cmp	edx, 1438h ; 1920*1080 (780hx438h) limit
-	ja	short pix_op_lin_err1 ; invalid type 
+	ja	short pix_op_lin_err1 ; invalid type
 			    	; (for current version)
 	test	dx, 0FFFh
 	jz	short pix_op_lin_err1 ; zero length!
@@ -6551,7 +6551,7 @@ pix_op_lin_h_1:
 	cmp	byte [v_bpp], 24 ; 24bpp
 	ja	short pix_op_lin_h_4 ; 32bpp
 	jb	short pix_op_lin_h_3 ; 16bpp
-	
+
 	; 24 bit true colors
 	; * 3
 	add	[u.r0], edx
@@ -6560,7 +6560,7 @@ pix_op_lin_h_1:
 pix_op_lin_h_2:
 	stosw
 	ror	eax, 16
-	stosb	
+	stosb
 	rol	eax, 16
 	loop	pix_op_lin_h_2
 	retn
@@ -6607,7 +6607,7 @@ pix_op_new_24:
 	; edi = start pixel address
 
 	stosw
-	ror	eax, 16	
+	ror	eax, 16
 	stosb
 	rol	eax, 16
 	loop	pix_op_new_24
@@ -6618,7 +6618,7 @@ pix_op_new_32:
 	; CHANGE PIXEL COLOR
 	; ecx = pixel count per row
 	; eax = color
-	; edi = start pixel address 
+	; edi = start pixel address
 
 	rep	stosd
 	retn
@@ -6826,7 +6826,7 @@ pix_op_or_24_0:
 	or	eax, [edi]
 	stosw
 	shr	eax, 16
-	stosb	
+	stosb
 	mov	eax, edx
 	loop	pix_op_or_24_0
 	retn
@@ -6887,7 +6887,7 @@ pix_op_and_24_0:
 	and	eax, [edi]
 	stosw
 	shr	eax, 16
-	stosb	
+	stosb
 	mov	eax, edx
 	loop	pix_op_and_24_0
 	retn
@@ -6948,7 +6948,7 @@ pix_op_xor_24_0:
 	xor	eax, [edi]
 	stosw
 	shr	eax, 16
-	stosb	
+	stosb
 	mov	eax, edx
 	loop	pix_op_xor_24_0
 	retn
@@ -7194,7 +7194,7 @@ pix_op_inc_24_0:
 	jnz	short pix_op_inc_24_1
 	;mov	eax, 0FFFFFFh  ; Max. value
 	dec	eax ; 0FFFFFFFFh
-pix_op_inc_24_1: 
+pix_op_inc_24_1:
 	stosw
 	shr	eax, 16
 	stosb
@@ -7588,7 +7588,7 @@ pix_op_chr_fpos_8:
 	jnz	short pix_op_chr_fpos_6
 	; scale = 3
 	mov	cl, dh ; 16 or 8 (height/rows)
-	shl	cl, 1 
+	shl	cl, 1
 	add	cl, dh ; 48 or 24 rows
 	mov	dh, 24 ; columns (width)
 	jmp	short pix_op_chr_f2p
@@ -7983,7 +7983,7 @@ m_pix_op_new_32:
 	; 32 bit true colors
 	mov	edx, eax ; new color
 m_pix_op_new_32_0:
-	lodsd 
+	lodsd
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_new_32_1 ; exclude
 	mov	[edi], edx
@@ -8012,7 +8012,7 @@ m_pix_op_new_w:
 
 	; Window
 	;mov	edi, [v_str] ; LFB start address
-	;mov	esi, edi 
+	;mov	esi, edi
 
 	cmp	byte [v_bpp], 8 ; 8bpp
 	ja	short m_pix_op_new_w_1
@@ -8108,7 +8108,7 @@ m_pix_op_add_8:
 	; 8 bit colors (256 colors)
 	mov	dl, al ; new color
 m_pix_op_add_8_0:
-	lodsb 
+	lodsb
 	cmp	al, [maskcolor]
 	je	short m_pix_op_add_8_1 ; exclude
 	inc	dword [u.r0] ; +1
@@ -8204,7 +8204,7 @@ m_pix_op_add_w:
 
 	; window
 	;mov	edi, [v_str] ; LFB start address
-	;mov	esi, edi 
+	;mov	esi, edi
 
 	cmp	byte [v_bpp], 8 ; 8bpp
 	ja	short m_pix_op_add_w_1
@@ -8414,11 +8414,11 @@ m_pix_op_mix_8:
 	; 8 bit colors (256 colors)
 	mov	dl, al ; new (mixing) color
 m_pix_op_mix_8_0:
-	lodsb 
+	lodsb
 	cmp	al, [maskcolor]
 	je	short m_pix_op_mix_8_1 ; exclude
 	add	al, dl ; 25/02/2021
-	rcr	al, 1	
+	rcr	al, 1
 	mov	[edi], al
 	inc	dword [u.r0] ; +1
 m_pix_op_mix_8_1:
@@ -8478,7 +8478,7 @@ m_pix_op_mix_32:
 	; 32 bit true colors
 	mov	edx, eax ; new color
 m_pix_op_mix_32_0:
-	lodsd 
+	lodsd
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_mix_32_1 ; exclude
 	add	eax, edx
@@ -8653,7 +8653,7 @@ m_pix_op_and_w:
 
 	; window
 	;mov	edi, [v_str] ; LFB start address
-	;mov	esi, edi 
+	;mov	esi, edi
 
 	cmp	byte [v_bpp], 8 ; 8bpp
 	ja	short m_pix_op_and_w_1
@@ -8767,7 +8767,7 @@ m_pix_op_or_32:
 	; 32 bit true colors
 	mov	edx, eax ; new color
 m_pix_op_or_32_0:
-	lodsd 
+	lodsd
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_or_32_1 ; exclude
 	or	[edi], edx ; 25/02/2021
@@ -8796,7 +8796,7 @@ m_pix_op_or_w:
 
 	; window
 	;mov	edi, [v_str] ; LFB start address
-	;mov	esi, edi 
+	;mov	esi, edi
 
 	cmp	byte [v_bpp], 8 ; 8bpp
 	ja	short m_pix_op_or_w_1
@@ -9042,7 +9042,7 @@ m_pix_op_not_3:
 	;jmp	short m_pix_op_not_32
 m_pix_op_not_32:
 	; 32 bit true colors
-	lodsd 
+	lodsd
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_not_32_1 ; exclude
 	not	dword [edi]
@@ -9457,7 +9457,7 @@ m_pix_op_dec_3:
 	;jmp	short m_pix_op_dec_32
 m_pix_op_dec_32:
 	; 32 bit true colors
-	lodsd 
+	lodsd
 	cmp	eax, [maskcolor]
 	je	short m_pix_op_dec_32_1 ; exclude
 	dec	dword [edi]
@@ -10256,7 +10256,7 @@ sysvideo_19:
 	; BH = 7
 	; Get (Super/Extended VGA) mode
 	; and Linear Frame Buffer info.
-	
+
 	; 22/01/2021
 	mov	bl, 0FFh
 	; 11/12/2020
@@ -10333,7 +10333,7 @@ sysvideo_20_1:
 	;jnc	short sysvideo_20_2
 	jc	short sysvideo_20_4 ; edx = 0
 
-	;; clear LFBINFO table for invalidating	
+	;; clear LFBINFO table for invalidating
 	;mov	ecx, LFBINFO.size ; 16
 	;mov	edi, esi ; LFB_Info table address
 	;xor	eax, eax
@@ -10536,7 +10536,7 @@ sysvideo_21_4:
 	jmp	short sysvideo_21_0
 
 	; 23/07/2022
-sysvideo_21_7:	
+sysvideo_21_7:
 	; BMP file type palette handling
 
 	test	bl, 1
@@ -10630,7 +10630,7 @@ sysvideo_21_11:
 	shl	al, 2
 	shl	ebx, 8
 	mov	eax, ebx ; 00RRGGBBh
-	stosd	
+	stosd
 	loop	sysvideo_21_11
 	pop	ecx
 
@@ -10937,7 +10937,7 @@ sysvideo_26_5:
 	jnb	short sysvideo_27_0 ; nonsence !?
 
 	shl	eax, 16
-	;jz	short sysvideo_25 ; eax = 0 
+	;jz	short sysvideo_25 ; eax = 0
 
 	cmp	ebx, 1920*1080*4 ; maximum value of possible
 				 ; buffer sizes
@@ -11280,7 +11280,7 @@ sysvideo_28:
 	; Save/Restore Super VGA video state
 
 	; BL = options
-	;	bit 0 - Save (0) or Restore (1)	
+	;	bit 0 - Save (0) or Restore (1)
 	;	bit 1 - controller hardware state
 	;	bit 2 - BIOS data state
 	;	bit 3 - DAC state
@@ -11448,7 +11448,7 @@ sysvideo_28_7:
 
 	; source or destination is user buffer
 	test	bl, 1
-	jz	short sysvideo_28_12  ; Save
+	jz	short sysvideo_28_12 ; Save
 
 	; Restore
 	cmp	byte [srvsf], 0 ; srs permission flag
@@ -11733,13 +11733,13 @@ sysexec:
 	;	argp1... argpn - table of argument pointers
 	;	argp1:<...0> ... argpn:<...0> - argument strings
 	; Inputs: (arguments)
-	; Outputs: -	
+	; Outputs: -
 	; ...............................................................
 	;
 	; Retro UNIX 386 v1 modification:
-	;	User application runs in it's own virtual space 
+	;	User application runs in it's own virtual space
 	;	which is izolated from kernel memory (and other
-	;	memory pages) via 80386	paging in ring 3 
+	;	memory pages) via 80386	paging in ring 3
 	;	privilige mode. Virtual start address is always 0.
 	;	User's core memory starts at linear address 400000h
 	;	(the end of the 1st 4MB).
@@ -11761,7 +11761,7 @@ sysexec:
 	; * name - 'u.namep' points to address of file/path name
 	;          in the user's program segment ('u.segmnt')
 	;          with offset in BX register (as sysopen argument 1).
-	; * argp - sysexec argument 2 is in CX register 
+	; * argp - sysexec argument 2 is in CX register
 	;          which is on top of stack.
 	;
 		; jsr r0,arg2 / arg0 in u.namep,arg1 on top of stack
@@ -12024,7 +12024,7 @@ sysexec_9:
 	;jz	short sysexec_13 ; 19/11/2017
 	;;jnz	short sysexec_10
 	;;mov 	ebx, edi
-	;;sub	ebx, 4 
+	;;sub	ebx, 4
 	;;mov	[ebx], eax ; 0
 	;;jmp 	short sysexec_13
 	; 23/07/2022
@@ -12033,7 +12033,7 @@ sysexec_9:
 	or	eax, eax
 	jnz	short sysexec_10
 	mov 	ebx, edi
-	sub	ebx, 4 
+	sub	ebx, 4
 	mov	[ebx], eax ; 0
 	jmp 	short sysexec_13
 
@@ -12135,7 +12135,7 @@ sysexec_13:
 	lodsd
 	add	ecx, eax ; + data section size (initialized data)
 	mov	ebx, ecx
-	lodsd	
+	lodsd
 	add	ebx, eax ; + bss section size (for overrun checking)
 	cmp	ebx, [u.count]
 	ja	short sysexec_14  ; program overruns stack !
@@ -12417,7 +12417,7 @@ get_argp4:
 	retn
 
 	; 23/07/2022
-%if 0	
+%if 0
 
 sysstat: 
 	; 13/01/2017 - TRDOS 386 (TRDOS v2.0)
@@ -12427,7 +12427,7 @@ sysstat:
         mov     [u.r0], eax 
 	jmp	error
 
-sysfstat: 
+sysfstat:
 	; 13/01/2017 - TRDOS 386 (TRDOS v2.0)
 	; temporary !
 	mov	eax, ERR_INV_FNUMBER ; 'invalid function number !'
@@ -12449,10 +12449,10 @@ fclose:
 	;
 	; Given the file descriptor (index to the u.fp list)
 	; 'fclose' first gets the i-number of the file via 'getf'.
-	; If i-node is active (i-number > 0) the entry in 
+	; If i-node is active (i-number > 0) the entry in
 	; u.fp list is cleared. If all the processes that opened
 	; that file close it, then fsp etry is freed and the file
-	; is closed. If not a return is taken. 
+	; is closed. If not a return is taken.
 	; If the file has been deleted while open, 'anyi' is called
 	; to see anyone else has it open, i.e., see if it is appears
 	; in another entry in the fsp table. Upon return from 'anyi'
@@ -12499,7 +12499,7 @@ fclose:
 _fclose_0:
 	cmp	byte [ebx+OF_MODE], 1 ; open mode ; 0 = empty entry
 	jb	short fclose_1	      ; 1 = read, 2 = write
-	
+
 	; 18/09/2024 (EMPTY FILE BugFix)
 	;cmp	eax, 1 ; is the first cluster number > 0
 	;jb	short fclose_1 ; no, this is empty entry
@@ -12582,7 +12582,7 @@ getf3:
 	clc 
 getf4:
 	retn
-;getf5: 
+;getf5:
 	; 17/04/2021
 	; (following code is disabled as temporary)
 	;
@@ -12611,7 +12611,7 @@ trans_addr_nm:
 	; 17/06/2015
 	; 16/06/2015
 	;
-	; INPUTS: 
+	; INPUTS:
 	;	ebp = pathname address (virtual) ; [u.namep]
 	;	[u.pgdir] = user's page directory
 	; OUTPUT:
@@ -12667,7 +12667,7 @@ sysbreak:
 	; Arguments: -
 	;
 	; Inputs: u.break - current breakpoint
-	; Outputs: u.break - new breakpoint 
+	; Outputs: u.break - new breakpoint
 	;	area between old u.break and the stack (sp) is cleared.
 	;
 	; ...............................................................
@@ -13465,7 +13465,7 @@ load_and_run_file:
 	; 'loc_load_run_file_8' address has 
 	; 'jmp loc_file_rw_restore_retn' instruction
 	; 'loc_file_rw_restore_retn:' will return to
-	; [mainprog_return_addr] 
+	; [mainprog_return_addr]
 	; just after 'call command_interpreter'
 	;
 	push	_end_of_mainprog ; we must not return to here !
@@ -13524,7 +13524,7 @@ cnpm_3:
 	cmp	si, nproc 	; all processes checked
 	jb	short cnpm_1    ; no, branch back
 cnpm_panic:
-	jmp	panic 
+	jmp	panic
 cnpm_2:
 	mov	eax, [u.pgdir] ; page directory of MainProg
 	mov	[u.ppgdir], eax ; parent's page directory
@@ -13769,7 +13769,7 @@ mget_r_2:
 	; 23/07/2022
 	;xor	ch, ch
 	; 29/08/2023
-	shl	ecx, 9 
+	shl	ecx, 9
 	;shl	cx, 9 ; * 512
 	;dec	cx ; bytes per cluster - 1
 	; 23/07/2022
@@ -14163,7 +14163,7 @@ swap:
 	; OUTPUTS ->
 	;    (original unix v1 -> present process to its disk block)
 	;    (original unix v1 -> new process into core ->
-	;	   Retro Unix 8086 v1 -> segment registers changed 
+	;	   Retro Unix 8086 v1 -> segment registers changed
 	;	   for new process)
 	;    u.quant = 3 (Time quantum for a process)
 	; 	((INT 1Ch count down speed -> 18.2 times per second)
@@ -14281,7 +14281,7 @@ wswap:  ; < swap out, swap to disk >
 	;       'swap to disk' is replaced with 'change running segment'
 	;	according to 8086 cpu (x86 real mode) architecture.
 	;	pdp-11 was using 64KB uniform memory while IBM PC
-	;	compatibles was using 1MB segmented memory 
+	;	compatibles was using 1MB segmented memory
 	;	in 8086/8088 times.
 	;
 	; INPUTS ->
@@ -14354,9 +14354,9 @@ rswap:  ; < swap in, swap from disk >
 	;	saving 'u' structure and user registers for task switching).
 	;	u.usp - points to kernel stack address which contains
 	;		user's registers while entering system call.
-	;	u.sp  - points to kernel stack address 
+	;	u.sp  - points to kernel stack address
 	;		to return from system call -for IRET-.
-	;	[u.usp]+32+16 = [u.sp] 
+	;	[u.usp]+32+16 = [u.sp]
 	;	[u.usp] -> edi, esi, ebp, esp (= [u.usp]+32), ebx,
 	;		edx, ecx, eax, gs, fs, es, ds, -> [u.sp].
 	;
@@ -14482,7 +14482,7 @@ putlu:
 		; br 2f /
 putlu_1: ; 1:
 	mov	[ebx-1], al
-       		; movb r1,-1(r2) / user is only user; 
+       		; movb r1,-1(r2) / user is only user;
 			    ; / put process no. at beginning and at end
 putlu_2: ; 2:
 	mov	[ebx], al
@@ -14850,7 +14850,7 @@ sysfff: ; <Find First File>
 	;	*  CH = 3 -> Return msdos/FAT directory entry (32 bytes)
 	;		+ ASCIIZ LongName (130+1+1 bytes)
 	;               (The kernel performs UNICODE to ASCII conversion
-	;                 based on the country code set 
+	;                 based on the country code set
 	;			-for later kernel versions-)
 	;		((The default UNICODE to ASCIIZ conversion
         ;                method for the current kernel version:
@@ -16217,7 +16217,7 @@ uflmdt_1:
 	;;;
 	; 03/09/2024
 	shl	bl, 1 ; *2
-	; 27/08/2024 
+	; 27/08/2024
 	and	eax, eax
 	jnz	short uflmdt_3 ; not empty file
 	xchg	eax, [setfclust]
@@ -16356,7 +16356,7 @@ uflmdt_10:
 	jne	short uflmdt_2 ; no !?
 
 	;;;
-	; 27/08/2024 
+	; 27/08/2024
 	and	edx, edx
 	jnz	short uflmdt_12 ; not empty file
 	xchg	edx, [setfclust]
@@ -16446,7 +16446,7 @@ sysalloc:
 	;	   there is not a memory aperture with requested size
 	;	   but total free mem is not less than requested size.
 	;	   EAX = Physical addr of available memory aperture
-	;	   	 with max size 
+	;	   	 with max size
 	;	        (but it doesn't fit to the conditions!)
 	;	   ECX = Size of available memory aperture in bytes.
 	;	If CF = 1 -> EAX = 0FFFFFFFFh
@@ -16691,7 +16691,7 @@ syscalbac:
 	;	CF = 1 & EAX > 0 -> IRQ is prohibited or locked
 	;			by another process
 	;		 eax = ERR_PERM_DENIED -> prohibited or locked
-	;		 eax = ERR_INV_PARAMETER -> 
+	;		 eax = ERR_INV_PARAMETER ->
 	;		       invalid parameter/option or bad address
 	;
 	;	NOTE: Timer callbacks are set by using 'systimer'
@@ -16749,7 +16749,7 @@ syscalbac:
 	;		        Lock and unlock (by user) will change
 	;			these flags or 'terminate process' (sysexit)
 	;			will clear these flags and unlock those IRQs.
-	;			               
+	;
 	;		   	Bit 0 is for IRQ 0 and Bit 15 is for IRQ 15
 	;
 	;	   IRQ(x).owner	 : 1 byte, user, [u.uno], 0 = free (unlocked)
@@ -16788,7 +16788,7 @@ syscalbac:
 	;	      service, kernel will force (convert) system call to
 	;	      'sysrele' (sys release). So, this feature provides
 	;	      easy and simple usage of callback services without
-	;	      falling into deepless <please 'callback me' then 
+	;	      falling into deepless <please 'callback me' then
 	;	      let me 'callback you'> cycles! (User must return
 	;	      from callback service by using 'sysrele' system
 	;	      call, without a significant delay. Otherwise user
@@ -16878,7 +16878,7 @@ sysdelete_2:
 	; check file attributes
 
 	;test	bl, 17 ; system, hidden, readonly, directory
-        test	bl, 7 ; system, hidden, readonly 
+        test	bl, 7 ; system, hidden, readonly
         jz	short sysdelete_3
 
         mov	eax, ERR_FILE_ACCESS ; 11 = 'permission denied !'
@@ -17048,7 +17048,7 @@ sysrmdir_9:
 	jmp	short sysrmdir_7
 
 syschdir: ; Change Current (Working) Drive & Directory (for user)
-	; 30/12/2017 (TRDOS 386 = TRDOS v2.0) 
+	; 30/12/2017 (TRDOS 386 = TRDOS v2.0)
 	;
         ; INPUT ->
         ;          EBX = Directory name (ASCIIZ string) address
@@ -17072,7 +17072,7 @@ syschdir: ; Change Current (Working) Drive & Directory (for user)
 	; file name is not forced, change directory as temporary
 	xor	eax, eax
 	;mov	[FFF_Valid], ah ; 0 ; reset
-	;call	set_working_path 
+	;call	set_working_path
 	call	set_working_path_xx
 	jnc	short syschdir_ok
 	and	eax, eax  ; 0 -> Bad Path!
@@ -17159,7 +17159,7 @@ syschmod_0:
 	; file name is forced, change directory as temporary
 	;mov	ax, 1
 	;mov	[FFF_Valid], ah ; 0 ; reset
-	;call	set_working_path 
+	;call	set_working_path
 	call	set_working_path_x
 	jnc	short syschmod_1
 	and	eax, eax  ; 0 -> Bad Path!
@@ -17386,6 +17386,8 @@ sysldrvt: ; Get copy of Logical DOS Drive Description Table
 	jmp	short sysdir_ok
 
 systime: ; Get System Date&Time
+	; 16/05/2026
+	; 15/05/2026
 	; 03/05/2026
 	; 01/05/2026 (TRDOS 386 v2.0.11)
 	; 30/12/2017 (TRDOS 386 = TRDOS v2.0)
@@ -17414,7 +17416,11 @@ systime: ; Get System Date&Time
 	;		18.2Hz to 100Hz conversion: int(timerticks*1000/182)
 	;	    6 = Get Date&Time in MSDOS packed (direntry) format
 	;		(1980->0)
-	;	    7 & other values (>7) =
+	;	16/05/2026
+	;	    7 = Get Timer Ticks OVERFLOW Status
+	; 	    8 = Get Day Of The Week
+	;
+	;	    9 & other values (>9) =
 	;		System timer ticks will be returned
 	;		in EAX and Carry Flag will be set.
 	; OUTPUT ->
@@ -17472,8 +17478,20 @@ systime: ; Get System Date&Time
 	;			bit 0-4: day of the month (1-31)
 	;			bit 5-8: Month (1-12)
 	;			bit 9-15: Year (0-127) [Year-1980]
+	;	16/05/2026
+	;	For BL input = 7
+	;	    EAX = Timer OVERFLOW ([TIMER_OFL]) Status
+	;	        = 1 -> overflow occurred
+	;               = 0 -> no overflow occurred
+	;	For BL input = 8
+	; 	    EAX = Day of the week (1= sunday, 7 = saturday)
+	;	    NOTE: Each time the RTC date is updated/written,
+	;		  ("RTC_55:" in 'timer.s')
+	;	          the dow value in CMOS_DAY_WEEK will
+	;		  be reset/invalidated
+	;	    if CF = 1 or EAX = 0 -> error (invalid)
 	;
-	;	For BL input = 7 (or BL input > 7)
+	;	For BL input = 9 (or BL input > 9)
 	;	    CF = 1 (always.. for current kernel version)
 	;	    EAX = System timer ticks (no error code!)
 	;
@@ -17511,15 +17529,19 @@ systime_1:
 	; 02/05/2026
 	;mov	eax, [TIMER_LH]
 	; bl = 5
-	;call convert_to_100hz
+	;call	convert_to_100hz
 convert_to_100hz:
 	; eax = timer tick count (18.2 Hz)
-	mov	ecx, 1000
+	;mov	ecx, 1000
+	; 15/05/2026
+	mov	ecx, 200000 ; 2000*100
 	mul	ecx
-	mov	ecx, 182
-        div	ecx
+	;mov	ecx, 182
+        mov	ecx, 36413	; 18.2065 Hz = 36413/2000
+	div	ecx
 	; eax = quotient, edx = remainder
-	cmp	edx, 91
+	;cmp	edx, 91
+	cmp	edx, 18207
 	jb	short cnv_to_100hz_ok
 	inc	eax
 cnv_to_100hz_ok:
@@ -17527,11 +17549,45 @@ cnv_to_100hz_ok:
 	;retn
 	;mov	[u.r0], eax
 	;;mov	dword [u.error], 0 ; not an actual error
-	; "100 Hz is not the system timer frequeny"
+	; "100 Hz is not the system timer frequency"
 	;jmp	error	; return with cf = 1
-	;jmp	short systime_2 ; (return 100 Hz tick count)
+	; 16/05/2026
+	jmp	short systime_9 ; (return 100 Hz tick count)
 
 systime_2:
+	; 16/05/2026
+	cmp	bl, 8
+	ja	short systime_9	; invalid sub function
+	jb	short systime_7	; get timer overflow status
+
+	; bl = 8
+	; get day of week ; (in CMOS register 6)
+	;      1 = sunday, 7 = saturday
+	cmp	ecx, 7
+	ja	short systime_8
+	cmp	ecx, 1
+	jb	short systime_8
+
+	call	get_day_of_week
+	jc	short systime_8
+
+	movzx	eax, al
+	; eax = 1 -> sunday
+	; eax = 7 -> saturday
+	jmp	short systime_0
+
+	; 16/05/2026
+systime_7:
+	; bl = 7
+	movzx	eax, byte [TIMER_OFL]
+	; eax = timer -ticks- overflow status
+	;       1 = overflow occurred
+	;       0 = no overflow occurred
+	jmp	short systime_0
+
+systime_8:
+	sub	eax, eax ; 0 ; 0 -> error (invalid)
+systime_9:
 	mov	[u.r0], eax
 	jmp	error	; cf = 1 & [u.r0] = eax = timer ticks
 
@@ -17560,7 +17616,7 @@ systime_4:
 	mov	al, [second]
 	mov	ah, [minute]
 	test	bl, 2
-	jz	short systime_0	; bl = 1 (return time)
+	jz	systime_0	; bl = 1 (return time)
 	; bl = 3
 	; Check time & date match risk
 	; (23:59:59 may cause to wrong
@@ -17588,6 +17644,9 @@ systime_6:
 	jmp	systime_0	; bl = 3 (return date & time)
 
 sysstime: ; Set System Date&Time
+	; 16/05/2026
+	; 15/05/2026
+	; 14/05/2026
 	; 12/05/2026
 	; 03/05/2026
 	; 01/05/2026 (TRDOS 386 v2.0.11)
@@ -17623,12 +17682,19 @@ sysstime: ; Set System Date&Time
 	;		ECX = Unix Epoch Time
 	;	   10 = Set System Timer (Ticks) - 100 Hz input -
 	;		((conversion: input*182/1000))
-	;	   11-0FFh = invalid !
+	;	16/05/2026
+	;	   11 = Set Day Of The Week
+	;		ECX = day of the week (to be set)
+	;		    = 1 -> sunday
+	;		    = 7 -> saturday
+	;
+	;	   12-0FFh = invalid !
+	;
 	;	  ECX = Time (or Timer) value in selected format
 	;	  EDX = Date value in MSDOS format if BL=2,3,6
 	;
 	; OUTPUT ->
-	;	If CF = 0 -> (if BL input < 11 --> CF = 0) 
+	;	If CF = 0 -> (if BL input < 11 --> CF = 0)
 	;	   For BL input = 0,1,2,3,4,5,10
 	;			-> EAX = tick count (18.2 Hz)
 	;	   For BL input = 6,8 -> EAX = unix epoch time
@@ -17642,8 +17708,14 @@ sysstime: ; Set System Date&Time
 	;	   For BL input = 9 -> EAX = packed date&time
 	;			AX = msdos/direntry time (packed)
 	;		 HW of EAX = msdos/direntry date (packed)
+	;	   16/05/2026
+	;	   For BL input = 11
+	;		 EAX = day of the week (in AL)
+	;		     = ECX input (CL)
+	;	       if CF = 1 -> EAX = 0
+	;			   (invalid set value or error)
 	;
-	;	If CF = 1 -> (invalid BL input, >= 11)
+	;	If CF = 1 -> (invalid BL input, >= 12)
 	;	   EAX = ticks count [TIMER_LH] ; 18.2 Hz
 	;
 
@@ -17659,9 +17731,14 @@ sysstime_1:
 	; 03/05/2026
 	call	rtc_to_tick_count
 	; eax = ((182*seconds)+9)/10 ; 18.2 Hz tick count
+	; 15/05/2026
+	; eax = ((36413*seconds)+1000)/2000 ; 18.2065 Hz tick count
 sysstime_2:
 	cli
-	mov	[TIMER_LH], eax ; 18.2 * seconds
+	mov	[TIMER_LH], eax ; 18.2 * seconds (18.2065 Hz)
+	; 16/05/2026
+	; reset timer overflow flag
+	mov	byte [TIMER_OFL],0
 	sti
 sysstime_3:
 	mov	[u.r0], eax
@@ -17686,9 +17763,12 @@ sysstime_6:
 	cmp	bl, 8
 	jb	short sysstime_7
 	; 01/05/2026
-	cmp	bl, 11
+	;cmp	bl, 11
+	; 16/05/2026
+	cmp	bl, 12
 	jb	sysstime_12
-	; invalid input (>7) ; (>10) 01/05/2026
+	;
+	; invalid input (>11)
 	mov	eax, [TIMER_LH] ; 18.2 Hz timer ticks
 				; Note: [TIMER_LH] may be set
 				; to wrong timer value due to
@@ -17696,12 +17776,13 @@ sysstime_6:
 				; (This value must not be
 				; accepted as [TIMER_LH]/18.2
 				; seconds since the midnight.)
-	mov	[u.r0], eax	
+	mov	[u.r0], eax
 	jmp	error ; cf = 1 & [u.r0] = eax = timer ticks
 
 sysstime_7:
+	; 14/05/2026
 	cmp	bl, 4
-	je	short sysstime_3 ; set system timer ticks
+	je	short sysstime_4 ; set system timer ticks
 	cmp	bl, 5
 	;jne	short sysstime_8
 	je	short sysstime_1
@@ -17790,12 +17871,29 @@ sysstime_11:
 	; 03/05/2026
 	jmp	sysstime_1
 
+sysstime_15:
+	; 16/05/2026
+	; BL = 11
+	; set day of the week
+	; ecx (cl) = 1 -> sunday
+	;          = 7 -> saturday
+	;or	ecx, ecx
+	;jz	short sysstime_16
+	cmp	ecx, 7
+	ja	short sysstime_16
+	call	set_day_of_week
+	jc	short sysstime_16
+	mov	[u.r0], ecx	; cl -> day of the week
+	jmp	sysret	; return -> eax = day of the week
+sysstime_16:
+	sub	eax, eax
+	mov	[u.r0], eax	; 0 -> invalid
+	jmp	error
+
 	; 01/05/2026
 sysstime_12:
 	cmp	bl, 9
-	ja	short sysstime_13 ; set system timer ticks for
-				; 100 Hz input
-				; (at first, convert to 18.2 Hz)
+	ja	short sysstime_13 ; 16/05/2026
 	jb	short sysstime_14
 			; convert packed msdos format to epoch
 	; BL = 9
@@ -17832,23 +17930,32 @@ sysstime_12:
 	mov	[u.r0], ecx	; return the packed date&time
 	jmp	sysret
 
-	; 01/05/2026
 sysstime_13:
+	; 16/05/2026
+	cmp	bl, 11
+	je	sysstime_15
+	; 01/05/2026
 	; BL = 10
-	; ecx = timer tick count in 100 Hz format
-	; convert it to 18.2 Hz
+	; set system timer ticks for 100 Hz input
+	; (at first, convert it to 18.2 Hz)
 	; (current kernel version uses 18.2 Hz timer ticks)
+	;
+	; ecx = timer tick count in 100 Hz
 	;call	convert_to_18hz
 convert_to_18hz:
-	; ecx = timer tick count (100 Hz)
-	mov	eax, 182
+	;mov	eax, 182
+	; 15/05/2026
+	mov	eax, 36413 ; 18.2065 Hz = 36413/2000
 	mul	ecx
-	mov	ecx, 1000
-        div	ecx
+	;mov	ecx, 1000
+        mov	ecx, 200000 ; 2000*100
+	div	ecx
 	; eax = quotient, edx = remainder
-	cmp	edx, 500
-	jb	short cnv_to_18hz_ok
-	inc	eax
+	; 16/05/2026
+	;;cmp	edx, 500
+	;cmp	edx, 100000
+	;jb	short cnv_to_18hz_ok
+	;inc	eax
 cnv_to_18hz_ok:
 	; eax = timer tick count (18.2 Hz)
 	;retn
@@ -18319,7 +18426,7 @@ sysenv_1:
 	jc	short sysenv_err
 	mov	edi, ebx ; * ; user's buffer address
 	mov	ecx, eax ; String length
-	mov	esi, esp 
+	mov	esi, esp
 	; ESI = system buffer address
 	; EDI = User's buffer address
 	; ECX = transfer (byte) count

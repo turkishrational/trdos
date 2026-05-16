@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.11
 ; ----------------------------------------------------------------------------
-; Last Update: 12/05/2026 (Previous: 10/02/2026, v2.0.10)
+; Last Update: 16/05/2026 (Previous: 10/02/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -1916,6 +1916,7 @@ vbe2bios:
 	;; 02/12/2020
 	;dw 0	; 32 bit address in pmid_addr
 
+; 16/05/2026 (TRDOS 386 v2.0.11)
 ; 28/02/2017
 ; 22/01/2017
 ; 15/01/2017
@@ -1992,8 +1993,13 @@ T4:
 	;JNZ	short T5		; GO TO DISKETTE_CTL
 	;CMP	word [TIMER_LOW],0B0H
 	;JNZ	short T5		; GO TO DISKETTE_CTL
-	cmp	dword [TIMER_LH], 01800B0h ; 1573040
-	jne	short T5	
+	; 16/05/2026
+T10:
+	;cmp	dword [TIMER_LH], 01800B0h ; 1573040
+	;jne	short T5
+	; 16/05/2026
+	cmp	dword [TIMER_LH], 01800B1h ; 1573041
+	jb	short T5
 
 ;-----	TIMER HAS GONE 24 HOURS
 	;;SUB	AX,AX
@@ -2002,9 +2008,14 @@ T4:
 	; 02/05/2026
 	;sub	eax, eax
 	;mov	[TIMER_LH], eax
-	mov	dword [TIMER_LH], 0
+	; 16/05/2026
+	;mov	dword [TIMER_LH], 0
 	;
 	MOV	byte [TIMER_OFL],1
+	
+	; 16/05/2026
+	sub	dword [TIMER_LH], 01800B1h
+	;jmp	short T10
 
 ;-----	TEST FOR DISKETTE TIME OUT
 
@@ -2013,7 +2024,7 @@ T5:
 	jmp	short T6		; will be replaced with nop, nop
 					; (9090h) if a floppy disk
 					; is detected.
-	;mov	al,[CS:MOTOR_COUNT]
+	;mov	al, [CS:MOTOR_COUNT]
 	mov	al, [MOTOR_COUNT]
 	dec	al
 	;mov	[CS:MOTOR_COUNT], al	; DECREMENT DISKETTE MOTOR CONTROL
@@ -2035,7 +2046,7 @@ T5:
 T6:
 	;inc	word [CS:wait_count]	; 22/12/2014 (byte -> word)
 					; TIMER TICK INTERRUPT
-	;;inc	word [wait_count] ;;27/02/2015
+	;;inc	word [wait_count] ;; 27/02/2015
 	;INT	1CH			; TRANSFER CONTROL TO A USER ROUTINE
 	;cli
 	call 	u_timer			; TRANSFER CONTROL TO A USER ROUTINE
@@ -3787,7 +3798,7 @@ starting_msg:
 	;;;db "Turkish Rational DOS v2.0 [28/01/2025] ...", 0
 	;;db "Turkish Rational DOS v2.0 [28/12/2025] ...", 0
 	;db "Turkish Rational DOS v2.0 [10/02/2026] ...", 0
-	db "Turkish Rational DOS v2.0 [12/05/2026] ...", 0
+	db "Turkish Rational DOS v2.0 [16/05/2026] ...", 0
 NextLine:
 	db 0Dh, 0Ah, 0
 
