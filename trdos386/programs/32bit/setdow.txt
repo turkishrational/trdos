@@ -1,0 +1,547 @@
+     1                                  ; ****************************************************************************
+     2                                  ; setdow.s (TRDOS 386, TRDOS v2.0.11 - sample binary file, 'setdow.prg')
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; SETDOW.PRG ! "Set Day of Week" - 'sysstime' TEST program for TRDOS 386 !
+     5                                  ;
+     6                                  ; 17/05/2026
+     7                                  ;
+     8                                  ; [ Last Modification: 17/05/2026 ]
+     9                                  ;
+    10                                  ; ****************************************************************************
+    11                                  ; nasm setdow.s -l setdow.txt -o SETDOW.PRG
+    12                                  
+    13                                  ; ref: dow4.s (07/05/2026)
+    14                                  
+    15                                  ; 30/04/2026
+    16                                  ; 14/07/2020
+    17                                  ; 31/12/2017
+    18                                  ; TRDOS 386 (v2.0) system calls
+    19                                  _ver 	equ 0
+    20                                  _exit 	equ 1
+    21                                  _fork 	equ 2
+    22                                  _read 	equ 3
+    23                                  _write	equ 4
+    24                                  _open	equ 5
+    25                                  _close 	equ 6
+    26                                  _wait 	equ 7
+    27                                  _create	equ 8
+    28                                  _rename	equ 9
+    29                                  _delete	equ 10
+    30                                  _exec	equ 11
+    31                                  _chdir	equ 12
+    32                                  _time 	equ 13
+    33                                  _mkdir 	equ 14
+    34                                  _chmod	equ 15
+    35                                  _rmdir	equ 16
+    36                                  _break	equ 17
+    37                                  _drive	equ 18
+    38                                  _seek	equ 19
+    39                                  _tell 	equ 20
+    40                                  _memory	equ 21
+    41                                  _prompt	equ 22
+    42                                  _path	equ 23
+    43                                  _env	equ 24
+    44                                  _stime	equ 25
+    45                                  _quit	equ 26
+    46                                  _intr	equ 27
+    47                                  _dir	equ 28
+    48                                  _emt 	equ 29
+    49                                  _ldrvt 	equ 30
+    50                                  _video 	equ 31
+    51                                  _audio	equ 32
+    52                                  _timer	equ 33
+    53                                  _sleep	equ 34
+    54                                  _msg    equ 35
+    55                                  _geterr	equ 36
+    56                                  _fpstat	equ 37
+    57                                  _pri	equ 38
+    58                                  _rele	equ 39
+    59                                  _fff	equ 40
+    60                                  _fnf	equ 41
+    61                                  _alloc	equ 42
+    62                                  _dalloc equ 43
+    63                                  _calbac equ 44
+    64                                  _dma	equ 45
+    65                                  _stdio	equ 46
+    66                                  
+    67                                  %macro sys 1-4
+    68                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)
+    69                                      ; 03/09/2015
+    70                                      ; 13/04/2015
+    71                                      ; Retro UNIX 386 v1 system call.
+    72                                      %if %0 >= 2
+    73                                          mov ebx, %2
+    74                                          %if %0 >= 3
+    75                                              mov ecx, %3
+    76                                              %if %0 = 4
+    77                                                 mov edx, %4
+    78                                              %endif
+    79                                          %endif
+    80                                      %endif
+    81                                      mov eax, %1
+    82                                      ;int 30h
+    83                                      int 40h ; TRDOS 386 (TRDOS v2.0)
+    84                                  %endmacro
+    85                                  
+    86                                  [BITS 32] ; 32-bit intructions
+    87                                  
+    88                                  [ORG 0] 
+    89                                  
+    90                                  START_CODE:
+    91 00000000 89E6                    	mov	esi, esp
+    92 00000002 AD                      	lodsd
+    93 00000003 83F802                  	cmp	eax, 2 ; two arguments (program file name & dow)
+    94 00000006 722F                    	jb	short g_date ; do not set
+    95 00000008 AD                      	lodsd ; program file name address
+    96 00000009 AD                      	lodsd ; day of week (1 = sunday, 7 = monday)
+    97                                  
+    98 0000000A 89C6                    	mov	esi, eax
+    99 0000000C AC                      	lodsb
+   100                                  	
+   101 0000000D C605[46030000]01        	mov	byte [flag], 1
+   102                                  
+   103                                  	;cmp	al, '1'
+   104 00000014 3C30                    	cmp	al, '0'
+   105 00000016 7210                    	jb	short p_usage
+   106                                  	;cmp	al, '7'
+   107 00000018 3C39                    	cmp	al, '9'
+   108 0000001A 770C                    	ja	short p_usage
+   109                                  
+   110 0000001C 2C30                    	sub	al, '0'
+   111 0000001E A2[7C030000]            	mov	[dow_input], al
+   112                                  
+   113 00000023 AC                      	lodsb
+   114 00000024 20C0                    	and	al, al
+   115 00000026 740F                    	jz	short g_date
+   116                                  
+   117                                  p_usage:
+   118 00000028 BE[60020000]            	mov	esi, usage
+   119 0000002D E8A8010000              	call	print_msg
+   120                                  
+   121 00000032 E95A010000              	jmp	terminate
+   122                                  
+   123                                  g_date:
+   124                                  	; Get Date&Time in MSDOS (TRDOS 386) format
+   125                                  	sys	_time, 3
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1> 
+    72                              <1>  %if %0 >= 2
+    73 00000037 BB03000000          <1>  mov ebx, %2
+    74                              <1>  %if %0 >= 3
+    75                              <1>  mov ecx, %3
+    76                              <1>  %if %0 = 4
+    77                              <1>  mov edx, %4
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80                              <1>  %endif
+    81 0000003C B80D000000          <1>  mov eax, %1
+    82                              <1> 
+    83 00000041 CD40                <1>  int 40h
+   126 00000043 89D0                    	mov	eax, edx ; date
+   127                                  g_dow:
+   128 00000045 A3[00040000]            	mov	[date], eax
+   129                                  	; Get Day Of The Week
+   130                                  	sys	_time, 8
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1> 
+    72                              <1>  %if %0 >= 2
+    73 0000004A BB08000000          <1>  mov ebx, %2
+    74                              <1>  %if %0 >= 3
+    75                              <1>  mov ecx, %3
+    76                              <1>  %if %0 = 4
+    77                              <1>  mov edx, %4
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80                              <1>  %endif
+    81 0000004F B80D000000          <1>  mov eax, %1
+    82                              <1> 
+    83 00000054 CD40                <1>  int 40h
+   131 00000056 A3[04040000]            	mov	[dow], eax  ; (RTC CMOS register 6)
+   132                                  	; Get Date in MSDOS (TRDOS 386) format
+   133                                  	sys	_time, 2
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1> 
+    72                              <1>  %if %0 >= 2
+    73 0000005B BB02000000          <1>  mov ebx, %2
+    74                              <1>  %if %0 >= 3
+    75                              <1>  mov ecx, %3
+    76                              <1>  %if %0 = 4
+    77                              <1>  mov edx, %4
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80                              <1>  %endif
+    81 00000060 B80D000000          <1>  mov eax, %1
+    82                              <1> 
+    83 00000065 CD40                <1>  int 40h
+   134 00000067 3B05[00040000]          	cmp	eax, [date]
+   135 0000006D 75D6                    	jne	short g_dow
+   136                                  p_date:
+   137 0000006F A2[6C030000]            	mov	[day], al
+   138 00000074 8825[68030000]          	mov	[month], ah
+   139 0000007A C1E810                  	shr	eax, 16
+   140 0000007D A3[64030000]            	mov	[year], eax
+   141                                  
+   142 00000082 FF35[6C030000]          	push	dword [day]
+   143 00000088 FF35[68030000]          	push	dword [month]
+   144 0000008E FF35[64030000]          	push	dword [year]
+   145                                  
+   146 00000094 E851010000              	call	DayOfWeek
+   147                                  
+   148 00000099 83C40C                  	add	esp, 12
+   149                                  
+   150                                  	; eax = day of the week from this program (0 = sunday)
+   151 0000009C 40                      	inc	eax
+   152 0000009D A3[08040000]            	mov	[ndow], eax
+   153                                  	; [dow] = day of the week from RTC CMOS register 6
+   154 000000A2 3B05[04040000]          	cmp	eax, [dow]
+   155 000000A8 7407                    	je	short skip_dow_fix
+   156                                  
+   157 000000AA 800D[46030000]80        	or	byte [flag], 80h
+   158                                  skip_dow_fix:
+   159 000000B1 BE[FC020000]            	mov	esi, header
+   160 000000B6 E81F010000              	call	print_msg
+   161                                  
+   162 000000BB BF[0C040000]            	mov	edi, txt_date
+   163                                  
+   164 000000C0 A1[6C030000]            	mov	eax, [day]
+   165 000000C5 E8DC000000              	call	bin_to_str_2
+   166                                  
+   167 000000CA C6072F                  	mov	byte [edi],'/'
+   168 000000CD 47                       	inc	edi
+   169                                  
+   170 000000CE A1[68030000]            	mov	eax, [month]
+   171 000000D3 E8CE000000              	call	bin_to_str_2
+   172                                  
+   173 000000D8 C6072F                  	mov	byte [edi],'/'
+   174 000000DB 47                       	inc	edi
+   175                                  
+   176 000000DC A1[64030000]            	mov	eax, [year]
+   177 000000E1 E8B9000000              	call	bin_to_str_4
+   178                                  
+   179 000000E6 C60700                  	mov	byte [edi],0
+   180                                  
+   181 000000E9 BE[0C040000]            	mov	esi, txt_date
+   182 000000EE E8E7000000              	call	print_msg
+   183                                  
+   184 000000F3 BE[0B030000]            	mov	esi, _space
+   185 000000F8 E8DD000000              	call	print_msg
+   186                                  
+   187 000000FD 8B1D[04040000]          	mov	ebx, [dow]
+   188 00000103 4B                      	dec	ebx ; 1 .. 7 -> 0 .. 6
+   189 00000104 C1E302                  	shl	ebx, 2	; * 4
+   190 00000107 81C3[48030000]          	add	ebx, day_names
+   191 0000010D 8B33                    	mov	esi, [ebx]
+   192 0000010F E8C6000000              	call	print_msg
+   193                                  
+   194 00000114 BE[F9020000]            	mov	esi, newline
+   195 00000119 E8BC000000              	call	print_msg
+   196                                  
+   197 0000011E 803D[46030000]80        	cmp	byte [flag], 80h
+   198 00000125 720A                    	jb	short skip_wdow_msg
+   199                                  
+   200 00000127 BE[80030000]            	mov	esi, wrong_dow_msg
+   201 0000012C E8A9000000              	call	print_msg
+   202                                  	
+   203                                  skip_wdow_msg:
+   204 00000131 F605[46030000]FF        	test	byte [flag], 0FFh
+   205 00000138 744D                    	jz	short p_newline
+   206                                  
+   207 0000013A BE[F9020000]            	mov	esi, newline
+   208 0000013F E896000000              	call	print_msg
+   209                                  
+   210 00000144 BE[B3030000]            	mov	esi, confirm
+   211 00000149 E88C000000              	call	print_msg
+   212                                  
+   213                                  getchar:
+   214                                  	; TRDOS 386 keyboard input interrupt
+   215                                  	; (ROMBIOS INT 16h simulation)
+   216 0000014E 30E4                    	xor	ah, ah
+   217 00000150 CD32                    	int	32h
+   218                                  
+   219 00000152 3C1B                    	cmp	al, 27	; ESC (1Bh)
+   220 00000154 7431                    	je	short p_newline
+   221 00000156 3C0D                    	cmp	al, 13	; ENTER/CR (0Dh)
+   222 00000158 75F4                    	jne	short getchar
+   223                                  
+   224 0000015A 8B0D[08040000]          	mov	ecx, [ndow]
+   225 00000160 F605[46030000]01        	test 	byte [flag], 1 ; manual dow
+   226 00000167 7406                    	jz	short s_dow
+   227                                  	; use input (even if it is a wrong dow)
+   228 00000169 8B0D[7C030000]          	mov	ecx, [dow_input]
+   229                                  s_dow:
+   230                                  	; Set Day of the Week (RTC CMOS register 6)
+   231                                  	sys	_stime, 11   ; bl = 11, ecx = dow
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1> 
+    72                              <1>  %if %0 >= 2
+    73 0000016F BB0B000000          <1>  mov ebx, %2
+    74                              <1>  %if %0 >= 3
+    75                              <1>  mov ecx, %3
+    76                              <1>  %if %0 = 4
+    77                              <1>  mov edx, %4
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80                              <1>  %endif
+    81 00000174 B819000000          <1>  mov eax, %1
+    82                              <1> 
+    83 00000179 CD40                <1>  int 40h
+   232 0000017B 720A                    	jc	short p_newline
+   233                                  
+   234                                  	; updated message
+   235 0000017D BE[F5030000]            	mov	esi, updated
+   236 00000182 E853000000              	call	print_msg		
+   237                                  	
+   238                                  p_newline:
+   239 00000187 BE[F9020000]            	mov	esi, newline
+   240 0000018C E849000000              	call	print_msg
+   241                                  
+   242                                  terminate:
+   243                                  	sys	_exit, 0
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1> 
+    72                              <1>  %if %0 >= 2
+    73 00000191 BB00000000          <1>  mov ebx, %2
+    74                              <1>  %if %0 >= 3
+    75                              <1>  mov ecx, %3
+    76                              <1>  %if %0 = 4
+    77                              <1>  mov edx, %4
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80                              <1>  %endif
+    81 00000196 B801000000          <1>  mov eax, %1
+    82                              <1> 
+    83 0000019B CD40                <1>  int 40h
+   244                                  
+   245                                  ;-----------------------------------------------------------------
+   246                                  
+   247                                  hang:
+   248 0000019D EBFE                    	jmp	short hang
+   249                                  
+   250                                  ;-----------------------------------------------------------------
+   251                                  
+   252                                  	; 06/05/2026
+   253                                  bin_to_str_4:
+   254 0000019F BE04000000              	mov	esi, 4
+   255 000001A4 EB05                    	jmp	short bin_to_str
+   256                                  bin_to_str_2:
+   257 000001A6 BE02000000              	mov	esi, 2
+   258                                  bin_to_str:
+   259 000001AB 31C9                    	xor	ecx, ecx ; 0
+   260 000001AD 89E5                    	mov	ebp, esp
+   261 000001AF BB0A000000              	mov	ebx, 10
+   262                                  bin2str_div:
+   263 000001B4 31D2                    	xor	edx, edx
+   264 000001B6 F7F3                    	div	ebx
+   265 000001B8 80C230                  	add	dl, '0'
+   266 000001BB 52                      	push	edx
+   267 000001BC 41                      	inc	ecx
+   268                                  	;cmp	eax, 0
+   269                                  	;ja	short bin2str_div
+   270 000001BD 21C0                    	and	eax, eax
+   271 000001BF 75F3                    	jnz	short bin2str_div
+   272                                  
+   273 000001C1 89F3                    	mov	ebx, esi
+   274 000001C3 01FE                    	add	esi, edi
+   275 000001C5 29CB                    	sub	ebx, ecx
+   276 000001C7 7E06                    	jng	short skip_zero_prefix
+   277                                  	; eax = 0
+   278 000001C9 0430                    	add	al,'0'
+   279                                  zero_prefix:
+   280 000001CB AA                      	stosb
+   281 000001CC 4B                      	dec	ebx
+   282 000001CD 75FC                    	jnz	short zero_prefix
+   283                                  
+   284                                  skip_zero_prefix:
+   285                                  pop_next:
+   286 000001CF 58                      	pop	eax
+   287 000001D0 39F7                    	cmp	edi, esi
+   288 000001D2 7301                    	jnb	short skip_stosb
+   289 000001D4 AA                      	stosb
+   290                                  skip_stosb:
+   291 000001D5 39EC                    	cmp	esp, ebp
+   292 000001D7 72F6                    	jb	short pop_next
+   293                                  
+   294                                  bin2str_ok:
+   295 000001D9 C3                      	retn
+   296                                  
+   297                                  ;-----------------------------------------------------------------
+   298                                  
+   299                                  print_msg:
+   300 000001DA BB0F000000              	mov	ebx, 0Fh       ; white characters (bl)
+   301                                  		               ; video page 0 (bh)
+   302                                  print_msg_@:
+   303 000001DF B40E                    	mov	ah, 0Eh ; teletype output (write tty)
+   304 000001E1 AC                      	lodsb
+   305                                  _p_nextchar:
+   306 000001E2 CD31                    	int	31h
+   307 000001E4 AC                      	lodsb
+   308 000001E5 20C0                    	and	al, al
+   309 000001E7 75F9                    	jnz	short _p_nextchar
+   310 000001E9 C3                      	retn
+   311                                  
+   312                                  ;-----------------------------------------------------------------
+   313                                  ;
+   314                                  ;-----------------------------------------------------------------
+   315                                  
+   316                                  ; Work out what the day of the week is for a given date
+   317                                  ; Speed optimized x86 assembly (PIII) by Lingo
+   318                                  ;
+   319                                  ; C Algorithm by Tomohiko Sakamoto
+   320                                  ; int dayofweek(int d, int m, int y) {
+   321                                  ;   static int t[] = { 0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4 };
+   322                                  ;   y -= m < 3;
+   323                                  ;   return ( y + y/4 - y/100 + y/400 + t[m-1] + d) % 7;
+   324                                  ; }
+   325                                  ; year  = [0, 9999+]
+   326                                  ; month = [1, 12]
+   327                                  ; day   = [1, 31]
+   328                                  
+   329                                  ;DayOfWeekL  PROTO year:DWORD, month:DWORD, day:DWORD
+   330                                  
+   331                                  DayOfWeek:
+   332 000001EA 8B4C2408                  mov  ecx, [esp+8]               ; ecx=month
+   333 000001EE 8B542404                  mov  edx, [esp+4]               ; edx=year
+   334 000001F2 83F903                    cmp  ecx, 3                     ; test if month is < 3
+   335 000001F5 83DA00                    sbb  edx, 0                     ; if month < 3 then dec edx->years
+   336 000001F8 8B0C8D[2C020000]          mov  ecx, [monthdata + ecx*4-4] ; ecx-> monthdata[m-1]
+   337 000001FF 89D0                      mov  eax, edx                   ; eax=edx=years
+   338 00000201 69D2D8A30000              imul edx, 0A3D8h                ; dividing edx=years by 100 == imul edx, 0A3D8h / shr edx, 22
+   339 00000207 034C240C                  add  ecx, [esp+12]              ; add day; ecx= monthdata[m-1] + day
+   340 0000020B 01C1                      add  ecx, eax                   ; ecx-> monthdata[m-1] + day + years
+   341 0000020D C1E802                    shr  eax, 2                     ; eax= years/4
+   342 00000210 01C8                      add  eax, ecx                   ; eax= monthdata[m-1] + day + years + years/4
+   343                                    ;mov ecx, [esp]                 ; ecx->return address
+   344                                    ;mov [esp+12], ecx              ; ecx->return address to right place
+   345 00000212 C1EA16                    shr  edx, 22                    ; end of dividing ; edx=years/100
+   346 00000215 29D0                      sub  eax, edx                   ; eax= monthdata[m-1] +day + years + years/4 - years/100
+   347 00000217 C1EA02                    shr  edx, 2                     ; edx=years/400
+   348 0000021A 01D0                      add  eax, edx                   ; eax= monthdata[m-1] +day + years + years/4 - years/100 + years/400
+   349 0000021C BA25499224                mov  edx, 24924925h             ; dividing eax by 7 == mul edx, eax ; 24924925h=dword (1/7 * 2^35)
+   350 00000221 89C1                      mov  ecx, eax                   ; ecx= monthdata[m-1]  + day + years + years/4 - years/100 + years/400
+   351 00000223 F7E2                      mul  edx                        ; dividing eax by 7 ->result in edx
+   352 00000225 89C8                      mov  eax, ecx                   ; eax= monthdata[m-1] + day + years + years/4 - years/100 + years/400
+   353 00000227 8D0C52                    lea  ecx, [edx+edx*2]           ; multiplying edx by 7 ->
+   354 0000022A 8D1491                    lea  edx, [ecx+edx*4]           ; ->result in edx
+   355                                    ;add  esp, 3*4                  ; clearing the stack from 3 dword parameters
+   356 0000022D 29D0                      sub  eax, edx                   ; eax= (monthdata[m-1] + day + years + years/4 - years/100 + years/400) % 7
+   357 0000022F C3                        retn                            ; faster return then return 3*4
+   358                                  
+   359                                  ;-----------------------------------------------------------------
+   360                                  ;
+   361                                  ;-----------------------------------------------------------------
+   362                                  
+   363 00000230 000000000300000002-     monthdata: dd 0,3,2,5,0,3,5,1,4,6,2,4
+   363 00000239 000000050000000000-
+   363 00000242 000003000000050000-
+   363 0000024B 000100000004000000-
+   363 00000254 060000000200000004-
+   363 0000025D 000000             
+   364                                  
+   365                                  ;-----------------------------------------------------------------
+   366                                  
+   367                                  usage:
+   368 00000260 5452444F5320333836-     	db "TRDOS 386 v2 'systime' & 'sysstime' system call",0Dh,0Ah
+   368 00000269 207632202773797374-
+   368 00000272 696D65272026202773-
+   368 0000027B 79737374696D652720-
+   368 00000284 73797374656D206361-
+   368 0000028D 6C6C0D0A           
+   369 00000291 746573742070726F67-     	db  "test program by Erdogan Tan [May 2026]",0Dh,0Ah
+   369 0000029A 72616D206279204572-
+   369 000002A3 646F67616E2054616E-
+   369 000002AC 205B4D617920323032-
+   369 000002B5 365D0D0A           
+   370 000002B9 0D0A                    	db  0Dh, 0Ah
+   371 000002BB 55736167653A207365-     	db  "Usage: setdow day_of_week",0Dh,0Ah
+   371 000002C4 74646F77206461795F-
+   371 000002CD 6F665F7765656B0D0A 
+   372 000002D6 202020202020283120-     	db  "      (1 = sunday ... 7 = saturday)"
+   372 000002DF 3D2073756E64617920-
+   372 000002E8 2E2E2E2037203D2073-
+   372 000002F1 6174757264617929   
+   373                                  newline:
+   374 000002F9 0D0A00                  	db 0Dh,0Ah,0
+   375                                  
+   376 000002FC 0D0A                    header:	db 0Dh, 0Ah
+   377 000002FE 43757272656E742044-     	db "Current Date:"
+   377 00000307 6174653A           
+   378 0000030B 2000                    _space:	db " ",0
+   379                                  
+   380 0000030D 53554E44415900          _sunday:    db "SUNDAY",0
+   381 00000314 4D4F4E44415900          _monday:    db "MONDAY",0
+   382 0000031B 5455455344415900        _tuesday:   db "TUESDAY",0
+   383 00000323 5745444E4553444159-     _wednesday: db "WEDNESDAY",0
+   383 0000032C 00                 
+   384 0000032D 544855525344415900      _thursday:  db "THURSDAY",0
+   385 00000336 46524944415900          _friday:    db "FRIDAY",0
+   386 0000033D 534154555244415900      _saturday:  db "SATURDAY",0
+   387                                  
+   388 00000346 00                      flag:	db 0	; epoch input flag
+   389                                  
+   390 00000347 90                      align 4
+   391                                  
+   392                                  day_names:
+   393 00000348 [0D030000]              	dd _sunday
+   394 0000034C [14030000]              	dd _monday
+   395 00000350 [1B030000]              	dd _tuesday
+   396 00000354 [23030000]              	dd _wednesday
+   397 00000358 [2D030000]              	dd _thursday
+   398 0000035C [36030000]              	dd _friday
+   399 00000360 [3D030000]              	dd _saturday
+   400                                  
+   401 00000364 00000000                year:	dd 0
+   402 00000368 00000000                month:	dd 0
+   403 0000036C 00000000                day:	dd 0
+   404 00000370 00000000                hour:	dd 0
+   405 00000374 00000000                minute: dd 0
+   406 00000378 00000000                second: dd 0
+   407                                  dow_input:
+   408 0000037C 00000000                	dd 0
+   409                                  
+   410                                  wrong_dow_msg:
+   411 00000380 0D0A                    	db 0Dh,0Ah
+   412 00000382 57726F6E6720646179-     	db "Wrong day of the week in RTC CMOS register 6 !"
+   412 0000038B 206F66207468652077-
+   412 00000394 65656B20696E205254-
+   412 0000039D 4320434D4F53207265-
+   412 000003A6 676973746572203620-
+   412 000003AF 21                 
+   413 000003B0 0D0A00                  	db 0Dh,0Ah,0
+   414                                  confirm:
+   415 000003B3 0D0A                    	db 0Dh,0Ah
+   416 000003B5 507265737320454E54-     	db "Press ENTER to update day of the week",0Dh,0Ah
+   416 000003BE 455220746F20757064-
+   416 000003C7 61746520646179206F-
+   416 000003D0 662074686520776565-
+   416 000003D9 6B0D0A             
+   417 000003DC 6F7220707265737320-     	db "or press ESC to cancel",0Dh,0Ah,0
+   417 000003E5 45534320746F206361-
+   417 000003EE 6E63656C0D0A00     
+   418                                  updated:
+   419 000003F5 0D0A                    	db 0Dh,0Ah
+   420 000003F7 4F4B202E2E2E0D0A00      	db "OK ...",0Dh,0Ah,0
+   421                                  
+   422                                  ;-----------------------------------------------------------------
+   423                                  ;  uninitialized data
+   424                                  ;-----------------------------------------------------------------
+   425                                  
+   426                                  bss:
+   427                                  
+   428                                  ABSOLUTE bss
+   429                                  
+   430 00000400 ????????                date:	resd 1
+   431 00000404 ????????                dow:	resd 1
+   432 00000408 ????????                ndow:	resd 1
+   433                                  
+   434                                  txt_date:
+   435 0000040C <res Ch>                	resb 12
