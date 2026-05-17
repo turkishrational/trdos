@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.11
 ; ----------------------------------------------------------------------------
-; Last Update: 16/05/2026 (Previous: 10/02/2026, v2.0.10)
+; Last Update: 17/05/2026 (Previous: 10/02/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -2975,7 +2975,7 @@ bcd_to_ascii:
 	; INPUT ->
 	;	al = Packed BCD number
 	; OUTPUT ->
-	;	ax  = ASCII word/number
+	;	ax = ASCII word/number
 	;
 	; Erdogan Tan - 1998 (proc_hex) - TRDOS.ASM (2004-2011)
 	;
@@ -3390,36 +3390,36 @@ Align 2
 
 ; 04/11/2014 (Retro UNIX 386 v1)
 mem_1m_1k:   dw 0  ; Number of contiguous KB between
-                     ; 1 and 16 MB, max. 3C00h = 15 MB.
+                   ; 1 and 16 MB, max. 3C00h = 15 MB.
 mem_16m_64k: dw 0  ; Number of contiguous 64 KB blocks
 		   ; between 16 MB and 4 GB.
 
 ; 12/11/2014 (Retro UNIX 386 v1)
-boot_drv:    db 0 ; boot drive number (physical)
+boot_drv:    db 0  ; boot drive number (physical)
 ; 24/11/2014
 drv:	     db 0 
-last_drv:    db 0 ; last hdd
+last_drv:    db 0  ; last hdd
 hdc:         db 0  ; number of hard disk drives
-		     ; (present/detected)
+		   ; (present/detected)
 
 ; 24/11/2014 (Retro UNIX 386 v1)
 ; Physical drive type & flags
 fd0_type:    db 0  ; floppy drive type
 fd1_type:    db 0  ; 4 = 1.44 Mb, 80 track, 3.5" (18 spt)
-		     ; 6 = 2.88 Mb, 80 track, 3.5" (36 spt)
-		     ; 3 = 720 Kb, 80 track, 3.5" (9 spt)
-		     ; 2 = 1.2 Mb, 80 track, 5.25" (15 spt)
-		     ; 1 = 360 Kb, 40 track, 5.25" (9 spt)
+		   ; 6 = 2.88 Mb, 80 track, 3.5" (36 spt)
+		   ; 3 = 720 Kb, 80 track, 3.5" (9 spt)
+		   ; 2 = 1.2 Mb, 80 track, 5.25" (15 spt)
+		   ; 1 = 360 Kb, 40 track, 5.25" (9 spt)
 hd0_type:    db 0  ; EDD status for hd0 (bit 7 = present flag)
 hd1_type:    db 0  ; EDD status for hd1 (bit 7 = present flag)
 hd2_type:    db 0  ; EDD status for hd2 (bit 7 = present flag)
 hd3_type:    db 0  ; EDD status for hd3 (bit 7 = present flag)
-		     ; bit 0 - Fixed disk access subset supported
-		     ; bit 1 - Drive locking and ejecting
-		     ; bit 2 - Enhanced disk drive support
-		     ; bit 3 = Reserved (64 bit EDD support)
-		     ; (If bit 0 is '1' Retro UNIX 386 v1
-		     ; will interpret it as 'LBA ready'!)
+		   ; bit 0 - Fixed disk access subset supported
+		   ; bit 1 - Drive locking and ejecting
+		   ; bit 2 - Enhanced disk drive support
+		   ; bit 3 = Reserved (64 bit EDD support)
+		   ; (If bit 0 is '1' Retro UNIX 386 v1
+		   ; will interpret it as 'LBA ready'!)
 
 ; 08/08/2022
 ; (drv.cylinders, drv.spt, drv.spt will not be used now on)
@@ -3798,7 +3798,7 @@ starting_msg:
 	;;;db "Turkish Rational DOS v2.0 [28/01/2025] ...", 0
 	;;db "Turkish Rational DOS v2.0 [28/12/2025] ...", 0
 	;db "Turkish Rational DOS v2.0 [10/02/2026] ...", 0
-	db "Turkish Rational DOS v2.0 [16/05/2026] ...", 0
+	db "Turkish Rational DOS v2.0 [17/05/2026] ...", 0
 NextLine:
 	db 0Dh, 0Ah, 0
 
@@ -3951,13 +3951,13 @@ first_page:  resd 1 ; offset value in M.A.T. which
 mat_size:    resd 1 ; Memory Allocation Table size in pages
 
 ; 20/11/2020
-;vbe2bios:    resw 1 ; VBE2 video bios ID (bochs/qemu)
+;vbe2bios:   resw 1 ; VBE2 video bios ID (bochs/qemu)
 ;		    ; (0B0C4h or 0B0C5h for bochs/plex86 vgabios)
 
 ; 02/09/2014 (Retro UNIX 386 v1)
 ; 04/12/2013 (Retro UNIX 8086 v1)
-CRT_START:   resw 1 	  ; starting address in regen buffer
-			  ; NOTE: active page only
+CRT_START:   resw 1 ; starting address in regen buffer
+		    ; NOTE: active page only
 CURSOR_POSN: resw 8 ; cursor positions for video pages
 ACTIVE_PAGE: 
 ptty: 	     resb 1 ; current tty
@@ -3968,7 +3968,7 @@ ccolor:	     resb 1 ; current color attribute
 ttychr:      resw ntty+2 ; Character buffer (multiscreen)
 
 ; 18/05/2015 (03/06/2013 - Retro UNIX 8086 v1 feature only!)
-p_time:      resd 1     ; present time (for systime & sysmdate)
+p_time:      resd 1 ; present time (for systime & sysmdate)
 
 ; 18/05/2015 (16/08/2013 - Retro UNIX 8086 v1 feature only !)
 ; (open mode locks for pseudo TTYs)
@@ -3982,8 +3982,8 @@ wlist:       resb ntty+2 ; wait channel list (0 to 9 for TTYs)
 ;; 12/07/2014 -> sp_init set comm. parameters as 0E3h
 ;; 0 means serial port is not available 
 ;;comprm: ; 25/06/2014
-com1p:       resb 1  ;;0E3h
-com2p:       resb 1  ;;0E3h
+com1p:       resb 1 ;;0E3h
+com2p:       resb 1 ;;0E3h
 
 ; 17/11/2015
 ; request for response (from the terminal)

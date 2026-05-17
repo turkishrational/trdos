@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 16/05/2026  (Previous: 10/01/2026, v2.0.10)
+; Last Update: 17/05/2026  (Previous: 10/01/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -17560,14 +17560,6 @@ systime_2:
 	ja	short systime_9	; invalid sub function
 	jb	short systime_7	; get timer overflow status
 
-	; bl = 8
-	; get day of week ; (in CMOS register 6)
-	;      1 = sunday, 7 = saturday
-	cmp	ecx, 7
-	ja	short systime_8
-	cmp	ecx, 1
-	jb	short systime_8
-
 	call	get_day_of_week
 	jc	short systime_8
 
@@ -17644,6 +17636,7 @@ systime_6:
 	jmp	systime_0	; bl = 3 (return date & time)
 
 sysstime: ; Set System Date&Time
+	; 17/05/2026
 	; 16/05/2026
 	; 15/05/2026
 	; 14/05/2026
@@ -17836,11 +17829,13 @@ sysstime_8:
 	mov	[month], dh
 	shr	edx, 16
 	mov	[year], dx
-	and	bl, 3
-	jz	short sysstime_10 ; 6
+	; 17/05/2026  
+	cmp	bl, 3
+	ja	short sysstime_10 ; 6
 	; BL = 2,3
-	test	bl, 1
-	jz	short sysstime_11 ; 2
+	;test	bl, 1
+	;jz	short sysstime_11 ; 2
+	jb	short sysstime_11
 	; BL = 3
 	;call	set_rtc_date_time
 	;jmp	sysret
@@ -17898,6 +17893,7 @@ sysstime_12:
 			; convert packed msdos format to epoch
 	; BL = 9
 	; convert the given epoch to packed msdos/direntry format
+	mov	eax, ecx ; 17/05/2026	
 	call	convert_from_epoch
 	xor	ecx, ecx
 	mov	ax, [year]
