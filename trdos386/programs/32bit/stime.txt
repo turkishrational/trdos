@@ -1,0 +1,630 @@
+     1                                  ; ****************************************************************************
+     2                                  ; stime.s (TRDOS 386, TRDOS v2.0.11 - sample binary file, 'stime.prg')
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; STIME.PRG ! "Get/Set Time" - "systime" & 'sysstime' TEST program !
+     5                                  ;
+     6                                  ; 18/05/2026
+     7                                  ;
+     8                                  ; [ Last Modification: 18/05/2026 ]
+     9                                  ;
+    10                                  ; ****************************************************************************
+    11                                  ; nasm stime.s -l stime.txt -o STIME.PRG
+    12                                  
+    13                                  ; 30/04/2026
+    14                                  ; 14/07/2020
+    15                                  ; 31/12/2017
+    16                                  ; TRDOS 386 (v2.0) system calls
+    17                                  _ver 	equ 0
+    18                                  _exit 	equ 1
+    19                                  _fork 	equ 2
+    20                                  _read 	equ 3
+    21                                  _write	equ 4
+    22                                  _open	equ 5
+    23                                  _close 	equ 6
+    24                                  _wait 	equ 7
+    25                                  _create	equ 8
+    26                                  _rename	equ 9
+    27                                  _delete	equ 10
+    28                                  _exec	equ 11
+    29                                  _chdir	equ 12
+    30                                  _time 	equ 13
+    31                                  _mkdir 	equ 14
+    32                                  _chmod	equ 15
+    33                                  _rmdir	equ 16
+    34                                  _break	equ 17
+    35                                  _drive	equ 18
+    36                                  _seek	equ 19
+    37                                  _tell 	equ 20
+    38                                  _memory	equ 21
+    39                                  _prompt	equ 22
+    40                                  _path	equ 23
+    41                                  _env	equ 24
+    42                                  _stime	equ 25
+    43                                  _quit	equ 26
+    44                                  _intr	equ 27
+    45                                  _dir	equ 28
+    46                                  _emt 	equ 29
+    47                                  _ldrvt 	equ 30
+    48                                  _video 	equ 31
+    49                                  _audio	equ 32
+    50                                  _timer	equ 33
+    51                                  _sleep	equ 34
+    52                                  _msg    equ 35
+    53                                  _geterr	equ 36
+    54                                  _fpstat	equ 37
+    55                                  _pri	equ 38
+    56                                  _rele	equ 39
+    57                                  _fff	equ 40
+    58                                  _fnf	equ 41
+    59                                  _alloc	equ 42
+    60                                  _dalloc equ 43
+    61                                  _calbac equ 44
+    62                                  _dma	equ 45
+    63                                  _stdio	equ 46
+    64                                  
+    65                                  %macro sys 1-4
+    66                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)
+    67                                      ; 03/09/2015
+    68                                      ; 13/04/2015
+    69                                      ; Retro UNIX 386 v1 system call.
+    70                                      %if %0 >= 2
+    71                                          mov ebx, %2
+    72                                          %if %0 >= 3
+    73                                              mov ecx, %3
+    74                                              %if %0 = 4
+    75                                                 mov edx, %4
+    76                                              %endif
+    77                                          %endif
+    78                                      %endif
+    79                                      mov eax, %1
+    80                                      ;int 30h
+    81                                      int 40h ; TRDOS 386 (TRDOS v2.0)
+    82                                  %endmacro
+    83                                  
+    84                                  [BITS 32] ; 32-bit intructions
+    85                                  
+    86                                  [ORG 0]
+    87                                  
+    88                                  START_CODE:
+    89 00000000 E813000000              	call	show_time
+    90 00000005 E85A000000              	call	set_time
+    91                                  	
+    92                                  terminate:
+    93                                  	sys	_exit, 0
+    66                              <1> 
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1>  %if %0 >= 2
+    71 0000000A BB00000000          <1>  mov ebx, %2
+    72                              <1>  %if %0 >= 3
+    73                              <1>  mov ecx, %3
+    74                              <1>  %if %0 = 4
+    75                              <1>  mov edx, %4
+    76                              <1>  %endif
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79 0000000F B801000000          <1>  mov eax, %1
+    80                              <1> 
+    81 00000014 CD40                <1>  int 40h
+    94                                  
+    95                                  ;-----------------------------------------------------------------
+    96                                  
+    97                                  hang:
+    98 00000016 EBFE                    	jmp	short hang
+    99                                  
+   100                                  ;-----------------------------------------------------------------
+   101                                  
+   102                                  show_time:
+   103                                  	; ref: trdosk3.s  - 19/12/2025
+   104                                  	;      'show_time:'
+   105                                  	;      (26/07/2022 - TRDOS 386 Kernel v2.0.5)
+   106                                  
+   107                                  	;;mov	ah, 02h
+   108                                  	;;int	1Ah
+   109                                  	;	; RTC_20 ; GET RTC TIME
+   110                                  	;mov	ah, 02h
+   111                                  	;int	35h
+   112                                  
+   113                                  	;mov	al, ch
+   114                                  	;call	bcd_to_ascii
+   115                                  	;mov	[Hour], ax
+   116                                  
+   117                                  	;mov	al, cl
+   118                                  	;call	bcd_to_ascii
+   119                                  	;mov	[Minute], ax
+   120                                  
+   121                                  	;mov	al, dh
+   122                                  	;call	bcd_to_ascii
+   123                                  	;mov	[Second], ax
+   124                                  
+   125                                  	; 18/05/2026
+   126                                  	; Get Time in MSDOS (TRDOS 386) format
+   127                                  	sys	_time, 1
+    66                              <1> 
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1>  %if %0 >= 2
+    71 00000018 BB01000000          <1>  mov ebx, %2
+    72                              <1>  %if %0 >= 3
+    73                              <1>  mov ecx, %3
+    74                              <1>  %if %0 = 4
+    75                              <1>  mov edx, %4
+    76                              <1>  %endif
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79 0000001D B80D000000          <1>  mov eax, %1
+    80                              <1> 
+    81 00000022 CD40                <1>  int 40h
+   128                                  
+   129 00000024 A2[2C030000]            	mov	[second], al
+   130 00000029 8825[30030000]          	mov	[minute], ah
+   131 0000002F C1E810                  	shr	eax, 16
+   132                                  	;mov	[hour], eax
+   133                                  
+   134                                  	;mov	eax, [hour]
+   135 00000032 BF[21030000]            	mov	edi, Hour
+   136 00000037 E874020000              	call	bin_to_str
+   137                                  
+   138 0000003C A1[30030000]            	mov	eax, [minute]
+   139 00000041 BF[24030000]            	mov	edi, Minute
+   140 00000046 E865020000              	call	bin_to_str
+   141                                  
+   142 0000004B A1[2C030000]            	mov	eax, [second]
+   143 00000050 BF[27030000]            	mov	edi, Second
+   144 00000055 E856020000              	call	bin_to_str
+   145                                  
+   146 0000005A BE[11030000]            	mov	esi, Msg_Show_Time
+   147                                  	;call	print_msg
+   148                                  	;retn
+   149 0000005F E97A020000              	jmp	print_msg
+   150                                  
+   151                                  set_time:
+   152                                  	; ref: trdosk3.s  - 19/12/2025
+   153                                  	;      'set_time:'
+   154                                  	;      (26/07/2022 - TRDOS 386 Kernel v2.0.5)
+   155                                  
+   156 00000064 BE[00030000]            	mov 	esi, Msg_Enter_Time
+   157 00000069 E870020000              	call	print_msg
+   158                                  
+   159                                  loc_enter_hour_1:
+   160 0000006E 30E4                    	xor     ah, ah
+   161 00000070 CD32                    	int	32h
+   162                                  	; AL = ASCII Code of the Character
+   163 00000072 3C0D                    	cmp	al, 13 ; ENTER key
+   164 00000074 742D                            je	short loc_set_time_retn
+   165 00000076 3C1B                    	cmp	al, 27 ; ESC key
+   166 00000078 7429                            je	short loc_set_time_retn
+   167                                  set_time_0:
+   168 0000007A A2[21030000]            	mov	[Hour], al
+   169 0000007F 3C30                    	cmp	al, '0'
+   170 00000081 7204                            jb	short loc_set_time_stc_0
+   171 00000083 3C32                    	cmp	al, '2'
+   172 00000085 7626                    	jna	short set_time_1
+   173                                  
+   174                                  loc_set_time_stc_0:
+   175 00000087 E862020000              	call	beeper ; BEEP !
+   176 0000008C EBE0                    	jmp	short loc_enter_hour_1
+   177                                  
+   178                                  loc_set_time_stc_1:
+   179 0000008E E806020000              	call	check_for_backspace
+   180 00000093 7407                    	je	short loc_set_time_bs_1
+   181 00000095 E854020000              	call	beeper ; BEEP !
+   182 0000009A EB17                    	jmp	short loc_enter_hour_2
+   183                                  loc_set_time_bs_1:
+   184 0000009C E8E1010000              	call	write_backspace
+   185 000000A1 EBCB                    	jmp	short loc_enter_hour_1
+   186                                  
+   187                                  loc_set_time_retn:
+   188 000000A3 BE[29030000]            	mov 	esi, nextline
+   189                                  	;call	print_msg
+   190                                  	;retn
+   191 000000A8 E931020000              	jmp	print_msg
+   192                                  
+   193                                  set_time_1:
+   194                                  	;mov	bx, 7 ; attribute/color (bl)
+   195                                  		      ; video page 0 (bh)
+   196 000000AD B307                    	mov	bl, 7
+   197                                  	; _write_tty
+   198 000000AF B40E                    	mov	ah, 0Eh
+   199 000000B1 CD31                    	int	31h
+   200                                  loc_enter_hour_2:
+   201 000000B3 30E4                    	xor     ah, ah
+   202                                  	;int	16h
+   203 000000B5 CD32                    	int	32h
+   204                                  	; AL = ASCII Code of the Character
+   205 000000B7 3C1B                    	cmp	al, 27
+   206 000000B9 74E8                    	je	short loc_set_time_retn
+   207 000000BB A2[22030000]            	mov	[Hour+1], al
+   208 000000C0 3C30                    	cmp	al, '0'
+   209 000000C2 72CA                    	jb	short loc_set_time_stc_1
+   210 000000C4 3C39                    	cmp	al, '9'
+   211 000000C6 77C6                    	ja	short loc_set_time_stc_1
+   212 000000C8 803D[21030000]32                cmp     byte [Hour], '2'
+   213 000000CF 7204                    	jb	short pass_set_time_24
+   214 000000D1 3C34                    	cmp	al, '4'
+   215 000000D3 77B9                    	ja	short loc_set_time_stc_1
+   216                                  pass_set_time_24:
+   217                                  	;mov	bx, 7 ; attribute/color (bl)
+   218                                  		      ; video page 0 (bh)
+   219 000000D5 B307                    	mov	bl, 7
+   220                                  	; _write_tty
+   221 000000D7 B40E                    	mov	ah, 0Eh
+   222 000000D9 CD31                    	int	31h
+   223                                  loc_enter_time_separator_1:
+   224 000000DB 28E4                    	sub    ah, ah ; 0
+   225                                  	;int	16h
+   226 000000DD CD32                    	int	32h
+   227                                  	; AL = ASCII Code of the Character
+   228 000000DF 3C1B                    	cmp	al, 27
+   229 000000E1 74C0                    	je	short loc_set_time_retn
+   230 000000E3 3C3A                    	cmp	al, ':'
+   231 000000E5 7415                    	je	short set_time_2
+   232                                  
+   233                                  loc_set_time_stc_2:
+   234 000000E7 E8AD010000              	call	check_for_backspace
+   235 000000EC 7407                    	je	short loc_set_time_bs_2
+   236 000000EE E8FB010000              	call	beeper ; BEEP !
+   237 000000F3 EBE6                    	jmp	short loc_enter_time_separator_1
+   238                                  loc_set_time_bs_2:
+   239 000000F5 E888010000              	call	write_backspace
+   240 000000FA EBB7                    	jmp	short loc_enter_hour_2
+   241                                  
+   242                                  set_time_2:
+   243                                  	;mov	bx, 7 ; attribute/color (bl)
+   244                                  		      ; video page 0 (bh)
+   245 000000FC B307                    	mov	bl, 7
+   246                                  	; _write_tty
+   247 000000FE B40E                    	mov	ah, 0Eh
+   248 00000100 CD31                    	int	31h
+   249                                  loc_enter_minute_1:
+   250 00000102 30E4                    	xor     ah, ah
+   251 00000104 CD32                    	int	32h
+   252                                  	; AL = ASCII Code of the Character
+   253 00000106 3C1B                    	cmp	al, 27
+   254 00000108 7499                    	je	short loc_set_time_retn
+   255 0000010A A2[24030000]            	mov	[Minute], al
+   256 0000010F 3C30                    	cmp	al, '0'
+   257 00000111 7204                    	jb	short loc_set_time_stc_3
+   258 00000113 3C35                    	cmp	al, '5'
+   259 00000115 7615                    	jna	short set_time_3
+   260                                  
+   261                                  loc_set_time_stc_3:
+   262 00000117 E87D010000              	call	check_for_backspace
+   263 0000011C 7407                    	je	short loc_set_time_bs_3
+   264 0000011E E8CB010000              	call	beeper ; BEEP !
+   265 00000123 EBDD                    	jmp	short loc_enter_minute_1
+   266                                  loc_set_time_bs_3:
+   267 00000125 E858010000              	call	write_backspace
+   268 0000012A EBAF                    	jmp	short loc_enter_time_separator_1
+   269                                  
+   270                                  set_time_3:
+   271                                  	;mov	bx, 7 ; attribute/color (bl)
+   272                                  		      ; video page 0 (bh)
+   273 0000012C B307                    	mov	bl, 7
+   274                                  	; _write_tty
+   275 0000012E B40E                    	mov	ah, 0Eh
+   276 00000130 CD31                    	int	31h
+   277                                  loc_enter_minute_2:
+   278 00000132 30E4                    	xor     ah, ah
+   279 00000134 CD32                    	int	32h
+   280                                  	; AL = ASCII Code of the Character
+   281 00000136 3C1B                    	cmp	al, 27
+   282 00000138 7505                    	jne	short loc_enter_minute_3
+   283 0000013A E964FFFFFF              	jmp	loc_set_time_retn
+   284                                  loc_enter_minute_3:
+   285 0000013F A2[25030000]            	mov	[Minute+1], al
+   286 00000144 3C30                    	cmp	al, '0'
+   287 00000146 7204                    	jb	short loc_set_time_stc_4
+   288 00000148 3C39                    	cmp	al, '9'
+   289 0000014A 7615                    	jna	short set_time_4
+   290                                  
+   291                                  loc_set_time_stc_4:
+   292 0000014C E848010000              	call	check_for_backspace
+   293 00000151 7407                    	je	short loc_set_time_bs_4
+   294 00000153 E896010000              	call	beeper ; BEEP !
+   295 00000158 EBD8                    	jmp	short loc_enter_minute_2
+   296                                  loc_set_time_bs_4:
+   297 0000015A E823010000              	call	write_backspace
+   298 0000015F EBA1                    	jmp	short loc_enter_minute_1
+   299                                  
+   300                                  set_time_4:
+   301                                  	;mov	bx, 7 ; attribute/color (bl)
+   302                                  		      ; video page 0 (bh)
+   303 00000161 B307                    	mov	bl, 7
+   304                                  	; _write_tty
+   305 00000163 B40E                    	mov	ah, 0Eh
+   306 00000165 CD31                    	int	31h
+   307                                  loc_enter_time_separator_2:
+   308 00000167 66C705[27030000]30-     	mov	word [Second], 3030h
+   308 0000016F 30                 
+   309 00000170 28E4                    	sub     ah, ah
+   310 00000172 CD32                    	int	32h
+   311                                  	; AL = ASCII Code of the Character
+   312 00000174 3C0D                    	cmp	al, 13
+   313 00000176 7505                    	jne	short loc_enter_time_separator_3
+   314                                  jmp_loc_set_time_progress:
+   315 00000178 E9C5000000              	jmp	loc_set_time_progress
+   316                                  loc_enter_time_separator_3:
+   317 0000017D 3C1B                    	cmp	al, 27
+   318 0000017F 7502                    	jne	short loc_enter_time_separator_4
+   319 00000181 EB76                    	jmp	loc_set_time_ok
+   320                                  loc_enter_time_separator_4:
+   321 00000183 3C3A                    	cmp	al, ':'
+   322 00000185 7557                            jne	short loc_set_time_stc_5
+   323                                  
+   324                                  	;mov	bx, 7 ; attribute/color (bl)
+   325                                  		      ; video page 0 (bh)
+   326 00000187 B307                    	mov	bl, 7
+   327                                  	; _write_tty
+   328 00000189 B40E                    	mov	ah, 0Eh
+   329 0000018B CD31                    	int	31h
+   330                                  loc_enter_second_1:
+   331 0000018D 30E4                    	xor     ah, ah
+   332 0000018F CD32                    	int	32h
+   333                                  	; AL = ASCII Code of the Character
+   334 00000191 3C0D                    	cmp	al, 13
+   335 00000193 74E3                    	je	short jmp_loc_set_time_progress
+   336 00000195 3C1B                    	cmp	al, 27
+   337 00000197 7502                    	jne	short loc_enter_second_2
+   338 00000199 EB5E                    	jmp	loc_set_time_ok
+   339                                  loc_enter_second_2:
+   340 0000019B A2[27030000]            	mov	[Second], al
+   341 000001A0 3C30                    	cmp	al, '0'
+   342 000001A2 725F                    	jb	short loc_set_time_stc_6
+   343 000001A4 3C35                    	cmp	al, '5'
+   344 000001A6 775B                    	ja	short loc_set_time_stc_6
+   345                                  	;mov	bx, 7 ; attribute/color (bl)
+   346                                  		      ; video page 0 (bh)
+   347 000001A8 B307                    	mov	bl, 7
+   348                                  	; _write_tty
+   349 000001AA B40E                    	mov	ah, 0Eh
+   350 000001AC CD31                    	int	31h
+   351                                  loc_enter_second_3:
+   352 000001AE 30E4                    	xor     ah, ah
+   353 000001B0 CD32                    	int	32h
+   354                                  	; AL = ASCII Code of the Character
+   355 000001B2 3C1B                    	cmp	al, 27
+   356 000001B4 7443                    	je	short loc_set_time_ok
+   357 000001B6 3C30                    	cmp	al, '0'
+   358 000001B8 726D                            jb	short loc_set_time_stc_7
+   359 000001BA 3C39                    	cmp	al, '9'
+   360 000001BC 7769                            ja	short loc_set_time_stc_7
+   361                                  	;mov	bx, 7 ; attribute/color (bl)
+   362                                  		      ; video page 0 (bh)
+   363 000001BE B307                    	mov	bl, 7
+   364                                  	; _write_tty
+   365 000001C0 B40E                    	mov	ah, 0Eh
+   366 000001C2 CD31                    	int	31h
+   367                                  loc_set_time_get_lchar_again:
+   368 000001C4 28E4                    	sub	ah, ah ; 0
+   369 000001C6 CD32                    	int	32h
+   370                                  	; AL = ASCII Code of the Character
+   371 000001C8 3C0D                    	cmp	al, 13
+   372 000001CA 7476                    	je	short loc_set_time_progress
+   373 000001CC 3C1B                    	cmp	al, 27
+   374 000001CE 7429                    	je	short loc_set_time_ok
+   375                                  	;
+   376 000001D0 E8C4000000              	call	check_for_backspace
+   377 000001D5 75ED                    	jne	short loc_set_time_get_lchar_again
+   378                                  
+   379                                  loc_set_time_bs_8:
+   380 000001D7 E8A6000000              	call	write_backspace
+   381 000001DC EBD0                    	jmp	short loc_enter_second_3
+   382                                  
+   383                                  loc_set_time_stc_5:
+   384 000001DE E8B6000000              	call	check_for_backspace
+   385 000001E3 740A                    	je	short loc_set_time_bs_5
+   386 000001E5 E804010000              	call	beeper ; BEEP !
+   387 000001EA E978FFFFFF              	jmp	loc_enter_time_separator_2
+   388                                  loc_set_time_bs_5:
+   389 000001EF E88E000000              	call	write_backspace
+   390 000001F4 E939FFFFFF              	jmp	loc_enter_minute_2
+   391                                  
+   392                                  loc_set_time_ok:
+   393 000001F9 BE[29030000]            	mov 	esi, nextline
+   394                                  	;call	print_msg
+   395                                  	;retn
+   396 000001FE E9DB000000              	jmp	print_msg
+   397                                  
+   398                                  loc_set_time_stc_6:
+   399 00000203 E891000000              	call	check_for_backspace
+   400 00000208 7413                    	je	short loc_set_time_bs_6
+   401 0000020A E8DF000000              	call	beeper ; BEEP !
+   402 0000020F 66C705[27030000]30-     	mov	word [Second], 3030h
+   402 00000217 30                 
+   403 00000218 E970FFFFFF              	jmp	loc_enter_second_1
+   404                                  loc_set_time_bs_6:
+   405 0000021D E860000000              	call	write_backspace
+   406 00000222 E940FFFFFF              	jmp	loc_enter_time_separator_2
+   407                                  loc_set_time_stc_7:
+   408 00000227 E86D000000              	call	check_for_backspace
+   409 0000022C 740A                    	je	short loc_set_time_bs_7
+   410 0000022E E8BB000000              	call	beeper ; BEEP !
+   411 00000233 E976FFFFFF              	jmp	loc_enter_second_3
+   412                                  loc_set_time_bs_7:
+   413 00000238 E845000000              	call	write_backspace
+   414 0000023D E94BFFFFFF              	jmp	loc_enter_second_1
+   415                                  
+   416                                  loc_set_time_progress:
+   417                                  	; Get Current Time
+   418                                  	;;mov	ah, 02h
+   419                                  	;;int	1Ah
+   420                                  		; RTC_20 ; GET RTC TIME
+   421 00000242 B402                    	mov	ah, 02h
+   422 00000244 CD35                    	int	35h
+   423                                  	; DL = Daylight Savings Enable option (0-1)
+   424                                  
+   425 00000246 66A1[21030000]          	mov	ax, [Hour]
+   426 0000024C 662D3030                	sub	ax, '00'
+   427 00000250 C0E004                  	shl	al, 4 ; * 16
+   428 00000253 88C5                    	mov	ch, al
+   429 00000255 00E5                    	add	ch, ah
+   430 00000257 66A1[24030000]          	mov	ax, [Minute]
+   431 0000025D 662D3030                	sub	ax, '00'
+   432 00000261 C0E004                  	shl	al, 4 ; * 16
+   433 00000264 88C1                    	mov	cl, al
+   434 00000266 00E1                    	add	cl, ah
+   435 00000268 66A1[27030000]          	mov	ax, [Second]
+   436 0000026E 662D3030                	sub	ax, '00'
+   437 00000272 C0E004                  	shl	al, 4 ; * 16
+   438 00000275 88C6                    	mov	dh, al
+   439 00000277 00E6                    	add	dh, ah
+   440                                  
+   441                                  	;mov	ah, 03h
+   442                                  	;int	1Ah
+   443                                  		; RTC_30 ; SET RTC TIME
+   444 00000279 B403                    	mov	ah, 03h
+   445 0000027B CD35                    	int	35h
+   446                                  
+   447 0000027D E977FFFFFF              	jmp	loc_set_time_ok
+   448                                  
+   449                                  ;-----------------------------------------------------------------
+   450                                  
+   451                                  write_backspace:
+   452 00000282 B008                    	mov	al, 08h ; BACKSPACE
+   453 00000284 BB07000000              	mov	ebx, 7 ; bl = attribute/color
+   454                                  		      ; bh = video page = 0
+   455                                  	; _write_tty
+   456 00000289 B40E                    	mov	ah, 0Eh
+   457 0000028B CD31                    	int	31h
+   458 0000028D B020                    	mov	al, 20h ; BLANK/SPACE char
+   459                                  	;mov	ebx, 7 ; attribute/color
+   460                                  	; _write_c_current
+   461 0000028F B409                    	mov	ah, 09h
+   462 00000291 B901000000              	mov	ecx, 1
+   463 00000296 CD31                    	int	31h
+   464 00000298 C3                      	retn
+   465                                  	
+   466                                  check_for_backspace:
+   467 00000299 663D080E                	cmp	ax, 0E08h
+   468 0000029D 7410                    	je	short cfbs_retn
+   469 0000029F 663DE04B                	cmp	ax, 4BE0h
+   470 000002A3 740A                    	je	short cfbs_retn
+   471 000002A5 663D004B                	cmp	ax, 4B00h
+   472 000002A9 7404                    	je	short cfbs_retn
+   473 000002AB 663DE053                	cmp	ax, 53E0h
+   474                                  cfbs_retn:
+   475 000002AF C3                      	retn
+   476                                  
+   477                                  ;-----------------------------------------------------------------
+   478                                  
+   479                                  	; 18/05/2026
+   480                                  	; 09/05/2026 (ref: 'ctime1.s')
+   481                                  bin_to_str:
+   482 000002B0 BB02000000              	mov	ebx, 2
+   483 000002B5 89E5                    	mov	ebp, esp
+   484 000002B7 B90A000000              	mov	ecx, 10
+   485                                  bin2str_div:
+   486 000002BC 31D2                    	xor	edx, edx
+   487 000002BE F7F1                    	div	ecx
+   488 000002C0 80C230                  	add	dl, '0'
+   489 000002C3 52                      	push	edx
+   490 000002C4 83F800                  	cmp	eax, 0
+   491 000002C7 77F3                    	ja	short bin2str_div
+   492                                  pop_next:
+   493 000002C9 58                      	pop	eax
+   494 000002CA 09DB                    	or	ebx, ebx
+   495 000002CC 7402                    	jz	short skip_stosb
+   496 000002CE AA                      	stosb
+   497 000002CF 4B                      	dec	ebx
+   498                                  skip_stosb:
+   499 000002D0 39EC                    	cmp	esp, ebp
+   500 000002D2 72F5                    	jb	short pop_next
+   501                                  zero_prefix:
+   502 000002D4 09DB                    	or	ebx, ebx
+   503 000002D6 7405                    	jz	short bin2str_ok
+   504 000002D8 C647FF30                	mov	byte [edi-1],'0'
+   505 000002DC AA                      	stosb
+   506                                  	; 18/05/2026
+   507                                  	;dec	ebx
+   508                                  	;jmp	short zero_prefix
+   509                                  bin2str_ok:
+   510 000002DD C3                      	retn
+   511                                  
+   512                                  ;-----------------------------------------------------------------
+   513                                  
+   514                                  print_msg:
+   515 000002DE BB0F000000              	mov	ebx, 0Fh       ; white characters (bl)
+   516                                  		               ; video page 0 (bh)
+   517                                  print_msg_@:
+   518 000002E3 B40E                    	mov	ah, 0Eh ; teletype output (write tty)
+   519 000002E5 AC                      	lodsb
+   520                                  _p_nextchar:
+   521 000002E6 CD31                    	int	31h
+   522 000002E8 AC                      	lodsb
+   523 000002E9 20C0                    	and	al, al
+   524 000002EB 75F9                    	jnz	short _p_nextchar
+   525 000002ED C3                      	retn
+   526                                  
+   527                                  ;-----------------------------------------------------------------
+   528                                  
+   529                                  	; ref: TRDOS 386 v2.0 Kernel - 'video.s' (10/02/2026)
+   530                                  	;      'beeper:' (04/08/2016)
+   531                                  beeper: 
+   532 000002EE B933050000              	mov	ecx, 1331 	; divisor for 886 hz tone
+   533                                  	;mov	bl, 31		; set count for 31/64 second for beep
+   534 000002F3 BB1F000000              	mov	ebx, 31
+   535                                  
+   536                                  	sys	_audio		; bh = 0 -> Beep (PC Speaker)
+    66                              <1> 
+    67                              <1> 
+    68                              <1> 
+    69                              <1> 
+    70                              <1>  %if %0 >= 2
+    71                              <1>  mov ebx, %2
+    72                              <1>  %if %0 >= 3
+    73                              <1>  mov ecx, %3
+    74                              <1>  %if %0 = 4
+    75                              <1>  mov edx, %4
+    76                              <1>  %endif
+    77                              <1>  %endif
+    78                              <1>  %endif
+    79 000002F8 B820000000          <1>  mov eax, %1
+    80                              <1> 
+    81 000002FD CD40                <1>  int 40h
+   537 000002FF C3                      	retn
+   538                                  
+   539                                  ;-----------------------------------------------------------------
+   540                                  
+   541                                  ;bcd_to_ascii:
+   542                                  ;	; ref: TRDOS 386 v2.0 Kernel - 'trdos386.s' (17/05/2026)
+   543                                  ;	;      'bcd_to_ascii:' (25/08/2014)
+   544                                  ;	; input: al = Packed BCD number
+   545                                  ;	; output: ax = ASCII word/number
+   546                                  ;	
+   547                                  ;	db	0D4h, 10h	; Undocumented inst. AAM
+   548                                  ;				; AH = AL / 10h
+   549                                  ;				; AL = AL MOD 10h
+   550                                  ;	or	ax, '00'	; Make it ASCII based
+   551                                  ;	xchg	ah, al
+   552                                  ;	                             
+   553                                  ;	retn
+   554                                  	
+   555                                  ;-----------------------------------------------------------------
+   556                                  ;
+   557                                  ;-----------------------------------------------------------------
+   558                                  
+   559                                  	; ref: 'trdosk9.s' (04/01/2016-17/05/2026)
+   560                                  Msg_Enter_Time:
+   561 00000300 456E746572206E6577-     	db 'Enter new time: '
+   561 00000309 2074696D653A20     
+   562 00000310 00                      	db 0
+   563                                  Msg_Show_Time:
+   564 00000311 43757272656E742074-     	db 'Current time is '
+   564 0000031A 696D6520697320     
+   565 00000321 30                      Hour:	db '0'
+   566 00000322 30                      	db '0'
+   567 00000323 3A                      	db ':'
+   568 00000324 30                      Minute:	db '0'
+   569 00000325 30                      	db '0'
+   570 00000326 3A                      	db ':'
+   571 00000327 30                      Second:	db '0'
+   572 00000328 30                      	db '0'
+   573                                  nextline:
+   574 00000329 0D0A00                  	db 0Dh, 0Ah, 0
+   575                                  
+   576 0000032C 00000000                second:	dd 0
+   577 00000330 00000000                minute:	dd 0
+   578                                  ;hour:	dd 0
