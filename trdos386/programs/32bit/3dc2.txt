@@ -1,0 +1,869 @@
+     1                                  ; ****************************************************************************
+     2                                  ; 3dc.s (TRDOS 386, TRDOS v2.0 - sample binary file, '3dc.prg')
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; 3DC.PRG ! TEST program !  TRDOS 386 VGA Functionality test !
+     5                                  ;
+     6                                  ; 05/09/2016 -disassembled source code-
+     7                                  ;
+     8                                  ; [ Last Modification: 19/05/2026 ] -rewritten using the original source code-
+     9                                  ;
+    10                                  ; Derived from disassembly of '3D.COM' (MSDOS) intro file
+    11                                  ; (10/09/1995, 2113 bytes)
+    12                                  ;
+    13                                  ; Assembler: NASM 2.11 (3.01, 2026)
+    14                                  ;
+    15                                  ; Original code disassembler: IDA Pro Free (MASM syntax)
+    16                                  ; 
+    17                                  ; (Original -msdos- code has been modifed for TRDOS 386 system calls and
+    18                                  ; other protected mode (TRDOS 386) interrupts.)
+    19                                  ; ****************************************************************************
+    20                                  ; nasm 3dc2.s -l 3dc2.txt -o 3DC2.PRG
+    21                                  
+    22                                  ; Modified from: 3dc.s (05/09/2016)
+    23                                  ; ref: 3D.ASM (09-06-1995) ((vulture))
+    24                                  
+    25                                  ;==============================================================================;
+    26                                  ;                                                                              ;
+    27                                  ;   Assembler Program By Vulture.                                              ;
+    28                                  ;   3D-system example. Use the following formulas to rotate a point:           ;
+    29                                  ;                                                                              ;
+    30                                  ;        Rotate around x-axis                                                  ;
+    31                                  ;        YT = Y * COS(xang) - Z * SIN(xang) / 256                              ;
+    32                                  ;        ZT = Y * SIN(xang) + Z * COS(xang) / 256                              ;
+    33                                  ;        Y = YT                                                                ;
+    34                                  ;        Z = ZT                                                                ;
+    35                                  ;                                                                              ;
+    36                                  ;        Rotate around y-axis                                                  ;
+    37                                  ;        XT = X * COS(yang) - Z * SIN(yang) / 256                              ;
+    38                                  ;        ZT = X * SIN(yang) + Z * COS(yang) / 256                              ;
+    39                                  ;        X = XT                                                                ;
+    40                                  ;        Z = ZT                                                                ;
+    41                                  ;                                                                              ;
+    42                                  ;        Rotate around z-axis                                                  ;
+    43                                  ;        XT = X * COS(zang) - Y * SIN(zang) / 256                              ;
+    44                                  ;        YT = X * SIN(zang) + Y * COS(zang) / 256                              ;
+    45                                  ;        X = XT                                                                ;
+    46                                  ;        Y = YT                                                                ;
+    47                                  ;                                                                              ;
+    48                                  ;   Divide by 256 coz we have multiplyd our sin values with 256 too.           ;
+    49                                  ;   This example isn't too fast right now but it'll work just fine.            ;
+    50                                  ;                                                                              ;
+    51                                  ;       Current Date: 6-9-95         Vulture                                   ;
+    52                                  ;                                                                              ;
+    53                                  ;==============================================================================;
+    54                                  
+    55                                  ; 30/04/2026
+    56                                  ; 14/07/2020
+    57                                  ; 31/12/2017
+    58                                  ; TRDOS 386 (v2.0) system calls
+    59                                  _ver 	equ 0
+    60                                  _exit 	equ 1
+    61                                  _fork 	equ 2
+    62                                  _read 	equ 3
+    63                                  _write	equ 4
+    64                                  _open	equ 5
+    65                                  _close 	equ 6
+    66                                  _wait 	equ 7
+    67                                  _create	equ 8
+    68                                  _rename	equ 9
+    69                                  _delete	equ 10
+    70                                  _exec	equ 11
+    71                                  _chdir	equ 12
+    72                                  _time 	equ 13
+    73                                  _mkdir 	equ 14
+    74                                  _chmod	equ 15
+    75                                  _rmdir	equ 16
+    76                                  _break	equ 17
+    77                                  _drive	equ 18
+    78                                  _seek	equ 19
+    79                                  _tell 	equ 20
+    80                                  _memory	equ 21
+    81                                  _prompt	equ 22
+    82                                  _path	equ 23
+    83                                  _env	equ 24
+    84                                  _stime	equ 25
+    85                                  _quit	equ 26
+    86                                  _intr	equ 27
+    87                                  _dir	equ 28
+    88                                  _emt 	equ 29
+    89                                  _ldrvt 	equ 30
+    90                                  _video 	equ 31
+    91                                  _audio	equ 32
+    92                                  _timer	equ 33
+    93                                  _sleep	equ 34
+    94                                  _msg    equ 35
+    95                                  _geterr	equ 36
+    96                                  _fpstat	equ 37
+    97                                  _pri	equ 38
+    98                                  _rele	equ 39
+    99                                  _fff	equ 40
+   100                                  _fnf	equ 41
+   101                                  _alloc	equ 42
+   102                                  _dalloc equ 43
+   103                                  _calbac equ 44
+   104                                  _dma	equ 45
+   105                                  _stdio	equ 46
+   106                                  
+   107                                  %macro sys 1-4
+   108                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)
+   109                                      ; 03/09/2015
+   110                                      ; 13/04/2015
+   111                                      ; Retro UNIX 386 v1 system call.
+   112                                      %if %0 >= 2   
+   113                                          mov ebx, %2
+   114                                          %if %0 >= 3
+   115                                              mov ecx, %3
+   116                                              %if %0 = 4
+   117                                                 mov edx, %4
+   118                                              %endif
+   119                                          %endif
+   120                                      %endif
+   121                                      mov eax, %1
+   122                                      ;int 30h
+   123                                      int 40h ; TRDOS 386 (TRDOS v2.0)
+   124                                  %endmacro
+   125                                  
+   126                                  ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
+   127                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+   128                                  
+   129                                  
+   130                                  ; 3D.ASM
+   131                                  ; +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+   132                                  ; +	This file is generated by The Interactive Disassembler (IDA)	    +
+   133                                  ; +	Copyright (c) 2010 by Hex-Rays SA, <support@hex-rays.com>	    +
+   134                                  ; +			 Licensed to: Freeware version			    +
+   135                                  ; +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+   136                                  ;
+   137                                  ; Input	MD5   :	99FB4748896801681275A14F458D4563
+   138                                  
+   139                                  ; File Name   :	C:\dosprogs\PROGRAMS\3D.COM
+   140                                  ; Format      :	MS-DOS COM-file
+   141                                  ; Base Address:	0h Range: 100h-941h Loaded length: 841h
+   142                                  
+   143                                  ; NASM version: Erdogan Tan, 14/08/2016
+   144                                  
+   145                                  ; ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+   146                                  
+   147                                  [BITS 32] ; 80386 Protected Mode (32 bit) intructions
+   148                                  
+   149                                  [ORG 0]	  ; (Start at Virtual Address 0)
+   150                                  
+   151                                  start:
+   152                                  	; DIRECT VGA MEMORY ACCESS
+   153                                  	;xor	ebx, ebx
+   154 00000000 B705                    	mov	bh, 5 ; Direct access/map to VGA memory (0A0000h)
+   155                                  	;mov	eax, _video ; 1Fh
+   156 00000002 B01F                    	mov	al, 1Fh ; sys _video ; TRDOS 386 Video functions
+   157 00000004 CD40                    	int	40h   ; TRDOS 386 system call
+   158                                  
+   159                                  	; eax = 0A0000h
+   160 00000006 21C0                    	and	eax, eax
+   161 00000008 0F8480000000            	jz      terminate ; error (eax = 0)
+   162                                  
+   163                                  	;mov     esi, prg_msg
+   164                                  	;call	print_msg
+   165                                  
+   166 0000000E 66B81300                	mov	ax, 13h
+   167                                  	;int	10h		; - VIDEO - SET	VIDEO MODE
+   168                                  				; AL = mode
+   169 00000012 CD31                    	int	31h	; TRDOS 386 Video interrupt
+   170                                  
+   171 00000014 BF00000A00              	mov	edi, 0A0000h
+   172 00000019 BE[2A070000]            	mov	esi, Palette	; Set palette
+   173 0000001E 66BAC803                	mov	dx, 3C8h
+   174 00000022 30C0                    	xor	al, al
+   175                                  	;out	dx, al
+   176                                  
+   177 00000024 B401                    	mov	ah, 1 ; out (byte)
+   178 00000026 CD34                    	int	34h ; TRDOS 386 - IOCTL interrupt
+   179                                  
+   180                                  	;mov	dx, 3C9h
+   181 00000028 42                      	inc	edx ; 3C9h
+   182                                  
+   183 00000029 B937020000              	mov	ecx, 189*3 ; 237h
+   184                                  	;rep outsb
+   185                                  outsb_1:
+   186 0000002E AC                      	lodsb
+   187                                  	;mov	ah, 1 ; out (byte)
+   188                                  	; al = data byte
+   189                                  	; dx = port number
+   190 0000002F CD34                    	int	34h ; TRDOS 386 - IOCTL interrupt
+   191                                  
+   192 00000031 49                      	dec	ecx
+   193 00000032 75FA                    	jnz	short outsb_1
+   194                                  
+   195                                  	; === Set some variables ===
+   196 00000034 66C705[94090000]01-     	mov	word [DeltaX], 1 ; Initial speed of rotation
+   196 0000003C 00                 
+   197 0000003D 66C705[98090000]01-     	mov	word [DeltaY], 1 ; Change this and watch
+   197 00000045 00                 
+   198 00000046 66C705[9C090000]01-     	mov	word [DeltaZ], 1 ; what happens. It's fun!
+   198 0000004E 00                 
+   199 0000004F 66C705[A0090000]00-     	mov	word [Xoff], 256 ; 100h
+   199 00000057 01                 
+   200 00000058 66C705[A4090000]00-     	mov	word [Yoff], 256 ; Used for calculating vga-pos
+   200 00000060 01                 
+   201 00000061 66C705[A8090000]2C-     	mov	word [Zoff], 300 ; 12Ch ; Distance from viewer
+   201 00000069 01                 
+   202                                  MainLoop:
+   203 0000006A E88E020000              	call	MainProgram
+   204                                  
+   205                                  	;in	al, 60h		; AT Keyboard controller 8042.
+   206                                  	;cmp	al, 1
+   207                                  	;jnz	short MainLoop
+   208                                  
+   209 0000006F B900020000              	mov	ecx, 512
+   210                                  slow_down_cycle:
+   211 00000074 90                      	nop
+   212 00000075 49                      	dec	ecx
+   213 00000076 75FC                    	jnz	short slow_down_cycle
+   214                                  
+   215 00000078 B401                    	mov	ah, 1	; Check keyboard buffer
+   216 0000007A CD32                    	int	32h	; TRDOS 386 Keyboard interrupt
+   217 0000007C 74EC                    	jz	short MainLoop
+   218                                  
+   219 0000007E 66B80300                	mov	ax, 3
+   220                                  
+   221                                  	;int	10h	; - VIDEO - SET	VIDEO MODE
+   222                                  			; AL = mode
+   223 00000082 CD31                    	int	31h	; TRDOS 386 Video interrupt
+   224                                  
+   225                                  	;mov	esi, prg_msg
+   226 00000084 BE[90030000]            	mov	esi, Credits
+   227 00000089 E8AC020000              	call	print_msg
+   228                                  terminate:
+   229                                  	sys 	_exit   ; INT 40h
+   108                              <1> 
+   109                              <1> 
+   110                              <1> 
+   111                              <1> 
+   112                              <1>  %if %0 >= 2
+   113                              <1>  mov ebx, %2
+   114                              <1>  %if %0 >= 3
+   115                              <1>  mov ecx, %3
+   116                              <1>  %if %0 = 4
+   117                              <1>  mov edx, %4
+   118                              <1>  %endif
+   119                              <1>  %endif
+   120                              <1>  %endif
+   121 0000008E B801000000          <1>  mov eax, %1
+   122                              <1> 
+   123 00000093 CD40                <1>  int 40h
+   230                                  here:
+   231 00000095 EBFE                    	jmp	short here
+   232                                  
+   233                                  ; --------------- S U B	R O U T	I N E ---------------------------------------
+   234                                  
+   235                                  WaitVrt:
+   236 00000097 66BADA03                	mov	dx, 3DAh
+   237                                  
+   238 0000009B B400                    	mov	ah, 0
+   239                                  Vrt:
+   240                                  	;in	al, dx	; Video	status bits:
+   241                                  			; 0: retrace.  1=display is in vert or horiz retrace.
+   242                                  			; 1: 1=light pen is triggered; 0=armed
+   243                                  			; 2: 1=light pen switch	is open; 0=closed
+   244                                  			; 3: 1=vertical	sync pulse is occurring.
+   245                                  
+   246                                  	;mov	ah, 0 ; in (byte)
+   247 0000009D CD34                    	int	34h ; TRDOS 386 - IOCTL interrupt
+   248                                  
+   249 0000009F A808                    	test	al, 8
+   250 000000A1 75FA                    	jnz	short Vrt ; Wait until Verticle Retrace starts
+   251                                  
+   252                                  NoVrt:
+   253                                  	;in	al, dx	; Video	status bits:
+   254                                  			; 0: retrace.  1=display is in vert or horiz retrace.
+   255                                  			; 1: 1=light pen is triggered; 0=armed
+   256                                  			; 2: 1=light pen switch	is open; 0=closed
+   257                                  			; 3: 1=vertical	sync pulse is occurring.
+   258                                  
+   259                                  	;mov	ah, 0 ; in (byte)
+   260 000000A3 CD34                    	int	34h ; TRDOS 386 - IOCTL interrupt
+   261                                  
+   262 000000A5 A808                    	test	al, 8
+   263 000000A7 74FA                    	jz	short NoVrt ; Wait until Verticle Retrace ends
+   264 000000A9 C3                      	retn
+   265                                  
+   266                                  ; --------------- S U B	R O U T	I N E ---------------------------------------
+   267                                  
+   268                                  UpdateAngles:
+   269                                  	; Calculates new x,y,z angles
+   270                                  	; to rotate around
+   271 000000AA A1[64090000]            	mov	eax, [XAngle]	; Load current angles
+   272 000000AF 8B1D[68090000]          	mov	ebx, [YAngle]
+   273 000000B5 8B0D[6C090000]          	mov	ecx, [ZAngle]
+   274                                  
+   275 000000BB 0305[94090000]          	add	eax, [DeltaX]	; Add velocity
+   276 000000C1 25FF000000              	and	eax, 0FFh	; Range from 0..255
+   277 000000C6 A3[64090000]            	mov	[XAngle], eax	; Update X
+   278 000000CB 031D[98090000]          	add	ebx, [DeltaY]	; Add velocity
+   279 000000D1 81E3FF000000            	and	ebx, 0FFh	; Range from 0..255
+   280 000000D7 891D[68090000]          	mov	[YAngle], ebx	; Update Y
+   281 000000DD 030D[9C090000]          	add	ecx, [DeltaZ]	; Add velocity
+   282 000000E3 81E1FF000000            	and	ecx, 0FFh	; Range from 0..255
+   283 000000E9 890D[6C090000]          	mov	[ZAngle], ecx	; Update Z
+   284 000000EF C3                      	retn
+   285                                  
+   286                                  ; --------------- S U B	R O U T	I N E ---------------------------------------
+   287                                  
+   288                                  GetSinCos:
+   289                                  	; Needed : ebx=angle (0..255)
+   290                                  	; Returns: eax=Sin ebx=Cos
+   291 000000F0 53                      	push	ebx		; Save angle (use as pointer)
+   292 000000F1 D1E3                    	shl	ebx, 1		; Grab a word, so ebx=ebx*2
+   293 000000F3 0FBF83[B3030000]        	movsx	eax, word [ebx+SinCos] ; Get sine
+   294 000000FA 5B                      	pop	ebx		; Restore pointer into ebx
+   295 000000FB 83C340                  	add	ebx, 64	; 40h	; Add 64 to get cosine
+   296 000000FE 81E3FF000000            	and	ebx, 0FFh	; Range from 0..255
+   297 00000104 D1E3                    	shl	ebx, 1		; * 2 coz it's a word
+   298 00000106 0FBF9B[B3030000]        	movsx	ebx, word [ebx+SinCos] ; Get cosine
+   299 0000010D C3                      	retn
+   300                                  
+   301                                  ; --------------- S U B	R O U T	I N E ---------------------------------------
+   302                                  
+   303                                  SetRotation:
+   304                                  	; Set sine & cosine of x,y,z
+   305 0000010E 8B1D[64090000]          	mov	ebx, [XAngle]	; Grab angle
+   306 00000114 E8D7FFFFFF              	call	GetSinCos	; Get the sine&cosine
+   307 00000119 A3[AC090000]            	mov	[XSin], eax	; Save sin
+   308 0000011E 891D[B0090000]          	mov	[XCos], ebx	; Save cos
+   309                                  
+   310 00000124 8B1D[68090000]          	mov	ebx, [YAngle]
+   311 0000012A E8C1FFFFFF              	call	GetSinCos
+   312 0000012F A3[B4090000]            	mov	[YSin], eax
+   313 00000134 891D[B8090000]          	mov	[YCos], ebx
+   314                                  
+   315 0000013A 8B1D[6C090000]          	mov	ebx, [ZAngle]
+   316 00000140 E8ABFFFFFF              	call	GetSinCos
+   317 00000145 A3[BC090000]            	mov	[ZSin], eax
+   318 0000014A 891D[C0090000]          	mov	[ZCos], ebx
+   319 00000150 C3                      	retn
+   320                                  
+   321                                  ; --------------- S U B	R O U T	I N E ---------------------------------------
+   322                                  
+   323                                  RotatePoint:
+   324                                  	; Rotates the point around x,y,z
+   325                                  
+   326                                  	; Gets original x,y,z values
+   327                                  	; This can be done elsewhere
+   328 00000151 0FBE86[B3050000]        	movsx	eax, byte [esi+Cube]	; esi = X (movsx coz of byte)
+   329 00000158 A3[7C090000]            	mov	[X], eax
+   330 0000015D 0FBE86[B4050000]        	movsx	eax, byte [esi+Cube+1]	; esi+1 = Y
+   331 00000164 A3[80090000]            	mov	[Y], eax
+   332 00000169 0FBE86[B5050000]        	movsx	eax, byte [esi+Cube+2]	; esi+2 = Z
+   333 00000170 A3[84090000]            	mov	[Z], eax
+   334                                  
+   335                                  	; Rotate around x-axis
+   336                                  	; YT = Y * COS(xang) - Z * SIN(xang) / 256
+   337                                  	; ZT = Y * SIN(xang) + Z * COS(xang) / 256
+   338                                  	; Y = YT
+   339                                  	; Z = ZT
+   340 00000175 A1[80090000]            	mov	eax, [Y]
+   341 0000017A 8B1D[B0090000]          	mov	ebx, [XCos]
+   342 00000180 F7EB                    	imul	ebx		; eax = Y * Cos(xang)
+   343 00000182 89C5                    	mov	ebp, eax
+   344 00000184 A1[84090000]            	mov	eax, [Z]
+   345 00000189 8B1D[AC090000]          	mov	ebx, [XSin]
+   346 0000018F F7EB                    	imul	ebx		; eax = Z * Sin(xang)
+   347 00000191 29C5                    	sub	ebp, eax	; ebp = Y * Cos(xang) - Z * Sin(xang)
+   348 00000193 C1FD08                  	sar	ebp, 8		; ebp = Y * Cos(xang) - Z * Sin(xang) / 256
+   349 00000196 892D[8C090000]          	mov	[Yt], ebp
+   350                                  
+   351 0000019C A1[80090000]            	mov	eax, [Y]
+   352 000001A1 8B1D[AC090000]          	mov	ebx, [XSin]
+   353 000001A7 F7EB                    	imul	ebx		; eax = Y * Sin(xang)
+   354 000001A9 89C5                    	mov	ebp, eax
+   355 000001AB A1[84090000]            	mov	eax, [Z]
+   356 000001B0 8B1D[B0090000]          	mov	ebx, [XCos]
+   357 000001B6 F7EB                    	imul	ebx		; eax = Z * Cos(xang)
+   358 000001B8 01C5                    	add	ebp, eax	; ebp = Y * Sin(xang) + Z * Cos(xang)
+   359 000001BA C1FD08                  	sar	ebp, 8		; ebp = Y * Sing(xang) + Z * Cos(xang) / 256
+   360 000001BD 892D[90090000]          	mov	[Zt], ebp
+   361                                  
+   362 000001C3 A1[8C090000]            	mov	eax, [Yt]	; Switch values
+   363 000001C8 A3[80090000]            	mov	[Y], eax
+   364 000001CD A1[90090000]            	mov	eax, [Zt]
+   365 000001D2 A3[84090000]            	mov	[Z], eax
+   366                                  
+   367                                  	; Rotate around y-axis
+   368                                  	; XT = X * COS(yang) - Z * SIN(yang) / 256
+   369                                  	; ZT = X * SIN(yang) + Z * COS(yang) / 256
+   370                                  	; X = XT
+   371                                  	; Z = ZT
+   372 000001D7 A1[7C090000]            	mov	eax, [X]
+   373 000001DC 8B1D[B8090000]          	mov	ebx, [YCos]
+   374 000001E2 F7EB                    	imul	ebx		; eax = X * Cos(yang)
+   375 000001E4 89C5                    	mov	ebp, eax
+   376 000001E6 A1[84090000]            	mov	eax, [Z]
+   377 000001EB 8B1D[B4090000]          	mov	ebx, [YSin]
+   378 000001F1 F7EB                    	imul	ebx		; eax = Z * Sin(yang)
+   379 000001F3 29C5                    	sub	ebp, eax	; ebp = X * Cos(yang) - Z * Sin(yang)
+   380 000001F5 C1FD08                  	sar	ebp, 8		; ebp = X * Cos(yang) - Z * Sin(yang) / 256
+   381 000001F8 892D[88090000]          	mov	[Xt], ebp
+   382                                  
+   383 000001FE A1[7C090000]            	mov	eax, [X]
+   384 00000203 8B1D[B4090000]          	mov	ebx, [YSin]
+   385 00000209 F7EB                    	imul	ebx		; eax = X * Sin(yang)
+   386 0000020B 89C5                    	mov	ebp, eax
+   387 0000020D A1[84090000]            	mov	eax, [Z]
+   388 00000212 8B1D[B8090000]          	mov	ebx, [YCos]
+   389 00000218 F7EB                    	imul	ebx		; eax = Z * Cos(yang)
+   390 0000021A 01C5                    	add	ebp, eax	; ebp = X * Sin(yang) + Z * Cos(yang)
+   391 0000021C C1FD08                  	sar	ebp, 8		; ebp = X * Sin(yang) + Z * Cos(yang) / 256
+   392 0000021F 892D[90090000]          	mov	[Zt], ebp
+   393                                  
+   394 00000225 A1[88090000]            	mov	eax, [Xt]	; Switch values
+   395 0000022A A3[7C090000]            	mov	[X], eax
+   396 0000022F A1[90090000]            	mov	eax, [Zt]
+   397 00000234 A3[84090000]            	mov	[Z], eax
+   398                                  
+   399                                  	; Rotate around z-axis
+   400                                  	; XT = X * COS(zang) - Y * SIN(zang) / 256
+   401                                  	; YT = X * SIN(zang) + Y * COS(zang) / 256
+   402                                  	; X = XT
+   403                                  	; Y = YT
+   404 00000239 A1[7C090000]            	mov	eax, [X]
+   405 0000023E 8B1D[C0090000]          	mov	ebx, [ZCos]
+   406 00000244 F7EB                    	imul	ebx		; eax = X * Cos(zang)
+   407 00000246 89C5                    	mov	ebp, eax
+   408 00000248 A1[80090000]            	mov	eax, [Y]
+   409 0000024D 8B1D[BC090000]          	mov	ebx, [ZSin]
+   410 00000253 F7EB                    	imul	ebx		; eax = Y * Sin(zang)
+   411 00000255 29C5                    	sub	ebp, eax	; ebp = X * Cos(zang) - Y * Sin(zang)
+   412 00000257 C1FD08                  	sar	ebp, 8		; ebp = X * Cos(zang) - Y * Sin(zang) / 256
+   413 0000025A 892D[88090000]          	mov	[Xt], ebp
+   414                                  
+   415 00000260 A1[7C090000]            	mov	eax, [X]
+   416 00000265 8B1D[BC090000]          	mov	ebx, [ZSin]
+   417 0000026B F7EB                    	imul	ebx		; eax = X * Sin(zang)
+   418 0000026D 89C5                    	mov	ebp, eax
+   419 0000026F A1[80090000]            	mov	eax, [Y]
+   420 00000274 8B1D[C0090000]          	mov	ebx, [ZCos]
+   421 0000027A F7EB                    	imul	ebx		; eax = Y * Cos(zang)
+   422 0000027C 01C5                    	add	ebp, eax	; ebp = X * Sin(zang) + Y * Cos(zang)
+   423 0000027E C1FD08                  	sar	ebp, 8		; ebp = X * Sin(zang) + Y * Cos(zang) / 256
+   424 00000281 892D[8C090000]          	mov	[Yt], ebp
+   425                                  
+   426 00000287 A1[88090000]            	mov	eax, [Xt]	; Switch values
+   427 0000028C A3[7C090000]            	mov	[X], eax
+   428 00000291 A1[8C090000]            	mov	eax, [Yt]
+   429 00000296 A3[80090000]            	mov	[Y], eax
+   430 0000029B C3                      	retn
+   431                                  
+   432                                  ; --------------- S U B	R O U T	I N E ---------------------------------------
+   433                                  
+   434                                  ShowPoint:
+   435                                  	; Calculates screen position
+   436                                  	; and plots the point on the screen
+   437 0000029C A1[A0090000]            	mov	eax, [Xoff]	; Xoff*X / Z+Zoff = screen x
+   438 000002A1 8B1D[7C090000]          	mov	ebx, [X]
+   439 000002A7 F7EB                    	imul	ebx
+   440 000002A9 8B1D[84090000]          	mov	ebx, [Z]
+   441 000002AF 031D[A8090000]          	add	ebx, [Zoff]	; Distance
+   442 000002B5 F7FB                    	idiv	ebx
+   443 000002B7 0305[70090000]          	add	eax, [Mx]	; Center on screen
+   444 000002BD 89C5                    	mov	ebp, eax
+   445 000002BF A1[A4090000]            	mov	eax, [Yoff]	; Yoff*Y / Z+Zoff = screen y
+   446 000002C4 8B1D[80090000]          	mov	ebx, [Y]
+   447 000002CA F7EB                    	imul	ebx
+   448 000002CC 8B1D[84090000]          	mov	ebx, [Z]
+   449 000002D2 031D[A8090000]          	add	ebx, [Zoff]	; Distance
+   450 000002D8 F7FB                    	idiv	ebx
+   451 000002DA 0305[74090000]          	add	eax, [My]	; Center on screen
+   452 000002E0 BB40010000              	mov	ebx, 320 ; 140h
+   453 000002E5 F7EB                    	imul	ebx
+   454 000002E7 01E8                    	add	eax, ebp	; eax = (y*320)+x
+   455                                  	; hw of of edi = 0Ah
+   456 000002E9 6689C7                  	mov	di, ax
+   457 000002EC A1[84090000]            	mov	eax, [Z]	; Get color from Z
+   458 000002F1 0464                    	add	al, 100	; 64h	; (This piece of code could be improved)
+   459 000002F3 8807                    	mov	[edi], al	; Place a dot with color al
+   460 000002F5 6689BE[C4090000]        	mov	[esi+Erase], di	; Save position for erase
+   461 000002FC C3                      	retn
+   462                                  
+   463                                  ; --------------- S U B	R O U T	I N E ---------------------------------------
+   464                                  
+   465                                  MainProgram:
+   466 000002FD E8A8FDFFFF              	call	UpdateAngles	; Calculate new angles
+   467 00000302 E807FEFFFF              	call	SetRotation	; Find sine & cosine of those angles
+   468 00000307 31F6                    	xor	esi, esi	; First 3d-point
+   469 00000309 B97D000000              	mov	ecx, MaxPoints	; 125
+   470                                  	;nop
+   471                                  ShowLoop:
+   472 0000030E E83EFEFFFF              	call	RotatePoint	; Rotates the point using above formulas
+   473 00000313 E884FFFFFF              	call	ShowPoint	; Shows the point
+   474 00000318 83C602                  	add	esi, 2		; Next 3d-point
+   475 0000031B E2F1                    	loop	ShowLoop
+   476 0000031D E875FDFFFF              	call	WaitVrt		; Wait for retrace
+   477 00000322 31F6                    	xor	esi, esi	; Starting with point 0
+   478 00000324 30C0                    	xor	al, al		; Color = 0 = black
+   479 00000326 B97D000000              	mov	ecx, MaxPoints	; 7Dh ; 125
+   480                                  	;nop
+   481                                  Deletion:
+   482 0000032B 668BBE[C4090000]        	mov	di, [esi+Erase] ; di = vgapos old point
+   483 00000332 8807                    	mov	[edi], al
+   484 00000334 83C602                  	add	esi, 2
+   485 00000337 E2F2                    	loop	Deletion
+   486 00000339 C3                      	retn
+   487                                  
+   488                                  ; --------------- S U B	R O U T	I N E ---------------------------------------
+   489                                  
+   490                                  print_msg:
+   491 0000033A 66BB0700                	mov	bx, 7
+   492 0000033E B40E                            mov     ah, 0Eh
+   493                                  pmsg_loop:
+   494 00000340 AC                      	lodsb
+   495 00000341 20C0                    	and	al, al
+   496 00000343 7404                    	jz	short pmsg_ok
+   497 00000345 CD31                    	int	31h		; TRDOS 386 video interrupt
+   498 00000347 EBF7                    	jmp	short pmsg_loop
+   499                                  pmsg_ok:
+   500                                  	;mov	ah, 10h		; Getchar
+   501                                  	;int	32h		; TRDOS 386 keyboard interrupt
+   502 00000349 C3                      	retn
+   503                                  
+   504                                  ;-----------------------------------------------------------------
+   505                                  ; data
+   506                                  ;-----------------------------------------------------------------
+   507                                  
+   508                                  prg_msg:
+   509 0000034A 4552444F47414E2054-     	db 'ERDOGAN TAN - TRDOS 386 VGA Test - 3DC.PRG'
+   509 00000353 414E202D205452444F-
+   509 0000035C 532033383620564741-
+   509 00000365 2054657374202D2033-
+   509 0000036E 44432E505247       
+   510 00000374 0D0A                    	db 0Dh,0Ah
+   511 00000376 30352F30392F323031-     	db '05/09/2016 - 19/05/2026'
+   511 0000037F 36202D2031392F3035-
+   511 00000388 2F32303236         
+   512 0000038D 0D0A                    	db 0Dh,0Ah
+   513 0000038F 00                      	db 0 
+   514                                  
+   515                                  ; --------------- DATA -----------------------------------------------------
+   516                                  
+   517                                  Credits:
+   518 00000390 0D0A436F6465206279-     	db 13,10,"Code by Vulture / Outlaw Triad",13,10
+   518 00000399 2056756C7475726520-
+   518 000003A2 2F204F75746C617720-
+   518 000003AB 54726961640D0A     
+   519                                  	;db "$"
+   520 000003B2 00                      	db 0
+   521                                  SinCos:					; 256 values
+   522 000003B3 000006000D00130019-     	dw 0,6,13,19,25,31,38,44,50,56
+   522 000003BC 001F0026002C003200-
+   522 000003C5 3800               
+   523 000003C7 3E0044004A00500056-     	dw 62,68,74,80,86,92,98,104,109,115
+   523 000003D0 005C00620068006D00-
+   523 000003D9 7300               
+   524 000003DB 79007E00840089008E-     	dw 121,126,132,137,142,147,152,157,162,167
+   524 000003E4 00930098009D00A200-
+   524 000003ED A700               
+   525 000003EF AC00B100B500B900BE-     	dw 172,177,181,185,190,194,198,202,206,209
+   525 000003F8 00C200C600CA00CE00-
+   525 00000401 D100               
+   526 00000403 D500D800DC00DF00E2-     	dw 213,216,220,223,226,229,231,234,237,239
+   526 0000040C 00E500E700EA00ED00-
+   526 00000415 EF00               
+   527 00000417 F100F300F500F700F8-     	dw 241,243,245,247,248,250,251,252,253,254
+   527 00000420 00FA00FB00FC00FD00-
+   527 00000429 FE00               
+   528 0000042B FF00FF000001000100-     	dw 255,255,256,256,256,256,256,255,255,254
+   528 00000434 0100010001FF00FF00-
+   528 0000043D FE00               
+   529 0000043F FD00FC00FB00FA00F8-     	dw 253,252,251,250,248,247,245,243,241,239
+   529 00000448 00F700F500F300F100-
+   529 00000451 EF00               
+   530 00000453 ED00EA00E700E500E2-     	dw 237,234,231,229,226,223,220,216,213,209
+   530 0000045C 00DF00DC00D800D500-
+   530 00000465 D100               
+   531 00000467 CE00CA00C600C200BE-     	dw 206,202,198,194,190,185,181,177,172,167
+   531 00000470 00B900B500B100AC00-
+   531 00000479 A700               
+   532 0000047B A2009D00980093008E-     	dw 162,157,152,147,142,137,132,126,121,115
+   532 00000484 00890084007E007900-
+   532 0000048D 7300               
+   533 0000048F 6D00680062005C0056-     	dw 109,104,98,92,86,80,74,68,62,56
+   533 00000498 0050004A0044003E00-
+   533 000004A1 3800               
+   534 000004A3 32002C0026001F0019-     	dw 50,44,38,31,25,19,13,6,0,-6
+   534 000004AC 0013000D0006000000-
+   534 000004B5 FAFF               
+   535 000004B7 F3FFEDFFE7FFE1FFDA-     	dw -13,-19,-25,-31,-38,-44,-50,-56,-62,-68
+   535 000004C0 FFD4FFCEFFC8FFC2FF-
+   535 000004C9 BCFF               
+   536 000004CB B6FFB0FFAAFFA4FF9E-     	dw -74,-80,-86,-92,-98,-104,-109,-115,-121,-126
+   536 000004D4 FF98FF93FF8DFF87FF-
+   536 000004DD 82FF               
+   537 000004DF 7CFF77FF72FF6DFF68-     	dw -132,-137,-142,-147,-152,-157,-162,-167,-172,-177
+   537 000004E8 FF63FF5EFF59FF54FF-
+   537 000004F1 4FFF               
+   538 000004F3 4BFF47FF42FF3EFF3A-     	dw -181,-185,-190,-194,-198,-202,-206,-209,-213,-216
+   538 000004FC FF36FF32FF2FFF2BFF-
+   538 00000505 28FF               
+   539 00000507 24FF21FF1EFF1BFF19-     	dw -220,-223,-226,-229,-231,-234,-237,-239,-241,-243
+   539 00000510 FF16FF13FF11FF0FFF-
+   539 00000519 0DFF               
+   540 0000051B 0BFF09FF08FF06FF05-     	dw -245,-247,-248,-250,-251,-252,-253,-254,-255,-255
+   540 00000524 FF04FF03FF02FF01FF-
+   540 0000052D 01FF               
+   541 0000052F 00FF00FF00FF00FF00-     	dw -256,-256,-256,-256,-256,-255,-255,-254,-253,-252
+   541 00000538 FF01FF01FF02FF03FF-
+   541 00000541 04FF               
+   542 00000543 05FF06FF08FF09FF0B-     	dw -251,-250,-248,-247,-245,-243,-241,-239,-237,-234
+   542 0000054C FF0DFF0FFF11FF13FF-
+   542 00000555 16FF               
+   543 00000557 19FF1BFF1EFF21FF24-     	dw -231,-229,-226,-223,-220,-216,-213,-209,-206,-202
+   543 00000560 FF28FF2BFF2FFF32FF-
+   543 00000569 36FF               
+   544 0000056B 3AFF3EFF42FF47FF4B-     	dw -198,-194,-190,-185,-181,-177,-172,-167,-162,-157
+   544 00000574 FF4FFF54FF59FF5EFF-
+   544 0000057D 63FF               
+   545 0000057F 68FF6DFF72FF77FF7C-     	dw -152,-147,-142,-137,-132,-126,-121,-115,-109,-104
+   545 00000588 FF82FF87FF8DFF93FF-
+   545 00000591 98FF               
+   546 00000593 9EFFA4FFAAFFB0FFB6-     	dw -98,-92,-86,-80,-74,-68,-62,-56,-50,-44
+   546 0000059C FFBCFFC2FFC8FFCEFF-
+   546 000005A5 D4FF               
+   547 000005A7 DAFFE1FFE7FFEDFFF3-     	dw -38,-31,-25,-19,-13,-6
+   547 000005B0 FFFAFF             
+   548                                  
+   549                                  Cube:				; The 3d points
+   550 000005B3 DDDDDD                  	db  -35, -35, -35	; 5x*5y*5z (=125) points
+   551 000005B6 F1DDDD                  	db  -15, -35, -35	; c = -35 ; rept 5 ; b = -35
+   552 000005B9 05DDDD                  	db    5, -35, -35	; rept 5 ; a = -35 ; rept 5
+   553 000005BC 19DDDD                  	db   25, -35, -35	; db a,b,c ; a = a + 20
+   554 000005BF 2DDDDD                  	db   45, -35, -35	; endm ; b = b + 20 ; endm
+   555 000005C2 DDF1DD                  	db  -35, -15, -35	; c = c + 20 ; endm
+   556 000005C5 F1F1DD                  	db  -15, -15, -35
+   557 000005C8 05F1DD                  	db    5, -15, -35
+   558 000005CB 19F1DD                  	db   25, -15, -35
+   559 000005CE 2DF1DD                  	db   45, -15, -35
+   560 000005D1 DD05DD                  	db  -35,   5, -35
+   561 000005D4 F105DD                  	db  -15,   5, -35
+   562 000005D7 0505DD                  	db    5,   5, -35
+   563 000005DA 1905DD                  	db   25,   5, -35
+   564 000005DD 2D05DD                  	db   45,   5, -35
+   565 000005E0 DD19DD                  	db  -35,  25, -35
+   566 000005E3 F119DD                  	db  -15,  25, -35
+   567 000005E6 0519DD                  	db    5,  25, -35
+   568 000005E9 1919DD                  	db   25,  25, -35
+   569 000005EC 2D19DD                  	db   45,  25, -35
+   570 000005EF DD2DDD                  	db  -35,  45, -35
+   571 000005F2 F12DDD                  	db  -15,  45, -35
+   572 000005F5 052DDD                  	db    5,  45, -35
+   573 000005F8 192DDD                  	db   25,  45, -35
+   574 000005FB 2D2DDD                  	db   45,  45, -35
+   575 000005FE DDDDF1                  	db  -35, -35, -15
+   576 00000601 F1DDF1                  	db  -15, -35, -15
+   577 00000604 05DDF1                  	db    5, -35, -15
+   578 00000607 19DDF1                  	db   25, -35, -15
+   579 0000060A 2DDDF1                  	db   45, -35, -15
+   580 0000060D DDF1F1                  	db  -35, -15, -15
+   581 00000610 F1F1F1                  	db  -15, -15, -15
+   582 00000613 05F1F1                  	db    5, -15, -15
+   583 00000616 19F1F1                  	db   25, -15, -15
+   584 00000619 2DF1F1                  	db   45, -15, -15
+   585 0000061C DD05F1                  	db  -35,   5, -15
+   586 0000061F F105F1                  	db  -15,   5, -15
+   587 00000622 0505F1                  	db    5,   5, -15
+   588 00000625 1905F1                  	db   25,   5, -15
+   589 00000628 2D05F1                  	db   45,   5, -15
+   590 0000062B DD19F1                  	db  -35,  25, -15
+   591 0000062E F119F1                  	db  -15,  25, -15
+   592 00000631 0519F1                  	db    5,  25, -15
+   593 00000634 1919F1                  	db   25,  25, -15
+   594 00000637 2D19F1                  	db   45,  25, -15
+   595 0000063A DD2DF1                  	db  -35,  45, -15
+   596 0000063D F12DF1                  	db  -15,  45, -15
+   597 00000640 052DF1                  	db    5,  45, -15
+   598 00000643 192DF1                  	db   25,  45, -15
+   599 00000646 2D2DF1                  	db   45,  45, -15
+   600 00000649 DDDD05                  	db  -35, -35,	5
+   601 0000064C F1DD05                  	db  -15, -35,	5
+   602 0000064F 05DD05                  	db    5, -35,	5
+   603 00000652 19DD05                  	db   25, -35,	5
+   604 00000655 2DDD05                  	db   45, -35,	5
+   605 00000658 DDF105                  	db  -35, -15,	5
+   606 0000065B F1F105                  	db  -15, -15,	5
+   607 0000065E 05F105                  	db    5, -15,	5
+   608 00000661 19F105                  	db   25, -15,	5
+   609 00000664 2DF105                  	db   45, -15,	5
+   610 00000667 DD0505                  	db  -35,   5,	5
+   611 0000066A F10505                  	db  -15,   5,	5
+   612 0000066D 050505                  	db    5,   5,	5
+   613 00000670 190505                  	db   25,   5,	5
+   614 00000673 2D0505                  	db   45,   5,	5
+   615 00000676 DD1905                  	db  -35,  25,	5
+   616 00000679 F11905                  	db  -15,  25,	5
+   617 0000067C 051905                  	db    5,  25,	5
+   618 0000067F 191905                  	db   25,  25,	5
+   619 00000682 2D1905                  	db   45,  25,	5
+   620 00000685 DD2D05                  	db  -35,  45,	5
+   621 00000688 F12D05                  	db  -15,  45,	5
+   622 0000068B 052D05                  	db    5,  45,	5
+   623 0000068E 192D05                  	db   25,  45,	5
+   624 00000691 2D2D05                  	db   45,  45,	5
+   625 00000694 DDDD19                  	db  -35, -35,  25
+   626 00000697 F1DD19                  	db  -15, -35,  25
+   627 0000069A 05DD19                  	db    5, -35,  25
+   628 0000069D 19DD19                  	db   25, -35,  25
+   629 000006A0 2DDD19                  	db   45, -35,  25
+   630 000006A3 DDF119                  	db  -35, -15,  25
+   631 000006A6 F1F119                  	db  -15, -15,  25
+   632 000006A9 05F119                  	db    5, -15,  25
+   633 000006AC 19F119                  	db   25, -15,  25
+   634 000006AF 2DF119                  	db   45, -15,  25
+   635 000006B2 DD0519                  	db  -35,   5,  25
+   636 000006B5 F10519                  	db  -15,   5,  25
+   637 000006B8 050519                  	db    5,   5,  25
+   638 000006BB 190519                  	db   25,   5,  25
+   639 000006BE 2D0519                  	db   45,   5,  25
+   640 000006C1 DD1919                  	db  -35,  25,  25
+   641 000006C4 F11919                  	db  -15,  25,  25
+   642 000006C7 051919                  	db    5,  25,  25
+   643 000006CA 191919                  	db   25,  25,  25
+   644 000006CD 2D1919                  	db   45,  25,  25
+   645 000006D0 DD2D19                  	db  -35,  45,  25
+   646 000006D3 F12D19                  	db  -15,  45,  25
+   647 000006D6 052D19                  	db    5,  45,  25
+   648 000006D9 192D19                  	db   25,  45,  25
+   649 000006DC 2D2D19                  	db   45,  45,  25
+   650 000006DF DDDD2D                  	db  -35, -35,  45
+   651 000006E2 F1DD2D                  	db  -15, -35,  45
+   652 000006E5 05DD2D                  	db    5, -35,  45
+   653 000006E8 19DD2D                  	db   25, -35,  45
+   654 000006EB 2DDD2D                  	db   45, -35,  45
+   655 000006EE DDF12D                  	db  -35, -15,  45
+   656 000006F1 F1F12D                  	db  -15, -15,  45
+   657 000006F4 05F12D                  	db    5, -15,  45
+   658 000006F7 19F12D                  	db   25, -15,  45
+   659 000006FA 2DF12D                  	db   45, -15,  45
+   660 000006FD DD052D                  	db  -35,   5,  45
+   661 00000700 F1052D                  	db  -15,   5,  45
+   662 00000703 05052D                  	db    5,   5,  45
+   663 00000706 19052D                  	db   25,   5,  45
+   664 00000709 2D052D                  	db   45,   5,  45
+   665 0000070C DD192D                  	db  -35,  25,  45
+   666 0000070F F1192D                  	db  -15,  25,  45
+   667 00000712 05192D                  	db    5,  25,  45
+   668 00000715 19192D                  	db   25,  25,  45
+   669 00000718 2D192D                  	db   45,  25,  45
+   670 0000071B DD2D2D                  	db  -35,  45,  45
+   671 0000071E F12D2D                  	db  -15,  45,  45
+   672 00000721 052D2D                  	db    5,  45,  45
+   673 00000724 192D2D                  	db   25,  45,  45
+   674 00000727 2D2D2D                  	db   45,  45,  45
+   675                                  
+   676                                  Palette:			; The palette to use
+   677 0000072A 000000                  	db 0, 0, 0		; 63*3 gray-tint
+   678 0000072D 3F3F3F3F3F3F3F3F3F      	db 63, 63, 63, 63, 63, 63, 63, 63, 63	; d = 63
+   679 00000736 3E3E3E3E3E3E3E3E3E      	db 62, 62, 62, 62, 62, 62, 62, 62, 62	; rept 63
+   680 0000073F 3D3D3D3D3D3D3D3D3D      	db 61, 61, 61, 61, 61, 61, 61, 61, 61	; db d,d,d
+   681 00000748 3C3C3C3C3C3C3C3C3C      	db 60, 60, 60, 60, 60, 60, 60, 60, 60	; db d,d,d
+   682 00000751 3B3B3B3B3B3B3B3B3B      	db 59, 59, 59, 59, 59, 59, 59, 59, 59	; db d,d,d
+   683 0000075A 3A3A3A3A3A3A3A3A3A      	db 58, 58, 58, 58, 58, 58, 58, 58, 58	; d = d - 1
+   684 00000763 393939393939393939      	db 57, 57, 57, 57, 57, 57, 57, 57, 57	; endm
+   685 0000076C 383838383838383838      	db 56, 56, 56, 56, 56, 56, 56, 56, 56
+   686 00000775 373737373737373737      	db 55, 55, 55, 55, 55, 55, 55, 55, 55
+   687 0000077E 363636363636363636      	db 54, 54, 54, 54, 54, 54, 54, 54, 54
+   688 00000787 353535353535353535      	db 53, 53, 53, 53, 53, 53, 53, 53, 53
+   689 00000790 343434343434343434      	db 52, 52, 52, 52, 52, 52, 52, 52, 52
+   690 00000799 333333333333333333      	db 51, 51, 51, 51, 51, 51, 51, 51, 51
+   691 000007A2 323232323232323232      	db 50, 50, 50, 50, 50, 50, 50, 50, 50
+   692 000007AB 313131313131313131      	db 49, 49, 49, 49, 49, 49, 49, 49, 49
+   693 000007B4 303030303030303030      	db 48, 48, 48, 48, 48, 48, 48, 48, 48
+   694 000007BD 2F2F2F2F2F2F2F2F2F      	db 47, 47, 47, 47, 47, 47, 47, 47, 47
+   695 000007C6 2E2E2E2E2E2E2E2E2E      	db 46, 46, 46, 46, 46, 46, 46, 46, 46
+   696 000007CF 2D2D2D2D2D2D2D2D2D      	db 45, 45, 45, 45, 45, 45, 45, 45, 45
+   697 000007D8 2C2C2C2C2C2C2C2C2C      	db 44, 44, 44, 44, 44, 44, 44, 44, 44
+   698 000007E1 2B2B2B2B2B2B2B2B2B      	db 43, 43, 43, 43, 43, 43, 43, 43, 43
+   699 000007EA 2A2A2A2A2A2A2A2A2A      	db 42, 42, 42, 42, 42, 42, 42, 42, 42
+   700 000007F3 292929292929292929      	db 41, 41, 41, 41, 41, 41, 41, 41, 41
+   701 000007FC 282828282828282828      	db 40, 40, 40, 40, 40, 40, 40, 40, 40
+   702 00000805 272727272727272727      	db 39, 39, 39, 39, 39, 39, 39, 39, 39
+   703 0000080E 262626262626262626      	db 38, 38, 38, 38, 38, 38, 38, 38, 38
+   704 00000817 252525252525252525      	db 37, 37, 37, 37, 37, 37, 37, 37, 37
+   705 00000820 242424242424242424      	db 36, 36, 36, 36, 36, 36, 36, 36, 36
+   706 00000829 232323232323232323      	db 35, 35, 35, 35, 35, 35, 35, 35, 35
+   707 00000832 222222222222222222      	db 34, 34, 34, 34, 34, 34, 34, 34, 34
+   708 0000083B 212121212121212121      	db 33, 33, 33, 33, 33, 33, 33, 33, 33
+   709 00000844 202020202020202020      	db 32, 32, 32, 32, 32, 32, 32, 32, 32
+   710 0000084D 1F1F1F1F1F1F1F1F1F      	db 31, 31, 31, 31, 31, 31, 31, 31, 31
+   711 00000856 1E1E1E1E1E1E1E1E1E      	db 30, 30, 30, 30, 30, 30, 30, 30, 30
+   712 0000085F 1D1D1D1D1D1D1D1D1D      	db 29, 29, 29, 29, 29, 29, 29, 29, 29
+   713 00000868 1C1C1C1C1C1C1C1C1C      	db 28, 28, 28, 28, 28, 28, 28, 28, 28
+   714 00000871 1B1B1B1B1B1B1B1B1B      	db 27, 27, 27, 27, 27, 27, 27, 27, 27
+   715 0000087A 1A1A1A1A1A1A1A1A1A      	db 26, 26, 26, 26, 26, 26, 26, 26, 26
+   716 00000883 191919191919191919      	db 25, 25, 25, 25, 25, 25, 25, 25, 25
+   717 0000088C 181818181818181818      	db 24, 24, 24, 24, 24, 24, 24, 24, 24
+   718 00000895 171717171717171717      	db 23, 23, 23, 23, 23, 23, 23, 23, 23
+   719 0000089E 161616161616161616      	db 22, 22, 22, 22, 22, 22, 22, 22, 22
+   720 000008A7 151515151515151515      	db 21, 21, 21, 21, 21, 21, 21, 21, 21
+   721 000008B0 141414141414141414      	db 20, 20, 20, 20, 20, 20, 20, 20, 20
+   722 000008B9 131313131313131313      	db 19, 19, 19, 19, 19, 19, 19, 19, 19
+   723 000008C2 121212121212121212      	db 18, 18, 18, 18, 18, 18, 18, 18, 18
+   724 000008CB 111111111111111111      	db 17, 17, 17, 17, 17, 17, 17, 17, 17
+   725 000008D4 101010101010101010      	db 16, 16, 16, 16, 16, 16, 16, 16, 16
+   726 000008DD 0F0F0F0F0F0F0F0F0F      	db 15, 15, 15, 15, 15, 15, 15, 15, 15
+   727 000008E6 0E0E0E0E0E0E0E0E0E      	db 14, 14, 14, 14, 14, 14, 14, 14, 14
+   728 000008EF 0D0D0D0D0D0D0D0D0D      	db 13, 13, 13, 13, 13, 13, 13, 13, 13
+   729 000008F8 0C0C0C0C0C0C0C0C0C      	db 12, 12, 12, 12, 12, 12, 12, 12, 12
+   730 00000901 0B0B0B0B0B0B0B0B0B      	db 11, 11, 11, 11, 11, 11, 11, 11, 11
+   731 0000090A 0A0A0A0A0A0A0A0A0A      	db 10, 10, 10, 10, 10, 10, 10, 10, 10
+   732 00000913 090909090909090909      	db 9, 9, 9, 9, 9, 9, 9, 9, 9
+   733 0000091C 080808080808080808      	db 8, 8, 8, 8, 8, 8, 8, 8, 8
+   734 00000925 070707070707070707      	db 7, 7, 7, 7, 7, 7, 7, 7, 7
+   735 0000092E 060606060606060606      	db 6, 6, 6, 6, 6, 6, 6, 6, 6
+   736 00000937 050505050505050505      	db 5, 5, 5, 5, 5, 5, 5, 5, 5
+   737 00000940 040404040404040404      	db 4, 4, 4, 4, 4, 4, 4, 4, 4
+   738 00000949 030303030303030303      	db 3, 3, 3, 3, 3, 3, 3, 3, 3
+   739 00000952 020202020202020202      	db 2, 2, 2, 2, 2, 2, 2, 2, 2
+   740 0000095B 010101010101010101      	db 1, 1, 1, 1, 1, 1, 1, 1, 1
+   741                                  
+   742 00000964 00000000                XAngle:	dd 0		 ; Angle to rotate around x
+   743 00000968 00000000                YAngle:	dd 0
+   744 0000096C 00000000                ZAngle:	dd 0
+   745                                  
+   746 00000970 A0000000                Mx:	dd 160	; 0A0h
+   747 00000974 64000000                My:	dd 100	; 64h
+   748                                  
+   749 00000978 00                      db 0
+   750                                  
+   751                                  ;-----------------------------------------------------------------
+   752                                  ; uninitialized data
+   753                                  ;-----------------------------------------------------------------
+   754                                  
+   755                                  bss:
+   756                                  
+   757                                  ABSOLUTE bss
+   758                                  
+   759 00000979 ??????                  alignb 4
+   760                                  
+   761 0000097C ????????                X:	resd 1		; X variable for formula
+   762 00000980 ????????                Y:	resd 1
+   763 00000984 ????????                Z:	resd 1
+   764                                  
+   765 00000988 ????????                Xt:	resd 1		; Temporary variable for x
+   766 0000098C ????????                Yt:	resd 1
+   767 00000990 ????????                Zt:	resd 1
+   768                                  
+   769 00000994 ????????                DeltaX:	resd 1		; Amound Xangle is increased each time
+   770 00000998 ????????                DeltaY:	resd 1
+   771 0000099C ????????                DeltaZ:	resd 1
+   772                                  
+   773 000009A0 ????????                Xoff:	resd 1
+   774 000009A4 ????????                Yoff:	resd 1
+   775 000009A8 ????????                Zoff:	resd 1		; Distance from viewer
+   776                                  
+   777 000009AC ????????                XSin:	resd 1		; Sine and cosine of angle to rotate around
+   778 000009B0 ????????                XCos:	resd 1
+   779 000009B4 ????????                YSin:	resd 1
+   780 000009B8 ????????                YCos:	resd 1
+   781 000009BC ????????                ZSin:	resd 1
+   782 000009C0 ????????                ZCos:	resd 1
+   783                                  
+   784                                  MaxPoints EQU 125	; Number of 3d Points
+   785                                  
+   786 000009C4 <res FAh>               Erase:	resw MaxPoints	; Array for deletion screenpoints
+   787                                  _end:
