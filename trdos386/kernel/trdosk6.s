@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 17/05/2026  (Previous: 10/01/2026, v2.0.10)
+; Last Update: 21/05/2026  (Previous: 10/01/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -46,7 +46,7 @@ sysent: ; < enter to system call >
 	;	Arguments of particular system call.
 	; ...............................................................
 	;
-	; Retro UNIX 8086 v1 modification: 
+	; Retro UNIX 8086 v1 modification:
 	;       System call number is in EAX register.
 	;
 	;       Other parameters are in EDX, EBX, ECX, ESI, EDI, EBP
@@ -205,6 +205,7 @@ badsys:
 	jmp	sysexit_0FFh
 
 syscalls: ; 1:
+	; 21/05/2026 - TRDOS 386 v2.0.11
 	; 20/08/2024 - TRDOS 386 v2.0.9
 	; 31/12/2017
 	; 28/02/2017
@@ -272,6 +273,7 @@ syscalls: ; 1:
 			     ; 28/08/2017 (20/08/2017)
 	dd sysdma	; 45 ; TRDOS 386 - (ISA) DMA service
 	dd sysstdio	; 46 ; TRDOS 386 v2.0.9 (STDIN/STDOUT functions)
+	dd sysfstat	; 47 ; TRDOS 386 v2.0.11
 
 end_of_syscalls:
 
@@ -301,7 +303,7 @@ sysemt: ; enable (or disable) multi tasking -time sharing-
 	;
 	;  Note: Multi tasking is disabled during system
 	;	 initialization, it must be enabled by using
-	;	 this system call. (Otherwise, running proces 
+	;	 this system call. (Otherwise, running proces
 	;	 will not be changed by another process within
 	;	 run time sequence/schedule, if running process
 	;	 will not 'release' itself. Only 'wakeup' procedure
@@ -992,7 +994,7 @@ sysexit_5: ; 3:
 	;cmp	al, 2
 		; cmp r2,$2 / is the parent waiting for
 			  ; / this child to die
-	;jne	short sysexit_6	
+	;jne	short sysexit_6
 		; bne 2f / yes, notify parent not to wait any more
 	; p.stat = 2 --> waiting
 	; p.stat = 4 --> sleeping
@@ -1530,7 +1532,7 @@ sysfork_5: ; 2:
 	;cmp	si, 10
 		; cmp r1,$10. / 10. files is the maximum number which
 			    ; / can be opened
-	jb	short sysfork_4	
+	jb	short sysfork_4
 		; blt 1b / check next entry
 	jmp	sysret
 		; br sysret1
@@ -2107,6 +2109,24 @@ sysopen_7:
 	mov	bx, [FindFile_DirEntryNumber]
 	mov	[edi+OF_DIRENTRY], bx
 
+	; 20/05/2026
+	;mov	ax, [FindFile_DirEntry+14] ; DIR_CrtTime
+	;mov	dx, [FindFile_DirEntry+16] ; DIR_CrtDate
+	mov	eax, [FindFile_DirEntry+14]
+	mov	[edi+OF_CRTTIME], ax
+	;mov	[edi+OF_CRTDATE], dx
+	shr	eax, 16
+	mov	[edi+OF_CRTDATE], ax
+	mov	ax, [FindFile_DirEntry+18] ; DIR_LstAccDate
+	mov	[edi+OF_LADATE], ax
+	;mov	ax, [FindFile_DirEntry+22] ; DIR_WrtTime
+	;mov	dx, [FindFile_DirEntry+24] ; DIR_WrtDate
+	mov	eax, [FindFile_DirEntry+22]
+	mov	[edi+OF_WRTTIME], ax
+	;mov	[edi+OF_WRTDATE], dx
+	shr	eax, 16
+	mov	[edi+OF_WRTDATE], ax
+
 	xor	edx, edx
 	;;shr	di, 2 ; /4 (byte offset)
 	;shr	di, 1 ; 2/2, byte offset
@@ -2115,12 +2135,27 @@ sysopen_7:
 	mov	byte [edi+OF_OPENCOUNT], dl ; 0
 	mov	byte [edi+OF_STATUS], dl ; 0
 
+	; 20/05/2026
+	mov	al, [FindFile_DirEntry+11] ; DIR_Attr
+	mov	[edi+OF_ATTRIB], al
+
 	mov	ebx, edi
 	inc	bl
 
 	mov     [esi+u.fp], bl ; Open File Entry Number
 	mov     [u.r0], esi ; move index to u.fp list
 			    ; into eax on stack
+
+	; 20/05/2026
+	;mov	esi, FindFile_DirEntry
+	;mov	eax, edi
+	;mov	ecx, 12
+	;mul	ecx
+	;add	eax, OF_NAME
+	;mov	edi, eax
+	;dec	ecx ; 11
+	;rep	stosb
+	;;mov	byte [edi], 0
 
 	call 	reset_working_path
 
@@ -3411,7 +3446,7 @@ sysvideo: ; VIDEO DATA TRANSFER FUNCTIONS
 	;		    If video memory starts at 0A0000h
 	;		    and if resolution is 320x200 (256 colors) ..
 	;		    window start offset: (64*320)+100 = 20580
-	;		    window size: 16072 bytes (pixels) 
+	;		    window size: 16072 bytes (pixels)
 	;		    window end offset: 20580+16072 = 36652
 	;		    window start address: 0A0000h+564h = 0A5064h
 	; Outputs:
@@ -3427,7 +3462,7 @@ sysvideo: ; VIDEO DATA TRANSFER FUNCTIONS
 	; PIXEL READ/WRITE (in current/active video mode)
 	;
 	;	BH = 3 = Read/Write pixel(s) -for all graphics modes-
-	;	     BL = 
+	;	     BL =
 	;		0 = Read pixel
 	;		1 = Write pixel
 	;	     	2 = swap pixel colors
@@ -17636,6 +17671,7 @@ systime_6:
 	jmp	systime_0	; bl = 3 (return date & time)
 
 sysstime: ; Set System Date&Time
+	; 21/05/2026
 	; 17/05/2026
 	; 16/05/2026
 	; 15/05/2026
@@ -17893,7 +17929,7 @@ sysstime_12:
 			; convert packed msdos format to epoch
 	; BL = 9
 	; convert the given epoch to packed msdos/direntry format
-	mov	eax, ecx ; 17/05/2026	
+	mov	eax, ecx ; 17/05/2026
 	call	convert_from_epoch
 	xor	ecx, ecx
 	mov	ax, [year]
@@ -17958,9 +17994,59 @@ cnv_to_18hz_ok:
 	; eax = system timer tick count (18.2 Hz)
 	jmp	sysstime_2	; set system timer ticks
 
+	; 21/05/2026
 	; 01/05/2026
 sysstime_14:
 	; BL = 8
+	; convert msdos/direntry (packed) format
+	; date&time to unix epoch time
+	;
+	; ECX (time) bits = hhhhhmmmmmmsssss
+	;	bits 0-4: seconds divided by 2, 0-28
+	;	bits 5-10: minute (0-59)
+	;	bits 11-15: hour (0-23)
+	; HW of ECX (date) bits = yyyyyyymmmmddddd
+	;	bit 0-4: day of the month (1-31)
+	;	bit 5-8: Month (1-12)
+	;	bit 9-15: Year (0-127) [Year-1980]
+
+	;mov	al, cl
+	;and	al, 31
+	;shl	al, 1
+	;mov	[second], al
+	;shr	ecx, 5
+	;mov	al, cl
+	;and	al, 63
+	;mov	[minute], al
+	;shr	ecx, 6
+	;mov	al, cl
+	;and	al, 31
+	;mov	[hour], al
+	;shr	ecx, 5
+	;mov	al, cl
+	;and	al, 31
+	;mov	[day], al
+	;shr	ecx, 5
+	;mov	al, cl
+	;and	al, 15
+	;mov	[month], al
+	;shr	ecx, 4
+	;mov	eax, ecx
+	;;and	ax, 127
+	;add	ax, 1980
+	;mov	[year], ax
+
+	;call	convert_to_epoch
+
+	; 21/05/2026
+	call	packed_time_to_epoch
+
+	;mov	[u.r0], eax ; seconds since 1/1/1970 00:00:00
+	;jmp	sysret
+	jmp	sysstime_3
+
+	; 21/05/2026
+packed_time_to_epoch:
 	; convert msdos/direntry (packed) format
 	; date&time to unix epoch time
 	;
@@ -17999,10 +18085,9 @@ sysstime_14:
 	add	ax, 1980
 	mov	[year], ax
 
-	call	convert_to_epoch
-	;mov	[u.r0], eax ; seconds since 1/1/1970 00:00:00
-	;jmp	sysret
-	jmp	sysstime_3
+	;call	convert_to_epoch
+	;retn
+	jmp	convert_to_epoch	
 
 sysrename: ; Rename File (or Directory)
 	; 19/12/2025 - TRDOS 386 v2.0.10

@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 10/02/2026 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 20/05/2026 (Previous: 10/02/2026 - Kernel v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -693,6 +693,15 @@ OF_CCINDEX:	resd OPENFILES  ; Cluster index numbers of current clusters
 ; 24/10/2016
 OF_DIRENTRY:	resw OPENFILES  ; Directory entry index no. in dir cluster
 				; Sector index = entry index / 16
+; 20/05/2026
+OF_ATTRIB:	resb OPENFILES	; File attributes
+OF_CRTTIME:	resw OPENFILES	; Time file was created
+OF_CRTDATE:	resw OPENFILES	; Date file was created
+OF_LADATE:	resw OPENFILES	; Last access date
+OF_WRTTIME:	resw OPENFILES	; Time of last write
+OF_WRTDATE:	resw OPENFILES	; Date of last write
+;OF_NAME	resb 12*OPENFILES ; Short name of file
+
 ;alignb 2
 
 DTA:		;resd 24	; Find First File data transfer area

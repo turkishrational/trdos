@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 29/04/2026  (Previous: 28/01/2025, v2.0.10)
+; Last Update: 22/05/2026  (Previous: 28/01/2025, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -5005,6 +5005,173 @@ ungetchar:
 
 	; 18/09/2024
 charbuf: db 0
+
+sysfstat: ; Return Open File Status (Parameters)
+	; 22/05/2026
+	; 21/05/2026 - TRDOS 386 Kernel v2.0.11
+	; ref: Google AI (27/04/2026) ((TRDOS 386 LIBC, gcc port))
+	;
+	; Input:
+	;	EBX = File Descriptor (Handle)
+	;	ECX = Pointer to stat structure (User Buffer)
+	;
+	; Output:
+	;	If cf = 0 -> EAX = 0
+	;	If cf = 1 -> EAX = error code (= -1)
+
+	; 22/05/2026 - ref: tcc (include/sys) stat.h ((modified))
+	; stat structure:
+	; 	st_dev:   resd 1 ; 0
+	;	st_ino:	  resd 1 ; 4
+	;	st_mode:  resw 1 ; 8
+	;	st_nlink: resw 1 ; 10
+	;	st_uid:   resw 1 ; 12
+	;	st_gid:   resw 1 ; 14
+	;	st_rdev:  resd 1 ; 16
+	;	st_size:  resd 1 ; 20
+	;		  resd 1 ; 24
+	;	st_atime: resd 1 ; 28
+	;	st_mtime: resd 1 ; 32
+	;	st_ctime: resd 1 ; 36
+
+	cmp	ebx, 10
+	jae	short sysfstat_err
+
+	; Is the file open? (0 = empty/closed)
+	mov	bl, [u.fp + ebx]
+	or	bl, bl
+	;jz	short sysfstat_err
+	jnz	short sysfstat_@
+
+sysfstat_err:
+	;mov	eax, ERR_FILE_NOT_OPEN ; 10
+	mov	eax, -1
+	dec	eax ; -1
+	mov	[u.error], eax
+	mov	[u.r0], eax
+	jmp	error
+
+sysfstat_@:
+	mov	ebp, ecx ; user's stat buffer address
+
+	;xor	eax, eax
+	mov	al, 0
+	mov	ecx, 40		; stat structure size
+	sub	esp, ecx
+	mov	edi, esp
+	push	edi
+	rep	stosb		; clear fields
+	pop	edi
+
+	; ebx = 1 based file (open file index) number
+	dec	ebx ; zero based file (open file index) number
+	mov	esi, ebx
+	shl	esi, 2 ; * 4
+
+	; --- Fill Stat Structure---
+	; [edi+0]	; st_dev (word)
+	;movzx	eax, byte [OF_DRIVE + ebx]
+	; ah = 0
+	mov	al, [OF_DRIVE + ebx]
+	;mov	[edi], ax
+	stosd
+
+	; [edi+4]	; st_ino (dword)
+	mov	eax, [OF_FCLUSTER + esi]
+	;mov	[edi+4], eax
+	stosd
+
+	; [edi+8]	; st_mode (word)
+	mov	al, [OF_ATTRIB + ebx]
+	call	fat_attr_to_unix_mode ; FAT Attrib to UNIX Mode
+	;mov	[edi+8], ax
+	stosw
+	; edi = stat structure start address + 10
+
+	;xor	eax, eax ; 0
+	;mov	[edi+10], ax ; number of links
+	;mov	[edi+12], ax ; uid
+	;mov	[edi+14], ax ; gid
+	;mov	[edi+16], eax ; st_rdev (root device)
+
+ 	; [edi+20]	; st_size (dword)
+	mov	eax, [OF_SIZE + esi]
+	;mov	[edi+20], eax
+
+	add	edi, 10
+	stosd
+
+	;sub	eax, eax
+	;mov	[edi+24], eax ; 0  ; high dword of file size
+
+	shr	esi, 1
+
+	; [edi+28]	; st_atime (dword - Epoch)
+	mov	cx, [OF_LADATE + esi] ; last access date
+	shl	ecx, 16	
+	; last access time = 12:00:00 (default)
+	mov	cx, 6000h
+
+	; ECX (time) bits = hhhhhmmmmmmsssss
+	;	bits 0-4: seconds divided by 2, 0-28
+	;	bits 5-10: minute (0-59)
+	;	bits 11-15: hour (0-23)
+	; HW of ECX (date) bits = yyyyyyymmmmddddd
+	;	bit 0-4: day of the month (1-31)
+	;	bit 5-8: Month (1-12)
+	;	bit 9-15: Year (0-127) [Year-1980]
+
+	call	packed_time_to_epoch
+
+	; EAX = Unix Epoch TimeStamp
+
+	;mov	[edi+28], eax   ; atime (Last Access)
+	add	edi, 4
+	stosd
+
+	; [edi+28]	; st_atime (dword - Epoch)
+	mov	cx, [OF_WRTDATE + esi]
+	shl	ecx, 16
+	mov	cx, [OF_WRTTIME + esi]
+
+	call	packed_time_to_epoch
+
+	;mov	[edi+32], eax   ; mtime (Last Modif)
+	stosd
+
+	mov	cx, [OF_CRTDATE + esi]
+	shl	ecx, 16
+	mov	cx, [OF_CRTTIME + esi]
+
+	call	packed_time_to_epoch
+
+	;mov	[edi+36], eax   ; ctime (Creation)
+	stosd
+
+	mov	esi, esp ; source address in system space
+	mov	edi, ebp ; user's buffer address
+	mov	ecx, 40	 ; transfer (byte) count
+	; [u.pgdir] = user's page directory
+	call	transfer_to_user_buffer
+	; if carry flag = 1 -> transfer count < 40
+	mov	ebp, 40
+	add	esp, ebp
+	cmp	ecx, ebp	; transfer count check
+	jb	sysfstat_err
+
+	xor	eax, eax	; successful
+	mov	[u.r0], eax	; 0
+	jmp	sysret
+
+	; FAT Attrib (AL) -> UNIX Mode (AX)
+fat_attr_to_unix_mode:
+	test	al, 1Fh ; readonly, hidden, system, volume, dir
+	jnz	short fatum_ro
+	mov	ax, 81A4h	; Normal: rw-r--r-- ; octal 644
+	retn
+fatum_ro:
+	mov	ax, 8124h	; Readonly: r--r--r-- ; octal 444
+	retn
 
 otty:
 sret:
