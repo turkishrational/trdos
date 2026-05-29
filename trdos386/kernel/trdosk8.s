@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 22/05/2026  (Previous: 28/01/2025, v2.0.10)
+; Last Update: 29/05/2026  (Previous: 28/01/2025, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -235,6 +235,8 @@ clk_1:
 clk_2:
 	retn   ; return to (hardware) timer interrupt routine
 
+; 29/05/2026 - TRDOS 386 v2.0.11
+; 	(Corrected by Google AI)
 ; 12/10/2017
 ; 15/01/2017
 ; 14/01/2017
@@ -287,9 +289,10 @@ int34h: ; #IOCTL# (I/O port access support for ring 3)
 	; 14/01/2017
 	; 02/01/2017
 	;;mov	byte [ss:intflg], 34h	; IOCTL interrupt
-	sti
-	
+
+	; 29/05/2026
 	;sti	; enable interrupts
+
 	and	byte [esp+8], 11111110b	; clear carry bit of eflags register
 
 	cmp	ah, 1
@@ -307,7 +310,7 @@ int34h_iret:
 	;cli	; 07/01/2017
 	;; 15/01/2017
 	;;mov	byte [ss:intflg], 0 ; reset
-	iretd 
+	iretd
 
 int34h_1:
 	test	ah, 1

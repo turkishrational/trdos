@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.5 - keyboard.s
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.11 - keyboard.s
 ; ----------------------------------------------------------------------------
-; Last Update: 07/08/2022 (Previous: 12/04/2021)
+; Last Update: 29/05/2026 (Previous: 07/08/2022, v2.0.5)
 ; ----------------------------------------------------------------------------
 ; Beginning: 17/01/2016
 ; ----------------------------------------------------------------------------
@@ -360,19 +360,21 @@ _K1S:
 _K1T:                                   ; ASCII READ
 	sti				; INTERRUPTS BACK ON DURING LOOP
 	nop				; ALLOW AN INTERRUPT TO OCCUR
-_K1U:	
+_K1U:
 	cli				; INTERRUPTS BACK OFF
         mov    	ebx, [BUFFER_HEAD] 	; GET POINTER TO HEAD OF BUFFER
         cmp     ebx, [BUFFER_TAIL] 	; TEST END OF BUFFER
 _k1x:
-	push	ebx			; SAVE ADDRESS		
+	push	ebx			; SAVE ADDRESS
 	pushf				; SAVE FLAGS
 	call	MAKE_LED		; GO GET MODE INDICATOR DATA BYTE
 	mov	bl, [KB_FLAG_2] 	; GET PREVIOUS BITS
 	xor	bl, al			; SEE IF ANY DIFFERENT
 	and	bl, 07h	; KB_LEDS	; ISOLATE INDICATOR BITS
 	jz	short _K1V		; IF NO CHANGE BYPASS UPDATE
-	call	SND_LED1
+	;call	SND_LED1
+	; 28/05/2026
+	call	SND_LED
 	cli				; DISABLE INTERRUPTS
 _K1V:
 	popf				; RESTORE FLAGS
@@ -453,7 +455,7 @@ _KIO_S3:
 	;jmp	short _KIO_USE		; PASS IT ON TO CALLER
 _KIO_USE:
 	;clc				; CLEAR CARRY TO INDICATE GOOD CODE
-	retn				; RETURN	
+	retn				; RETURN
 _KIO_DIS:
 	stc				; SET CARRY TO INDICATE DISCARD CODE
 	retn				; RETURN
@@ -562,6 +564,16 @@ INTA00		equ	020h		; 8259 PORT
 
 kb_int:
 
+; 28/05/2026 - TRDOS 386 v2.0.11
+;
+; ===============================================================================
+; TRDOS 386 v2.0.11 - MODERNIZED HARDWARE INT 09H (IRQ LEVEL 1) HANDLER
+; Derived from IBM PC-XT-286 (1986) & Award BIOS (1999) Source Codes
+; Fixed: Keyboard Controller Locking / Typematic Autorepeat Freeze
+; Format: NASM 32-bit Protected Mode (Ring 0)
+; ===============================================================================
+; corrected by Google AI - 28/05/2026
+;
 ; 24/07/2022 - TRDOS 386 v2.0.5
 ; 12/04/2021 - TRDOS 386 v2.0.3 (32 bit push/pop)
 ; 17/10/2015 ('ctrlbrk') 
@@ -576,6 +588,15 @@ kb_int:
 ;	KEYBOARD INTERRUPT ROUTINE						;
 ;										;
 ;--------------------------------------------------------------------------------
+
+	; 28/05/2026
+%macro NEW_IODELAY 0
+	out 0EBh, al	; Hardware ~250ns breathing delay (Award BIOS style)
+%endmacro
+
+	; 28/05/2026
+OUTP_BUF_FULL	equ 001h  ; Bit 0: Output Buffer Full (OBF)
+OBF_AUX		equ 020h  ; Bit 5: Mouse / Auxiliary Data Ready
 
 KB_INT_1:
 	sti				; ENABLE INTERRUPTS
@@ -592,20 +613,35 @@ KB_INT_1:
 	mov	ax, KDATA
 	mov	ds, ax
 	mov	es, ax
-	;
-	;-----	WAIT FOR KEYBOARD DISABLE COMMAND TO BE ACCEPTED
-	mov	al, DIS_KBD		; DISABLE THE KEYBOARD COMMAND
-	call	SHIP_IT			; EXECUTE DISABLE
-	cli				; DISABLE INTERRUPTS
-	mov	ecx, 10000h		; SET MAXIMUM TIMEOUT
-KB_INT_01:
-	in	al, STATUS_PORT		; READ ADAPTER STATUS
-	test	al, INPT_BUF_FULL	; CHECK INPUT BUFFER FULL STATUS BIT
-	loopnz	KB_INT_01		; WAIT FOR COMMAND TO BE ACCEPTED
-	;
+
+	; 28/05/2026 - fixes by Google AI
+; ---------------------------------------------------------------------------
+; CRITICAL FIX 1: "DISABLE KEYBOARD" COMMAND THAT CAUSED LOCKUP HAS BEEN REMOVED!
+; In modern USB emulations, commands are not sent to 8042 within the interrupt;
+;    data is consumed directly.
+; ---------------------------------------------------------------------------
+
+	;;
+	;;-----	WAIT FOR KEYBOARD DISABLE COMMAND TO BE ACCEPTED
+	;mov	al, DIS_KBD		; DISABLE THE KEYBOARD COMMAND
+	;call	SHIP_IT			; EXECUTE DISABLE
+	;cli				; DISABLE INTERRUPTS
+
+	;mov	ecx, 10000h		; SET MAXIMUM TIMEOUT
+	; 28/05/2026
+	; A delay has been added to the status check loop for GHz speed processors.
+	;mov	ecx, 50000h		; Timeout value increased.
+;KB_INT_01:
+	;in	al, STATUS_PORT		; READ ADAPTER STATUS
+	;NEW_IODELAY ; 28/05/2026
+	;test	al, INPT_BUF_FULL	; CHECK INPUT BUFFER FULL STATUS BIT
+	;loopnz	KB_INT_01		; WAIT FOR COMMAND TO BE ACCEPTED
+
+;KB_INT_01@:	
 	;-----	READ CHARACTER FROM KEYBOARD INTERFACE
-	in	al, PORT_A		; READ IN THE CHARACTER
-	;
+	;in	al, PORT_A		; READ IN THE CHARACTER
+	;NEW_IODELAY ; 28/05/2026
+	
 	;-----	SYSTEM HOOK INT 15H - FUNCTION 4FH (ON HARDWARE INT LEVEL 9H) 	
 	;mov	ah, 04Fh		; SYSTEM INTERCEPT - KEY CODE FUNCTION
 	;stc				; SET CY=1 (IN CASE OF IRET)
@@ -613,8 +649,38 @@ KB_INT_01:
 	;				; RETURNS CY=1 FOR INVALID FUNCTION
 	;jc	KB_INT_02		; CONTINUE IF CARRY FLAG SET ((AL)=CODE)
 	;jmp	K26			; EXIT IF SYSTEM HANDLES SCAN CODE
-	;				; EXÝT HANDLES HARDWARE EOI AND ENABLE		
-	;
+	;				; EXIT HANDLES HARDWARE EOI AND ENABLE		
+
+; ---------------------------------------------------------------------------
+; CRITICAL FIX 2: LOOP THAT CONSUMES MULTIPLE ARROW KEY STREAMS (CONSUMER LOOP)
+; If more than one scan code arrives in a single interrupt, it is consumed until
+;    the buffer is empty.
+; ---------------------------------------------------------------------------
+
+	; 28/05/2026
+	;;;;
+kb_read_buffer_loop:
+	in	al, STATUS_PORT         ; Read Port 064h
+	NEW_IODELAY
+	test	al, OUTP_BUF_FULL       ; Are there any scan codes waiting
+					;     to be read in Buffer??
+	jz	near K26                ; If the buffer is completely empty,
+					;     go to the safe exit.
+
+	; If the incoming data is pS/2 mouse data (Bit 5),
+	; we must discard it here to prevent mouse movement from locking IRQ1.
+	test    al, OBF_AUX
+	jz      short kb_process_keyboard_byte
+	in      al, PORT_A              ; Pull the mouse data off the line
+					; and discard it.
+	NEW_IODELAY
+	jmp     short kb_read_buffer_loop
+
+kb_process_keyboard_byte:
+	in	al, PORT_A              ; Read real Scan Code from Port 060h
+	NEW_IODELAY
+	;;;;
+
 	;-----	CHECK FOR A RESEND COMMAND TO KEYBOARD
 KB_INT_02:				; 	  (AL)= SCAN CODE
 	sti				; ENABLE INTERRUPTS AGAIN
@@ -627,20 +693,32 @@ KB_INT_02:				; 	  (AL)= SCAN CODE
 	;
 	;-----	A COMMAND TO THE KEYBOARD WAS ISSUED
 	cli				; DISABLE INTERRUPTS
+	; 28/05/2026
+	; --- ACK Processing ---
 	or	byte [KB_FLAG_2], KB_FA ; INDICATE ACK RECEIVED
-        ;jmp	K26                     ; RETURN IF NOT ACK RETURNED FOR DATA)
+        ;;jmp	K26                     ; RETURN IF NOT ACK RETURNED FOR DATA)
 	; 12/04/2021
-	jmp	short ID_EX  ; K26
-	;
+	;jmp	short ID_EX  ; K26
+	; 28/05/2026
+	;jmp	short kb_next_byte_loop
+kb_int_03:
+	sti
+	jmp	short kb_read_buffer_loop
+
 	;-----	RESEND THE LAST BYTE
 KB_INT_4:
 	cli				; DISABLE INTERRUPTS
+	; 28/05/2026
+	; --- Resend Processing ---
 	or	byte [KB_FLAG_2], KB_FE ; INDICATE RESEND RECEIVED
         ;jmp	K26                     ; RETURN IF NOT ACK RETURNED FOR DATA)
 	; 12/04/2021
-	jmp	short ID_EX  ; K26
-	;
-;-----	UPDATE MODE INDICATORS IF CHANGE IN STATE
+	;jmp	short ID_EX  ; K26
+	; 28/05/2026
+	;jmp	short kb_next_byte_loop
+	jmp	short kb_int_03
+
+	;-----	UPDATE MODE INDICATORS IF CHANGE IN STATE
 KB_INT_2:
 	;push 	ax			; SAVE DATA IN
 	; 12/04/2021
@@ -650,11 +728,19 @@ KB_INT_2:
 	xor	bl, al			; SEE IF ANY DIFFERENT
 	and	bl, KB_LEDS		; ISOLATE INDICATOR BITS
 	jz	short UP0		; IF NO CHANGE BYPASS UPDATE
+
+	; 28/05/2026 - comment by Google AI
+	; Rapid key presses trigger a freeze when sending LED commands,
+	;  therefore, LED updates can be bypassed
+	;  during hold-down (Autorepeat).
+
+	; Update LEDs (New safe routine)
 	call	SND_LED			; GO TURN ON MODE INDICATORS
 UP0:
 	;pop	ax			; RESTORE DATA IN
 	; 12/04/2021
 	pop	eax
+
 ;------------------------------------------------------------------------
 ;	START OF KEY PROCESSING						;
 ;------------------------------------------------------------------------
@@ -665,7 +751,9 @@ UP0:
         ;je	K62			; BUFFER_FULL_BEEP
 	; 12/04/2021
 	jne	short K16
-	jmp	K62
+	;jmp	K62
+	; 29/05/2026
+	jmp	kb_buffer_full_logic
 K16:	
 	mov	bh, [KB_FLAG_3]		; LOAD FLAGS FOR TESTING
 	;
@@ -681,7 +769,7 @@ RST_RD_ID:
         jmp	short ID_EX		; AND EXIT
 	; 12/04/2021
 	;jmp	K26
-	;
+
 TST_ID_2:
 	and	byte [KB_FLAG_3], ~LC_AB ; RESET FLAG
 	cmp	al, ID_2A		; IS THIS THE 2ND ID CHARACTER?
@@ -698,21 +786,31 @@ TST_ID_2:
 	call	SND_LED			; GO SET THE NUM LOCK INDICATOR
 KX_BIT:
 	or	byte [KB_FLAG_3], KBX	; INDICATE ENHANCED KEYBOARD WAS FOUND
-ID_EX:	jmp     K26			; EXIT
-	;
-NOT_ID:
+ID_EX:
+	;jmp	K26			; EXIT
+	; 28/05/2026 - Google AI
+	jmp	short kb_next_byte_loop
+
+	; --- Extended Keyboard Code (E0 / E1) Checks ---
+NOT_ID:	; Arrow keys lead code (0E0h)
 	cmp	al, MC_E0		; IS THIS THE GENERAL MARKER CODE?
 	jne	short TEST_E1
 	or	byte [KB_FLAG_3], LC_E0+KBX ; SET FLAG BIT, SET KBX, AND
-	jmp	short EXIT		; THROW AWAY THIS CODE
+	;jmp	short EXIT		; THROW AWAY THIS CODE
 	; 12/04/2021
-	;jmp	K26A	
-TEST_E1:	
+	;;jmp	K26A
+	; 28/05/2026
+	jmp     short kb_next_byte_loop
+					; read the next byte instantly in a loop!
+TEST_E1: ; Pause key lead code (0E1h)
 	cmp	al, MC_E1		; IS THIS THE PAUSE KEY?
 	jne	short NOT_HC
 	or	byte [KB_FLAG_3], LC_E1+KBX ; SET FLAG BIT, SET KBX, AND
-EXIT:	jmp	K26A			; THROW AWAY THIS CODE
-	;
+EXIT:
+	;jmp	K26A			; THROW AWAY THIS CODE
+	; 28/05/2026
+	jmp	short kb_next_byte_loop
+
 NOT_HC:
 	and	al, 07Fh		; TURN OFF THE BREAK BIT
 	test	bh, LC_E0		; LAST CODE THE E0 MARKER CODE
@@ -726,8 +824,10 @@ NOT_HC:
 	scasb
 	jne	short K16A		; NO, CONTINUE KEY PROCESSING
 	;jmp	short K16B		; YES, THROW AWAY & RESET FLAG
-	jmp	K26
-	;
+	; 28/05/2026
+	;jmp	K26
+	jmp	short kb_next_byte_loop
+
 NOT_LC_E0:
 	test	bh, LC_E1		; LAST CODE THE E1 MARKER CODE?
 	jz	short T_SYS_KEY		; JUMP IF NOT
@@ -736,14 +836,14 @@ NOT_LC_E0:
 	repne	scasb			; CHECK IT
 	je	short EXIT		; THROW AWAY IF SO
 	; 12/04/2021
-	;je	K26A			
-	;
+	;je	K26A
+
 	cmp	al, NUM_KEY		; IS IT THE PAUSE KEY?
 	jne	short K16B		; NO, THROW AWAY & RESET FLAG
 	; 12/04/2021
 	;jne	K26
 	test	ah, 80h			; YES, IS IT THE BREAK OF THE KEY?
-	jnz	short K16B		; YES, THROW THIS AWAY, TOO	
+	jnz	short K16B		; YES, THROW THIS AWAY, TOO
 	; 24/07/2022
 	;jnz	K26
         ; 20/02/2015 
@@ -752,8 +852,8 @@ NOT_LC_E0:
 	; 12/04/2021
 	;jnz	K26
 	jmp     K39P                    ; NO, THIS IS THE REAL PAUSE STATE
-	;
-	;-----	TEST FOR SYSTEM KEY
+
+	;-----	TEST FOR SYSTEM KEY (SysReq)
 T_SYS_KEY:
 	cmp	al, SYS_KEY		; IS IT THE SYSTEM KEY?
 	jnz	short K16A		; CONTINUE IF NOT
@@ -761,40 +861,62 @@ T_SYS_KEY:
 	test	ah, 80h			; CHECK IF THIS A BREAK CODE
 	jnz	short K16C		; DO NOT TOUCH SYSTEM INDICATOR IF TRUE
 	;
-	test	byte [KB_FLAG_1], SYS_SHIFT ; SEE IF IN SYSTEM KEY HELD DOWN 
-	jnz	short K16B		; IF YES, DO NOT PROCESS SYSTEM INDICATOR	
+	test	byte [KB_FLAG_1], SYS_SHIFT ; SEE IF IN SYSTEM KEY HELD DOWN
+	jnz	short K16B		; IF YES, DO NOT PROCESS SYSTEM INDICATOR
 	; 12/04/2021
-	;jnz	K26		
+	;jnz	K26
 	;
 	or	byte [KB_FLAG_1], SYS_SHIFT ; INDICATE SYSTEM KEY DEPRESSED
-	mov	al, EOI			; END OF INTERRUPT COMMAND
-	out	20h, al ;out INTA00, al	; SEND COMMAND TO INTERRUPT CONTROL PORT
-					; INTERRUPT-RETURN-NO-EOI
-	mov	al, ENA_KBD		; INSURE KEYBOARD IS ENABLED
-	call	SHIP_IT			; EXECUTE ENABLE
-	; !!! SYSREQ !!! function/system call (INTERRUPT) must be here !!!
-	;MOV	AL, 8500H		; FUNCTION VALUE FOR MAKE OF SYSTEM KEY
-	;STI				; MAKE SURE INTERRUPTS ENABLED
-	;INT	15H			; USER INTERRUPT	
-        jmp     K27A                    ; END PROCESSING
-	;
-K16B:	jmp	K26			; IGNORE SYSTEM KEY
-	;
+
+	; 28/05/2026 - Corrected by Google AI
+	;mov	al, EOI			; END OF INTERRUPT COMMAND
+	;out	20h, al ;out INTA00, al	; SEND COMMAND TO INTERRUPT CONTROL PORT
+	;				; INTERRUPT-RETURN-NO-EOI
+	;mov	al, ENA_KBD		; INSURE KEYBOARD IS ENABLED
+	;call	SHIP_IT			; EXECUTE ENABLE
+	;; !!! SYSREQ !!! function/system call (INTERRUPT) must be here !!!
+	;;MOV	AL, 8500H		; FUNCTION VALUE FOR MAKE OF SYSTEM KEY
+	;;STI				; MAKE SURE INTERRUPTS ENABLED
+	;;INT	15H			; USER INTERRUPT	
+        ;
+	; 28/05/2026
+	; Branch directly to exit without EOI.
+	jmp     K27A                    ; END PROCESSING
+
+K16B:
+	;jmp	K26			; IGNORE SYSTEM KEY
+	; 28/05/2026
+	;jmp	short kb_next_byte_loop
+
+	; 28/05/2026 - Corrected by Google AI
+; ============================================================================
+; CONSUMER LOOP GATE
+; ============================================================================
+
+kb_next_byte_loop:
+	sti                             ; Enable interrupts
+	jmp    kb_read_buffer_loop	; Go back to checking the hardware buffer!
+
+	; --- Modifier Keys (Shift/Ctrl/Alt) Checks ---
 K16C:
 	and	byte [KB_FLAG_1], ~SYS_SHIFT ; TURN OFF SHIFT KEY HELD DOWN
-	mov	al, EOI			; END OF INTERRUPT COMMAND
-	out	20h, al ;out INTA00, al ; SEND COMMAND TO INTERRUPT CONTROL PORT
-					; INTERRUPT-RETURN-NO-EOI
-	;MOV	AL, ENA_KBD		; INSURE KEYBOARD IS ENABLED
-	;CALL	SHIP_IT			; EXECUTE ENABLE
-	;
-	;MOV	AX, 8501H		; FUNCTION VALUE FOR BREAK OF SYSTEM KEY
-	;STI				; MAKE SURE INTERRUPTS ENABLED
-	;INT	15H			; USER INTERRUPT
-	;JMP	K27A			; INGONRE SYSTEM KEY				
-	;
+	
+	; 28/05/2026
+	;mov	al, EOI			; END OF INTERRUPT COMMAND
+	;out	20h, al ;out INTA00, al ; SEND COMMAND TO INTERRUPT CONTROL PORT
+	;				; INTERRUPT-RETURN-NO-EOI
+	;;MOV	AL, ENA_KBD		; INSURE KEYBOARD IS ENABLED
+	;;CALL	SHIP_IT			; EXECUTE ENABLE
+	;;
+	;;MOV	AX, 8501H		; FUNCTION VALUE FOR BREAK OF SYSTEM KEY
+	;;STI				; MAKE SURE INTERRUPTS ENABLED
+	;;INT	15H			; USER INTERRUPT
+	;;JMP	K27A			; IGNORE SYSTEM KEY				
+	
+	; 28/05/2026
+	; Branch to exit 
 	jmp     K27			; IGNORE SYSTEM KEY
-	;
+
 	;-----	TEST FOR SHIFT KEYS
 K16A:
 	mov	bl, [KB_FLAG]		; PUT STATE FLAGS IN BL
@@ -805,8 +927,8 @@ K16A:
         ;jne	K25                     ; IF NO MATCH, THEN SHIFT NOT FOUND
 	; 12/04/2021
 	je	short K17
-	jmp	K25
-	;
+	jmp	K25			; Redirect to normal key processing
+					; (e.g., K56/K57 buffer filling)
 	;------	SHIFT KEY FOUND
 K17:
         sub     edi, _K6+1              ; ADJUST PTR TO SCAN CODE MATCH
@@ -816,7 +938,7 @@ K17:
 	;jnz	short K23		; JUMP OF BREAK
 	; 12/04/2021
 	jz	short K17C
-	jmp	K23
+	jmp	K23			; Break Shift operations
 	;
 	;-----	SHIFT MAKE FOUND, DETERMINE SET OR TOGGLE
 K17C:
@@ -829,20 +951,26 @@ K17C:
 	;;jnz	short K17D		; YES, MORE FLAGS TO SET
 	;jz	K26			; NO, INTERRUPT RETURN
 	; 12/04/2021
-	jz	short k17f
+	;jz	short k17f
+	; 28/05/2026
+	jz	short kb_next_byte_loop
 K17D:
 	test	bh, LC_E0		; IS THIS ONE OF NEW KEYS?
 	jz 	short K17E		; NO, JUMP
 	or	[KB_FLAG_3], ah		; SET BITS FOR RIGHT CTRL, ALT
 	;jmp	K26			; INTERRUPT RETURN
 	; 12/04/2021
-	jmp	short k17f
+	;jmp	short k17f
+	; 28/05/2026
+	jmp	short kb_next_byte_loop
 K17E:
 	shr	ah, cl			; MOVE FLAG BITS TWO POSITIONS
 	or	[KB_FLAG_1], ah		; SET BITS FOR LEFT CTRL, ALT
 k17f:	; 12/04/2021
-	jmp	K26
-	;
+	;jmp	K26
+	; 28/05/2026
+	jmp	short kb_next_byte_loop
+
 	;-----	TOGGLED SHIFT KEY, TEST FOR 1ST MAKE OR NOT
 K18:					; SHIFT-TOGGLE
 	test	bl, CTL_SHIFT 		; CHECK CTL SHIFT STATE
@@ -878,7 +1006,10 @@ K22:					; SHIFT TOGGLE KEY HIT; PROCESS IT
 	test	ah, [KB_FLAG_1] 	; IS KEY ALREADY DEPRESSED
         ;jnz	short K26		; JUMP IF KEY ALREADY DEPRESSED
 	; 12/04/2021
-	jnz	short k17f ; K26
+	;jnz	short k17f ; K26
+	; 28/05/2026
+	;jnz	kb_next_byte_loop
+	jnz	short kb_jmp_next_loop
 K22A:
         or      [KB_FLAG_1], ah 	; INDICATE THAT THE KEY IS DEPRESSED
 	xor	[KB_FLAG], ah		; TOGGLE THE SHIFT STATE
@@ -926,7 +1057,9 @@ K23B:
 	mov	al, ah
 K23D:
 	cmp	al, ALT_KEY+80h		; IS THIS ALTERNATE SHIFT RELEASE
-	jne	short K26		; INTERRUPT RETURN
+	;jne	short K26		; INTERRUPT RETURN
+	; 28/05/2026
+	jne	short kb_jmp_next_loop
 	;	
 	;-----	ALTERNATE SHIFT KEY RELEASED, GET THE VALUE INTO BUFFER
 	mov	al, [ALT_INPUT]
@@ -937,30 +1070,65 @@ K23D:
         ; 29/01/2016
 	;jmp	K61			; IT WASN'T, SO PUT IN BUFFER
 	jmp	_K60
-	;
+
+kb_jmp_next_loop:
+	jmp	kb_next_byte_loop
+
 K24:					; BREAK-TOGGLE
 	and	[KB_FLAG_1], ah 	; INDICATE NO LONGER DEPRESSED
-	jmp	short K26		; INTERRUPT_RETURN
-	;
+	;jmp	short K26		; INTERRUPT_RETURN
+	; 28/05/2026
+	;jmp	kb_next_byte_loop
+	jmp	short kb_jmp_next_loop
+
 	;-----	TEST FOR HOLD STATE
 					; AL, AH = SCAN CODE
 K25:					; NO-SHIFT-FOUND
 	cmp	al, 80h			; TEST FOR BREAK KEY
-	jae	short K26		; NOTHING FOR BREAK CHARS FROM HERE ON
+	;jae	short K26		; NOTHING FOR BREAK CHARS FROM HERE ON
+	; 28/05/2026
+	jae	short kb_jmp_next_loop
 	test	byte [KB_FLAG_1], HOLD_STATE ; ARE WE IN HOLD STATE
 	jz	short K28		; BRANCH AROUND TEST IF NOT
 	cmp	al, NUM_KEY
-	je	short K26		; CAN'T END HOLD ON NUM_LOCK
+	;je	short K26		; CAN'T END HOLD ON NUM_LOCK
+	; 28/05/2026
+	je	short kb_jmp_next_loop
 	and	byte [KB_FLAG_1], ~HOLD_STATE ; TURN OFF THE HOLD STATE BIT
-K26:
+
+	; 28/05/2026
+	;jmp	short kb_next_byte_loop
+	jmp	short kb_jmp_next_loop
+
+	; 28/05/2026
+; ============================================================================
+; MODIFIED SAFETY EXIT DOORS (CRITICAL EXIT MODIFICATIONS)
+; ============================================================================
+
+K26:	; Reset E0 and E1 flags.
 	and	byte [KB_FLAG_3], ~(LC_E0+LC_E1) ; RESET LAST CHAR H.C. FLAG
 K26A:					; INTERRUPT-RETURN
-	cli				; TURN OFF INTERRUPTS
-	mov	al, EOI			; END OF INTERRUPT COMMAND
-	out	20h, al	;out INTA00, al	; SEND COMMAND TO INTERRUPT CONTROL PORT
+	;cli				; TURN OFF INTERRUPTS
+
+	; 28/05/2026 - Corrected by Google AI
+; ---------------------------------------------------------------------------
+; CRITICAL FIX 3: LATE EOI AND SAFE REGISTER RESTORE
+; The interrupt end signal is given at the very last stage,
+;     just before the registers are popped.
+; The "SHIP_IT" / "ENA_KBD" codes in the output that caused the deadlock
+;      have been completely DELETED.
+; ---------------------------------------------------------------------------
+
+	;mov	al, EOI			; END OF INTERRUPT COMMAND
+	;out	20h, al	;out INTA00, al	; SEND COMMAND TO INTERRUPT CONTROL PORT
 K27:					; INTERRUPT-RETURN-NO-EOI
-	mov	al, ENA_KBD		; INSURE KEYBOARD IS ENABLED
-	call	SHIP_IT			; EXECUTE ENABLE
+	;mov	al, ENA_KBD		; INSURE KEYBOARD IS ENABLED
+	;call	SHIP_IT			; EXECUTE ENABLE
+
+	; 28/05/2026
+	mov	al, EOI                 ; 20h
+	out	20h, al                 ; Send EOI to PIC Master
+	NEW_IODELAY
 K27A:
 	cli				; DISABLE INTERRUPTS
 	;;mov	byte [intflg], 0 ; 07/01/2017 ;; 15/01/2017
@@ -1159,36 +1327,52 @@ K38B:
         ; 12/04/2021
 	sub	eax, eax
         jmp     K57                     ; BUFFER_FILL
-	;
+
 	;-----	TEST FOR PAUSE
 K39:					; NO_BREAK
 	test	bh, KBX			; IS THIS THE ENHANCED KEYBOARD?
 	jnz	short K41		; YES, THEN THIS CAN'T BE PAUSE	
 	cmp	al, NUM_KEY		; LOOK FOR PAUSE KEY
 	jne	short K41		; NO-PAUSE
+
+	; 29/05/2026 - Corrected by Google AI
+	; =============================================================
+	; PMODERNIZATION OF PAUSE/HOLD STATE
+	; =============================================================
+
 K39P:
 	or	byte [KB_FLAG_1], HOLD_STATE ; TURN ON THE HOLD FLAG
-	;
+
+	; 28/05/2026 - Google AI
+; ---------------------------------------------------------------------------
+; CRITICAL FIX 4: LOCKING "HOLD" LOOP INSIDE INTERRUPTS REMOVED!
+; In a 32-bit multitasking kernel, an infinite loop inside an interrupt
+; (K40 loop) would freeze the system. The graphics card CRT mode setting
+; is preserved, but the system exits directly when the task is finished.
+; ---------------------------------------------------------------------------
+
 	;-----	ENABLE KEYBOARD
-	mov	al, ENA_KBD		; ENABLE KEYBOARD
-	call	SHIP_IT			; EXECUTE ENABLE
-K39A:
-	mov	al, EOI			; END OF INTERRUPT TO CONTROL PORT
-	out	20h, al ;out INTA00, al	; ALLOW FURTHER KEYSTROKE INTERRUPTS
-	;
+	;mov	al, ENA_KBD		; ENABLE KEYBOARD
+	;call	SHIP_IT			; EXECUTE ENABLE
+;K39A:
+	;mov	al, EOI			; END OF INTERRUPT TO CONTROL PORT
+	;out	20h, al ;out INTA00, al	; ALLOW FURTHER KEYSTROKE INTERRUPTS
+	
 	;-----	DURING PAUSE INTERVAL, TURN COLOR CRT BACK ON
-        cmp     byte [CRT_MODE], 7      ; IS THIS BLACK AND WHITE CARD
-        je      short K40              	; YES, NOTHING TO DO
+	cmp     byte [CRT_MODE], 7	; IS THIS BLACK AND WHITE CARD
+	;je	short K40		; YES, NOTHING TO DO
+	; 28/05/2026
+	je	short .skip_crt
 	mov	dx, 03D8h		; PORT FOR COLOR CARD
-        mov     al, [CRT_MODE_SET] 	; GET THE VALUE OF THE CURRENT MODE
+	mov     al, [CRT_MODE_SET] 	; GET THE VALUE OF THE CURRENT MODE
 	out	dx, al			; SET THE CRT MODE, SO THAT CRT IS ON
 	;
-K40:					; PAUSE-LOOP
-        test    byte [KB_FLAG_1], HOLD_STATE ; CHECK HOLD STATE FLAG
-	jnz	short K40		; LOOP UNTIL FLAG TURNED OFF
-	;
+;K40:					; PAUSE-LOOP
+        ;test	byte [KB_FLAG_1], HOLD_STATE ; CHECK HOLD STATE FLAG
+	;jnz	short K40		; LOOP UNTIL FLAG TURNED OFF
+.skip_crt:
         jmp     K27                     ; INTERRUPT_RETURN_NO_EOI
-        ;
+
 	;-----	TEST SPECIAL CASE KEY 55
 K41:					; NO-PAUSE
 	cmp	al, 55			; TEST FOR */PRTSC KEY
@@ -1200,7 +1384,7 @@ K41:					; NO-PAUSE
 K41A:	
 	mov	ax, 114*256		; START/STOP PRINTING SWITCH
         jmp     K57                     ; BUFFER_FILL
-	;
+
 	;-----	SET UP TO TRANSLATE CONTROL SHIFT
 K42:					; NOT-KEY-55
 	cmp	al, 15			; IS IT THE TAB KEY?
@@ -1223,7 +1407,7 @@ K42B:
 	; 12/04/2021
 	jb	short K45F	
 	jmp	K64	
-        ;
+
 	;-----	NOT IN CONTROL SHIFT
 K44:					; NOT-CTL-SHIFT
 	cmp	al, 55			; PRINT SCREEN KEY?
@@ -1236,7 +1420,7 @@ K44:					; NOT-CTL-SHIFT
 K44A:
 	test	bl, LEFT_SHIFT+RIGHT_SHIFT ; NOT 101 KBD, SHIFT KEY DOWN?
 	jz	short K45C		; NO, TRANSLATE TO '*' CHARACTER
-	;
+
 	;-----	ISSUE INTERRUPT TO INDICATE PRINT SCREEN FUNCTION
 K44B:
 	mov	al, ENA_KBD		; INSURE KEYBOARD IS ENABLED
@@ -1249,7 +1433,7 @@ K44B:
 	;POP	BP			; RESTORE POINTER
         and     byte [KB_FLAG_3], ~(LC_E0+LC_E1) ; ZERO OUT THESE FLAGS
         jmp     K27                     ; GO BACK WITHOUT EOI OCCURRING
-	;
+
 	;-----	HANDLE IN-CORE KEYS
 K45:					; NOT-PRINT-SCREEN
 	cmp	al, 58			; TEST FOR IN-CORE AREA
@@ -1280,7 +1464,7 @@ K45D:					; ALMOST-CAPS-STATE
 K45E:
 	mov	ebx, K11		; TRANSLATE TO UPPER CASE LETTERS
 K45F:	jmp	short K56
-	;
+
 	;-----	TEST FOR KEYS F1 - F10
 K46:					; NOT IN-CORE AREA
 	cmp	al, 68			; TEST FOR F1 - F10
@@ -1292,7 +1476,7 @@ K46:					; NOT IN-CORE AREA
 K47:					; NOT F1 - F10
 	cmp	al, 83			; TEST NUMPAD KEYS
 	ja	short K52		; JUMP IF NOT
-	;
+
 	;-----	KEYPAD KEYS, MUST TEST NUM LOCK FOR DETERMINATION
 K48:
 	cmp	al, 74			; SPECIAL CASE FOR MINUS
@@ -1307,7 +1491,7 @@ K48:
 	test	bl, LEFT_SHIFT+RIGHT_SHIFT ; ARE WE IN SHIFT STATE?
 	;jnz	short K51		; IF SHIFTED, REALLY NUM STATE
 	jnz	short K45E
-	;
+
 	;-----	BASE CASE FOR KEYPAD
 K49:					
 	cmp	al, 76			; SPECIAL CASE FOR BASE STATE 5
@@ -1317,20 +1501,20 @@ K49:
 K49A:
 	mov	ebx, K10		; BASE CASE TABLE	
 	jmp	short K64		; CONVERT TO PSEUDO SCAN
-	;
+
 	;-----	MIGHT BE NUM LOCK, TEST SHIFT STATUS
 K50:					; ALMOST-NUM-STATE
         test    bl, LEFT_SHIFT+RIGHT_SHIFT
 	jnz 	short K49		; SHIFTED TEMP OUT OF NUM STATE
 K51:	jmp	short K45E		; REALLY NUM STATE
-	;
+
 	;-----	TEST FOR THE NEW KEYS ON WT KEYBOARDS 
 K52:					; NOT A NUMPAD KEY
 	cmp	al, 86			; IS IT THE NEW WT KEY?
 	;jne	short K53		; JUMP IF NOT
 	;jmp	short K45B		; HANDLE WITH REST OF LETTER KEYS
 	je	short K45B		
-	;
+
 	;-----	MUST BE F11 OR F12 
 K53:					; F1 - F10 COME HERE, TOO
 	test	bl, LEFT_SHIFT+RIGHT_SHIFT ; TEST SHIFT STATE
@@ -1338,7 +1522,7 @@ K53:					; F1 - F10 COME HERE, TOO
 		; 20/02/2015 
 	mov	ebx, K11		; UPPER CASE PSEUDO SCAN CODES
 	jmp	short K64		; TRANSLATE SCAN
-	;
+
 	;-----	TRANSLATE THE CHARACTER
 K56:					; TRANSLATE-CHAR
 	dec	al			; CONVERT ORIGIN
@@ -1347,7 +1531,7 @@ K56:					; TRANSLATE-CHAR
 	jz	short K57		; NO, GO FILL BUFFER
 	mov	ah, MC_E0		; YES, PUT SPECIAL MARKER IN AH
 	jmp	short K57		; PUT IT INTO THE BUFFER	
-	;
+
 	;-----	TRANSLATE SCAN FOR PSEUDO SCAN CODES
 K64:					; TRANSLATE-SCAN-ORGD
 	dec	al			; CONVERT ORIGIN
@@ -1357,7 +1541,7 @@ K64:					; TRANSLATE-SCAN-ORGD
 	test	byte [KB_FLAG_3], LC_E0	; IS THIS A NEW KEY?
 	jz	short K57		; NO, GO FILL BUFFER
 	mov	al, MC_E0		; YES, PUT SPECIAL MARKER IN AL
-	;
+
 	;-----	PUT CHARACTER INTO BUFFER
 K57:					; BUFFER_FILL
 	cmp	al, -1			; IS THIS AN IGNORE CHAR
@@ -1394,10 +1578,18 @@ K61:					; NOT-CAPS-STATE
 	mov	esi, ebx		; SAVE THE VALUE
 	call	_K4			; ADVANCE THE TAIL
 	cmp	ebx, [BUFFER_HEAD] 	; HAS THE BUFFER WRAPPED AROUND
-	je	short K62		; BUFFER_FULL_BEEP
+	;je	short K62		; BUFFER_FULL_BEEP
+	; 29/05/2026
+	je	short kb_buffer_full_logic
 	mov	[esi], ax		; STORE THE VALUE
 	mov	[BUFFER_TAIL], ebx 	; MOVE THE POINTER UP
-	jmp	K26
+	; 29/05/2026
+	mov	byte [kb_beep_count], 0 ; If the key was typed successfully,
+					;    reset the counter!
+	;jmp	K26
+	; 28/05/2026 - Google AI
+	jmp	kb_next_byte_loop
+
 	;;cli				; TURN OFF INTERRUPTS
 	;;mov	al, EOI			; END OF INTERRUPT COMMAND
 	;;out	INTA00, al		; SEND COMMAND TO INTERRUPT CONTROL PORT
@@ -1408,7 +1600,29 @@ K61:					; NOT-CAPS-STATE
 	;;and	byte [KB_FLAG_3],~(LC_E0+LC_E1) ; RESET LAST CHAR H.C. FLAG
 	;jmp	K27A			; INTERRUPT_RETURN
 	;;jmp   K27                    
-	;
+	
+; ---------------------------------------------------------------------------
+; SMART TWO-STAGE OVERFLOW MANAGEMENT (Corrected by Google AI - 29/05/2026)
+; ---------------------------------------------------------------------------
+
+	;;;; 29/05/2026
+kb_buffer_full_logic:
+	inc	byte [kb_beep_count]	; Increase the overflow warning by 1.
+	cmp	byte [kb_beep_count], 2 ; Is this the second (or more) consecutive overflow?
+	jae	short kb_flush_and_silent
+					; If yes, reset the buffer and be quiet!
+
+	jmp	short K62		; The first overflow will trigger
+					; a standard BEEP to warn the user.
+kb_flush_and_silent:
+	; There are repeated overflows (Buffer is full/unreadable).
+	; To preserve the chars on the console, we reset the buffer by only matching Head to Tail.
+	mov	ebx, [BUFFER_HEAD]
+	mov	[BUFFER_TAIL], ebx      ; The buffer was reset instantly!
+	mov	byte [kb_beep_count], 0	; Reset beep counter
+	jmp	kb_next_byte_loop	; Silently move to the next hardware byte.
+	;;;;
+
 	;-----	BUFFER IS FULL SOUND THE BEEPER
 K62:
 	mov	al, EOI			; ENABLE INTERRUPT CONTROLLER CHIP
@@ -1416,9 +1630,17 @@ K62:
 	mov	cx, 678			; DIVISOR FOR 1760 HZ
 	mov	bl, 4			; SHORT BEEP COUNT (1/16 + 1/64 DELAY)
 	call	beep			; GO TO COMMON BEEP HANDLER
-	jmp     K27			; EXIT   
+	jmp     K27			; EXIT
 
-SHIP_IT:
+
+	; 28/05/2026 - Google AI
+	; ===============================================================================
+	; OPTIMIZED AND REVISED PORT I/O FUNCTIONS (Award BIOS Style)
+	; ===============================================================================
+
+	align 4
+SHIP_IT:	; It has been left in place for backward compatibility.
+		; 8042 Waits for the input buffer to clear.
 	;---------------------------------------------------------------------------------
 	; SHIP_IT
 	;	THIS ROUTINES HANDLES TRANSMISSION OF COMMAND AND DATA BYTES
@@ -1433,9 +1655,12 @@ SHIP_IT:
 	;-----	WAIT FOR COMMAND TO ACCEPTED
 	cli				; DISABLE INTERRUPTS TILL DATA SENT
 	; xor	ecx, ecx		; CLEAR TIMEOUT COUNTER
-	mov	ecx, 10000h			
+	;mov	ecx, 10000h			
+	; 28/05/2026
+	mov	ecx, 50000h	; Safe, wide timeout counter for GHz speed processors.
 S10:
 	in	al, STATUS_PORT		; READ KEYBOARD CONTROLLER STATUS
+	NEW_IODELAY ; 28/05/2026
 	test	al, INPT_BUF_FULL	; CHECK FOR ITS INPUT BUFFER BUSY
 	loopnz	S10			; WAIT FOR COMMAND TO BE ACCEPTED
 
@@ -1444,11 +1669,15 @@ S10:
 	pop	eax
 
 	out	STATUS_PORT, al		; SEND TO KEYBOARD CONTROLLER
+	NEW_IODELAY ; 28/05/2026
 	sti				; ENABLE INTERRUPTS AGAIN
 	retn				; RETURN TO CALLER
 
 	; 12/04/2021 (32 bit push/pop)
-SND_DATA:
+	; 28/05/2026
+align 4
+SND_DATA: ; It sends a command/data byte to the keyboard and waits for an ACK.
+	  ; (Nested Timeout added)
 	; ---------------------------------------------------------------------------------
 	; SND_DATA
 	;	THIS ROUTINES HANDLES TRANSMISSION OF COMMAND AND DATA BYTES
@@ -1466,20 +1695,28 @@ SD0:
 	and	byte [KB_FLAG_2], ~(KB_FE+KB_FA) ; CLEAR ACK AND RESEND FLAGS
 	;
 	;-----	WAIT FOR COMMAND TO BE ACCEPTED
-	mov	ecx, 10000h		; MAXIMUM WAIT COUNT
+	;mov	ecx, 10000h		; MAXIMUM WAIT COUNT
+	; 28/05/2026
+	mov	ecx, 50000h
 SD5:
 	in	al, STATUS_PORT		; READ KEYBOARD PROCESSOR STATUS PORT
+	NEW_IODELAY ; 28/05/2026
 	test	al, INPT_BUF_FULL	; CHECK FOR ANY PENDING COMMAND
 	loopnz	SD5			; WAIT FOR COMMAND TO BE ACCEPTED
 	;
 	mov	al, bh			; REESTABLISH BYTE TO TRANSMIT
 	out	PORT_A, al		; SEND BYTE
-	sti				; ENABLE INTERRUPTS
+	NEW_IODELAY ; 28/05/2026
+	;sti				; ENABLE INTERRUPTS
+
+	; 28/05/2026
+	; Nested Timeout (Waiting for ACK with a nested loop)
 	;mov	cx, 01A00h		; LOAD COUNT FOR 10 ms+
 	mov	ecx, 0FFFFh
 SD1:
 	test	byte [KB_FLAG_2], KB_FE+KB_FA ; SEE IF EITHER BIT SET
 	jnz	short SD3		; IF SET, SOMETHING RECEIVED GO PROCESS
+	NEW_IODELAY ; 28/05/2026
 	loop	SD1			; OTHERWISE WAIT
 SD2:
 	dec	bl			; DECREMENT RETRY COUNT
@@ -1489,13 +1726,17 @@ SD2:
 SD3:
 	test	byte [KB_FLAG_2], KB_FA ; SEE IF THIS IS AN ACKNOWLEDGE
 	jz	short SD2		; IF NOT, GO RESEND
-SD4:	
+SD4:
 	pop	ecx			; RESTORE REGISTERS
 	pop	ebx ; pop bx
 	pop	eax ; pop ax
+	; 28/05/2026
+	sti
 	retn				; RETURN, GOOD TRANSMISSION
 
-SND_LED:
+	; 28/05/2026
+align 4	
+SND_LED: ; Updates keyboard LED status (Early EOI cleaned up!)
 	; ---------------------------------------------------------------------------------
 	; SND_LED
 	;	THIS ROUTINES TURNS ON THE MODE INDICATORS.
@@ -1507,17 +1748,20 @@ SND_LED:
 	jnz 	short SL1		; DON'T UPDATE AGAIN IF UPDATE UNDERWAY
 	;
 	or	byte [KB_FLAG_2], KB_PR_LED ; TURN ON UPDATE IN PROCESS
-	mov	al, EOI			; END OF INTERRUPT COMMAND
-	out	20h, al ;out INTA00, al	; SEND COMMAND TO INTERRUPT CONTROL PORT
-	jmp	short SL0		; GO SEND MODE INDICATOR COMMAND
-SND_LED1:
-	cli				; TURN OFF INTERRUPTS
-	test	byte [KB_FLAG_2], KB_PR_LED ; CHECK FOR MODE INDICATOR UPDATE
-	jnz	short SL1		; DON'T UPDATE AGAIN IF UPDATE UNDERWAY
-	;
-	or	byte [KB_FLAG_2], KB_PR_LED ; TURN ON UPDATE IN PROCESS
+	; 28/05/2026
+	;mov	al, EOI			; END OF INTERRUPT COMMAND
+	;out	20h, al ;out INTA00, al	; SEND COMMAND TO INTERRUPT CONTROL PORT
+
+	; 28/05/2026
+	;jmp	short SL0		; GO SEND MODE INDICATOR COMMAND
+;SND_LED1:
+	;cli				; TURN OFF INTERRUPTS
+	;test	byte [KB_FLAG_2], KB_PR_LED ; CHECK FOR MODE INDICATOR UPDATE
+	;jnz	short SL1		; DON'T UPDATE AGAIN IF UPDATE UNDERWAY
+	;;
+	;or	byte [KB_FLAG_2], KB_PR_LED ; TURN ON UPDATE IN PROCESS
 SL0:
-	mov	al, LED_CMD		; LED CMD BYTE
+	mov	al, LED_CMD ; 0EDh	; LED CMD BYTE
 	call	SND_DATA		; SEND DATA TO KEYBOARD
 	cli
 	call	MAKE_LED		; GO FORM INDICATOR DATA BYTE
