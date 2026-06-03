@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.5 - kybdata.s
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.11 - kybdata.s
 ; ----------------------------------------------------------------------------
-; Last Update: 24/07/2022 (Previous: 17/01/2016)
+; Last Update: 03/06/2026 (Previous: 24/07/2022, v2.0.5)
 ; ----------------------------------------------------------------------------
 ; Beginning: 17/01/2016
 ; ----------------------------------------------------------------------------
@@ -13,18 +13,19 @@
 ; Derived from 'Retro UNIX 386 Kernel - v0.2.1.0' source code by Erdogan Tan
 ; kybdata.inc (11/03/2015)
 ;
-; Derived from 'IBM PC-XT-286' BIOS source code (1986) 
+; Derived from 'IBM PC-XT-286' BIOS source code (1986)
 ; ****************************************************************************
 
 ; Retro UNIX 386 v1 Kernel - KYBDATA.INC
 ; Last Modification: 11/03/2015
-;		 (Data Section for 'KEYBOARD.INC')	
+;		 (Data Section for 'KEYBOARD.INC')
 ;
 ; ///////// KEYBOARD DATA ///////////////
 
+; 03/06/2026 - TRDOS 386 v2.0.11 (Google AI)
 ; 24/07/2022 - TRDOS 386 Kernel v2.0.5
 ; 05/12/2014
-; 04/12/2014 (derived from pc-xt-286 bios source code -1986-) 
+; 04/12/2014 (derived from pc-xt-286 bios source code -1986-)
 ; 03/06/86  KEYBOARD BIOS
 
 ;---------------------------------------------------------------------------------
@@ -32,7 +33,7 @@
 ;---------------------------------------------------------------------------------
 
 ;-----	TABLES FOR ALT CASE ------------
-;-----	ALT-INPUT-TABLE 
+;-----	ALT-INPUT-TABLE
 K30:	db	82,79,80,81,75
 	db	76,77,71,72,73		; 10 NUMBER ON KEYPAD
 ;-----	SUPER-SHIFT-TABLE 
@@ -46,13 +47,15 @@ K30:	db	82,79,80,81,75
 ;-----	KEY_TABLE 
 _K6:    db      INS_KEY                 ; INSERT KEY
 	db	CAPS_KEY,NUM_KEY,SCROLL_KEY,ALT_KEY,CTL_KEY
-        db      LEFT_KEY,RIGHT_KEY
+        ; 03/06/2026
+	;db     LEFT_KEY,RIGHT_KEY
 _K6L    equ     $-_K6
 
 ;-----	MASK_TABLE
 _K7:    db      INS_SHIFT               ; INSERT MODE SHIFT
 	db	CAPS_SHIFT,NUM_SHIFT,SCROLL_SHIFT,ALT_SHIFT,CTL_SHIFT
-	db	LEFT_SHIFT,RIGHT_SHIFT
+	; 03/06/2026
+	;db	LEFT_SHIFT,RIGHT_SHIFT
 
 ;-----	TABLES FOR CTRL CASE		;---- CHARACTERS ------
 _K8:	db	27,-1,0,-1,-1,-1	; Esc, 1, 2, 3, 4, 5
@@ -66,7 +69,7 @@ _K8:	db	27,-1,0,-1,-1,-1	; Esc, 1, 2, 3, 4, 5
 	db	28,26,24,3,22,2		; Bkslash, Z, X, C, V, B
 	db	14,13,-1,-1,-1,-1	; N, M, ,, ., /, RShift
 	db	150,-1,' ',-1		; *, ALT, Spc, CL
-	;				;----- FUNCTIONS ------		
+	;				;----- FUNCTIONS ------
 	db 	94,95,96,97,98,99	; F1 - F6
 	db	100,101,102,103,-1,-1	; F7 - F10, NL, SL
 	db	119,141,132,142,115,143	; Home, Up, PgUp, -, Left, Pad5
