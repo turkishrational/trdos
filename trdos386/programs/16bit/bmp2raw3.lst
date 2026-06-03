@@ -1,0 +1,142 @@
+     1                                  ; =========================================================================
+     2                                  ; BMP TO RAW BINARY CONVERTER (MS-DOS / RETRO DOS - 16-BIT REAL MODE)
+     3                                  ; Amac: 256 renk, sikistirilmamis BMP dosyasinin sadece saf piksel verisini
+     4                                  ;       okuyup basliksiz (raw) .BIN dosyasina kaydeder.
+     5                                  ; Derleme: nasm -f bin -o bmp2raw.com bmp2raw.asm
+     6                                  ; =========================================================================
+     7                                  
+     8                                  org 100h
+     9                                  
+    10                                  start:
+    11                                      ; 1. Kaynak BMP Dosyasini Ac (sys_open)
+    12 00000000 B43D                        mov ah, 3Dh                 ; DOS Open File function
+    13 00000002 B000                        mov al, 0                   ; Read-only mode
+    14 00000004 BA[9600]                    mov dx, input_file          ; DS:DX -> Dosya adi
+    15 00000007 CD21                        int 21h
+    16 00000009 7275                        jc file_error
+    17 0000000B A3[4201]                    mov [input_handle], ax
+    18                                  
+    19                                      ; 2. Hedef RAW Dosyasini Olustur (sys_create / sys_open)
+    20 0000000E B43C                        mov ah, 3Ch                 ; DOS Create File function
+    21 00000010 B90000                      mov cx, 0                   ; Normal dosya özniteligi
+    22 00000013 BA[A000]                    mov dx, output_file         ; DS:DX -> Çikis dosya adi
+    23 00000016 CD21                        int 21h
+    24 00000018 7266                        jc file_error
+    25 0000001A A3[4401]                    mov [output_handle], ax
+    26                                  
+    27                                      ; 3. BMP Header'i Atla (54 Byte)
+    28 0000001D B43F                        mov ah, 3Fh                 ; DOS Read File function
+    29 0000001F 8B1E[4201]                  mov bx, [input_handle]
+    30 00000023 B93600                      mov cx, 54                  ; 54 byte header
+    31 00000026 BA[4801]                    mov dx, scratch_buffer      ; Geçici bellek alanina oku
+    32 00000029 CD21                        int 21h
+    33 0000002B 7258                        jc read_error
+    34                                  
+    35                                      ; 4. BMP Renk Paletini Atla (1024 Byte)
+    36                                      ; Not: Palet verisini VGA kartina yuklemek isterseniz burayi saklayabilirsiniz.
+    37 0000002D B43F                        mov ah, 3Fh
+    38 0000002F 8B1E[4201]                  mov bx, [input_handle]
+    39 00000033 B90004                      mov cx, 1024                ; 256 renk * 4 byte (RGBA)
+    40 00000036 BA[4801]                    mov dx, scratch_buffer
+    41 00000039 CD21                        int 21h
+    42 0000003B 7248                        jc read_error
+    43                                  
+    44                                  read_write_loop:
+    45                                      ; 5. Saf Piksel Verisini Bloklar Halinde Oku ve Yaz
+    46 0000003D B43F                        mov ah, 3Fh
+    47 0000003F 8B1E[4201]                  mov bx, [input_handle]
+    48 00000043 B90008                      mov cx, 2048                ; 2 KB'lik bloklar halinde transfer
+    49 00000046 BA[4801]                    mov dx, scratch_buffer
+    50 00000049 CD21                        int 21h
+    51 0000004B 7238                        jc read_error
+    52                                      
+    53 0000004D 21C0                        and ax, ax                  ; AX = Okunan byte sayisi. 0 ise EOF (Dosya bitti)
+    54 0000004F 7416                        jz conversion_done
+    55                                      
+    56 00000051 A3[4601]                    mov [bytes_read], ax        ; Okunan miktari sakla
+    57                                  
+    58                                      ; 6. Okunan Blogu Hedef Dosyaya Yaz (sys_write)
+    59 00000054 B440                        mov ah, 40h                 ; DOS Write File function
+    60 00000056 8B1E[4401]                  mov bx, [output_handle]
+    61 0000005A 8B0E[4601]                  mov cx, [bytes_read]        ; Okundugu kadar yaz
+    62 0000005E BA[4801]                    mov dx, scratch_buffer
+    63 00000061 CD21                        int 21h
+    64 00000063 7225                        jc write_error
+    65 00000065 EBD6                        jmp read_write_loop         ; Dosya bitene kadar devam et
+    66                                  
+    67                                  conversion_done:
+    68                                      ; 7. Dosyalari Kapat (sys_close)
+    69 00000067 B43E                        mov ah, 3Eh                 ; DOS Close File
+    70 00000069 8B1E[4201]                  mov bx, [input_handle]
+    71 0000006D CD21                        int 21h
+    72                                  
+    73 0000006F B43E                        mov ah, 3Eh
+    74 00000071 8B1E[4401]                  mov bx, [output_handle]
+    75 00000075 CD21                        int 21h
+    76                                  
+    77                                      ; Ekrana basari mesaji bas
+    78 00000077 B409                        mov ah, 09h
+    79 00000079 BA[AA00]                    mov dx, msg_success
+    80 0000007C CD21                        int 21h
+    81 0000007E EB11                        jmp exit_program
+    82                                  
+    83                                  file_error:
+    84 00000080 BA[CE00]                    mov dx, msg_err_file
+    85 00000083 EB08                        jmp print_error
+    86                                  read_error:
+    87 00000085 BA[FB00]                    mov dx, msg_err_read
+    88 00000088 EB03                        jmp print_error
+    89                                  write_error:
+    90 0000008A BA[1E01]                    mov dx, msg_err_write
+    91                                  print_error:
+    92 0000008D B409                        mov ah, 09h
+    93 0000008F CD21                        int 21h
+    94                                  
+    95                                  exit_program:
+    96 00000091 B8004C                      mov ax, 4C00h               ; DOS Terminate Process (sys_exit)
+    97 00000094 CD21                        int 21h
+    98                                  
+    99                                  ; =========================================================================
+   100                                  ; DATA SEGMENT
+   101                                  ; =========================================================================
+   102                                  
+   103 00000096 4341525F522E424D50-     input_file      db "CAR_R.BMP", 0      ; Dönüstürülecek 256 renk BMP görseli
+   103 0000009F 00                 
+   104 000000A0 4341525F522E42494E-     output_file     db "CAR_R.BIN", 0      ; Olusacak saf raw piksel dosyasi
+   104 000000A9 00                 
+   105                                  
+   106 000000AA 426173617269796C61-     msg_success     db "Basariyla donusturuldu: CAR_R.BIN", 0Dh, 0Ah, "$"
+   106 000000B3 20646F6E7573747572-
+   106 000000BC 756C64753A20434152-
+   106 000000C5 5F522E42494E0D0A24 
+   107 000000CE 486174613A20446F73-     msg_err_file    db "Hata: Dosya acilamadi veya olusturulamadi!", 0Dh, 0Ah, "$"
+   107 000000D7 7961206163696C616D-
+   107 000000E0 616469207665796120-
+   107 000000E9 6F6C7573747572756C-
+   107 000000F2 616D616469210D0A24 
+   108 000000FB 486174613A20424D50-     msg_err_read    db "Hata: BMP okunurken hata olustu!", 0Dh, 0Ah, "$"
+   108 00000104 206F6B756E75726B65-
+   108 0000010D 6E2068617461206F6C-
+   108 00000116 75737475210D0A24   
+   109 0000011E 486174613A20524157-     msg_err_write   db "Hata: RAW yazilirken hata olustu!", 0Dh, 0Ah, "$"
+   109 00000127 2079617A696C69726B-
+   109 00000130 656E2068617461206F-
+   109 00000139 6C75737475210D0A24 
+   110                                  
+   111                                  ; =========================================================================
+   112                                  ; BSS / UNINITIALIZED DATA
+   113                                  ; =========================================================================
+   114                                  
+   115                                  bss:
+   116                                  
+   117                                  ABSOLUTE bss
+   118                                  
+   119                                  alignb 2
+   120                                  
+   121 00000142 ????                    input_handle:   resw 1
+   122 00000144 ????                    output_handle:  resw 1
+   123 00000146 ????                    bytes_read: 	resw 1
+   124                                  
+   125                                  alignb 4
+   126                                  
+   127 00000148 <res 800h>              scratch_buffer: resb 2048              ; Disk okuma/yazma tamponu

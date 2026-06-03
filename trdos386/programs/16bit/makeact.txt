@@ -1,0 +1,65 @@
+     1                                  org 100h            ; COM dosyasý baþlangýç adresi
+     2                                  
+     3                                  section .text
+     4                                  
+     5                                  start:
+     6                                      ; 1. Ekraný Mode 13h'e geçir (BIOS varsayýlan paleti RAM'e yüklesin)
+     7 00000000 B81300                      mov ax, 0013h
+     8 00000003 CD10                        int 10h
+     9                                  
+    10                                      ; 2. BIOS'tan donaným palet tablosunu oku
+    11                                      ; Ýnt 10h, AX=1017h fonksiyonu 256 rengi ES:DX adresine yazar (Her renk 3 bayt, toplam 768 bayt)
+    12 00000005 B81710                      mov ax, 1017h
+    13 00000008 31DB                        xor bx, bx      ; Baþlangýç rengi = 0
+    14 0000000A B90001                      mov cx, 256     ; Okunacak renk sayýsý = 256
+    15 0000000D BA[0000]                    mov dx, buffer  ; Verinin yazýlacaðý geçici bellek adresi
+    16 00000010 0E                          push cs
+    17 00000011 07                          pop es          ; ES = CS (Segment eþitleme)
+    18 00000012 CD10                        int 10h
+    19                                  
+    20                                      ; 3. Normal metin moduna geri dön (Ekraný eski haline getirmek için)
+    21 00000014 B80300                      mov ax, 0003h
+    22 00000017 CD10                        int 10h
+    23                                  
+    24                                      ; 4. VGA 6-bit palet verisini Photoshop 8-bit ACT formatýna dönüþtür
+    25                                      ; Her bir bayt deðerini 2 bit sola kaydýracaðýz ( value = value * 4 )
+    26 00000019 B90003                      mov cx, 768     ; Toplam iþlenecek bayt sayýsý (256 renk * 3 kanal)
+    27 0000001C BE[0000]                    mov si, buffer  ; Okunacak ham 6-bit veri
+    28 0000001F BF[0003]                    mov di, act_buf ; Yazýlacak 8-bit ACT verisi
+    29                                  
+    30                                  convert_loop:
+    31 00000022 AC                          lodsb           ; AL = [SI], SI++
+    32 00000023 C0E002                      shl al, 2       ; 6-bit -> 8-bit (Sola 2 bit kaydýr)
+    33 00000026 AA                          stosb           ; [DI] = AL, DI++
+    34 00000027 E2F9                        loop convert_loop
+    35                                  
+    36                                      ; 5. MODE13H.ACT dosyasýný oluþtur
+    37 00000029 B43C                        mov ah, 3Ch     ; DOS dosya oluþturma fonksiyonu
+    38 0000002B 31C9                        xor cx, cx      ; Normal dosya özniteliði (attribute)
+    39 0000002D BA[0000]                    mov dx, filename
+    40 00000030 CD21                        int 21h
+    41 00000032 7210                        jc error        ; Hata varsa çýkýþa git
+    42 00000034 89C3                        mov bx, ax      ; Dosya handle numarasýný BX'e aktar
+    43                                  
+    44                                      ; 6. Dönüþtürülmüþ 768 baytlýk ACT verisini dosyaya yaz
+    45 00000036 B440                        mov ah, 40h     ; DOS dosyaya yazma fonksiyonu
+    46 00000038 B90003                      mov cx, 768     ; Yazýlacak bayt boyutu
+    47 0000003B BA[0003]                    mov dx, act_buf ; Yazýlacak verinin adresi
+    48 0000003E CD21                        int 21h
+    49                                  
+    50                                      ; 7. Dosyayý kapat
+    51 00000040 B43E                        mov ah, 3Eh     ; DOS dosya kapatma fonksiyonu
+    52 00000042 CD21                        int 21h
+    53                                  
+    54                                  error:
+    55                                      ; 8. Programý sonlandýr ve DOS'a dön
+    56 00000044 B8004C                      mov ax, 4C00h
+    57 00000047 CD21                        int 21h
+    58                                  
+    59                                  section .data
+    60 00000000 4D4F44453133482E41-         filename db "MODE13H.ACT", 0
+    60 00000009 435400             
+    61                                  
+    62                                  section .bss
+    63 00000000 <res 300h>                  buffer   resb 768    ; BIOS'tan gelen ham 6-bitlik palet için yer ayýr
+    64 00000300 <res 300h>                  act_buf  resb 768    ; Dönüþtürülmüþ 8-bitlik ACT paleti için yer ayýr
