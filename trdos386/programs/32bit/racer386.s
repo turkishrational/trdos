@@ -3,6 +3,7 @@
 ; Uyumluluk: TRDOS 386 v2.0.11+, 32-bit Paging, Flat Memory Model (Ring 3)
 ; Derleme: nasm racer386.s -l racer386.txt -o RACER386.PRG
 ; =========================================================================
+; 01/06/2026
 ; 31/05/2026 - Lotus Style Pure Physics & Keyboard Priority Calibration
 
 bits 32                         ; Saf 32-bit instruction set üretimi zorunlu kýlýnýyor
@@ -46,6 +47,7 @@ main_game_loop:
     mov dx, 60h
     xor eax, eax                ; AH=0 (Port okuma modu)
     int 34h                     ; AL = Basýlan tuþun Scan Code'u
+
     mov [scancode], al          ; BSS'deki tampona kaydet
 
     ; --- 3. KLAVYE ÖNCELÝKLÝ YÖN VE DÝREKSÝYON MATRÝSÝ ---
@@ -53,12 +55,21 @@ main_game_loop:
     mov ecx, 2                  ; Sabit, sarsmayan direksiyon dönüþ adýmý
     mov edi, 0                  ; EDI: Gaz basýlma bayraðý (0=Býrakýldý, 1=Basýlýyor)
 
+    ;mov ah, 11h
+    ;int 32h
+    ;jz	.apply_inertia
+    ;mov ah, 10h
+    ;int 32h
+    ;mov al, ah
+
+    ;mov [scancode], al
+
     ; ATALET KÝLÝDÝ
     ; Kullanýcý Sol veya Sað ok tuþuna basarken Yukarý ok (Gaz) tuþunu býrakmýþ gibi 
     ; algýlanmasýný önlemek için mantýksal gaz köprülemesi kuruyoruz.
     cmp al, 4Bh                 ; Sol Ok Tuþu Scan Code
     jne .check_right
-    sub dword [player_x], ecx   
+    sub dword [player_x], ecx
     mov esi, 1                  ; SOL sprite aktif
     mov edi, 1                  ; [MANTIKSAL GAZ]: Dönüþ anýnda gazý açýk tut!
     jmp .check_throttle
@@ -66,7 +77,7 @@ main_game_loop:
 .check_right:
     cmp al, 4Dh                 ; Sað Ok Tuþu Scan Code
     jne .check_throttle
-    add dword [player_x], ecx   
+    add dword [player_x], ecx
     mov esi, 2                  ; SAÐ sprite aktif
     mov edi, 1                  ; [MANTIKSAL GAZ]: Dönüþ anýnda gazý açýk tut!
     jmp .check_throttle
@@ -76,7 +87,7 @@ main_game_loop:
     ; Eðer kullanýcý doðrudan Yukarý Ok tuþuna basýyorsa da gazý aktif et
     cmp al, 48h                 ; Yukarý Ok Tuþu (GAZ)
     je .gas_active
-    
+
     ; Eðer Sað/Sol ok tuþlarýndan dolayý EDI=1 olmuþsa gazý yine aktif say!
     cmp edi, 1
     je .gas_active
@@ -86,20 +97,20 @@ main_game_loop:
     mov eax, [player_speed]
     cmp dword [on_grass], 1
     jne .asphalt_speed_limit
-    
+
     ; Çimen hýz limiti
-    cmp eax, 12                 
+    cmp eax, 12
     jge .physics_update
-    add dword [player_speed], 1 
+    add dword [player_speed], 1
     jmp .physics_update
 
 .asphalt_speed_limit:
     cmp eax, 55                 ; Maksimum asfalttaki hýz sýnýrý
     jge .physics_update
-    
+
     cmp eax, 25
     jge .low_torque
-    add dword [player_speed], 2 
+    add dword [player_speed], 2
     jmp .physics_update
 .low_torque:
     add dword [player_speed], 1
@@ -108,7 +119,7 @@ main_game_loop:
 .check_brake:
     cmp al, 50h                 ; Aþaðý Ok Tuþu (FREN)
     jne .apply_inertia
-    sub dword [player_speed], 3 
+    sub dword [player_speed], 3
     jge .physics_update
     mov dword [player_speed], 0
     jmp .physics_update
@@ -116,24 +127,24 @@ main_game_loop:
 .apply_inertia:
     ; Gerçek rölanti yavaþlamasý (Hiçbir tuþa basýlmadýðýnda)
     mov eax, [player_speed]
-    or eax, eax                 
+    or eax, eax
     jz .physics_update
 
     cmp dword [on_grass], 1
-    je .grass_friction_fast     
+    je .grass_friction_fast
 
     ; Lotus Akýþ Ataleti: Gaz tamamen býrakýldýðýnda araba çok tatlý yavaþlar (8 karede 1 birim)
     mov ebx, [time_tick]
     and ebx, 7                  ; Yavaþlamayý 8 karede bire yayarak ataleti köklüyoruz
-    jnz .physics_update         
-    
+    jnz .physics_update
+
     cmp eax, 4
-    jle .physics_update         
+    jle .physics_update
     dec dword [player_speed]
     jmp .physics_update
 
 .grass_friction_fast:
-    sub dword [player_speed], 2 
+    sub dword [player_speed], 2
     jge .physics_update
     mov dword [player_speed], 0
 
@@ -142,78 +153,78 @@ main_game_loop:
     ; Sýnýr korumalarý
     cmp dword [player_x], -110
     jge .limit_left_ok
-    mov dword [player_x], -110   
+    mov dword [player_x], -110
 .limit_left_ok:
     cmp dword [player_x], 110
     jle .limit_right_ok
-    mov dword [player_x], 110    
+    mov dword [player_x], 110
 .limit_right_ok:
 
     ; Yol ilerleme adýmý
     mov eax, [player_speed]
-    add [player_z], eax         
+    add [player_z], eax
 
     ; Viraj bükülme frekansý (Ufuktaki tatlý salýným ayarý)
     mov eax, [player_speed]
-    shr eax, 5                  
-    add [time_tick], eax        
+    shr eax, 5
+    add [time_tick], eax
 
     mov eax, [time_tick]
-    shr eax, 3                  
+    shr eax, 3
     and eax, 63
     mov [sine_index], eax
 
     ; Viraj merkezkaç kuvveti
     mov edi, [sine_index]
     movsx eax, word [sine_table + edi * 2]
-    sar eax, 4                  
+    sar eax, 4
     imul eax, [player_speed]
-    sar eax, 8                  
-    sub [player_x], eax         
+    sar eax, 8
+    sub [player_x], eax
 
     ; --- KESÝNTÝSÝZ MUTLAK MERKEZLEME FÝLTRESÝ ---
     ; Dönüþ tuþlarý aktif deðilse arabayý yolun ortasýndaki beyaz çizgiye zýmbalar
     cmp esi, 0
-    jnz .skip_centering         
-    cmp dword [player_speed], 4 
+    jnz .skip_centering
+    cmp dword [player_speed], 4
     jl .skip_centering
 
     mov ecx, [player_x]
     and ecx, ecx
-    jz .skip_centering          
-    jns .center_from_right      
+    jz .skip_centering
+    jns .center_from_right
 
     ; Araç solda: Saða (merkeze) doðru güçlü çekiþ
     add dword [player_x], 2     ; Çekiþ gücü 2 birime sabitlendi
-    cmp dword [player_x], 0     
+    cmp dword [player_x], 0
     jle .skip_centering
-    mov dword [player_x], 0     
+    mov dword [player_x], 0
     jmp .skip_centering
 
 .center_from_right:
     ; Araç saðda: Sola (merkeze) doðru güçlü çekiþ
     sub dword [player_x], 2     ; Çekiþ gücü 2 birime sabitlendi
-    cmp dword [player_x], 0     
+    cmp dword [player_x], 0
     jge .skip_centering
-    mov dword [player_x], 0     
+    mov dword [player_x], 0
 
 .skip_centering:
 
     ; --- 6. SANAL BUFFER TEMÝZLEME (SKY) ---
-    mov edi, [vram_buffer_ptr]   
-    mov ecx, 16000               
-    mov eax, 34343434h           
-    rep stosd                    
+    mov edi, [vram_buffer_ptr]
+    mov ecx, 16000
+    mov eax, 34343434h
+    rep stosd
 
     ; --- 7. PERSPEKTÝF YOL ÇÝZÝM MATRÝSÝ ---
     mov ebp, 100
 .line_loop:
     mov eax, ebp
-    sub eax, 100                 
-    mov ecx, eax                 
-    
+    sub eax, 100
+    mov ecx, eax
+
     mov ebx, 14
-    imul ebx                     
+    imul ebx
     shr eax, 3
     add eax, 8
     mov [road_width], eax
@@ -237,37 +248,37 @@ main_game_loop:
     imul eax, ebx
     imul eax, ebx
     sar eax, 14
-    mov ebx, eax                 
+    mov ebx, eax
 
     ; --- YOL VE ARABA SARSINTI YUMUÞATMA (DAMPING) ---
     ; Oyuncunun 'player_x' hareketini perspektif çarpýmýndan sonra 2 bit daha saða kaydýrýyoruz (sar edx, 8)
     ; Böylece araba ekranda geniþ geniþ hareket ederken, yol çizgisi ve ufuk aþýrý saða sola fýrlamayacak, stabil kalacaktýr!
     mov edx, [player_x]
-    imul edx, ecx                
+    imul edx, ecx
     sar edx, 8                  ; 6 yerine 8 yapýldý (Sallantý elendi!)
 
     mov eax, 160
     add eax, ebx
     sub eax, edx
-    mov [road_center], eax  
+    mov [road_center], eax
 
     ; Tekerlek Hizasý Çimen Kontrolü (EBP = 185)
     cmp ebp, 185
     jne .skip_grass_check
-    
+
     mov edx, [player_x]
     and edx, edx
     jns .abs_x
-    neg edx                                    
+    neg edx
 .abs_x:
     mov ebx, [road_width]
-    add ebx, 25                 
+    add ebx, 25
     cmp edx, ebx
     jle .on_asphalt
-    mov dword [on_grass], 1     
+    mov dword [on_grass], 1
     jmp .skip_grass_check
 .on_asphalt:
-    mov dword [on_grass], 0     
+    mov dword [on_grass], 0
 .skip_grass_check:
 
     ; Kýrpma Sýnýrlarý (Clipping)
@@ -291,19 +302,19 @@ main_game_loop:
 
     ; Çizgi Ofsetlerini Hesapla (Y * 320)
     mov eax, ebp
-    shl eax, 8                   
+    shl eax, 8
     mov edi, eax
     mov eax, ebp
-    shl eax, 6                   
-    add edi, eax                 
-    add edi, [vram_buffer_ptr]   
+    shl eax, 6
+    add edi, eax
+    add edi, [vram_buffer_ptr]
 
     ; Hiperbolik daralma periyotlarý
     mov eax, ebp
     sub eax, 99
     mov ebx, eax
     mov eax, 4400h
-    xor edx, edx                 
+    xor edx, edx
     div ebx
     mov ebx, eax
 
@@ -317,7 +328,7 @@ main_game_loop:
     mov [grass_color_flag], eax
 
 .render_pixels:
-    xor ecx, ecx                 
+    xor ecx, ecx
 .pixel_loop:
     cmp ecx, [left_bound]
     jl .draw_grass_pixel
@@ -354,15 +365,15 @@ main_game_loop:
     add edx, [line_width]
     cmp ecx, edx
     jg .asphalt_logic
-    mov al, 15                  
+    mov al, 15
     jmp .put_pixel
 .asphalt_logic:
     cmp dword [strip_color_flag], 0
     jz .dark_asphalt
-    mov al, 7                   
+    mov al, 7
     jmp .put_pixel
 .dark_asphalt:
-    mov al, 8                   
+    mov al, 8
     jmp .put_pixel
 .draw_rumble_pixel:
     cmp dword [strip_color_flag], 0
@@ -380,7 +391,7 @@ main_game_loop:
 .dark_grass:
     mov al, 10
 .put_pixel:
-    mov [edi], al                
+    mov [edi], al
     inc edi
     inc ecx
     cmp ecx, 320
@@ -394,14 +405,14 @@ main_game_loop:
 ; NÝHAÝ ARABA ÇÝZÝM MOTORU (KLAVYE ÖNCELÝKLÝ KESÝN SÜZGEC)
 ; =========================================================================
 draw_player_car_32:
-    cld                         
+    cld
     
     ; [DÜZELTME] Sprite seçimi konum yerine doðrudan basýlan tuþun kaydý (ESI) ile yapýlýyor!
     cmp esi, 1
     je .select_left
     cmp esi, 2
     je .select_right
-    
+
     ; Kullanýcý dönüþ tuþuna basmýyorsa veya sadece yukarý basýyorsa KESÝNLÝKLE DÜZ SPRITE
     mov dword [active_bmp_ptr], car_straight_bmp
     jmp .parse_bmp
@@ -418,7 +429,7 @@ draw_player_car_32:
     mov edx, [active_bmp_ptr]
     mov eax, [edx + 10]
     mov [pixel_start_ptr], eax
-    
+
     mov ecx, [edx + 18]         ; Geniþlik (77)
     mov ebx, [edx + 22]         ; Yükseklik (38)
     mov [sprite_w], ecx
@@ -461,58 +472,58 @@ draw_player_car_32:
     mov ebx, [sprite_w]
     add ebx, [padding_w]
     imul eax, ebx
-    add esi, eax                
+    add esi, eax
 
-    mov edx, [sprite_h]         
+    mov edx, [sprite_h]
 
 .bmp_y_loop:
-    push edi                    
-    push esi                    
-    
+    push edi
+    push esi
+
     mov ecx, [sprite_w]
 .bmp_x_loop1:
     lodsb
-    cmp al, 255                 
-    je .skip_p1                 
-    cmp al, 15                  
+    cmp al, 255
     je .skip_p1
-    
+    cmp al, 15
+    je .skip_p1
+
     mov [edi], al
-    mov [edi+1], al             
+    mov [edi+1], al
 .skip_p1:
     add edi, 2
     dec ecx
     jnz .bmp_x_loop1
 
-    pop esi                     
-    pop edi                     
-    push edi                    
-    push esi                    
-    
-    add edi, 320                
+    pop esi
+    pop edi
+    push edi
+    push esi
+
+    add edi, 320
     mov ecx, [sprite_w]
 .bmp_x_loop2:
     lodsb
-    cmp al, 255 
+    cmp al, 255
     je .skip_p2
     cmp al, 15
     je .skip_p2
     
-    mov [edi], al               
-    mov [edi+1], al             
+    mov [edi], al
+    mov [edi+1], al
 .skip_p2:
     add edi, 2
     dec ecx
     jnz .bmp_x_loop2
 
-    pop esi                     
+    pop esi
     mov eax, [sprite_w]
     add eax, [padding_w]
-    sub esi, eax                
+    sub esi, eax
 
-    pop edi                     
-    add edi, 640                
-    
+    pop edi
+    add edi, 640
+
     dec edx
     jnz .bmp_y_loop
     ;;;;
@@ -554,7 +565,7 @@ exit_program:
 ; =========================================================================
 
 align 4
-scancode: db 0	
+scancode: db 0
 
 ; 16-bit sinüs tablosu uyumluluk için word kalmýþtýr, movsx eax ile 32-bit'e geniþletilir
 align 4

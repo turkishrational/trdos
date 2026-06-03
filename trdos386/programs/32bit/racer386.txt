@@ -3,652 +3,663 @@
      3                                  ; Uyumluluk: TRDOS 386 v2.0.11+, 32-bit Paging, Flat Memory Model (Ring 3)
      4                                  ; Derleme: nasm racer386.s -l racer386.txt -o RACER386.PRG
      5                                  ; =========================================================================
-     6                                  ; 31/05/2026 - Lotus Style Pure Physics & Keyboard Priority Calibration
-     7                                  
-     8                                  bits 32                         ; Saf 32-bit instruction set üretimi zorunlu kýlýnýyor
-     9                                  org 0x0                         ; TRDOS flat binary baþlangýç adresi (0)
-    10                                  
-    11                                  start:
-    12                                      ; DIRECT VGA MEMORY ACCESS
-    13 00000000 B705                        mov bh, 5                   ; Direct access/map to VGA memory (0A0000h)
-    14 00000002 B01F                        mov al, 1Fh                 ; sys _video ; TRDOS 386 Video functions
-    15 00000004 CD40                        int 40h                     ; TRDOS 386 system call
-    16                                  
-    17 00000006 21C0                        and eax, eax
-    18 00000008 7509                        jnz short set_mode_13h
-    19 0000000A BBFFFFFFFF                  mov ebx, -1 
-    20 0000000F B001                        mov al, 1                   ; sysexit
-    21 00000011 CD40                        int 40h
-    22                                  
-    23                                  set_mode_13h:
-    24 00000013 66B81300                    mov ax, 13h
-    25 00000017 CD31                        int 31h
-    26                                  
-    27                                      ; Sanal Arka Plan Belleði Tahsisi
-    28 00000019 C705[D8350000]-             mov dword [vram_buffer_ptr], vram_sanal_bellek
-    28 0000001F [14360000]         
-    29 00000023 C705[DC350000]0000-         mov dword [player_x], 0     ; Baþlangýç konumu yolun ortasý
-    29 0000002B 0000               
-    30 0000002D C705[0C360000]0000-         mov dword [player_speed], 0 ; Baþlangýç hýzý sýfýr
-    30 00000035 0000               
-    31 00000037 C605[58050000]00            mov byte [scancode], 0
-    32                                  
-    33                                  main_game_loop:
-    34                                      ; --- 1. DONANIMSAL VSYNC KÝLÝDÝ ---
-    35 0000003E 66BADA03                    mov dx, 03DAh
-    36                                  .wait_low:
-    37 00000042 CD34                        int 34h
-    38 00000044 A808                        test al, 8
-    39 00000046 75FA                        jnz .wait_low
-    40                                  .wait_high:
-    41 00000048 CD34                        int 34h
-    42 0000004A A808                        test al, 8
-    43 0000004C 74FA                        jz .wait_high
-    44                                  
-    45                                      ; --- 2. KLAVYE TAMPON OKUMA (TEK SEFERDE AL REGISTER'INA ALIM) ---
-    46 0000004E 66BA6000                    mov dx, 60h
-    47 00000052 31C0                        xor eax, eax                ; AH=0 (Port okuma modu)
-    48 00000054 CD34                        int 34h                     ; AL = Basýlan tuþun Scan Code'u
-    49 00000056 A2[58050000]                mov [scancode], al          ; BSS'deki tampona kaydet
+     6                                  ; 01/06/2026
+     7                                  ; 31/05/2026 - Lotus Style Pure Physics & Keyboard Priority Calibration
+     8                                  
+     9                                  bits 32                         ; Saf 32-bit instruction set üretimi zorunlu kýlýnýyor
+    10                                  org 0x0                         ; TRDOS flat binary baþlangýç adresi (0)
+    11                                  
+    12                                  start:
+    13                                      ; DIRECT VGA MEMORY ACCESS
+    14 00000000 B705                        mov bh, 5                   ; Direct access/map to VGA memory (0A0000h)
+    15 00000002 B01F                        mov al, 1Fh                 ; sys _video ; TRDOS 386 Video functions
+    16 00000004 CD40                        int 40h                     ; TRDOS 386 system call
+    17                                  
+    18 00000006 21C0                        and eax, eax
+    19 00000008 7509                        jnz short set_mode_13h
+    20 0000000A BBFFFFFFFF                  mov ebx, -1 
+    21 0000000F B001                        mov al, 1                   ; sysexit
+    22 00000011 CD40                        int 40h
+    23                                  
+    24                                  set_mode_13h:
+    25 00000013 66B81300                    mov ax, 13h
+    26 00000017 CD31                        int 31h
+    27                                  
+    28                                      ; Sanal Arka Plan Belleði Tahsisi
+    29 00000019 C705[D8350000]-             mov dword [vram_buffer_ptr], vram_sanal_bellek
+    29 0000001F [14360000]         
+    30 00000023 C705[DC350000]0000-         mov dword [player_x], 0     ; Baþlangýç konumu yolun ortasý
+    30 0000002B 0000               
+    31 0000002D C705[0C360000]0000-         mov dword [player_speed], 0 ; Baþlangýç hýzý sýfýr
+    31 00000035 0000               
+    32 00000037 C605[58050000]00            mov byte [scancode], 0
+    33                                  
+    34                                  main_game_loop:
+    35                                      ; --- 1. DONANIMSAL VSYNC KÝLÝDÝ ---
+    36 0000003E 66BADA03                    mov dx, 03DAh
+    37                                  .wait_low:
+    38 00000042 CD34                        int 34h
+    39 00000044 A808                        test al, 8
+    40 00000046 75FA                        jnz .wait_low
+    41                                  .wait_high:
+    42 00000048 CD34                        int 34h
+    43 0000004A A808                        test al, 8
+    44 0000004C 74FA                        jz .wait_high
+    45                                  
+    46                                      ; --- 2. KLAVYE TAMPON OKUMA (TEK SEFERDE AL REGISTER'INA ALIM) ---
+    47 0000004E 66BA6000                    mov dx, 60h
+    48 00000052 31C0                        xor eax, eax                ; AH=0 (Port okuma modu)
+    49 00000054 CD34                        int 34h                     ; AL = Basýlan tuþun Scan Code'u
     50                                  
-    51                                      ; --- 3. KLAVYE ÖNCELÝKLÝ YÖN VE DÝREKSÝYON MATRÝSÝ ---
-    52 0000005B BE00000000                  mov esi, 0                  ; ESI: Sprite yönü (0=DÜZ, 1=SOL, 2=SAÐ)
-    53 00000060 B902000000                  mov ecx, 2                  ; Sabit, sarsmayan direksiyon dönüþ adýmý
-    54 00000065 BF00000000                  mov edi, 0                  ; EDI: Gaz basýlma bayraðý (0=Býrakýldý, 1=Basýlýyor)
-    55                                  
-    56                                      ; ATALET KÝLÝDÝ
-    57                                      ; Kullanýcý Sol veya Sað ok tuþuna basarken Yukarý ok (Gaz) tuþunu býrakmýþ gibi 
-    58                                      ; algýlanmasýný önlemek için mantýksal gaz köprülemesi kuruyoruz.
-    59 0000006A 3C4B                        cmp al, 4Bh                 ; Sol Ok Tuþu Scan Code
-    60 0000006C 7512                        jne .check_right
-    61 0000006E 290D[DC350000]              sub dword [player_x], ecx   
-    62 00000074 BE01000000                  mov esi, 1                  ; SOL sprite aktif
-    63 00000079 BF01000000                  mov edi, 1                  ; [MANTIKSAL GAZ]: Dönüþ anýnda gazý açýk tut!
-    64 0000007E EB16                        jmp .check_throttle
-    65                                  
-    66                                  .check_right:
-    67 00000080 3C4D                        cmp al, 4Dh                 ; Sað Ok Tuþu Scan Code
-    68 00000082 7512                        jne .check_throttle
-    69 00000084 010D[DC350000]              add dword [player_x], ecx   
-    70 0000008A BE02000000                  mov esi, 2                  ; SAÐ sprite aktif
-    71 0000008F BF01000000                  mov edi, 1                  ; [MANTIKSAL GAZ]: Dönüþ anýnda gazý açýk tut!
-    72 00000094 EB00                        jmp .check_throttle
-    73                                  
-    74                                      ; --- 4. GAZ / FREN / SÜRTÜNME VE ATALET MOTORU ---
-    75                                  .check_throttle:
-    76                                      ; Eðer kullanýcý doðrudan Yukarý Ok tuþuna basýyorsa da gazý aktif et
-    77 00000096 3C48                        cmp al, 48h                 ; Yukarý Ok Tuþu (GAZ)
-    78 00000098 7407                        je .gas_active
-    79                                      
-    80                                      ; Eðer Sað/Sol ok tuþlarýndan dolayý EDI=1 olmuþsa gazý yine aktif say!
-    81 0000009A 83FF01                      cmp edi, 1
-    82 0000009D 7402                        je .gas_active
-    83 0000009F EB38                        jmp .check_brake            ; Ýkisi de yoksa fren/sürtünme kontrolüne git
+    51 00000056 A2[58050000]                mov [scancode], al          ; BSS'deki tampona kaydet
+    52                                  
+    53                                      ; --- 3. KLAVYE ÖNCELÝKLÝ YÖN VE DÝREKSÝYON MATRÝSÝ ---
+    54 0000005B BE00000000                  mov esi, 0                  ; ESI: Sprite yönü (0=DÜZ, 1=SOL, 2=SAÐ)
+    55 00000060 B902000000                  mov ecx, 2                  ; Sabit, sarsmayan direksiyon dönüþ adýmý
+    56 00000065 BF00000000                  mov edi, 0                  ; EDI: Gaz basýlma bayraðý (0=Býrakýldý, 1=Basýlýyor)
+    57                                  
+    58                                      ;mov ah, 11h
+    59                                      ;int 32h
+    60                                      ;jz	.apply_inertia
+    61                                      ;mov ah, 10h
+    62                                      ;int 32h
+    63                                      ;mov al, ah
+    64                                  
+    65                                      ;mov [scancode], al
+    66                                  
+    67                                      ; ATALET KÝLÝDÝ
+    68                                      ; Kullanýcý Sol veya Sað ok tuþuna basarken Yukarý ok (Gaz) tuþunu býrakmýþ gibi 
+    69                                      ; algýlanmasýný önlemek için mantýksal gaz köprülemesi kuruyoruz.
+    70 0000006A 3C4B                        cmp al, 4Bh                 ; Sol Ok Tuþu Scan Code
+    71 0000006C 7512                        jne .check_right
+    72 0000006E 290D[DC350000]              sub dword [player_x], ecx
+    73 00000074 BE01000000                  mov esi, 1                  ; SOL sprite aktif
+    74 00000079 BF01000000                  mov edi, 1                  ; [MANTIKSAL GAZ]: Dönüþ anýnda gazý açýk tut!
+    75 0000007E EB16                        jmp .check_throttle
+    76                                  
+    77                                  .check_right:
+    78 00000080 3C4D                        cmp al, 4Dh                 ; Sað Ok Tuþu Scan Code
+    79 00000082 7512                        jne .check_throttle
+    80 00000084 010D[DC350000]              add dword [player_x], ecx
+    81 0000008A BE02000000                  mov esi, 2                  ; SAÐ sprite aktif
+    82 0000008F BF01000000                  mov edi, 1                  ; [MANTIKSAL GAZ]: Dönüþ anýnda gazý açýk tut!
+    83 00000094 EB00                        jmp .check_throttle
     84                                  
-    85                                  .gas_active:
-    86 000000A1 A1[0C360000]                mov eax, [player_speed]
-    87 000000A6 833D[10360000]01            cmp dword [on_grass], 1
-    88 000000AD 750E                        jne .asphalt_speed_limit
-    89                                      
-    90                                      ; Çimen hýz limiti
-    91 000000AF 83F80C                      cmp eax, 12                 
-    92 000000B2 7D7B                        jge .physics_update
-    93 000000B4 8305[0C360000]01            add dword [player_speed], 1 
-    94 000000BB EB72                        jmp .physics_update
+    85                                      ; --- 4. GAZ / FREN / SÜRTÜNME VE ATALET MOTORU ---
+    86                                  .check_throttle:
+    87                                      ; Eðer kullanýcý doðrudan Yukarý Ok tuþuna basýyorsa da gazý aktif et
+    88 00000096 3C48                        cmp al, 48h                 ; Yukarý Ok Tuþu (GAZ)
+    89 00000098 7407                        je .gas_active
+    90                                  
+    91                                      ; Eðer Sað/Sol ok tuþlarýndan dolayý EDI=1 olmuþsa gazý yine aktif say!
+    92 0000009A 83FF01                      cmp edi, 1
+    93 0000009D 7402                        je .gas_active
+    94 0000009F EB38                        jmp .check_brake            ; Ýkisi de yoksa fren/sürtünme kontrolüne git
     95                                  
-    96                                  .asphalt_speed_limit:
-    97 000000BD 83F837                      cmp eax, 55                 ; Maksimum asfalttaki hýz sýnýrý
-    98 000000C0 7D6D                        jge .physics_update
-    99                                      
-   100 000000C2 83F819                      cmp eax, 25
-   101 000000C5 7D09                        jge .low_torque
-   102 000000C7 8305[0C360000]02            add dword [player_speed], 2 
-   103 000000CE EB5F                        jmp .physics_update
-   104                                  .low_torque:
-   105 000000D0 8305[0C360000]01            add dword [player_speed], 1
-   106 000000D7 EB56                        jmp .physics_update
-   107                                  
-   108                                  .check_brake:
-   109 000000D9 3C50                        cmp al, 50h                 ; Aþaðý Ok Tuþu (FREN)
-   110 000000DB 7515                        jne .apply_inertia
-   111 000000DD 832D[0C360000]03            sub dword [player_speed], 3 
-   112 000000E4 7D49                        jge .physics_update
-   113 000000E6 C705[0C360000]0000-         mov dword [player_speed], 0
-   113 000000EE 0000               
-   114 000000F0 EB3D                        jmp .physics_update
-   115                                  
-   116                                  .apply_inertia:
-   117                                      ; Gerçek rölanti yavaþlamasý (Hiçbir tuþa basýlmadýðýnda)
-   118 000000F2 A1[0C360000]                mov eax, [player_speed]
-   119 000000F7 09C0                        or eax, eax                 
-   120 000000F9 7434                        jz .physics_update
-   121                                  
-   122 000000FB 833D[10360000]01            cmp dword [on_grass], 1
-   123 00000102 7418                        je .grass_friction_fast     
-   124                                  
-   125                                      ; Lotus Akýþ Ataleti: Gaz tamamen býrakýldýðýnda araba çok tatlý yavaþlar (8 karede 1 birim)
-   126 00000104 8B1D[E4350000]              mov ebx, [time_tick]
-   127 0000010A 83E307                      and ebx, 7                  ; Yavaþlamayý 8 karede bire yayarak ataleti köklüyoruz
-   128 0000010D 7520                        jnz .physics_update         
-   129                                      
-   130 0000010F 83F804                      cmp eax, 4
-   131 00000112 7E1B                        jle .physics_update         
-   132 00000114 FF0D[0C360000]              dec dword [player_speed]
-   133 0000011A EB13                        jmp .physics_update
-   134                                  
-   135                                  .grass_friction_fast:
-   136 0000011C 832D[0C360000]02            sub dword [player_speed], 2 
-   137 00000123 7D0A                        jge .physics_update
-   138 00000125 C705[0C360000]0000-         mov dword [player_speed], 0
-   138 0000012D 0000               
-   139                                  
-   140                                      ; --- 5. FÝZÝK GÜNCELLEME VE AGRESÝF MERKEZLEME KÝLÝDÝ ---
-   141                                  .physics_update:
-   142                                      ; Sýnýr korumalarý
-   143 0000012F 833D[DC350000]92            cmp dword [player_x], -110
-   144 00000136 7D0A                        jge .limit_left_ok
-   145 00000138 C705[DC350000]92FF-         mov dword [player_x], -110   
-   145 00000140 FFFF               
-   146                                  .limit_left_ok:
-   147 00000142 833D[DC350000]6E            cmp dword [player_x], 110
-   148 00000149 7E0A                        jle .limit_right_ok
-   149 0000014B C705[DC350000]6E00-         mov dword [player_x], 110    
-   149 00000153 0000               
-   150                                  .limit_right_ok:
-   151                                  
-   152                                      ; Yol ilerleme adýmý
-   153 00000155 A1[0C360000]                mov eax, [player_speed]
-   154 0000015A 0105[E0350000]              add [player_z], eax         
-   155                                  
-   156                                      ; Viraj bükülme frekansý (Ufuktaki tatlý salýným ayarý)
-   157 00000160 A1[0C360000]                mov eax, [player_speed]
-   158 00000165 C1E805                      shr eax, 5                  
-   159 00000168 0105[E4350000]              add [time_tick], eax        
-   160                                  
-   161 0000016E A1[E4350000]                mov eax, [time_tick]
-   162 00000173 C1E803                      shr eax, 3                  
-   163 00000176 83E03F                      and eax, 63
-   164 00000179 A3[E8350000]                mov [sine_index], eax
-   165                                  
-   166                                      ; Viraj merkezkaç kuvveti
-   167 0000017E 8B3D[E8350000]              mov edi, [sine_index]
-   168 00000184 0FBF843F[5C050000]          movsx eax, word [sine_table + edi * 2]
-   169 0000018C C1F804                      sar eax, 4                  
-   170 0000018F 0FAF05[0C360000]            imul eax, [player_speed]
-   171 00000196 C1F808                      sar eax, 8                  
-   172 00000199 2905[DC350000]              sub [player_x], eax         
-   173                                  
-   174                                      ; --- KESÝNTÝSÝZ MUTLAK MERKEZLEME FÝLTRESÝ ---
-   175                                      ; Dönüþ tuþlarý aktif deðilse arabayý yolun ortasýndaki beyaz çizgiye zýmbalar
-   176 0000019F 83FE00                      cmp esi, 0
-   177 000001A2 754B                        jnz .skip_centering         
-   178 000001A4 833D[0C360000]04            cmp dword [player_speed], 4 
-   179 000001AB 7C42                        jl .skip_centering
-   180                                  
-   181 000001AD 8B0D[DC350000]              mov ecx, [player_x]
-   182 000001B3 21C9                        and ecx, ecx
-   183 000001B5 7438                        jz .skip_centering          
-   184 000001B7 791C                        jns .center_from_right      
-   185                                  
-   186                                      ; Araç solda: Saða (merkeze) doðru güçlü çekiþ
-   187 000001B9 8305[DC350000]02            add dword [player_x], 2     ; Çekiþ gücü 2 birime sabitlendi
-   188 000001C0 833D[DC350000]00            cmp dword [player_x], 0     
-   189 000001C7 7E26                        jle .skip_centering
-   190 000001C9 C705[DC350000]0000-         mov dword [player_x], 0     
-   190 000001D1 0000               
-   191 000001D3 EB1A                        jmp .skip_centering
-   192                                  
-   193                                  .center_from_right:
-   194                                      ; Araç saðda: Sola (merkeze) doðru güçlü çekiþ
-   195 000001D5 832D[DC350000]02            sub dword [player_x], 2     ; Çekiþ gücü 2 birime sabitlendi
-   196 000001DC 833D[DC350000]00            cmp dword [player_x], 0     
-   197 000001E3 7D0A                        jge .skip_centering
-   198 000001E5 C705[DC350000]0000-         mov dword [player_x], 0     
-   198 000001ED 0000               
-   199                                  
-   200                                  .skip_centering:
-   201                                  
-   202                                      ; --- 6. SANAL BUFFER TEMÝZLEME (SKY) ---
-   203 000001EF 8B3D[D8350000]              mov edi, [vram_buffer_ptr]   
-   204 000001F5 B9803E0000                  mov ecx, 16000               
-   205 000001FA B834343434                  mov eax, 34343434h           
-   206 000001FF F3AB                        rep stosd                    
-   207                                  
-   208                                      ; --- 7. PERSPEKTÝF YOL ÇÝZÝM MATRÝSÝ ---
-   209 00000201 BD64000000                  mov ebp, 100
-   210                                  .line_loop:
-   211 00000206 89E8                        mov eax, ebp
-   212 00000208 83E864                      sub eax, 100                 
-   213 0000020B 89C1                        mov ecx, eax                 
-   214                                      
-   215 0000020D BB0E000000                  mov ebx, 14
-   216 00000212 F7EB                        imul ebx                     
-   217 00000214 C1E803                      shr eax, 3
-   218 00000217 83C008                      add eax, 8
-   219 0000021A A3[EC350000]                mov [road_width], eax
-   220                                  
-   221 0000021F A1[EC350000]                mov eax, [road_width]
-   222 00000224 C1E803                      shr eax, 3
-   223 00000227 40                          inc eax
-   224 00000228 A3[F4350000]                mov [rumble_width], eax
+    96                                  .gas_active:
+    97 000000A1 A1[0C360000]                mov eax, [player_speed]
+    98 000000A6 833D[10360000]01            cmp dword [on_grass], 1
+    99 000000AD 750E                        jne .asphalt_speed_limit
+   100                                  
+   101                                      ; Çimen hýz limiti
+   102 000000AF 83F80C                      cmp eax, 12
+   103 000000B2 7D7B                        jge .physics_update
+   104 000000B4 8305[0C360000]01            add dword [player_speed], 1
+   105 000000BB EB72                        jmp .physics_update
+   106                                  
+   107                                  .asphalt_speed_limit:
+   108 000000BD 83F837                      cmp eax, 55                 ; Maksimum asfalttaki hýz sýnýrý
+   109 000000C0 7D6D                        jge .physics_update
+   110                                  
+   111 000000C2 83F819                      cmp eax, 25
+   112 000000C5 7D09                        jge .low_torque
+   113 000000C7 8305[0C360000]02            add dword [player_speed], 2
+   114 000000CE EB5F                        jmp .physics_update
+   115                                  .low_torque:
+   116 000000D0 8305[0C360000]01            add dword [player_speed], 1
+   117 000000D7 EB56                        jmp .physics_update
+   118                                  
+   119                                  .check_brake:
+   120 000000D9 3C50                        cmp al, 50h                 ; Aþaðý Ok Tuþu (FREN)
+   121 000000DB 7515                        jne .apply_inertia
+   122 000000DD 832D[0C360000]03            sub dword [player_speed], 3
+   123 000000E4 7D49                        jge .physics_update
+   124 000000E6 C705[0C360000]0000-         mov dword [player_speed], 0
+   124 000000EE 0000               
+   125 000000F0 EB3D                        jmp .physics_update
+   126                                  
+   127                                  .apply_inertia:
+   128                                      ; Gerçek rölanti yavaþlamasý (Hiçbir tuþa basýlmadýðýnda)
+   129 000000F2 A1[0C360000]                mov eax, [player_speed]
+   130 000000F7 09C0                        or eax, eax
+   131 000000F9 7434                        jz .physics_update
+   132                                  
+   133 000000FB 833D[10360000]01            cmp dword [on_grass], 1
+   134 00000102 7418                        je .grass_friction_fast
+   135                                  
+   136                                      ; Lotus Akýþ Ataleti: Gaz tamamen býrakýldýðýnda araba çok tatlý yavaþlar (8 karede 1 birim)
+   137 00000104 8B1D[E4350000]              mov ebx, [time_tick]
+   138 0000010A 83E307                      and ebx, 7                  ; Yavaþlamayý 8 karede bire yayarak ataleti köklüyoruz
+   139 0000010D 7520                        jnz .physics_update
+   140                                  
+   141 0000010F 83F804                      cmp eax, 4
+   142 00000112 7E1B                        jle .physics_update
+   143 00000114 FF0D[0C360000]              dec dword [player_speed]
+   144 0000011A EB13                        jmp .physics_update
+   145                                  
+   146                                  .grass_friction_fast:
+   147 0000011C 832D[0C360000]02            sub dword [player_speed], 2
+   148 00000123 7D0A                        jge .physics_update
+   149 00000125 C705[0C360000]0000-         mov dword [player_speed], 0
+   149 0000012D 0000               
+   150                                  
+   151                                      ; --- 5. FÝZÝK GÜNCELLEME VE AGRESÝF MERKEZLEME KÝLÝDÝ ---
+   152                                  .physics_update:
+   153                                      ; Sýnýr korumalarý
+   154 0000012F 833D[DC350000]92            cmp dword [player_x], -110
+   155 00000136 7D0A                        jge .limit_left_ok
+   156 00000138 C705[DC350000]92FF-         mov dword [player_x], -110
+   156 00000140 FFFF               
+   157                                  .limit_left_ok:
+   158 00000142 833D[DC350000]6E            cmp dword [player_x], 110
+   159 00000149 7E0A                        jle .limit_right_ok
+   160 0000014B C705[DC350000]6E00-         mov dword [player_x], 110
+   160 00000153 0000               
+   161                                  .limit_right_ok:
+   162                                  
+   163                                      ; Yol ilerleme adýmý
+   164 00000155 A1[0C360000]                mov eax, [player_speed]
+   165 0000015A 0105[E0350000]              add [player_z], eax
+   166                                  
+   167                                      ; Viraj bükülme frekansý (Ufuktaki tatlý salýným ayarý)
+   168 00000160 A1[0C360000]                mov eax, [player_speed]
+   169 00000165 C1E805                      shr eax, 5
+   170 00000168 0105[E4350000]              add [time_tick], eax
+   171                                  
+   172 0000016E A1[E4350000]                mov eax, [time_tick]
+   173 00000173 C1E803                      shr eax, 3
+   174 00000176 83E03F                      and eax, 63
+   175 00000179 A3[E8350000]                mov [sine_index], eax
+   176                                  
+   177                                      ; Viraj merkezkaç kuvveti
+   178 0000017E 8B3D[E8350000]              mov edi, [sine_index]
+   179 00000184 0FBF843F[5C050000]          movsx eax, word [sine_table + edi * 2]
+   180 0000018C C1F804                      sar eax, 4
+   181 0000018F 0FAF05[0C360000]            imul eax, [player_speed]
+   182 00000196 C1F808                      sar eax, 8
+   183 00000199 2905[DC350000]              sub [player_x], eax
+   184                                  
+   185                                      ; --- KESÝNTÝSÝZ MUTLAK MERKEZLEME FÝLTRESÝ ---
+   186                                      ; Dönüþ tuþlarý aktif deðilse arabayý yolun ortasýndaki beyaz çizgiye zýmbalar
+   187 0000019F 83FE00                      cmp esi, 0
+   188 000001A2 754B                        jnz .skip_centering
+   189 000001A4 833D[0C360000]04            cmp dword [player_speed], 4
+   190 000001AB 7C42                        jl .skip_centering
+   191                                  
+   192 000001AD 8B0D[DC350000]              mov ecx, [player_x]
+   193 000001B3 21C9                        and ecx, ecx
+   194 000001B5 7438                        jz .skip_centering
+   195 000001B7 791C                        jns .center_from_right
+   196                                  
+   197                                      ; Araç solda: Saða (merkeze) doðru güçlü çekiþ
+   198 000001B9 8305[DC350000]02            add dword [player_x], 2     ; Çekiþ gücü 2 birime sabitlendi
+   199 000001C0 833D[DC350000]00            cmp dword [player_x], 0
+   200 000001C7 7E26                        jle .skip_centering
+   201 000001C9 C705[DC350000]0000-         mov dword [player_x], 0
+   201 000001D1 0000               
+   202 000001D3 EB1A                        jmp .skip_centering
+   203                                  
+   204                                  .center_from_right:
+   205                                      ; Araç saðda: Sola (merkeze) doðru güçlü çekiþ
+   206 000001D5 832D[DC350000]02            sub dword [player_x], 2     ; Çekiþ gücü 2 birime sabitlendi
+   207 000001DC 833D[DC350000]00            cmp dword [player_x], 0
+   208 000001E3 7D0A                        jge .skip_centering
+   209 000001E5 C705[DC350000]0000-         mov dword [player_x], 0
+   209 000001ED 0000               
+   210                                  
+   211                                  .skip_centering:
+   212                                  
+   213                                      ; --- 6. SANAL BUFFER TEMÝZLEME (SKY) ---
+   214 000001EF 8B3D[D8350000]              mov edi, [vram_buffer_ptr]
+   215 000001F5 B9803E0000                  mov ecx, 16000
+   216 000001FA B834343434                  mov eax, 34343434h
+   217 000001FF F3AB                        rep stosd
+   218                                  
+   219                                      ; --- 7. PERSPEKTÝF YOL ÇÝZÝM MATRÝSÝ ---
+   220 00000201 BD64000000                  mov ebp, 100
+   221                                  .line_loop:
+   222 00000206 89E8                        mov eax, ebp
+   223 00000208 83E864                      sub eax, 100
+   224 0000020B 89C1                        mov ecx, eax
    225                                  
-   226 0000022D A1[EC350000]                mov eax, [road_width]
-   227 00000232 C1E805                      shr eax, 5
-   228 00000235 40                          inc eax
-   229 00000236 A3[F0350000]                mov [line_width], eax
-   230                                  
-   231                                      ; Viraj Geometrisi
-   232 0000023B 8B3D[E8350000]              mov edi, [sine_index]
-   233 00000241 0FBF843F[5C050000]          movsx eax, word [sine_table + edi * 2]
-   234 00000249 D1F8                        sar eax, 1
-   235 0000024B BB64000000                  mov ebx, 100
-   236 00000250 29CB                        sub ebx, ecx
-   237 00000252 0FAFC3                      imul eax, ebx
-   238 00000255 0FAFC3                      imul eax, ebx
-   239 00000258 C1F80E                      sar eax, 14
-   240 0000025B 89C3                        mov ebx, eax                 
+   226 0000020D BB0E000000                  mov ebx, 14
+   227 00000212 F7EB                        imul ebx
+   228 00000214 C1E803                      shr eax, 3
+   229 00000217 83C008                      add eax, 8
+   230 0000021A A3[EC350000]                mov [road_width], eax
+   231                                  
+   232 0000021F A1[EC350000]                mov eax, [road_width]
+   233 00000224 C1E803                      shr eax, 3
+   234 00000227 40                          inc eax
+   235 00000228 A3[F4350000]                mov [rumble_width], eax
+   236                                  
+   237 0000022D A1[EC350000]                mov eax, [road_width]
+   238 00000232 C1E805                      shr eax, 5
+   239 00000235 40                          inc eax
+   240 00000236 A3[F0350000]                mov [line_width], eax
    241                                  
-   242                                      ; --- YOL VE ARABA SARSINTI YUMUÞATMA (DAMPING) ---
-   243                                      ; Oyuncunun 'player_x' hareketini perspektif çarpýmýndan sonra 2 bit daha saða kaydýrýyoruz (sar edx, 8)
-   244                                      ; Böylece araba ekranda geniþ geniþ hareket ederken, yol çizgisi ve ufuk aþýrý saða sola fýrlamayacak, stabil kalacaktýr!
-   245 0000025D 8B15[DC350000]              mov edx, [player_x]
-   246 00000263 0FAFD1                      imul edx, ecx                
-   247 00000266 C1FA08                      sar edx, 8                  ; 6 yerine 8 yapýldý (Sallantý elendi!)
-   248                                  
-   249 00000269 B8A0000000                  mov eax, 160
-   250 0000026E 01D8                        add eax, ebx
-   251 00000270 29D0                        sub eax, edx
-   252 00000272 A3[F8350000]                mov [road_center], eax  
-   253                                  
-   254                                      ; Tekerlek Hizasý Çimen Kontrolü (EBP = 185)
-   255 00000277 81FDB9000000                cmp ebp, 185
-   256 0000027D 752F                        jne .skip_grass_check
-   257                                      
-   258 0000027F 8B15[DC350000]              mov edx, [player_x]
-   259 00000285 21D2                        and edx, edx
-   260 00000287 7902                        jns .abs_x
-   261 00000289 F7DA                        neg edx                                    
-   262                                  .abs_x:
-   263 0000028B 8B1D[EC350000]              mov ebx, [road_width]
-   264 00000291 83C319                      add ebx, 25                 
-   265 00000294 39DA                        cmp edx, ebx
-   266 00000296 7E0C                        jle .on_asphalt
-   267 00000298 C705[10360000]0100-         mov dword [on_grass], 1     
-   267 000002A0 0000               
-   268 000002A2 EB0A                        jmp .skip_grass_check
-   269                                  .on_asphalt:
-   270 000002A4 C705[10360000]0000-         mov dword [on_grass], 0     
-   270 000002AC 0000               
-   271                                  .skip_grass_check:
-   272                                  
-   273                                      ; Kýrpma Sýnýrlarý (Clipping)
-   274 000002AE 8B1D[F8350000]              mov ebx, [road_center]
-   275 000002B4 2B1D[EC350000]              sub ebx, [road_width]
-   276 000002BA 2B1D[F4350000]              sub ebx, [rumble_width]
-   277 000002C0 83FB00                      cmp ebx, 0
-   278 000002C3 7D02                        jge .left_ok
-   279 000002C5 31DB                        xor ebx, ebx
-   280                                  .left_ok:
-   281 000002C7 891D[FC350000]              mov [left_bound], ebx
-   282                                  
-   283 000002CD 8B1D[F8350000]              mov ebx, [road_center]
-   284 000002D3 031D[EC350000]              add ebx, [road_width]
-   285 000002D9 031D[F4350000]              add ebx, [rumble_width]
-   286 000002DF 81FB40010000                cmp ebx, 320
-   287 000002E5 7E05                        jle .right_ok
-   288 000002E7 BB40010000                  mov ebx, 320
-   289                                  .right_ok:
-   290 000002EC 891D[00360000]              mov [right_bound], ebx
-   291                                  
-   292                                      ; Çizgi Ofsetlerini Hesapla (Y * 320)
-   293 000002F2 89E8                        mov eax, ebp
-   294 000002F4 C1E008                      shl eax, 8                   
-   295 000002F7 89C7                        mov edi, eax
-   296 000002F9 89E8                        mov eax, ebp
-   297 000002FB C1E006                      shl eax, 6                   
-   298 000002FE 01C7                        add edi, eax                 
-   299 00000300 033D[D8350000]              add edi, [vram_buffer_ptr]   
-   300                                  
-   301                                      ; Hiperbolik daralma periyotlarý
-   302 00000306 89E8                        mov eax, ebp
-   303 00000308 83E863                      sub eax, 99
-   304 0000030B 89C3                        mov ebx, eax
-   305 0000030D B800440000                  mov eax, 4400h
-   306 00000312 31D2                        xor edx, edx                 
-   307 00000314 F7F3                        div ebx
-   308 00000316 89C3                        mov ebx, eax
-   309                                  
-   310 00000318 0305[E0350000]              add eax, [player_z]
-   311 0000031E 83E020                      and eax, 32
-   312 00000321 A3[04360000]                mov [strip_color_flag], eax
-   313                                  
-   314 00000326 89D8                        mov eax, ebx
-   315 00000328 0305[E0350000]              add eax, [player_z]
-   316 0000032E 83E040                      and eax, 64
-   317 00000331 A3[08360000]                mov [grass_color_flag], eax
-   318                                  
-   319                                  .render_pixels:
-   320 00000336 31C9                        xor ecx, ecx                 
-   321                                  .pixel_loop:
-   322 00000338 3B0D[FC350000]              cmp ecx, [left_bound]
-   323 0000033E 0F8CA7000000                jl .draw_grass_pixel
-   324 00000344 3B0D[00360000]              cmp ecx, [right_bound]
-   325 0000034A 0F8F9B000000                jg .draw_grass_pixel
-   326                                  
-   327 00000350 8B15[F8350000]              mov edx, [road_center]
-   328 00000356 2B15[EC350000]              sub edx, [road_width]
-   329 0000035C 2B15[F4350000]              sub edx, [rumble_width]
-   330 00000362 39D1                        cmp ecx, edx
-   331 00000364 7C10                        jl .check_right_rumble
-   332 00000366 8B15[F8350000]              mov edx, [road_center]
-   333 0000036C 2B15[EC350000]              sub edx, [road_width]
-   334 00000372 39D1                        cmp ecx, edx
-   335 00000374 7C64                        jl .draw_rumble_pixel
-   336                                  .check_right_rumble:
-   337 00000376 8B15[F8350000]              mov edx, [road_center]
-   338 0000037C 0315[EC350000]              add edx, [road_width]
-   339 00000382 39D1                        cmp ecx, edx
-   340 00000384 7C16                        jl .check_center_line
-   341 00000386 8B15[F8350000]              mov edx, [road_center]
-   342 0000038C 0315[EC350000]              add edx, [road_width]
-   343 00000392 0315[F4350000]              add edx, [rumble_width]
-   344 00000398 39D1                        cmp ecx, edx
-   345 0000039A 7C3E                        jl .draw_rumble_pixel
-   346                                  .check_center_line:
-   347 0000039C 833D[04360000]00            cmp dword [strip_color_flag], 0
-   348 000003A3 7424                        jz .asphalt_logic
-   349 000003A5 8B15[F8350000]              mov edx, [road_center]
-   350 000003AB 2B15[F0350000]              sub edx, [line_width]
-   351 000003B1 39D1                        cmp ecx, edx
-   352 000003B3 7C14                        jl .asphalt_logic
-   353 000003B5 8B15[F8350000]              mov edx, [road_center]
-   354 000003BB 0315[F0350000]              add edx, [line_width]
-   355 000003C1 39D1                        cmp ecx, edx
-   356 000003C3 7F04                        jg .asphalt_logic
-   357 000003C5 B00F                        mov al, 15                  
-   358 000003C7 EB31                        jmp .put_pixel
-   359                                  .asphalt_logic:
-   360 000003C9 833D[04360000]00            cmp dword [strip_color_flag], 0
-   361 000003D0 7404                        jz .dark_asphalt
-   362 000003D2 B007                        mov al, 7                   
-   363 000003D4 EB24                        jmp .put_pixel
-   364                                  .dark_asphalt:
-   365 000003D6 B008                        mov al, 8                   
-   366 000003D8 EB20                        jmp .put_pixel
-   367                                  .draw_rumble_pixel:
-   368 000003DA 833D[04360000]00            cmp dword [strip_color_flag], 0
-   369 000003E1 7404                        jz .red_rumble
-   370 000003E3 B00F                        mov al, 15
-   371 000003E5 EB13                        jmp .put_pixel
-   372                                  .red_rumble:
-   373 000003E7 B004                        mov al, 4
-   374 000003E9 EB0F                        jmp .put_pixel
-   375                                  .draw_grass_pixel:
-   376 000003EB 833D[08360000]00            cmp dword [grass_color_flag], 0
-   377 000003F2 7404                        jz .dark_grass
-   378 000003F4 B002                        mov al, 2
-   379 000003F6 EB02                        jmp .put_pixel
-   380                                  .dark_grass:
-   381 000003F8 B00A                        mov al, 10
-   382                                  .put_pixel:
-   383 000003FA 8807                        mov [edi], al                
-   384 000003FC 47                          inc edi
-   385 000003FD 41                          inc ecx
-   386 000003FE 81F940010000                cmp ecx, 320
-   387 00000404 0F8C2EFFFFFF                jl .pixel_loop
-   388                                  
-   389 0000040A 45                          inc ebp
-   390 0000040B 81FDC8000000                cmp ebp, 200
-   391 00000411 0F8CEFFDFFFF                jl .line_loop
-   392                                  
-   393                                  ; =========================================================================
-   394                                  ; NÝHAÝ ARABA ÇÝZÝM MOTORU (KLAVYE ÖNCELÝKLÝ KESÝN SÜZGEC)
-   395                                  ; =========================================================================
-   396                                  draw_player_car_32:
-   397 00000417 FC                          cld                         
-   398                                      
-   399                                      ; [DÜZELTME] Sprite seçimi konum yerine doðrudan basýlan tuþun kaydý (ESI) ile yapýlýyor!
-   400 00000418 83FE01                      cmp esi, 1
-   401 0000041B 7411                        je .select_left
-   402 0000041D 83FE02                      cmp esi, 2
-   403 00000420 7418                        je .select_right
-   404                                      
-   405                                      ; Kullanýcý dönüþ tuþuna basmýyorsa veya sadece yukarý basýyorsa KESÝNLÝKLE DÜZ SPRITE
-   406 00000422 C705[DC050000]-             mov dword [active_bmp_ptr], car_straight_bmp
-   406 00000428 [F0050000]         
-   407 0000042C EB16                        jmp .parse_bmp
-   408                                  
-   409                                  .select_left:
-   410 0000042E C705[DC050000]-             mov dword [active_bmp_ptr], car_left_bmp
-   410 00000434 [E8150000]         
-   411 00000438 EB0A                        jmp .parse_bmp
-   412                                  
-   413                                  .select_right:
-   414                                      ; Eðer kullanýcý aktif olarak Sað Ok'a basýyorsa veya viraj arabayý saða fýrlatmýþsa:
-   415 0000043A C705[DC050000]-             mov dword [active_bmp_ptr], car_right_bmp
-   415 00000440 [E0250000]         
-   416                                  
-   417                                  .parse_bmp:
-   418 00000444 8B15[DC050000]              mov edx, [active_bmp_ptr]
-   419 0000044A 8B420A                      mov eax, [edx + 10]
-   420 0000044D A3[E0050000]                mov [pixel_start_ptr], eax
-   421                                      
-   422 00000452 8B4A12                      mov ecx, [edx + 18]         ; Geniþlik (77)
-   423 00000455 8B5A16                      mov ebx, [edx + 22]         ; Yükseklik (38)
-   424 00000458 890D[E4050000]              mov [sprite_w], ecx
-   425 0000045E 891D[E8050000]              mov [sprite_h], ebx
-   426                                  
-   427 00000464 89C8                        mov eax, ecx
-   428 00000466 83C003                      add eax, 3
-   429 00000469 83E0FC                      and eax, ~3
-   430 0000046C 29C8                        sub eax, ecx
-   431 0000046E A3[EC050000]                mov [padding_w], eax
+   242                                      ; Viraj Geometrisi
+   243 0000023B 8B3D[E8350000]              mov edi, [sine_index]
+   244 00000241 0FBF843F[5C050000]          movsx eax, word [sine_table + edi * 2]
+   245 00000249 D1F8                        sar eax, 1
+   246 0000024B BB64000000                  mov ebx, 100
+   247 00000250 29CB                        sub ebx, ecx
+   248 00000252 0FAFC3                      imul eax, ebx
+   249 00000255 0FAFC3                      imul eax, ebx
+   250 00000258 C1F80E                      sar eax, 14
+   251 0000025B 89C3                        mov ebx, eax
+   252                                  
+   253                                      ; --- YOL VE ARABA SARSINTI YUMUÞATMA (DAMPING) ---
+   254                                      ; Oyuncunun 'player_x' hareketini perspektif çarpýmýndan sonra 2 bit daha saða kaydýrýyoruz (sar edx, 8)
+   255                                      ; Böylece araba ekranda geniþ geniþ hareket ederken, yol çizgisi ve ufuk aþýrý saða sola fýrlamayacak, stabil kalacaktýr!
+   256 0000025D 8B15[DC350000]              mov edx, [player_x]
+   257 00000263 0FAFD1                      imul edx, ecx
+   258 00000266 C1FA08                      sar edx, 8                  ; 6 yerine 8 yapýldý (Sallantý elendi!)
+   259                                  
+   260 00000269 B8A0000000                  mov eax, 160
+   261 0000026E 01D8                        add eax, ebx
+   262 00000270 29D0                        sub eax, edx
+   263 00000272 A3[F8350000]                mov [road_center], eax
+   264                                  
+   265                                      ; Tekerlek Hizasý Çimen Kontrolü (EBP = 185)
+   266 00000277 81FDB9000000                cmp ebp, 185
+   267 0000027D 752F                        jne .skip_grass_check
+   268                                  
+   269 0000027F 8B15[DC350000]              mov edx, [player_x]
+   270 00000285 21D2                        and edx, edx
+   271 00000287 7902                        jns .abs_x
+   272 00000289 F7DA                        neg edx
+   273                                  .abs_x:
+   274 0000028B 8B1D[EC350000]              mov ebx, [road_width]
+   275 00000291 83C319                      add ebx, 25
+   276 00000294 39DA                        cmp edx, ebx
+   277 00000296 7E0C                        jle .on_asphalt
+   278 00000298 C705[10360000]0100-         mov dword [on_grass], 1
+   278 000002A0 0000               
+   279 000002A2 EB0A                        jmp .skip_grass_check
+   280                                  .on_asphalt:
+   281 000002A4 C705[10360000]0000-         mov dword [on_grass], 0
+   281 000002AC 0000               
+   282                                  .skip_grass_check:
+   283                                  
+   284                                      ; Kýrpma Sýnýrlarý (Clipping)
+   285 000002AE 8B1D[F8350000]              mov ebx, [road_center]
+   286 000002B4 2B1D[EC350000]              sub ebx, [road_width]
+   287 000002BA 2B1D[F4350000]              sub ebx, [rumble_width]
+   288 000002C0 83FB00                      cmp ebx, 0
+   289 000002C3 7D02                        jge .left_ok
+   290 000002C5 31DB                        xor ebx, ebx
+   291                                  .left_ok:
+   292 000002C7 891D[FC350000]              mov [left_bound], ebx
+   293                                  
+   294 000002CD 8B1D[F8350000]              mov ebx, [road_center]
+   295 000002D3 031D[EC350000]              add ebx, [road_width]
+   296 000002D9 031D[F4350000]              add ebx, [rumble_width]
+   297 000002DF 81FB40010000                cmp ebx, 320
+   298 000002E5 7E05                        jle .right_ok
+   299 000002E7 BB40010000                  mov ebx, 320
+   300                                  .right_ok:
+   301 000002EC 891D[00360000]              mov [right_bound], ebx
+   302                                  
+   303                                      ; Çizgi Ofsetlerini Hesapla (Y * 320)
+   304 000002F2 89E8                        mov eax, ebp
+   305 000002F4 C1E008                      shl eax, 8
+   306 000002F7 89C7                        mov edi, eax
+   307 000002F9 89E8                        mov eax, ebp
+   308 000002FB C1E006                      shl eax, 6
+   309 000002FE 01C7                        add edi, eax
+   310 00000300 033D[D8350000]              add edi, [vram_buffer_ptr]
+   311                                  
+   312                                      ; Hiperbolik daralma periyotlarý
+   313 00000306 89E8                        mov eax, ebp
+   314 00000308 83E863                      sub eax, 99
+   315 0000030B 89C3                        mov ebx, eax
+   316 0000030D B800440000                  mov eax, 4400h
+   317 00000312 31D2                        xor edx, edx
+   318 00000314 F7F3                        div ebx
+   319 00000316 89C3                        mov ebx, eax
+   320                                  
+   321 00000318 0305[E0350000]              add eax, [player_z]
+   322 0000031E 83E020                      and eax, 32
+   323 00000321 A3[04360000]                mov [strip_color_flag], eax
+   324                                  
+   325 00000326 89D8                        mov eax, ebx
+   326 00000328 0305[E0350000]              add eax, [player_z]
+   327 0000032E 83E040                      and eax, 64
+   328 00000331 A3[08360000]                mov [grass_color_flag], eax
+   329                                  
+   330                                  .render_pixels:
+   331 00000336 31C9                        xor ecx, ecx
+   332                                  .pixel_loop:
+   333 00000338 3B0D[FC350000]              cmp ecx, [left_bound]
+   334 0000033E 0F8CA7000000                jl .draw_grass_pixel
+   335 00000344 3B0D[00360000]              cmp ecx, [right_bound]
+   336 0000034A 0F8F9B000000                jg .draw_grass_pixel
+   337                                  
+   338 00000350 8B15[F8350000]              mov edx, [road_center]
+   339 00000356 2B15[EC350000]              sub edx, [road_width]
+   340 0000035C 2B15[F4350000]              sub edx, [rumble_width]
+   341 00000362 39D1                        cmp ecx, edx
+   342 00000364 7C10                        jl .check_right_rumble
+   343 00000366 8B15[F8350000]              mov edx, [road_center]
+   344 0000036C 2B15[EC350000]              sub edx, [road_width]
+   345 00000372 39D1                        cmp ecx, edx
+   346 00000374 7C64                        jl .draw_rumble_pixel
+   347                                  .check_right_rumble:
+   348 00000376 8B15[F8350000]              mov edx, [road_center]
+   349 0000037C 0315[EC350000]              add edx, [road_width]
+   350 00000382 39D1                        cmp ecx, edx
+   351 00000384 7C16                        jl .check_center_line
+   352 00000386 8B15[F8350000]              mov edx, [road_center]
+   353 0000038C 0315[EC350000]              add edx, [road_width]
+   354 00000392 0315[F4350000]              add edx, [rumble_width]
+   355 00000398 39D1                        cmp ecx, edx
+   356 0000039A 7C3E                        jl .draw_rumble_pixel
+   357                                  .check_center_line:
+   358 0000039C 833D[04360000]00            cmp dword [strip_color_flag], 0
+   359 000003A3 7424                        jz .asphalt_logic
+   360 000003A5 8B15[F8350000]              mov edx, [road_center]
+   361 000003AB 2B15[F0350000]              sub edx, [line_width]
+   362 000003B1 39D1                        cmp ecx, edx
+   363 000003B3 7C14                        jl .asphalt_logic
+   364 000003B5 8B15[F8350000]              mov edx, [road_center]
+   365 000003BB 0315[F0350000]              add edx, [line_width]
+   366 000003C1 39D1                        cmp ecx, edx
+   367 000003C3 7F04                        jg .asphalt_logic
+   368 000003C5 B00F                        mov al, 15
+   369 000003C7 EB31                        jmp .put_pixel
+   370                                  .asphalt_logic:
+   371 000003C9 833D[04360000]00            cmp dword [strip_color_flag], 0
+   372 000003D0 7404                        jz .dark_asphalt
+   373 000003D2 B007                        mov al, 7
+   374 000003D4 EB24                        jmp .put_pixel
+   375                                  .dark_asphalt:
+   376 000003D6 B008                        mov al, 8
+   377 000003D8 EB20                        jmp .put_pixel
+   378                                  .draw_rumble_pixel:
+   379 000003DA 833D[04360000]00            cmp dword [strip_color_flag], 0
+   380 000003E1 7404                        jz .red_rumble
+   381 000003E3 B00F                        mov al, 15
+   382 000003E5 EB13                        jmp .put_pixel
+   383                                  .red_rumble:
+   384 000003E7 B004                        mov al, 4
+   385 000003E9 EB0F                        jmp .put_pixel
+   386                                  .draw_grass_pixel:
+   387 000003EB 833D[08360000]00            cmp dword [grass_color_flag], 0
+   388 000003F2 7404                        jz .dark_grass
+   389 000003F4 B002                        mov al, 2
+   390 000003F6 EB02                        jmp .put_pixel
+   391                                  .dark_grass:
+   392 000003F8 B00A                        mov al, 10
+   393                                  .put_pixel:
+   394 000003FA 8807                        mov [edi], al
+   395 000003FC 47                          inc edi
+   396 000003FD 41                          inc ecx
+   397 000003FE 81F940010000                cmp ecx, 320
+   398 00000404 0F8C2EFFFFFF                jl .pixel_loop
+   399                                  
+   400 0000040A 45                          inc ebp
+   401 0000040B 81FDC8000000                cmp ebp, 200
+   402 00000411 0F8CEFFDFFFF                jl .line_loop
+   403                                  
+   404                                  ; =========================================================================
+   405                                  ; NÝHAÝ ARABA ÇÝZÝM MOTORU (KLAVYE ÖNCELÝKLÝ KESÝN SÜZGEC)
+   406                                  ; =========================================================================
+   407                                  draw_player_car_32:
+   408 00000417 FC                          cld
+   409                                      
+   410                                      ; [DÜZELTME] Sprite seçimi konum yerine doðrudan basýlan tuþun kaydý (ESI) ile yapýlýyor!
+   411 00000418 83FE01                      cmp esi, 1
+   412 0000041B 7411                        je .select_left
+   413 0000041D 83FE02                      cmp esi, 2
+   414 00000420 7418                        je .select_right
+   415                                  
+   416                                      ; Kullanýcý dönüþ tuþuna basmýyorsa veya sadece yukarý basýyorsa KESÝNLÝKLE DÜZ SPRITE
+   417 00000422 C705[DC050000]-             mov dword [active_bmp_ptr], car_straight_bmp
+   417 00000428 [F0050000]         
+   418 0000042C EB16                        jmp .parse_bmp
+   419                                  
+   420                                  .select_left:
+   421 0000042E C705[DC050000]-             mov dword [active_bmp_ptr], car_left_bmp
+   421 00000434 [E8150000]         
+   422 00000438 EB0A                        jmp .parse_bmp
+   423                                  
+   424                                  .select_right:
+   425                                      ; Eðer kullanýcý aktif olarak Sað Ok'a basýyorsa veya viraj arabayý saða fýrlatmýþsa:
+   426 0000043A C705[DC050000]-             mov dword [active_bmp_ptr], car_right_bmp
+   426 00000440 [E0250000]         
+   427                                  
+   428                                  .parse_bmp:
+   429 00000444 8B15[DC050000]              mov edx, [active_bmp_ptr]
+   430 0000044A 8B420A                      mov eax, [edx + 10]
+   431 0000044D A3[E0050000]                mov [pixel_start_ptr], eax
    432                                  
-   433                                      ; --- 2X BÜYÜTÜLMÜÞ ARABA MERKEZLEME DENKLEMÝ ---
-   434                                      ; Araba ekranda 2X geniþletildiði için gerçek geniþliði 154 pikseldir.
-   435                                      ; Tam merkez hizalama için çýkarýlmasý gereken yarýçap 38 deðil, tam 77'dir!
-   436 00000473 BAA0000000                  mov edx, 160                ; Ekranýn matematiksel tam X merkez koordinatý
-   437 00000478 0315[DC350000]              add edx, [player_x]         ; Oyuncunun yola göre baðýl konumu (0 = Merkez)
-   438 0000047E 83EA4D                      sub edx, 77                 ; [KRÝTÝK DÜZELTME]: 38 yerine 77 yapýldý!
-   439                                  
-   440                                      ; Ekran sýnýr korumasý (Clipping - 2X Geniþliðe göre optimize edildi)
-   441 00000481 83FA00                      cmp edx, 0
-   442 00000484 7D02                        jge .clip_left
-   443 00000486 31D2                        xor edx, edx
-   444                                  .clip_left:
-   445 00000488 81FAA6000000                cmp edx, 166                ; 320 - 154 = 166 (Ekran dýþýna taþma sýnýrý)
-   446 0000048E 7E05                        jle .clip_right
-   447 00000490 BAA6000000                  mov edx, 166
-   448                                  .clip_right:
-   449                                  
-   450                                      ; Sabit dikey konum (Y=199 tabanýna tam kilit)
-   451 00000495 BF7C000000                  mov edi, 124
-   452 0000049A 69FF40010000                imul edi, edi, 320
-   453 000004A0 01D7                        add edi, edx
-   454 000004A2 033D[D8350000]              add edi, [vram_buffer_ptr]
-   455                                  
-   456                                      ; BMP Ters Okuma Modu (Bottom-Up)
-   457 000004A8 8B35[DC050000]              mov esi, [active_bmp_ptr]
-   458 000004AE 0335[E0050000]              add esi, [pixel_start_ptr]
-   459 000004B4 A1[E8050000]                mov eax, [sprite_h]
-   460 000004B9 48                          dec eax
-   461 000004BA 8B1D[E4050000]              mov ebx, [sprite_w]
-   462 000004C0 031D[EC050000]              add ebx, [padding_w]
-   463 000004C6 0FAFC3                      imul eax, ebx
-   464 000004C9 01C6                        add esi, eax                
-   465                                  
-   466 000004CB 8B15[E8050000]              mov edx, [sprite_h]         
-   467                                  
-   468                                  .bmp_y_loop:
-   469 000004D1 57                          push edi                    
-   470 000004D2 56                          push esi                    
-   471                                      
-   472 000004D3 8B0D[E4050000]              mov ecx, [sprite_w]
-   473                                  .bmp_x_loop1:
-   474 000004D9 AC                          lodsb
-   475 000004DA 3CFF                        cmp al, 255                 
-   476 000004DC 7409                        je .skip_p1                 
-   477 000004DE 3C0F                        cmp al, 15                  
-   478 000004E0 7405                        je .skip_p1
-   479                                      
-   480 000004E2 8807                        mov [edi], al
-   481 000004E4 884701                      mov [edi+1], al             
-   482                                  .skip_p1:
-   483 000004E7 83C702                      add edi, 2
-   484 000004EA 49                          dec ecx
-   485 000004EB 75EC                        jnz .bmp_x_loop1
-   486                                  
-   487 000004ED 5E                          pop esi                     
-   488 000004EE 5F                          pop edi                     
-   489 000004EF 57                          push edi                    
-   490 000004F0 56                          push esi                    
-   491                                      
-   492 000004F1 81C740010000                add edi, 320                
-   493 000004F7 8B0D[E4050000]              mov ecx, [sprite_w]
-   494                                  .bmp_x_loop2:
-   495 000004FD AC                          lodsb
-   496 000004FE 3CFF                        cmp al, 255 
-   497 00000500 7409                        je .skip_p2
-   498 00000502 3C0F                        cmp al, 15
-   499 00000504 7405                        je .skip_p2
-   500                                      
-   501 00000506 8807                        mov [edi], al               
-   502 00000508 884701                      mov [edi+1], al             
-   503                                  .skip_p2:
-   504 0000050B 83C702                      add edi, 2
-   505 0000050E 49                          dec ecx
-   506 0000050F 75EC                        jnz .bmp_x_loop2
-   507                                  
-   508 00000511 5E                          pop esi                     
-   509 00000512 A1[E4050000]                mov eax, [sprite_w]
-   510 00000517 0305[EC050000]              add eax, [padding_w]
-   511 0000051D 29C6                        sub esi, eax                
-   512                                  
-   513 0000051F 5F                          pop edi                     
-   514 00000520 81C780020000                add edi, 640                
-   515                                      
-   516 00000526 4A                          dec edx
-   517 00000527 75A8                        jnz .bmp_y_loop
-   518                                      ;;;;
-   519                                  
-   520                                      ; --- DOUBLE BUFFER FLIP (FLAT MEMORY COPY OPTIMIZATION) ---
-   521 00000529 BF00000A00                  mov edi, 0x000A0000          ; TRDOS 386 Flat VGA bellek adresi
-   522 0000052E 8B35[D8350000]              mov esi, [vram_buffer_ptr]   ; Sanal arka plan bellek adresi
-   523 00000534 B9803E0000                  mov ecx, 16000               ; 64000 byte / 4 = 16000 dword transfer adýmý
-   524 00000539 F3A5                        rep movsd                    ; Blok halinde ve ultra hýzlý ekran güncelleme
-   525                                  
-   526                                      ; --- ESC TUÞU KONTROLÜ ---
-   527                                      ; Belirttiðiniz gibi int 34h veya TRDOS Syscall mekanizmasý handle edebilir.
-   528                                      ;;in al, 60h
-   529                                      ;mov dx, 60h
-   530                                      ;;mov ah, 0
-   531                                      ;xor eax, eax  ; read port -byte- (ah=0)
-   532                                      ;int 34h
-   533                                  
-   534                                      ;cmp al, 1
-   535 0000053B 803D[58050000]01            cmp byte [scancode], 1
-   536 00000542 0F85F6FAFFFF                jne main_game_loop
-   537                                  
-   538                                  exit_program:
-   539 00000548 66B80300                    mov ax, 0003h
-   540                                      ;int 10h
-   541 0000054C CD31                        int 31h	; set video mode to 13h
-   542                                      ; TRDOS 386 flat binary çýkýþ kesmesi veya standart çýkýþ rutini buraya gelecek
-   543                                      ;mov ah, 4Ch
-   544                                      ;int 21h
-   545 0000054E BB00000000                  mov ebx, 0 ; exit code ; not neccessary !
-   546 00000553 B001                        mov al, 1 ; sysexit (eax=1)
-   547 00000555 CD40                        int 40h
+   433 00000452 8B4A12                      mov ecx, [edx + 18]         ; Geniþlik (77)
+   434 00000455 8B5A16                      mov ebx, [edx + 22]         ; Yükseklik (38)
+   435 00000458 890D[E4050000]              mov [sprite_w], ecx
+   436 0000045E 891D[E8050000]              mov [sprite_h], ebx
+   437                                  
+   438 00000464 89C8                        mov eax, ecx
+   439 00000466 83C003                      add eax, 3
+   440 00000469 83E0FC                      and eax, ~3
+   441 0000046C 29C8                        sub eax, ecx
+   442 0000046E A3[EC050000]                mov [padding_w], eax
+   443                                  
+   444                                      ; --- 2X BÜYÜTÜLMÜÞ ARABA MERKEZLEME DENKLEMÝ ---
+   445                                      ; Araba ekranda 2X geniþletildiði için gerçek geniþliði 154 pikseldir.
+   446                                      ; Tam merkez hizalama için çýkarýlmasý gereken yarýçap 38 deðil, tam 77'dir!
+   447 00000473 BAA0000000                  mov edx, 160                ; Ekranýn matematiksel tam X merkez koordinatý
+   448 00000478 0315[DC350000]              add edx, [player_x]         ; Oyuncunun yola göre baðýl konumu (0 = Merkez)
+   449 0000047E 83EA4D                      sub edx, 77                 ; [KRÝTÝK DÜZELTME]: 38 yerine 77 yapýldý!
+   450                                  
+   451                                      ; Ekran sýnýr korumasý (Clipping - 2X Geniþliðe göre optimize edildi)
+   452 00000481 83FA00                      cmp edx, 0
+   453 00000484 7D02                        jge .clip_left
+   454 00000486 31D2                        xor edx, edx
+   455                                  .clip_left:
+   456 00000488 81FAA6000000                cmp edx, 166                ; 320 - 154 = 166 (Ekran dýþýna taþma sýnýrý)
+   457 0000048E 7E05                        jle .clip_right
+   458 00000490 BAA6000000                  mov edx, 166
+   459                                  .clip_right:
+   460                                  
+   461                                      ; Sabit dikey konum (Y=199 tabanýna tam kilit)
+   462 00000495 BF7C000000                  mov edi, 124
+   463 0000049A 69FF40010000                imul edi, edi, 320
+   464 000004A0 01D7                        add edi, edx
+   465 000004A2 033D[D8350000]              add edi, [vram_buffer_ptr]
+   466                                  
+   467                                      ; BMP Ters Okuma Modu (Bottom-Up)
+   468 000004A8 8B35[DC050000]              mov esi, [active_bmp_ptr]
+   469 000004AE 0335[E0050000]              add esi, [pixel_start_ptr]
+   470 000004B4 A1[E8050000]                mov eax, [sprite_h]
+   471 000004B9 48                          dec eax
+   472 000004BA 8B1D[E4050000]              mov ebx, [sprite_w]
+   473 000004C0 031D[EC050000]              add ebx, [padding_w]
+   474 000004C6 0FAFC3                      imul eax, ebx
+   475 000004C9 01C6                        add esi, eax
+   476                                  
+   477 000004CB 8B15[E8050000]              mov edx, [sprite_h]
+   478                                  
+   479                                  .bmp_y_loop:
+   480 000004D1 57                          push edi
+   481 000004D2 56                          push esi
+   482                                  
+   483 000004D3 8B0D[E4050000]              mov ecx, [sprite_w]
+   484                                  .bmp_x_loop1:
+   485 000004D9 AC                          lodsb
+   486 000004DA 3CFF                        cmp al, 255
+   487 000004DC 7409                        je .skip_p1
+   488 000004DE 3C0F                        cmp al, 15
+   489 000004E0 7405                        je .skip_p1
+   490                                  
+   491 000004E2 8807                        mov [edi], al
+   492 000004E4 884701                      mov [edi+1], al
+   493                                  .skip_p1:
+   494 000004E7 83C702                      add edi, 2
+   495 000004EA 49                          dec ecx
+   496 000004EB 75EC                        jnz .bmp_x_loop1
+   497                                  
+   498 000004ED 5E                          pop esi
+   499 000004EE 5F                          pop edi
+   500 000004EF 57                          push edi
+   501 000004F0 56                          push esi
+   502                                  
+   503 000004F1 81C740010000                add edi, 320
+   504 000004F7 8B0D[E4050000]              mov ecx, [sprite_w]
+   505                                  .bmp_x_loop2:
+   506 000004FD AC                          lodsb
+   507 000004FE 3CFF                        cmp al, 255
+   508 00000500 7409                        je .skip_p2
+   509 00000502 3C0F                        cmp al, 15
+   510 00000504 7405                        je .skip_p2
+   511                                      
+   512 00000506 8807                        mov [edi], al
+   513 00000508 884701                      mov [edi+1], al
+   514                                  .skip_p2:
+   515 0000050B 83C702                      add edi, 2
+   516 0000050E 49                          dec ecx
+   517 0000050F 75EC                        jnz .bmp_x_loop2
+   518                                  
+   519 00000511 5E                          pop esi
+   520 00000512 A1[E4050000]                mov eax, [sprite_w]
+   521 00000517 0305[EC050000]              add eax, [padding_w]
+   522 0000051D 29C6                        sub esi, eax
+   523                                  
+   524 0000051F 5F                          pop edi
+   525 00000520 81C780020000                add edi, 640
+   526                                  
+   527 00000526 4A                          dec edx
+   528 00000527 75A8                        jnz .bmp_y_loop
+   529                                      ;;;;
+   530                                  
+   531                                      ; --- DOUBLE BUFFER FLIP (FLAT MEMORY COPY OPTIMIZATION) ---
+   532 00000529 BF00000A00                  mov edi, 0x000A0000          ; TRDOS 386 Flat VGA bellek adresi
+   533 0000052E 8B35[D8350000]              mov esi, [vram_buffer_ptr]   ; Sanal arka plan bellek adresi
+   534 00000534 B9803E0000                  mov ecx, 16000               ; 64000 byte / 4 = 16000 dword transfer adýmý
+   535 00000539 F3A5                        rep movsd                    ; Blok halinde ve ultra hýzlý ekran güncelleme
+   536                                  
+   537                                      ; --- ESC TUÞU KONTROLÜ ---
+   538                                      ; Belirttiðiniz gibi int 34h veya TRDOS Syscall mekanizmasý handle edebilir.
+   539                                      ;;in al, 60h
+   540                                      ;mov dx, 60h
+   541                                      ;;mov ah, 0
+   542                                      ;xor eax, eax  ; read port -byte- (ah=0)
+   543                                      ;int 34h
+   544                                  
+   545                                      ;cmp al, 1
+   546 0000053B 803D[58050000]01            cmp byte [scancode], 1
+   547 00000542 0F85F6FAFFFF                jne main_game_loop
    548                                  
-   549                                  ;hang:
-   550                                      ;jmp short hang
-   551                                  
-   552                                  ; =========================================================================
-   553                                  ; DATA VE DEÐÝÞKENLER SAHASI (ALL FIELDS ARE 32-BIT ALIGNED DWORD)
-   554                                  ; =========================================================================
-   555                                  
-   556 00000557 90                      align 4
-   557 00000558 00                      scancode: db 0	
-   558                                  
-   559                                  ; 16-bit sinüs tablosu uyumluluk için word kalmýþtýr, movsx eax ile 32-bit'e geniþletilir
-   560 00000559 90<rep 3h>              align 4
-   561                                  sine_table:
-   562 0000055C 00000F001E002D003C-         dw 0, 15, 30, 45, 60, 74, 88, 101, 113, 123, 132, 139, 145, 149, 150, 150
-   562 00000565 004A00580065007100-
-   562 0000056E 7B0084008B00910095-
-   562 00000577 0096009600         
-   563 0000057C 940090008A00820078-         dw 148, 144, 138, 130, 120, 108, 95, 80, 65, 48, 31, 13, -4, -21, -38, -55
-   563 00000585 006C005F0050004100-
-   563 0000058E 30001F000D00FCFFEB-
-   563 00000597 FFDAFFC9FF         
-   564 0000059C B9FFAAFF9CFF90FF85-         dw -71, -86, -100, -112, -123, -131, -138, -143, -146, -147, -146, -142, -136, -128, -118, -106
-   564 000005A5 FF7DFF76FF71FF6EFF-
-   564 000005AE 6DFF6EFF72FF78FF80-
-   564 000005B7 FF8AFF96FF         
-   565 000005BC A3FFB2FFC1FFD2FFE3-         dw -93, -78, -63, -46, -29, -11, 6, 23, 41, 57, 73, 88, 101, 113, 123, 131
-   565 000005C5 FFF5FF060017002900-
-   565 000005CE 390049005800650071-
-   565 000005D7 007B008300         
+   549                                  exit_program:
+   550 00000548 66B80300                    mov ax, 0003h
+   551                                      ;int 10h
+   552 0000054C CD31                        int 31h	; set video mode to 13h
+   553                                      ; TRDOS 386 flat binary çýkýþ kesmesi veya standart çýkýþ rutini buraya gelecek
+   554                                      ;mov ah, 4Ch
+   555                                      ;int 21h
+   556 0000054E BB00000000                  mov ebx, 0 ; exit code ; not neccessary !
+   557 00000553 B001                        mov al, 1 ; sysexit (eax=1)
+   558 00000555 CD40                        int 40h
+   559                                  
+   560                                  ;hang:
+   561                                      ;jmp short hang
+   562                                  
+   563                                  ; =========================================================================
+   564                                  ; DATA VE DEÐÝÞKENLER SAHASI (ALL FIELDS ARE 32-BIT ALIGNED DWORD)
+   565                                  ; =========================================================================
    566                                  
-   567                                  ; =========================================================================
-   568                                  
-   569                                  ; DINAMIK BMP DEÐIÞKENLERI VE INCBIN ALANI
-   570                                  
-   571                                  ; =========================================================================
-   572                                  
-   573                                  
-   574                                  align 4
-   575                                  
-   576                                  
-   577 000005DC 00000000                active_bmp_ptr:   dd 0
-   578                                  
-   579 000005E0 00000000                pixel_start_ptr:  dd 0
-   580                                  
-   581 000005E4 00000000                sprite_w:         dd 0
-   582                                  
-   583 000005E8 00000000                sprite_h:         dd 0
+   567 00000557 90                      align 4
+   568 00000558 00                      scancode: db 0
+   569                                  
+   570                                  ; 16-bit sinüs tablosu uyumluluk için word kalmýþtýr, movsx eax ile 32-bit'e geniþletilir
+   571 00000559 90<rep 3h>              align 4
+   572                                  sine_table:
+   573 0000055C 00000F001E002D003C-         dw 0, 15, 30, 45, 60, 74, 88, 101, 113, 123, 132, 139, 145, 149, 150, 150
+   573 00000565 004A00580065007100-
+   573 0000056E 7B0084008B00910095-
+   573 00000577 0096009600         
+   574 0000057C 940090008A00820078-         dw 148, 144, 138, 130, 120, 108, 95, 80, 65, 48, 31, 13, -4, -21, -38, -55
+   574 00000585 006C005F0050004100-
+   574 0000058E 30001F000D00FCFFEB-
+   574 00000597 FFDAFFC9FF         
+   575 0000059C B9FFAAFF9CFF90FF85-         dw -71, -86, -100, -112, -123, -131, -138, -143, -146, -147, -146, -142, -136, -128, -118, -106
+   575 000005A5 FF7DFF76FF71FF6EFF-
+   575 000005AE 6DFF6EFF72FF78FF80-
+   575 000005B7 FF8AFF96FF         
+   576 000005BC A3FFB2FFC1FFD2FFE3-         dw -93, -78, -63, -46, -29, -11, 6, 23, 41, 57, 73, 88, 101, 113, 123, 131
+   576 000005C5 FFF5FF060017002900-
+   576 000005CE 390049005800650071-
+   576 000005D7 007B008300         
+   577                                  
+   578                                  ; =========================================================================
+   579                                  
+   580                                  ; DINAMIK BMP DEÐIÞKENLERI VE INCBIN ALANI
+   581                                  
+   582                                  ; =========================================================================
+   583                                  
    584                                  
-   585 000005EC 00000000                padding_w:        dd 0
+   585                                  align 4
    586                                  
    587                                  
-   588                                  
-   589                                  align 4
-   590                                  
-   591 000005F0 <bin FF8h>              car_straight_bmp: incbin "car.bmp"    ; Orijinal 8-bit 77x38 BMP Dosyasý
-   592                                  
-   593 000015E8 <bin FF8h>              car_left_bmp:     incbin "car_l.bmp"  ; Orijinal 8-bit 77x38 BMP Dosyasý
-   594                                  
-   595 000025E0 <bin FF8h>              car_right_bmp:    incbin "car_r.bmp"  ; Orijinal 8-bit 77x38 BMP Dosyasý
-   596                                  
-   597                                  ;current_trans_color: db 255
+   588 000005DC 00000000                active_bmp_ptr:   dd 0
+   589                                  
+   590 000005E0 00000000                pixel_start_ptr:  dd 0
+   591                                  
+   592 000005E4 00000000                sprite_w:         dd 0
+   593                                  
+   594 000005E8 00000000                sprite_h:         dd 0
+   595                                  
+   596 000005EC 00000000                padding_w:        dd 0
+   597                                  
    598                                  
-   599                                  ;-----------------------------------------------------------------
-   600                                  ;  uninitialized data
-   601                                  ;-----------------------------------------------------------------
-   602                                  
-   603                                  bss:
-   604                                  
-   605                                  ABSOLUTE bss
-   606                                  
-   607                                  alignb 4
-   608                                  
-   609 000035D8 ????????                vram_buffer_ptr:  resd 1
-   610 000035DC ????????                player_x:         resd 1
-   611 000035E0 ????????                player_z:         resd 1
-   612 000035E4 ????????                time_tick:        resd 1
-   613 000035E8 ????????                sine_index:       resd 1
-   614 000035EC ????????                road_width:       resd 1
-   615 000035F0 ????????                line_width:       resd 1
-   616 000035F4 ????????                rumble_width:     resd 1
-   617 000035F8 ????????                road_center:      resd 1
-   618 000035FC ????????                left_bound:       resd 1
-   619 00003600 ????????                right_bound:      resd 1
-   620 00003604 ????????                strip_color_flag: resd 1
-   621 00003608 ????????                grass_color_flag: resd 1
-   622 0000360C ????????                player_speed:     resd 1        ; Aracýn anlýk dinamik hýzýný tutar
-   623 00003610 ????????                on_grass:         resd 1        ; Araç çimende mi? (0=Hayýr, 1=Evet)
-   624                                  
-   625                                  ; Sanal buffer alaný Flat kodun bittiði yerin arkasýndaki boþ hafýzada açýlýr
-   626                                  ;alignb 4
-   627                                  vram_sanal_bellek:
-   628 00003614 <res FA00h>                               resb 64000 ; 320x200 piksellik buffer alaný
+   599                                  
+   600                                  align 4
+   601                                  
+   602 000005F0 <bin FF8h>              car_straight_bmp: incbin "car.bmp"    ; Orijinal 8-bit 77x38 BMP Dosyasý
+   603                                  
+   604 000015E8 <bin FF8h>              car_left_bmp:     incbin "car_l.bmp"  ; Orijinal 8-bit 77x38 BMP Dosyasý
+   605                                  
+   606 000025E0 <bin FF8h>              car_right_bmp:    incbin "car_r.bmp"  ; Orijinal 8-bit 77x38 BMP Dosyasý
+   607                                  
+   608                                  ;current_trans_color: db 255
+   609                                  
+   610                                  ;-----------------------------------------------------------------
+   611                                  ;  uninitialized data
+   612                                  ;-----------------------------------------------------------------
+   613                                  
+   614                                  bss:
+   615                                  
+   616                                  ABSOLUTE bss
+   617                                  
+   618                                  alignb 4
+   619                                  
+   620 000035D8 ????????                vram_buffer_ptr:  resd 1
+   621 000035DC ????????                player_x:         resd 1
+   622 000035E0 ????????                player_z:         resd 1
+   623 000035E4 ????????                time_tick:        resd 1
+   624 000035E8 ????????                sine_index:       resd 1
+   625 000035EC ????????                road_width:       resd 1
+   626 000035F0 ????????                line_width:       resd 1
+   627 000035F4 ????????                rumble_width:     resd 1
+   628 000035F8 ????????                road_center:      resd 1
+   629 000035FC ????????                left_bound:       resd 1
+   630 00003600 ????????                right_bound:      resd 1
+   631 00003604 ????????                strip_color_flag: resd 1
+   632 00003608 ????????                grass_color_flag: resd 1
+   633 0000360C ????????                player_speed:     resd 1        ; Aracýn anlýk dinamik hýzýný tutar
+   634 00003610 ????????                on_grass:         resd 1        ; Araç çimende mi? (0=Hayýr, 1=Evet)
+   635                                  
+   636                                  ; Sanal buffer alaný Flat kodun bittiði yerin arkasýndaki boþ hafýzada açýlýr
+   637                                  ;alignb 4
+   638                                  vram_sanal_bellek:
+   639 00003614 <res FA00h>                               resb 64000 ; 320x200 piksellik buffer alaný
