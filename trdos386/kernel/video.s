@@ -13,7 +13,7 @@
 ; Derived from 'Retro UNIX 386 Kernel - v0.2.1.0' source code by Erdogan Tan
 ; video.inc (13/08/2015)
 ;
-; Derived from 'IBM PC-AT' BIOS source code (1985) 
+; Derived from 'IBM PC-AT' BIOS source code (1985)
 ; ****************************************************************************
 
 ; Retro UNIX 386 v1 Kernel - VIDEO.INC
@@ -228,8 +228,7 @@ M1L	EQU	$ - M1
 ;; is used for timer -or RTC- interrupt. 
 ;; (This separation is needed because timer interrupt can occur
 ;;  while video interrupt handler is in progress.)
-  
- 
+
 ; 22/12/2025
 ; 21/12/2025 - TRDOS 386 v2.0.10
 ; 29/11/2023 - TRDOS 386 v2.0.7
@@ -2913,7 +2912,7 @@ n1:
 	; 12/04/2021
 	push	eax ; *
 	;mov 	esi, [CRT_BASE]
-        mov     esi, 0B8000h  
+        mov     esi, 0B8000h
         cmp     bh, [ACTIVE_PAGE]
 	jne	short n2
 	;
@@ -2930,7 +2929,7 @@ n3:
 	jnz	short n3
 n4:
 	call	scroll_position ; 16/01/2016
-        jz      short n6 
+        jz      short n6
 
         add     esi, ecx ; from address for scroll
 	mov	ch, dh  ; #rows in block
@@ -2939,7 +2938,7 @@ n5:
 	call	n10 ; 16/01/2016
 	
         push	ecx
-	movzx	ecx, byte [CRT_COLS] 
+	movzx	ecx, byte [CRT_COLS]
 	add	cl, cl
         add	esi, ecx  ; next line
         add	edi, ecx
@@ -3142,7 +3141,7 @@ _scroll_down: ; 27/06/2016
 	; 18/11/2020
 	cmp	ah, 4
  	jb	short _n0
-	cmp	ah, 7 ; TEST FOR BW CARD 
+	cmp	ah, 7 ; TEST FOR BW CARD
 		      ;	(80x25 text, mono)
 	je	short _n0 ; same with mode 3 for TRDOS 386
 	jmp	GRAPHICS_DOWN
@@ -3246,7 +3245,7 @@ read_ac_c:
 
 _read_ac_current:
 	; 26/06/2016
-	; 12/05/2016 
+	; 12/05/2016
 	; 18/01/2016
 
 	mov	ah, [CRT_MODE] ; current video mode
@@ -3530,7 +3529,7 @@ WRITE_TTY:
 	; 02/09/2014
 	; 30/08/2014 (Retro UNIX 386 v1 - beginning)
 	; 01/02/2014 (Retro UNIX 8086 v1 - last update)
-	; 03/12/2013 (Retro UNIX 8086 v1 - beginning)	
+	; 03/12/2013 (Retro UNIX 8086 v1 - beginning)
 	; (Modified registers: EAX, EBX, ECX, EDX, ESI, EDI)
 	;
 	; INPUT -> AL = Character to be written
@@ -3871,7 +3870,7 @@ _beep:
 	sti
 	retn
 
-beeper: 
+beeper:
 	; 04/08/2016
 	; 12/05/2016 - TRDOS 386 (TRDOS v2.0)
 	; 30/08/2014 (Retro UNIX 386 v1)
@@ -3889,7 +3888,7 @@ beeper_gfx: ; 04/08/2016
 	;call	beep		; sound the pod bell
 	;jmp	short u5 	; tty_return
 	;retn
-	
+
 TIMER	equ 	040h   		; 8254 TIMER - BASE ADDRESS
 PORT_B	equ	061h		; PORT B READ/WRITE DIAGNOSTIC REGISTER
 GATE2	equ	00000001b	; TIMER 2 INPUT CATE CLOCK BIT
@@ -3909,7 +3908,7 @@ beep:
 	; ENTRY:
 	;    (BL) = DURATION COUNTER ( 1 FOR 1/64 SECOND )
 	;    (CX) = FREQUENCY DIVISOR (1193180/FREQUENCY) (1331 FOR 886 HZ)
-	; EXIT:				:
+	; EXIT:
 	;    (AX),(BL),(CX) MODIFIED.
 
 	pushfd  ; 18/01/2014	; save interrupt status
@@ -4007,7 +4006,7 @@ waitf:
 	; 16/12/2014
 	;shr	cx, 1			; convert to count of 30 micro seconds
 	shr	ecx, 1	; 21/02/2015
-;17/12/2014	
+;17/12/2014
 ;WAITF1:
 ;	in	al, PORT_B   ;061h	; READ CURRENT COUNTER OUTPUT STATUS
 ;	and	al, REFRESH_BIT	;00010000b ; MASK FOR REFRESH DETERMINE BIT
@@ -4163,7 +4162,7 @@ P53:
 	;int	10h			; WRITE CHARACTER TO THE CRT
 
 	call	_write_c_current
-	
+
 	pop	edx ; *	
 
 	; 05/12/2020
@@ -4211,12 +4210,12 @@ P54:					; ROW_COLUMNS_SET
 	jnz	short P50next
 
 	pop	dx  ; *****		; RESTORE OLD CURSOR COORDINATES
-	
+
 	test	byte [w_str_cmd], 1	; IF CURSOR WAS NOT TO BE MOVED
 	;jnz	VIDEO_RETURN		; THEN EXIT WITHOUT RESETTING OLD VALUE
 	; 03/08/2022
 	jnz	short P58
-	
+
 	;mov	ax, 0200h		; ELSE RESTORE OLD CURSOR POSITION
 	;int	10h
 					; DONE - EXIT WRITE STRING
@@ -5531,7 +5530,7 @@ S16:
 	push	edi			; SAVE CODE POINTER
 	;mov	ecx, 4			; NUMBER OF WORDS TO MATCH
 	;repe	cmpsw			; COMPARE THE 8 BYTES AS WORDS
-	cmpsd				; compare first 4 bytes 
+	cmpsd				; compare first 4 bytes
 	jne	short S17		; 
 	cmpsd				; compare last 4 bytes
 S17:
@@ -6130,7 +6129,7 @@ vga_wca_planar:
 	cmp	dl, [CRT_COLS]
 	jnb	short vga_wca_1
 	; write_gfx_char_pl4(car,attr,xcurs,ycurs,nbcols,cheight);
-	; AL = car, BL = attr, DL = xcurs, DH = ycurs, 
+	; AL = car, BL = attr, DL = xcurs, DH = ycurs,
 	; [CRT_COLS] = nbcols, [CHAR_HEIGHT] = cheight
 	call	write_gfx_char_pl4
 	dec	cx ; count
@@ -6528,7 +6527,7 @@ vga_wp_2:
 	;
 	retn
 
-vga_read_pixel: 
+vga_read_pixel:
 	; 02/08/2022 (TRDOS 386 Kernel v2.0.5)
 	; 09/07/2016 (TRDOS 386 = TRDOS v2.0)
 	;
@@ -6556,7 +6555,7 @@ vga_rp_0:
 	jb	short vga_rp_0
 	retn	; nothing to do
 vga_rp_1:
-	add	esi, vga_memmodel - (vga_modes + 1)  
+	add	esi, vga_memmodel - (vga_modes + 1)
 	; [ESI] = VGA memory model number (LINEAR8, PLANAR4, PLANAR1)
 	mov	edi, 0A0000h
 	;
@@ -6650,7 +6649,7 @@ vga_write_teletype:
 	; OUTPUT ->
 	; Regen buffer updated
 
-	; biosfn_write_teletype (car, page, attr, flag) 
+	; biosfn_write_teletype (car, page, attr, flag)
 	; car = character (AL)
 	; page = 0
 	; attr = color (BL)
@@ -6759,7 +6758,7 @@ vga_wtty_12:
 
 vga_wtty_planar:
 	; write_gfx_char_pl4(car,attr,xcurs,ycurs,nbcols,cheight);
-	; AL = car, BL = attr (color), DL = xcurs, DH = ycurs, 
+	; AL = car, BL = attr (color), DL = xcurs, DH = ycurs,
 	; [CRT_COLS]= nbcols, [CHAR_HEIGHT] = cheight
 	call	write_gfx_char_pl4
 vga_wtty_9:
@@ -8332,7 +8331,7 @@ set_overscan_border_color:
 	; Set Overscan/Border Color Register
 	; BH = 6-bit RGB color to display
 	;      for that attribute
-	
+
 	mov	bl, 11h
   	; 07/08/2022
 	;jmp	short set_single_palette_reg
@@ -8622,7 +8621,7 @@ get_all_palette_reg:
 	; Read All Palette Registers
 	; EDX = Address of 17-byte buffer 
 	;	to receive data
-	
+
 	mov	edi, edx
 	mov	ebx, esp
 	mov	esi, ebx
@@ -9242,7 +9241,7 @@ vbe_biosfn_set_mode:
 	;;push	ds  ; *
 	;;push	es  ; **
 	;;push	ebp ; ***
-	;;push	esi ; **** 
+	;;push	esi ; ****
 
 	; 11/12/2020
 	push	edx ; *****
@@ -9287,7 +9286,7 @@ vbe_sm_1:
 
 	; 25/11/2020
 	; VBE DISPI will be disabled in 'biosfn_set_video_mode'
- 
+
 	;xor	al, al ; 0 ; VBE_DISPI_DISABLED
 	;call	dispi_set_enable
 
@@ -9527,7 +9526,7 @@ vbe_gm_0:
 	mov	ax, [video_mode]
 		; BX bits:
 		; bit 0 to 8 = VESA VBE video mode
-		; bit 9 to 13 = 0 
+		; bit 9 to 13 = 0
 		; bit 14 = last mode set LFB option
 		;	   1 - linear/flat frame buffer
 		;	   0 - windowed frame buffer
@@ -9554,7 +9553,7 @@ vbe_gm_1:
 		;	   0 if [noclearmem] = 0
 	jmp	short vbe_gm_return
 
-; * (TRDOS 386, INT 31h, VESA Video Bios functions) 
+; * (TRDOS 386, INT 31h, VESA Video Bios functions)
 ; * ---------------------------------------------------------
 ; * Function 04h - Save/Restore State
 ; * ---------------------------------------------------------
@@ -10079,7 +10078,7 @@ bfn_svs_4:
 	stosb
 	mov	al, [VGA_MODESET_CTL] ; basic mode set options
 	stosb
-	; followings are only used by TRDOS 386 v2 (IBM PC/AT ROMBIOS) code 
+	; followings are only used by TRDOS 386 v2 (IBM PC/AT ROMBIOS) code
 	; (bochs/plex86 does not use and return those)
 	mov	al, [CRT_PALETTE] ; current color palette ; TRDOS 386 feature only !
 	stosb
@@ -10107,7 +10106,7 @@ bfn_svs_5:
 	; (not accessable/meaningful address value by user)
 	mov	eax, [VGA_INT43H] ; VGA current (default) font address
 	stosd
-	
+
 	; (total 40 bytes are written above as BIOS data state)
 
 bfn_svs_6:
@@ -10449,8 +10448,8 @@ bfn_rvs_5:
 
 	; BX += 2; /* crtc_addr */     ; 3D4h
         ; BX += 4; /* plane latches */ ; 0
-	add	esi, 6	      
-	push	esi ; *	
+	add	esi, 6
+	push	esi ; *
 
 	;outb(VGAREG_SEQU_ADDRESS, read_byte(ES, addr1)); addr1++;
         ;outb(crtc_addr, read_byte(ES, addr1)); addr1++;
@@ -10530,7 +10529,7 @@ bfn_rvs_7:
 	mov	[CRT_MODE], al ; Current video mode (0FFh for VESA VBE modes) 
 	lodsb
 	mov	[CRT_MODE_SET], al ; 29h for mode 03h ; TRDOS 386 feature only !
-	lodsw	
+	lodsw
  	mov	[video_mode], ax ; Current VESA VBE (SVGA, extended VGA) mode
 	lodsw		 ; (valid if [CRT_MODE] = 0FFh)
 	mov	[CRT_LEN], ax ; page size (in bytes)
@@ -11094,7 +11093,7 @@ bit9_clear:
 	out	dx, al ; Write to attribute addr register
 	;mov	dx, 3CEh ; VGAREG_GRDC_ADDRESS
 	; 03/08/2022
-	mov	dl, 0CEh 
+	mov	dl, 0CEh
 	mov	ax, 0506h ; Misc. register, graph, mm 1
 	out	dx, ax
 	;mov	dx, 3C4h ; VGAREG_SEQU_ADDRESS
@@ -11140,7 +11139,7 @@ bit9_clear:
 	;mov	dx, 3C0h ; VGAREG_ACTL_ADDRESS
 	dec	dl
 	out	dx, al	 ; update mode control reggister
-	mov	al, 20h	 ; select display memory as PAS	
+	mov	al, 20h	 ; select display memory as PAS
 	out	dx, al
 	;mov	dx, 3C4h ; VGAREG_SEQU_ADDRESS
 	; 03/08/2022
@@ -11195,7 +11194,7 @@ vga_set_virt_width:
 	; 03/08/2022
 	shr	eax, 3
 	mov	dx, 3D4h ; VGAREG_VGA_CRTC_ADDRESS
-	;mov	ah, bl	; 
+	;mov	ah, bl	;
 	mov	ah, al	; width in bytes
 	mov	al, 13h	; offset register
 	out	dx, ax	; index (3D4h) and data (3D5h)
@@ -11701,7 +11700,7 @@ dispi_set_bank_farcall:
 	; 11/12/2020
 	; (This may be 'sysvideo' function, later)
 	;
-	; Input: 
+	; Input:
 	;	bx = 0000h, set bank number
 	;	   = 0100h, get bank number
 	;	dx = bank number (if bx = 0)
