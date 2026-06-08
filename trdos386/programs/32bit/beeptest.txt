@@ -1,0 +1,248 @@
+     1                                  ; ****************************************************************************
+     2                                  ; beeptest.s (TRDOS 386, TRDOS v2.0.11 - sample binary file)
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; BEEPTEST.PRG ! 'INT 32h, ah = 13h' TEST program for TRDOS 386 !
+     5                                  ;
+     6                                  ; 08/06/2026
+     7                                  ;
+     8                                  ; [ Last Modification: 08/06/2026 ]
+     9                                  ;
+    10                                  ; ****************************************************************************
+    11                                  ; nasm beeptest.s -l beeptest.txt -o BEEPTEST.PRG
+    12                                  
+    13                                  ; 21/05/2026
+    14                                  ; 30/04/2026
+    15                                  ; 14/07/2020
+    16                                  ; 31/12/2017
+    17                                  ; TRDOS 386 (v2.0) system calls
+    18                                  _ver 	equ 0
+    19                                  _exit 	equ 1
+    20                                  _fork 	equ 2
+    21                                  _read 	equ 3
+    22                                  _write	equ 4
+    23                                  _open	equ 5
+    24                                  _close 	equ 6
+    25                                  _wait 	equ 7
+    26                                  _create	equ 8
+    27                                  _rename	equ 9
+    28                                  _delete	equ 10
+    29                                  _exec	equ 11
+    30                                  _chdir	equ 12
+    31                                  _time 	equ 13
+    32                                  _mkdir 	equ 14
+    33                                  _chmod	equ 15
+    34                                  _rmdir	equ 16
+    35                                  _break	equ 17
+    36                                  _drive	equ 18
+    37                                  _seek	equ 19
+    38                                  _tell 	equ 20
+    39                                  _memory	equ 21
+    40                                  _prompt	equ 22
+    41                                  _path	equ 23
+    42                                  _env	equ 24
+    43                                  _stime	equ 25
+    44                                  _quit	equ 26
+    45                                  _intr	equ 27
+    46                                  _dir	equ 28
+    47                                  _emt 	equ 29
+    48                                  _ldrvt 	equ 30
+    49                                  _video 	equ 31
+    50                                  _audio	equ 32
+    51                                  _timer	equ 33
+    52                                  _sleep	equ 34
+    53                                  _msg    equ 35
+    54                                  _geterr	equ 36
+    55                                  _fpstat	equ 37
+    56                                  _pri	equ 38
+    57                                  _rele	equ 39
+    58                                  _fff	equ 40
+    59                                  _fnf	equ 41
+    60                                  _alloc	equ 42
+    61                                  _dalloc equ 43
+    62                                  _calbac equ 44
+    63                                  _dma	equ 45
+    64                                  _stdio	equ 46
+    65                                  _fstat	equ 47  
+    66                                  
+    67                                  %macro sys 1-4
+    68                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)
+    69                                      ; 03/09/2015
+    70                                      ; 13/04/2015
+    71                                      ; Retro UNIX 386 v1 system call.
+    72                                      %if %0 >= 2
+    73                                          mov ebx, %2
+    74                                          %if %0 >= 3
+    75                                              mov ecx, %3
+    76                                              %if %0 = 4
+    77                                                 mov edx, %4
+    78                                              %endif
+    79                                          %endif
+    80                                      %endif
+    81                                      mov eax, %1
+    82                                      ;int 30h
+    83                                      int 40h ; TRDOS 386 (TRDOS v2.0)
+    84                                  %endmacro
+    85                                  
+    86                                  ;-----------------------------------------------------------------
+    87                                  ; code
+    88                                  ;-----------------------------------------------------------------
+    89                                  
+    90                                  [BITS 32] ; 32-bit intructions
+    91                                  
+    92                                  [ORG 0]
+    93                                  
+    94                                  START_CODE:
+    95 00000000 BE[91000000]            	mov	esi, program
+    96 00000005 E877000000              	call	print_msg
+    97                                  
+    98                                  check_kb_buffer:
+    99                                  	;mov	ah, 11h
+   100 0000000A B401                    	mov	ah, 1
+   101 0000000C CD32                    	int	32h
+   102 0000000E 7406                    	jz	short bf_beep ; buffer empty
+   103                                  
+   104 00000010 B400                    	mov	ah, 0
+   105                                  	;mov	ah, 10h	; getchar (enchanced)
+   106 00000012 CD32                    	int	32h
+   107 00000014 EBF4                    	jmp	short check_kb_buffer
+   108                                  
+   109                                  bf_beep:
+   110 00000016 BE[E3000000]            	mov	esi, bf_beep_test
+   111 0000001B E861000000              	call	print_msg
+   112                                  
+   113                                  get_kb_buffer_status:
+   114 00000020 B001                    	mov	al, 1 ; keyboard buffer full beep
+   115 00000022 B413                    	mov	ah, 13h
+   116 00000024 CD32                    	int	32h   ; get keyboard buffer status
+   117                                  
+   118 00000026 83F8FF                  	cmp	eax, -1
+   119 00000029 75F5                    	jne	short get_kb_buffer_status
+   120                                  
+   121                                  	;mov	ah, 10h
+   122 0000002B B400                    	mov	ah, 0
+   123 0000002D CD32                    	int	32h
+   124                                  
+   125 0000002F 3C0D                    	cmp	al, 0Dh	; ENTER key
+   126 00000031 7410                    	je	short skip_kb_buffer_status
+   127                                  
+   128 00000033 66BA6000                	mov	dx, 60h
+   129 00000037 B400                    	mov	ah, 0
+   130 00000039 CD34                    	int	34h   ; in al, 60h
+   131 0000003B 3C01                    	cmp	al, 01h ; scancode
+   132 0000003D 742A                    	je	short nl_exit ; ESC key 
+   133 0000003F 3C1C                    	cmp	al, 1Ch ; scancode ; ENTER key 
+   134 00000041 75DD                    	jne	short get_kb_buffer_status
+   135                                  	
+   136                                  skip_kb_buffer_status:
+   137 00000043 BE[52010000]            	mov	esi, key_press_beep_test
+   138 00000048 E834000000              	call	print_msg
+   139                                  
+   140                                  empty_kb_buffer:
+   141                                  	;mov	ah, 10h
+   142 0000004D B400                    	mov	ah, 0
+   143 0000004F CD32                    	int	32h
+   144                                  
+   145                                  	;mov	ah, 11h
+   146 00000051 B401                    	mov	ah, 1
+   147 00000053 CD32                    	int	32h
+   148 00000055 75F6                    	jnz	short empty_kb_buffer	
+   149                                  
+   150                                  key_press_beep:
+   151 00000057 B413                    	mov	ah, 13h
+   152 00000059 B002                    	mov	al, 2 ; key press beep
+   153 0000005B CD32                    	int	32h   ; get keyboard buffer status
+   154                                  
+   155 0000005D 21C0                    	and	eax, eax
+   156 0000005F 74F6                    	jz	short key_press_beep
+   157                                  
+   158                                  	;mov	ah, 10h
+   159 00000061 B400                    	mov	ah, 0
+   160 00000063 CD32                    	int	32h
+   161                                  	
+   162 00000065 3C1B                    	cmp	al, 1Bh	; ESCape key
+   163 00000067 75EE                    	jne	short key_press_beep
+   164                                  
+   165                                  nl_exit:
+   166 00000069 BE[E0000000]            	mov	esi, nextline
+   167 0000006E E80E000000              	call	print_msg
+   168                                  
+   169                                  terminate:
+   170                                  	sys	_exit, 0
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1> 
+    72                              <1>  %if %0 >= 2
+    73 00000073 BB00000000          <1>  mov ebx, %2
+    74                              <1>  %if %0 >= 3
+    75                              <1>  mov ecx, %3
+    76                              <1>  %if %0 = 4
+    77                              <1>  mov edx, %4
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80                              <1>  %endif
+    81 00000078 B801000000          <1>  mov eax, %1
+    82                              <1> 
+    83 0000007D CD40                <1>  int 40h
+   171                                  
+   172                                  hang:
+   173 0000007F EBFE                    	jmp	short hang
+   174                                  
+   175                                  print_msg:
+   176 00000081 BB0F000000              	mov	ebx, 0Fh       ; white characters (bl)
+   177                                  		               ; video page 0 (bh)
+   178                                  print_msg_@:
+   179 00000086 B40E                    	mov	ah, 0Eh ; teletype output (write tty)
+   180 00000088 AC                      	lodsb
+   181                                  _p_nextchar:
+   182 00000089 CD31                    	int	31h
+   183 0000008B AC                      	lodsb
+   184 0000008C 20C0                    	and	al, al
+   185 0000008E 75F9                    	jnz	short _p_nextchar
+   186 00000090 C3                      	retn
+   187                                  
+   188                                  ;-----------------------------------------------------------------
+   189                                  ; data
+   190                                  ;-----------------------------------------------------------------
+   191                                  
+   192                                  program:
+   193 00000091 5452444F5320333836-     	db "TRDOS 386 v2.0.11 - INT 32h (AH = 13h) test program",0Dh,0Ah
+   193 0000009A 2076322E302E313120-
+   193 000000A3 2D20494E5420333268-
+   193 000000AC 20284148203D203133-
+   193 000000B5 682920746573742070-
+   193 000000BE 726F6772616D0D0A   
+   194 000000C6 6279204572646F6761-     	db "by Erdogan Tan [June 2026]"
+   194 000000CF 6E2054616E205B4A75-
+   194 000000D8 6E6520323032365D   
+   195                                  nextline:
+   196 000000E0 0D0A00                  	db 0Dh,0Ah,0
+   197                                  
+   198                                  bf_beep_test:
+   199 000000E3 0D0A                    	db 0Dh,0Ah
+   200 000000E5 507265737320616E79-     	db "Press any keys (16 times/keys at least)"  
+   200 000000EE 206B65797320283136-
+   200 000000F7 2074696D65732F6B65-
+   200 00000100 7973206174206C6561-
+   200 00000109 737429             
+   201 0000010C 0D0A                    	db 0Dh,0Ah
+   202 0000010E 202020202020666F72-     	db "      for Keyboard Buffer Full - BEEP test"
+   202 00000117 204B6579626F617264-
+   202 00000120 204275666665722046-
+   202 00000129 756C6C202D20424545-
+   202 00000132 502074657374       
+   203 00000138 0D0A                    	db 0Dh,0Ah
+   204 0000013A 28507265737320454E-     	db "(Press ENTER to skip)",0Dh,0Ah,0
+   204 00000143 54455220746F20736B-
+   204 0000014C 6970290D0A00       
+   205                                  
+   206                                  key_press_beep_test:
+   207 00000152 0D0A                    	db 0Dh,0Ah
+   208 00000154 50726573732061206B-     	db "Press a key to test key-press BEEP"  
+   208 0000015D 657920746F20746573-
+   208 00000166 74206B65792D707265-
+   208 0000016F 73732042454550     
+   209 00000176 0D0A                    	db 0Dh,0Ah
+   210 00000178 285072657373204553-     	db "(Press ESC to exit)",0Dh,0Ah,0
+   210 00000181 4320746F2065786974-
+   210 0000018A 290D0A00           
