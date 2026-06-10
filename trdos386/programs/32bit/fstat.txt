@@ -1,0 +1,933 @@
+     1                                  ; ****************************************************************************
+     2                                  ; fstat.s (TRDOS 386, TRDOS v2.0.11 - sample binary file)
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; FSTAT.PRG ! 'sysfstat' system call TEST program for TRDOS 386 !
+     5                                  ;
+     6                                  ; 10/06/2026
+     7                                  ;
+     8                                  ; [ Last Modification: 10/06/2026 ]
+     9                                  ;
+    10                                  ; ****************************************************************************
+    11                                  ; nasm fstat.s -l fstat.txt -o FSTAT.PRG 
+    12                                  
+    13                                  ; 21/05/2026
+    14                                  ; 30/04/2026
+    15                                  ; 14/07/2020
+    16                                  ; 31/12/2017
+    17                                  ; TRDOS 386 (v2.0) system calls
+    18                                  _ver 	equ 0
+    19                                  _exit 	equ 1
+    20                                  _fork 	equ 2
+    21                                  _read 	equ 3
+    22                                  _write	equ 4
+    23                                  _open	equ 5
+    24                                  _close 	equ 6
+    25                                  _wait 	equ 7
+    26                                  _create	equ 8
+    27                                  _rename	equ 9
+    28                                  _delete	equ 10
+    29                                  _exec	equ 11
+    30                                  _chdir	equ 12
+    31                                  _time 	equ 13
+    32                                  _mkdir 	equ 14
+    33                                  _chmod	equ 15
+    34                                  _rmdir	equ 16
+    35                                  _break	equ 17
+    36                                  _drive	equ 18
+    37                                  _seek	equ 19
+    38                                  _tell 	equ 20
+    39                                  _memory	equ 21
+    40                                  _prompt	equ 22
+    41                                  _path	equ 23
+    42                                  _env	equ 24
+    43                                  _stime	equ 25
+    44                                  _quit	equ 26
+    45                                  _intr	equ 27
+    46                                  _dir	equ 28
+    47                                  _emt 	equ 29
+    48                                  _ldrvt 	equ 30
+    49                                  _video 	equ 31
+    50                                  _audio	equ 32
+    51                                  _timer	equ 33
+    52                                  _sleep	equ 34
+    53                                  _msg    equ 35
+    54                                  _geterr	equ 36
+    55                                  _fpstat	equ 37
+    56                                  _pri	equ 38
+    57                                  _rele	equ 39
+    58                                  _fff	equ 40
+    59                                  _fnf	equ 41
+    60                                  _alloc	equ 42
+    61                                  _dalloc equ 43
+    62                                  _calbac equ 44
+    63                                  _dma	equ 45
+    64                                  _stdio	equ 46
+    65                                  _fstat	equ 47
+    66                                  
+    67                                  %macro sys 1-4
+    68                                      ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)
+    69                                      ; 03/09/2015
+    70                                      ; 13/04/2015
+    71                                      ; Retro UNIX 386 v1 system call.
+    72                                      %if %0 >= 2
+    73                                          mov ebx, %2
+    74                                          %if %0 >= 3
+    75                                              mov ecx, %3
+    76                                              %if %0 = 4
+    77                                                 mov edx, %4
+    78                                              %endif
+    79                                          %endif
+    80                                      %endif
+    81                                      mov eax, %1
+    82                                      ;int 30h
+    83                                      int 40h ; TRDOS 386 (TRDOS v2.0)
+    84                                  %endmacro
+    85                                  
+    86                                  ; TRDOS 386 (and Retro UNIX 386 v1) system call format:
+    87                                  ; sys systemcall (eax) <arg1 (ebx)>, <arg2 (ecx)>, <arg3 (edx)>
+    88                                  
+    89                                  ; 22/05/2026 - 'tdosk6.s' - 'sysfstat:'
+    90                                  ; ref: tcc (include/sys) stat.h ((modified))
+    91                                  ; stat structure:
+    92                                  st_dev	 equ 0
+    93                                  st_ino	 equ 4
+    94                                  st_mode	 equ 8
+    95                                  st_nlink equ 10
+    96                                  st_uid	 equ 12
+    97                                  st_gid   equ 14
+    98                                  st_rdev	 equ 16
+    99                                  st_size  equ 20
+   100                                  st_atime equ 28
+   101                                  st_mtime equ 32
+   102                                  st_ctime equ 36
+   103                                  
+   104                                  ;-----------------------------------------------------------------
+   105                                  ; code
+   106                                  ;-----------------------------------------------------------------
+   107                                  
+   108                                  [BITS 32] ; 32-bit intructions
+   109                                  
+   110                                  [ORG 0]
+   111                                  
+   112                                  START_CODE:
+   113 00000000 BE[53040000]            	mov	esi, program
+   114 00000005 E879020000              	call	print_msg
+   115                                  
+   116 0000000A 89E6                    	mov	esi, esp
+   117 0000000C AD                      	lodsd
+   118 0000000D 83F802                  	cmp	eax, 2 ; two arguments (program file name & text file name)
+   119 00000010 7313                    	jnb	short open_file
+   120                                  
+   121                                  	; nothing to do
+   122 00000012 BE[AB040000]            	mov	esi, usage
+   123                                  
+   124                                  fstat_ok:
+   125 00000017 E867020000              	call	print_msg
+   126                                  
+   127                                  	;mov	ebx, 0 ; not error
+   128                                  terminate:
+   129                                  	sys 	_exit		; INT 40h
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1> 
+    72                              <1>  %if %0 >= 2
+    73                              <1>  mov ebx, %2
+    74                              <1>  %if %0 >= 3
+    75                              <1>  mov ecx, %3
+    76                              <1>  %if %0 = 4
+    77                              <1>  mov edx, %4
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80                              <1>  %endif
+    81 0000001C B801000000          <1>  mov eax, %1
+    82                              <1> 
+    83 00000021 CD40                <1>  int 40h
+   130                                  here:
+   131 00000023 EBFE                    	jmp	short here
+   132                                  
+   133                                  open_file:
+   134 00000025 AD                      	lodsd ; program file name address
+   135 00000026 AD                      	lodsd ; file name (argument) address
+   136                                  	; EAX = arg2 ; file name address
+   137                                  
+   138 00000027 89C7                    	mov	edi, eax
+   139                                  
+   140                                  	; Find First File (basic parameters)
+   141                                  	sys	_fff, eax, 003Fh, fff_buffer
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1> 
+    72                              <1>  %if %0 >= 2
+    73 00000029 89C3                <1>  mov ebx, %2
+    74                              <1>  %if %0 >= 3
+    75 0000002B B93F000000          <1>  mov ecx, %3
+    76                              <1>  %if %0 = 4
+    77 00000030 BA[98060000]        <1>  mov edx, %4
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80                              <1>  %endif
+    81 00000035 B828000000          <1>  mov eax, %1
+    82                              <1> 
+    83 0000003A CD40                <1>  int 40h
+   142 0000003C 7237                    	jc	short not_found_err
+   143                                  	
+   144                                  	; check valid file attributes
+   145 0000003E F605[98060000]18        	test	byte [fff_buffer], 18h	; dir name or volume label
+   146 00000045 752E                    	jnz	short not_found_err	
+   147                                  
+   148 00000047 BE[04050000]            	mov	esi, txt_file_name
+   149 0000004C E832020000              	call	print_msg
+   150                                  
+   151                                  	;mov	esi, edi	; file name (input) address
+   152                                  	;call	print_msg
+   153                                  
+   154 00000051 BE[A2060000]            	mov	esi, fff_buffer+10	; short file name (ASCIIZ)
+   155 00000056 E828020000              	call	print_msg
+   156                                  
+   157 0000005B BE[C1040000]            	mov	esi, nextline
+   158 00000060 E81E020000              	call	print_msg
+   159                                  
+   160                                  	; Open File for reading
+   161                                  	sys	_open, edi, 0
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1> 
+    72                              <1>  %if %0 >= 2
+    73 00000065 89FB                <1>  mov ebx, %2
+    74                              <1>  %if %0 >= 3
+    75 00000067 B900000000          <1>  mov ecx, %3
+    76                              <1>  %if %0 = 4
+    77                              <1>  mov edx, %4
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80                              <1>  %endif
+    81 0000006C B805000000          <1>  mov eax, %1
+    82                              <1> 
+    83 00000071 CD40                <1>  int 40h
+   162 00000073 730C                    	jnc	short get_file_info
+   163                                  
+   164                                  not_found_err:
+   165 00000075 BE[C4040000]            	mov	esi, not_found
+   166 0000007A E804020000              	call	print_msg
+   167                                  
+   168                                  	;mov	ebx, -1 ; error
+   169 0000007F EB9B                    	jmp	short terminate
+   170                                  
+   171                                  get_file_info:
+   172                                  	; eax = file number
+   173 00000081 50                      	push	eax
+   174                                  	sys	_fstat, eax, fstat_buffer
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1> 
+    72                              <1>  %if %0 >= 2
+    73 00000082 89C3                <1>  mov ebx, %2
+    74                              <1>  %if %0 >= 3
+    75 00000084 B9[70060000]        <1>  mov ecx, %3
+    76                              <1>  %if %0 = 4
+    77                              <1>  mov edx, %4
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80                              <1>  %endif
+    81 00000089 B82F000000          <1>  mov eax, %1
+    82                              <1> 
+    83 0000008E CD40                <1>  int 40h
+   175 00000090 58                      	pop	eax
+   176 00000091 9C                      	pushf
+   177                                  	; close the file at first
+   178                                  	sys	_close, eax
+    68                              <1> 
+    69                              <1> 
+    70                              <1> 
+    71                              <1> 
+    72                              <1>  %if %0 >= 2
+    73 00000092 89C3                <1>  mov ebx, %2
+    74                              <1>  %if %0 >= 3
+    75                              <1>  mov ecx, %3
+    76                              <1>  %if %0 = 4
+    77                              <1>  mov edx, %4
+    78                              <1>  %endif
+    79                              <1>  %endif
+    80                              <1>  %endif
+    81 00000094 B806000000          <1>  mov eax, %1
+    82                              <1> 
+    83 00000099 CD40                <1>  int 40h
+   179 0000009B 9D                      	popf
+   180 0000009C 730F                    	jnc	short write_file_info
+   181                                  
+   182 0000009E BE[E1040000]            	mov	esi, fstat_error
+   183 000000A3 E8DB010000              	call	print_msg
+   184                                  	;mov	ebx, -1 ; error
+   185 000000A8 E96FFFFFFF              	jmp	terminate
+   186                                  
+   187                                  write_file_info:
+   188                                  	; device (logical dos drive)
+   189 000000AD BE[16050000]            	mov	esi, txt_st_dev
+   190 000000B2 E8CC010000              	call	print_msg
+   191                                  
+   192 000000B7 A1[70060000]            	mov	eax, [fstat_buffer+st_dev]
+   193 000000BC 83F81A                  	cmp	eax, 26
+   194 000000BF 7709                    	ja	short get_st_dev_number
+   195 000000C1 0441                    	add	al, 'A'
+   196 000000C3 A2[2A050000]            	mov	[txt_drv], al
+   197 000000C8 2C41                    	sub	al, 'A'
+   198                                  get_st_dev_number:
+   199 000000CA BF[B0060000]            	mov	edi, number_str
+   200 000000CF E8BF010000              	call	num_to_text
+   201                                  
+   202 000000D4 BE[B0060000]            	mov	esi, number_str
+   203 000000D9 E8A5010000              	call	print_msg
+   204                                  
+   205 000000DE BE[28050000]            	mov	esi, txt_ldrv
+   206 000000E3 E89B010000              	call	print_msg
+   207                                  
+   208                                  	; inode (first cluster)
+   209 000000E8 BE[2E050000]            	mov	esi, txt_st_ino
+   210 000000ED E891010000              	call	print_msg
+   211                                  
+   212 000000F2 A1[74060000]            	mov	eax, [fstat_buffer+st_ino]
+   213 000000F7 BF[B0060000]            	mov	edi, number_str
+   214 000000FC E892010000              	call	num_to_text
+   215                                  
+   216 00000101 BE[B0060000]            	mov	esi, number_str
+   217 00000106 E878010000              	call	print_msg
+   218                                  
+   219 0000010B BE[40050000]            	mov	esi, txt_fcluster
+   220 00000110 E86E010000              	call	print_msg
+   221                                  
+   222                                  	; mode (unix type file attributes)
+   223 00000115 BE[51050000]            	mov	esi, txt_st_mode
+   224 0000011A E864010000              	call	print_msg
+   225                                  
+   226 0000011F 0FB705[78060000]        	movzx	eax, word [fstat_buffer+st_mode]
+   227                                  
+   228 00000126 50                      	push	eax
+   229                                  
+   230 00000127 BF[B0060000]            	mov	edi, number_str
+   231 0000012C E87F010000              	call	num_to_htext
+   232                                  
+   233 00000131 BE[B0060000]            	mov	esi, number_str
+   234 00000136 E848010000              	call	print_msg	
+   235                                  
+   236 0000013B 58                      	pop	eax
+   237                                  
+   238 0000013C 3DA4810000              	cmp	eax, 81A4h
+   239 00000141 7415                    	je	short octal_644
+   240 00000143 3D24810000              	cmp	eax, 8124h
+   241 00000148 7407                    	je	short octal_444
+   242 0000014A BE[C1040000]            	mov	esi, nextline
+   243 0000014F EB0C                    	jmp	short write_it
+   244                                  octal_444:
+   245 00000151 BE[78050000]            	mov	esi, txt_mode_ro
+   246 00000156 EB05                    	jmp	short write_it
+   247                                  octal_644:
+   248 00000158 BE[63050000]            	mov	esi, txt_mode_norm
+   249                                  write_it:
+   250 0000015D E821010000              	call	print_msg
+   251                                  
+   252                                  	; number of links (=0) -not used-
+   253 00000162 BE[8F050000]            	mov	esi, txt_st_nlink
+   254 00000167 E817010000              	call	print_msg
+   255                                  
+   256                                  	;movzx	eax, word [fstat_buffer+st_nlink]
+   257 0000016C 66A1[7A060000]          	mov	ax, [fstat_buffer+st_nlink]
+   258 00000172 BF[B0060000]            	mov	edi, number_str
+   259 00000177 E817010000              	call	num_to_text
+   260                                  
+   261 0000017C BE[B0060000]            	mov	esi, number_str
+   262 00000181 E8FD000000              	call	print_msg
+   263                                  
+   264                                  	; user id (=0) -not used-
+   265 00000186 BE[A1050000]            	mov	esi, txt_st_uid
+   266 0000018B E8F3000000              	call	print_msg
+   267                                  
+   268                                  	;movzx	eax, word [fstat_buffer+st_uid]
+   269 00000190 66A1[7C060000]          	mov	ax, [fstat_buffer+st_uid]
+   270 00000196 BF[B0060000]            	mov	edi, number_str
+   271 0000019B E8F3000000              	call	num_to_text
+   272                                  
+   273 000001A0 BE[B0060000]            	mov	esi, number_str
+   274 000001A5 E8D9000000              	call	print_msg
+   275                                  
+   276                                  	; group id (=0) -not used-
+   277 000001AA BE[B3050000]            	mov	esi, txt_st_gid
+   278 000001AF E8CF000000              	call	print_msg
+   279                                  
+   280                                  	;movzx	eax, word [fstat_buffer+st_gid]
+   281 000001B4 66A1[7E060000]          	mov	ax, [fstat_buffer+st_gid]
+   282 000001BA BF[B0060000]            	mov	edi, number_str
+   283 000001BF E8CF000000              	call	num_to_text
+   284                                  
+   285 000001C4 BE[B0060000]            	mov	esi, number_str
+   286 000001C9 E8B5000000              	call	print_msg
+   287                                  
+   288                                  	; root device (=0) -not used-
+   289 000001CE BE[C5050000]            	mov	esi, txt_st_rdev
+   290 000001D3 E8AB000000              	call	print_msg
+   291                                  
+   292 000001D8 A1[80060000]            	mov	eax, [fstat_buffer+st_rdev]
+   293 000001DD BF[B0060000]            	mov	edi, number_str
+   294 000001E2 E8AC000000              	call	num_to_text
+   295                                  
+   296 000001E7 BE[B0060000]            	mov	esi, number_str
+   297 000001EC E892000000              	call	print_msg
+   298                                  
+   299                                  	; file size (8 bytes)
+   300 000001F1 BE[D7050000]            	mov	esi, txt_st_size
+   301 000001F6 E888000000              	call	print_msg
+   302                                  
+   303 000001FB A1[84060000]            	mov	eax, [fstat_buffer+st_size]
+   304                                  
+   305 00000200 83F801                  	cmp	eax, 1
+   306 00000203 7707                    	ja	short many_bytes
+   307                                  
+   308                                  	; 'bytes' -> 'byte '
+   309 00000205 C605[EE050000]20        	mov	[txt_s], 20h	; space
+   310                                  
+   311                                  many_bytes:
+   312 0000020C BF[B0060000]            	mov	edi, number_str
+   313 00000211 E87D000000              	call	num_to_text
+   314                                  
+   315 00000216 BE[B0060000]            	mov	esi, number_str
+   316 0000021B E863000000              	call	print_msg
+   317                                  
+   318 00000220 833D[88060000]00        	cmp	dword [fstat_buffer+st_size+4], 0
+   319 00000227 760A                    	jna	short write_size_bytes
+   320                                  
+   321                                  	; write exclamation mark (!)
+   322 00000229 BE[27060000]            	mov	esi, exc_mark
+   323 0000022E E850000000              	call	print_msg
+   324                                  
+   325                                  write_size_bytes:
+   326 00000233 BE[E9050000]            	mov	esi, txt_bytes
+   327 00000238 E846000000              	call	print_msg
+   328                                  
+   329                                  	; access date/time (unix epoch time format)
+   330 0000023D BE[F1050000]            	mov	esi, txt_st_atime
+   331 00000242 E83C000000              	call	print_msg
+   332                                  
+   333 00000247 A1[8C060000]            	mov	eax, [fstat_buffer+st_atime]
+   334 0000024C E883000000              	call	write_date_time
+   335                                  
+   336                                  	; last modification date/time (unix epoch time format)
+   337 00000251 BE[03060000]            	mov	esi, txt_st_mtime
+   338 00000256 E828000000              	call	print_msg
+   339                                  
+   340 0000025B A1[90060000]            	mov	eax, [fstat_buffer+st_mtime]
+   341 00000260 E86F000000              	call	write_date_time
+   342                                  
+   343                                  	; creating date/time (unix epoch time format)
+   344 00000265 BE[15060000]            	mov	esi, txt_st_ctime
+   345 0000026A E814000000              	call	print_msg
+   346                                  
+   347 0000026F A1[94060000]            	mov	eax, [fstat_buffer+st_ctime]
+   348 00000274 E85B000000              	call	write_date_time
+   349                                  
+   350                                  	; next line (CRLF) and exit
+   351 00000279 BE[C1040000]            	mov	esi, nextline
+   352 0000027E E994FDFFFF              	jmp	fstat_ok
+   353                                  
+   354                                  ;-----------------------------------------------------------------
+   355                                  
+   356                                  	; write/print message (string/text) on console display
+   357                                  print_msg:
+   358                                  	; esi = asciiz text/string address
+   359 00000283 BB0F000000              	mov	ebx, 0Fh       ; white characters (bl)
+   360                                  		               ; video page 0 (bh)
+   361                                  print_msg_@:
+   362 00000288 B40E                    	mov	ah, 0Eh ; teletype output (write tty)
+   363 0000028A AC                      	lodsb
+   364                                  _p_nextchar:
+   365 0000028B CD31                    	int	31h
+   366 0000028D AC                      	lodsb
+   367 0000028E 20C0                    	and	al, al
+   368 00000290 75F9                    	jnz	short _p_nextchar
+   369 00000292 C3                      	retn
+   370                                  
+   371                                  ;-----------------------------------------------------------------
+   372                                  	
+   373                                  	; binary number to decimal number string/text
+   374                                  num_to_text:
+   375                                  	; eax = binary number
+   376                                  	; edi = decimal string buffer (up to 16 bytes)
+   377 00000293 89E5                    	mov	ebp, esp
+   378 00000295 BB0A000000              	mov	ebx, 10
+   379                                  num2text_div:
+   380 0000029A 31D2                    	xor	edx, edx
+   381 0000029C F7F3                    	div	ebx
+   382 0000029E 80C230                  	add	dl, '0'
+   383 000002A1 52                      	push	edx
+   384 000002A2 21C0                    	and	eax, eax
+   385 000002A4 75F4                    	jnz	short num2text_div
+   386                                  pop_next:
+   387 000002A6 58                      	pop	eax
+   388 000002A7 AA                      	stosb
+   389 000002A8 39EC                    	cmp	esp, ebp
+   390 000002AA 72FA                    	jb	short pop_next
+   391 000002AC C60700                  	mov	[edi],0
+   392                                  num2text_ok:
+   393 000002AF C3                      	retn
+   394                                  
+   395                                  ;-----------------------------------------------------------------
+   396                                  
+   397                                  	; binary number to hexadecimal number string/text
+   398                                  num_to_htext:
+   399                                  	; eax = binary number (16 bit number)
+   400                                  	; edi = hexadecimal string buffer (6 bytes)
+   401 000002B0 89C3                    	mov	ebx, eax
+   402                                  	;mov	ecx, 8
+   403 000002B2 C1E310                  	shl	ebx, 16 ; discard high word
+   404 000002B5 B904000000              	mov	ecx, 4
+   405                                  dd2hex:
+   406 000002BA C1C304                  	rol	ebx, 4
+   407 000002BD 88DA                    	mov	dl, bl
+   408 000002BF 83E20F                  	and	edx, 15
+   409 000002C2 81C2[2B060000]          	add	edx, hex_digits
+   410 000002C8 8A02                    	mov	al, [edx]
+   411 000002CA AA                      	stosb
+   412 000002CB E2ED                    	loop	dd2hex
+   413 000002CD B068                    	mov	al, 'h'
+   414 000002CF AA                      	stosb
+   415 000002D0 C60700                  	mov	[edi], 0
+   416 000002D3 C3                      	retn
+   417                                  
+   418                                  ;-----------------------------------------------------------------
+   419                                  
+   420                                  	; write date & time (as epoch number and as normal)
+   421                                  write_date_time:
+   422                                  	; eax = unix epoch time
+   423                                  	; edi = epoch time string/text buffer address
+   424 000002D4 57                      	push	edi ; **
+   425 000002D5 50                      	push	eax ; *
+   426 000002D6 89FE                    	mov	esi, edi
+   427 000002D8 E8B3000000              	call	epoch_to_str
+   428                                  	; esi = asciiz string/text address
+   429 000002DD E8A1FFFFFF              	call	print_msg	
+   430 000002E2 58                      	pop	eax ; *
+   431                                  	; eax = unix (epoch) time ticks/seconds
+   432 000002E3 E8C6000000              	call	convert_from_epoch
+   433 000002E8 8B3C24                  	mov	edi, [esp] ; **
+   434                                  
+   435                                  	; dd/mm/yyyy
+   436 000002EB A1[60060000]            	mov	eax, [day]
+   437 000002F0 E86A000000              	call	bin_to_str_2
+   438 000002F5 C6072F                  	mov	byte [edi], '/'
+   439 000002F8 47                       	inc	edi
+   440 000002F9 A1[5C060000]            	mov	eax, [month]
+   441 000002FE E85C000000              	call	bin_to_str_2
+   442 00000303 C6072F                  	mov	byte [edi], '/'
+   443 00000306 47                       	inc	edi
+   444 00000307 A1[58060000]            	mov	eax, [year]
+   445 0000030C E847000000              	call	bin_to_str_4
+   446                                  
+   447 00000311 C60720                  	mov	byte [edi], 20h ; space
+   448 00000314 47                      	inc	edi
+   449                                  	
+   450                                  	; hh:mm:ss
+   451 00000315 A1[64060000]            	mov	eax, [hour]
+   452 0000031A E840000000              	call	bin_to_str_2
+   453                                  
+   454 0000031F C6073A                  	mov	byte [edi], ':'
+   455 00000322 47                       	inc	edi
+   456                                  
+   457 00000323 A1[68060000]            	mov	eax, [minute]
+   458 00000328 E832000000              	call	bin_to_str_2
+   459                                  
+   460 0000032D C6073A                  	mov	byte [edi], ':'
+   461 00000330 47                       	inc	edi
+   462                                  
+   463 00000331 A1[6C060000]            	mov	eax, [second]
+   464 00000336 E824000000              	call	bin_to_str_2
+   465                                  
+   466 0000033B C60700                  	mov	byte [edi], 0
+   467                                  
+   468 0000033E BE[3B060000]            	mov	esi, lbracket
+   469 00000343 E83BFFFFFF              	call	print_msg
+   470                                  
+   471 00000348 5E                      	pop	esi ; *	; string/text buffer address
+   472 00000349 E835FFFFFF              	call	print_msg
+   473                                  
+   474 0000034E BE[3E060000]            	mov	esi, rbracket
+   475                                  	;call	print_msg
+   476                                  	;retn
+   477 00000353 E92BFFFFFF              	jmp	print_msg
+   478                                  
+   479                                  ;-----------------------------------------------------------------
+   480                                  
+   481                                  bin_to_str_4:
+   482 00000358 BB04000000              	mov	ebx, 4
+   483 0000035D EB05                    	jmp	short bin_to_str
+   484                                  bin_to_str_2:
+   485 0000035F BB02000000              	mov	ebx, 2
+   486                                  bin_to_str:
+   487 00000364 89E5                    	mov	ebp, esp
+   488 00000366 B90A000000              	mov	ecx, 10
+   489                                  bin2str_div:
+   490 0000036B 31D2                    	xor	edx, edx
+   491 0000036D F7F1                    	div	ecx
+   492 0000036F 80C230                  	add	dl, '0'
+   493 00000372 52                      	push	edx
+   494 00000373 83F800                  	cmp	eax, 0
+   495 00000376 77F3                    	ja	short bin2str_div
+   496                                  bin2str_pop:
+   497 00000378 58                      	pop	eax
+   498 00000379 09DB                    	or	ebx, ebx
+   499 0000037B 7402                    	jz	short skip_stosb
+   500 0000037D AA                      	stosb
+   501 0000037E 4B                      	dec	ebx
+   502                                  skip_stosb:
+   503 0000037F 39EC                    	cmp	esp, ebp
+   504 00000381 72F5                    	jb	short bin2str_pop
+   505                                  zero_prefix:
+   506 00000383 09DB                    	or	ebx, ebx
+   507 00000385 7408                    	jz	short bin2str_ok
+   508 00000387 C647FF30                	mov	byte [edi-1],'0'
+   509 0000038B AA                      	stosb
+   510 0000038C 4B                      	dec	ebx
+   511 0000038D EBF4                    	jmp	short zero_prefix
+   512                                  bin2str_ok:
+   513 0000038F C3                      	retn
+   514                                  
+   515                                  ;-----------------------------------------------------------------
+   516                                  	
+   517                                  	; convert unix epoch time to string/text
+   518                                  epoch_to_str:
+   519                                  	; eax = unix epoch time
+   520                                  	; edi = epoch time string/text buffer address
+   521 00000390 89E5                    	mov	ebp, esp
+   522 00000392 B90A000000              	mov	ecx, 10
+   523                                  epoch2str_div:
+   524 00000397 31D2                    	xor	edx, edx
+   525 00000399 F7F1                    	div	ecx
+   526 0000039B 80C230                  	add	dl, '0'
+   527 0000039E 52                      	push	edx
+   528 0000039F 83F800                  	cmp	eax, 0
+   529 000003A2 77F3                    	ja	short epoch2str_div
+   530                                  e2s_pop_next:
+   531 000003A4 58                      	pop	eax
+   532 000003A5 AA                      	stosb
+   533                                  e2s_skip_stosb:
+   534 000003A6 39EC                    	cmp	esp, ebp
+   535 000003A8 72FA                    	jb	short e2s_pop_next
+   536                                  epoch2str_ok:
+   537 000003AA C60700                  	mov	byte [edi], 0
+   538 000003AD C3                      	retn
+   539                                  
+   540                                  ;-----------------------------------------------------------------
+   541                                  
+   542                                  	; ref: TRDOS 386 v2.0.11 Kernel - 'trdosk1.s'
+   543                                  convert_from_epoch:
+   544                                  	; 25/07/2022 (v2.0.5)
+   545                                  	; 18/04/2021 (v2.0.4)
+   546                                  	; 31/12/2017 (v2.0.0)
+   547                                  	; 30/12/2017 (TRDOS 386 = TRDOS v2.0)
+   548                                  	; 15/03/2015 (Retro UNIX 386 v1 - 32 bit version)
+   549                                  	; 20/06/2013 (Retro UNIX 8086 v1)
+   550                                  	; 'convert_from_epoch' procedure prototype:
+   551                                  	; 	            UNIXCOPY.ASM, 10/03/2013
+   552                                  	;
+   553                                  	; ((Modified registers: EAX, EDX, ECX, EBX))
+   554                                  	;
+   555                                  	; Derived from DALLAS Semiconductor
+   556                                  	; Application Note 31 (DS1602/DS1603)
+   557                                  	; 6 May 1998
+   558                                  	;
+   559                                  	; INPUT:
+   560                                  	; EAX = Unix (Epoch) Time
+   561                                  	;
+   562 000003AE 31D2                    	xor 	edx, edx
+   563                                  	;mov 	ecx, 60
+   564                                  	; 25/07/2022
+   565 000003B0 29C9                    	sub	ecx, ecx
+   566 000003B2 B13C                    	mov	cl, 60
+   567 000003B4 F7F1                    	div	ecx
+   568                                  	;mov 	[imin], eax   ; whole minutes
+   569                                  			  ; since 1/1/1970
+   570 000003B6 668915[6C060000]        	mov 	[second], dx  ; leftover seconds
+   571 000003BD 29D2                    	sub 	edx, edx
+   572 000003BF F7F1                    	div	ecx
+   573                                  	;mov 	[ihrs], eax   ; whole hours
+   574                                  	;		      ; since 1/1/1970
+   575 000003C1 668915[68060000]        	mov 	[minute], dx  ; leftover minutes
+   576 000003C8 31D2                    	xor	edx, edx
+   577                                  	;mov 	cx, 24
+   578 000003CA B118                    	mov 	cl, 24
+   579 000003CC F7F1                    	div	ecx
+   580                                  	;mov 	[iday], ax   ; whole days
+   581                                  			     ; since 1/1/1970
+   582 000003CE 668915[64060000]        	mov 	[hour], dx   ; leftover hours
+   583 000003D5 05DB020000              	add 	eax, 365+366 ; whole day since
+   584                                  			     ; 1/1/1968
+   585                                  	;mov 	[iday], ax
+   586 000003DA 50                      	push 	eax
+   587 000003DB 29D2                    	sub	edx, edx
+   588                                  	;mov 	ecx, (4*365)+1 ; 4 years = 1461 days
+   589                                  	; 25/07/2022
+   590 000003DD 66B9B505                	mov	cx, (4*365)+1
+   591 000003E1 F7F1                    	div	ecx
+   592 000003E3 59                      	pop 	ecx
+   593                                  	;mov 	[lday], ax   ; count of quadyrs (4 years)
+   594                                  	;push 	dx
+   595                                  	; 18/04/2021
+   596 000003E4 52                      	push	edx
+   597                                  	;mov 	[qday], dx   ; days since quadyr began
+   598 000003E5 6683FA3C                	cmp 	dx, 31+29    ; if past feb 29 then
+   599 000003E9 F5                      	cmc		     ; add this quadyr's leap day
+   600 000003EA 83D000                  	adc 	eax, 0	     ; to # of qadyrs (leap days)
+   601                                  	;mov 	[lday], ax   ; since 1968
+   602                                  	;mov 	cx, [iday]
+   603 000003ED 91                      	xchg 	ecx, eax     ; ECX = lday, EAX = iday
+   604 000003EE 29C8                    	sub 	eax, ecx     ; iday - lday
+   605                                  	;mov 	ecx, 365
+   606                                  	; 25/07/2022
+   607 000003F0 66B96D01                	mov	cx, 365
+   608 000003F4 31D2                    	xor	edx, edx
+   609                                  	; EAX = iday-lday, EDX = 0
+   610 000003F6 F7F1                    	div	ecx
+   611                                  	;mov 	[iyrs], ax   ; whole years since 1968
+   612                                  	;jday = iday - (iyrs*365) - lday
+   613                                  	;mov	[jday], dx   ; days since 1/1 of current year
+   614                                  	;add	eax, 1968
+   615 000003F8 6605B007                	add 	ax, 1968     ; compute year
+   616 000003FC 66A3[58060000]          	mov 	[year], ax
+   617                                  	;mov 	cx, dx
+   618                                  	; 25/07/2022
+   619 00000402 89D1                    	mov	ecx, edx
+   620                                  	;;mov 	dx, [qday]
+   621                                  	;pop 	dx
+   622                                  	; 18/04/2021
+   623 00000404 5A                      	pop	edx
+   624 00000405 6681FA6D01              	cmp 	dx, 365	     ; if qday <= 365 and qday >= 60
+   625 0000040A 7708                    	ja 	short cfe1   ; jday = jday +1
+   626 0000040C 6683FA3C                	cmp 	dx, 60       ; if past 2/29 and leap year then
+   627 00000410 F5                              cmc		     ; add a leap day to the # of whole
+   628                                  	;adc 	cx, 0        ; days since 1/1 of current year
+   629                                  	; 25/07/2022
+   630 00000411 83D100                  	adc	ecx, 0
+   631                                  cfe1:
+   632                                  	;mov 	[jday], cx
+   633                                  	;mov 	bx, 12       ; estimate month
+   634                                  	; 18/04/2021
+   635 00000414 29DB                    	sub	ebx, ebx
+   636 00000416 B30C                    	mov	bl, 12
+   637 00000418 66BA6E01                	mov 	dx, 366      ; mday, max. days since 1/1 is 365
+   638 0000041C 6683E003                	and 	ax, 11b      ; year mod 4 (and dx, 3)
+   639                                  cfe2:	; Month calculation  ; 0 to 11  (11 to 0)
+   640                                  	;cmp 	cx, dx       ; mday = # of days passed from 1/1
+   641                                  	; 25/07/2022
+   642 00000420 39D1                    	cmp	ecx, edx
+   643 00000422 731B                    	jnb 	short cfe3
+   644                                  	;dec 	bx           ; month = month - 1
+   645                                  	;shl 	bx, 1
+   646                                  	; 18/04/2021
+   647 00000424 FECB                    	dec	bl
+   648 00000426 D0E3                    	shl	bl, 1 
+   649 00000428 668B93[40060000]        	mov 	dx, [EBX+DMonth] ; # elapsed days at 1st of month
+   650                                  	; 18/04/2021
+   651                                  	;shr 	bx, 1        ; bx = month - 1 (0 to 11)
+   652 0000042F D0EB                    	shr	bl, 1
+   653                                  	;cmp	bx, 1        ; if month > 2 and year mod 4  = 0	
+   654 00000431 80FB01                  	cmp	bl, 1
+   655 00000434 76EA                    	jna 	short cfe2   ; then mday = mday + 1
+   656 00000436 76E8                    	jna 	short cfe2   ; then mday = mday + 1
+   657 00000438 08C0                    	or 	al, al       ; if past 2/29 and leap year then
+   658 0000043A 75E4                    	jnz 	short cfe2   ; add leap day (to mday)
+   659                                  	;inc 	dx           ; mday = mday + 1
+   660                                  	; 25/07/2022
+   661 0000043C 42                      	inc	edx
+   662 0000043D EBE1                    	jmp 	short cfe2
+   663                                  cfe3:
+   664                                  	;inc 	bx	     ; -> bx = month, 1 to 12
+   665                                  	; 18/04/2021
+   666 0000043F FEC3                    	inc	bl
+   667 00000441 66891D[5C060000]        	mov 	[month], bx
+   668                                  	;sub 	cx, dx	     ; day = jday - mday + 1
+   669                                  	; 25/07/2022
+   670 00000448 29D1                    	sub	ecx, edx
+   671                                  	;inc 	cx
+   672                                  	; 18/04/2021
+   673 0000044A FEC1                    	inc	cl
+   674                                  	;mov 	[day], cx
+   675 0000044C 880D[60060000]          	mov	[day], cl
+   676                                  
+   677                                  	; eax, ebx, ecx, edx is changed at return
+   678                                  	; output ->
+   679                                  	; [year], [month], [day], [hour], [minute], [second]
+   680                                  
+   681 00000452 C3                      	retn	; 31/12/2017 (TRDOS 386)
+   682                                  
+   683                                  ;-----------------------------------------------------------------
+   684                                  ;  data
+   685                                  ;-----------------------------------------------------------------
+   686                                  
+   687                                  program:
+   688 00000453 0D0A                    	db 0Dh, 0Ah
+   689 00000455 46535441542E505247-     	db "FSTAT.PRG /// TRDOS 386 (v2.0.11) sysfstat TEST program"
+   689 0000045E 202F2F2F205452444F-
+   689 00000467 532033383620287632-
+   689 00000470 2E302E313129207379-
+   689 00000479 736673746174205445-
+   689 00000482 53542070726F677261-
+   689 0000048B 6D                 
+   690 0000048C 0D0A                    	db 0Dh,0Ah
+   691 0000048E 6279204572646F6761-     	db "by Erdogan Tan, 10/06/2026",0Dh,0Ah,0
+   691 00000497 6E2054616E2C203130-
+   691 000004A0 2F30362F323032360D-
+   691 000004A9 0A00               
+   692                                  usage:
+   693 000004AB 0D0A                    	db 0Dh,0Ah
+   694 000004AD 6673746174203C6669-     	db "fstat <filename.ext>"
+   694 000004B6 6C656E616D652E6578-
+   694 000004BF 743E               
+   695                                  nextline:
+   696 000004C1 0D0A00                  	db 0Dh,0Ah,0
+   697                                  
+   698                                  not_found:
+   699 000004C4 0D0A                    	db 0Dh,0Ah
+   700 000004C6 4572726F72202120        	db "Error ! "
+   701 000004CE 46696C65206E6F7420-     	db "File not found !", 0Dh,0Ah,0
+   701 000004D7 666F756E6420210D0A-
+   701 000004E0 00                 
+   702                                  
+   703                                  fstat_error:
+   704 000004E1 0D0A                    	db 0Dh,0Ah
+   705 000004E3 277379736673746174-     	db "'sysfstat' system call error !"
+   705 000004EC 272073797374656D20-
+   705 000004F5 63616C6C206572726F-
+   705 000004FE 722021             
+   706 00000501 0D0A00                  	db 0Dh,0Ah,0
+   707                                  
+   708                                  txt_file_name:
+   709 00000504 0D0A                    	db 0Dh,0Ah
+   710 00000506 46696C65204E616D65-     	db "File Name    : ",0
+   710 0000050F 202020203A2000     
+   711                                  txt_st_dev:
+   712 00000516 0D0A                    	db 0Dh,0Ah
+   713 00000518 73745F646576202020-     	db "st_dev       : ",0
+   713 00000521 202020203A2000     
+   714                                  
+   715                                  txt_ldrv:
+   716 00000528 2028                    	db " ("
+   717                                  txt_drv:
+   718 0000052A 3F3A                    	db "?:"
+   719 0000052C 2900                    	db ")", 0
+   720                                  
+   721                                  txt_st_ino:
+   722 0000052E 0D0A                    	db 0Dh,0Ah
+   723 00000530 73745F696E6F202020-     	db "st_ino       : ",0
+   723 00000539 202020203A2000     
+   724                                  
+   725                                  txt_fcluster:
+   726 00000540 202866697273742063-     	db " (first cluster)", 0
+   726 00000549 6C75737465722900   
+   727                                  
+   728                                  txt_st_mode:
+   729 00000551 0D0A                    	db 0Dh,0Ah
+   730 00000553 73745F6D6F64652020-     	db "st_mode      : ",0
+   730 0000055C 202020203A2000     
+   731                                  
+   732                                  txt_mode_norm:
+   733 00000563 20284E6F726D616C3A-     	db " (Normal: rw-r--r--)",0
+   733 0000056C 2072772D722D2D722D-
+   733 00000575 2D2900             
+   734                                  txt_mode_ro:
+   735 00000578 2028526561646F6E6C-     	db " (Readonly: r--r--r--)",0
+   735 00000581 793A20722D2D722D2D-
+   735 0000058A 722D2D2900         
+   736                                  
+   737                                  txt_st_nlink:
+   738 0000058F 0D0A                    	db 0Dh,0Ah
+   739 00000591 73745F6E6C696E6B20-     	db "st_nlink     : ",0
+   739 0000059A 202020203A2000     
+   740                                  
+   741                                  txt_st_uid:
+   742 000005A1 0D0A                    	db 0Dh,0Ah
+   743 000005A3 73745F756964202020-     	db "st_uid       : ",0
+   743 000005AC 202020203A2000     
+   744                                  
+   745                                  txt_st_gid:
+   746 000005B3 0D0A                    	db 0Dh,0Ah
+   747 000005B5 73745F676964202020-     	db "st_gid       : ",0
+   747 000005BE 202020203A2000     
+   748                                  
+   749                                  txt_st_rdev:
+   750 000005C5 0D0A                    	db 0Dh,0Ah
+   751 000005C7 73745F726465762020-     	db "st_rdev      : ",0
+   751 000005D0 202020203A2000     
+   752                                  
+   753                                  txt_st_size:
+   754 000005D7 0D0A                    	db 0Dh,0Ah
+   755 000005D9 73745F73697A652020-     	db "st_size      : ",0
+   755 000005E2 202020203A2000     
+   756                                  
+   757                                  txt_bytes:
+   758 000005E9 2062797465              	db " byte"
+   759 000005EE 732000                  txt_s:	db "s ",0	
+   760                                  
+   761                                  txt_st_atime:
+   762 000005F1 0D0A                    	db 0Dh,0Ah
+   763 000005F3 73745F6174696D6520-     	db "st_atime     : ",0
+   763 000005FC 202020203A2000     
+   764                                  
+   765                                  txt_st_mtime:
+   766 00000603 0D0A                    	db 0Dh,0Ah
+   767 00000605 73745F6D74696D6520-     	db "st_mtime     : ",0
+   767 0000060E 202020203A2000     
+   768                                  
+   769                                  txt_st_ctime:
+   770 00000615 0D0A                    	db 0Dh,0Ah
+   771 00000617 73745F6374696D6520-     	db "st_ctime     : ",0
+   771 00000620 202020203A2000     
+   772                                  
+   773                                  exc_mark:
+   774 00000627 20212000                	db ' ! ',0
+   775                                  
+   776                                  hex_digits:
+   777 0000062B 303132333435363738-     	db '0123456789ABCDEF'
+   777 00000634 39414243444546     
+   778                                  
+   779                                  lbracket:
+   780 0000063B 205B00                  	db " [",0
+   781                                  rbracket:
+   782 0000063E 5D00                    	db "]",0	
+   783                                  
+   784                                  ;-----------------------------------------------------------------
+   785                                  
+   786                                  DMonth:
+   787 00000640 0000                    	dw 0
+   788 00000642 1F00                    	dw 31
+   789 00000644 3B00                    	dw 59
+   790 00000646 5A00                    	dw 90
+   791 00000648 7800                    	dw 120
+   792 0000064A 9700                    	dw 151
+   793 0000064C B500                    	dw 181
+   794 0000064E D400                    	dw 212
+   795 00000650 F300                    	dw 243
+   796 00000652 1101                    	dw 273
+   797 00000654 3001                    	dw 304
+   798 00000656 4E01                    	dw 334
+   799                                  
+   800 00000658 00000000                year:	dd 0
+   801 0000065C 00000000                month:	dd 0
+   802 00000660 00000000                day:	dd 0
+   803 00000664 00000000                hour:	dd 0
+   804 00000668 00000000                minute: dd 0
+   805 0000066C 00000000                second: dd 0
+   806                                  
+   807                                  ;-----------------------------------------------------------------
+   808                                  ;  uninitialized data
+   809                                  ;-----------------------------------------------------------------
+   810                                  
+   811                                  bss:
+   812                                  
+   813                                  ABSOLUTE bss
+   814                                  
+   815                                  alignb 4
+   816 00000670 <res 28h>               fstat_buffer:	resb 40
+   817 00000698 <res 18h>               fff_buffer:	resb 24
+   818 000006B0 <res 10h>               number_str:	resb 16
+   819 000006C0 <res 14h>               		resb 20
