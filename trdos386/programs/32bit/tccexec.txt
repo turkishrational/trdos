@@ -1,0 +1,388 @@
+     1                                  ; ****************************************************************************
+     2                                  ; tccexec.s - TRDOS 386 - TCC FLAT PRG EXECUTION & EXIT CODE MONITOR
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; Erdogan Tan & Google AI - 08/07/2026 [Tam Dinamik Dosya Adı Güncellemesi]
+     5                                  ; ****************************************************************************
+     6                                  
+     7                                  ; TRDOS 386 Sistem Çağrı Sabitleri
+     8                                  _exit 	equ 1
+     9                                  _fork 	equ 2
+    10                                  _wait 	equ 7
+    11                                  _exec	equ 11
+    12                                  _msg    equ 35
+    13                                  
+    14                                  %macro sys 1-4
+    15                                      %if %0 >= 2   
+    16                                          mov ebx, %2
+    17                                          %if %0 >= 3    
+    18                                              mov ecx, %3
+    19                                              %if %0 = 4
+    20                                                 mov edx, %4   
+    21                                              %endif
+    22                                          %endif
+    23                                      %endif
+    24                                      mov eax, %1
+    25                                      int 40h 
+    26                                  %endmacro
+    27                                  
+    28                                  [BITS 32] 
+    29                                  [ORG 0] 
+    30                                  
+    31                                  START_CODE:
+    32                                  	; BSS Alanını Temizle (Orijinal Taslak Mantığı)
+    33 00000000 66BF[D402]              	mov	di, bss_start
+    34 00000004 B935000000              	mov	ecx, (bss_end - bss_start)/4
+    35 00000009 F3AB                    	rep	stosd
+    36                                  
+    37                                  GetCommandLineArgs:
+    38 0000000B 89E6                    	mov	esi, esp
+    39 0000000D AD                      	lodsd				; EAX = Toplam argc sayısı
+    40 0000000E 83F802                  	cmp	eax, 2			; En az iki argüman olmalı: "tccexec <hedef_program>"
+    41 00000011 0F820E010000            	jb	pmsg_usage		; Eğer hedef dosya adı girilmediyse kullanım kılavuzuna zıpla
+    42                                  
+    43 00000017 48                      	dec	eax
+    44 00000018 A2[D4020000]            	mov	[argc], al		; Kalan toplam argüman sayısını sakla
+    45 0000001D AD                      	lodsd				; "tccexec" kendi adını atla
+    46                                  	
+    47                                  	; 1. ADIM: Komut satırındaki ilk gerçek argümanı prgfilename'e kopyala (Hedef Program)
+    48 0000001E AD                      	lodsd				; EAX = Çalıştırılacak program adının adresi
+    49 0000001F 89F5                    	mov	ebp, esi		; Kalan argüman pointer dizisinin yerini EBP'de sakla
+    50 00000021 89C6                    	mov	esi, eax
+    51 00000023 BF[D8020000]            	mov	edi, prgfilename
+    52                                  
+    53                                  .scan_target_name:
+    54 00000028 AC                      	lodsb
+    55 00000029 3C20                    	cmp	al, 20h			; Boşluk kontrolü
+    56 0000002B 74FB                    	je	short .scan_target_name
+    57 0000002D 0F82F2000000            	jb	pmsg_usage
+    58 00000033 AA                      	stosb
+    59                                  
+    60                                  .copy_target_name:
+    61 00000034 AC                      	lodsb
+    62 00000035 3C20                    	cmp	al, 20h
+    63 00000037 7603                    	jna	short .target_name_done
+    64 00000039 AA                      	stosb
+    65 0000003A EBF8                    	jmp	short .copy_target_name
+    66                                  
+    67                                  .target_name_done:
+    68 0000003C 30C0                    	xor	al, al
+    69 0000003E AA                      	stosb				; Hedef dosya adını NULL ile sonlandır
+    70                                  
+    71                                  	; 2. ADIM: Geriye kalan argümanlar varsa (argv[2] ve sonrası) tek bir string olarak topla
+    72 0000003F BF[28030000]            	mov	edi, arguments		; Hedef arabelleği hazırla
+    73 00000044 FE0D[D4020000]          	dec	byte [argc]
+    74 0000004A 741B                    	jz	short .all_args_done	; Başka argüman yoksa bitir
+    75                                  
+    76                                  .argument_loop:
+    77 0000004C 8B7500                  	mov	esi, [ebp]		; Sıradaki argüman kelimesinin adresi
+    78 0000004F 83C504                  	add	ebp, 4
+    79                                  
+    80                                  .copy_chars:
+    81 00000052 AC                      	lodsb
+    82 00000053 3C20                    	cmp	al, 20h			; Boşluk veya altı kontrolü
+    83 00000055 7603                    	jna	short .word_done
+    84 00000057 AA                      	stosb				; Karakteri 'arguments' tamponuna yaz
+    85 00000058 EBF8                    	jmp	short .copy_chars
+    86                                  
+    87                                  .word_done:
+    88 0000005A FE0D[D4020000]          	dec	byte [argc]		; İşlenecek kelime kaldı mı?
+    89 00000060 7405                    	jz	short .all_args_done
+    90                                  	
+    91 00000062 B020                    	mov	al, 20h			; Kelimelerin arasına boşluk (Space) yerleştir
+    92 00000064 AA                      	stosb	
+    93 00000065 EBE5                    	jmp	short .argument_loop
+    94                                  
+    95                                  .all_args_done:
+    96 00000067 30C0                    	xor	al, al
+    97 00000069 AA                      	stosb				; Argüman string akışını NULL ile sonlandır
+    98                                  
+    99                                  .launch_pipeline:
+   100                                  	; Başlangıç Monitör Başlığını Bas (Kırmızı Renk - 0Ch)
+   101 0000006A C605[BC010000]0C        	mov	byte [color], 0Ch
+   102 00000071 BE[D0010000]            	mov 	esi, tcc_monitor_hdr
+   103 00000076 E813010000              	call 	print_msg
+   104                                  
+   105                                  	; Süreci Çatalla (Fork)
+   106 0000007B BB[4A010000]            	mov 	ebx, child_launcher
+   107                                  	sys 	_fork
+    15                              <1>  %if %0 >= 2
+    16                              <1>  mov ebx, %2
+    17                              <1>  %if %0 >= 3
+    18                              <1>  mov ecx, %3
+    19                              <1>  %if %0 = 4
+    20                              <1>  mov edx, %4
+    21                              <1>  %endif
+    22                              <1>  %endif
+    23                              <1>  %endif
+    24 00000080 B802000000          <1>  mov eax, %1
+    25 00000085 CD40                <1>  int 40h
+   108 00000087 721A                    	jc 	short execution_error
+   109                                  
+   110 00000089 A3[C0010000]            	mov	[cpid], eax 		; Alt sürecin ID'sini sakla
+   111                                  
+   112                                  	; Parent (İzleme) bekleme döngüsüne giriyor
+   113 0000008E C605[BC010000]07        	mov	byte [color], 07h
+   114                                  parent_wait:
+   115 00000095 BBE7030000              	mov	ebx, 999 		; Bloklanan wait çağrısı
+   116                                  	sys 	_wait
+    15                              <1>  %if %0 >= 2
+    16                              <1>  mov ebx, %2
+    17                              <1>  %if %0 >= 3
+    18                              <1>  mov ecx, %3
+    19                              <1>  %if %0 = 4
+    20                              <1>  mov edx, %4
+    21                              <1>  %endif
+    22                              <1>  %endif
+    23                              <1>  %endif
+    24 0000009A B807000000          <1>  mov eax, %1
+    25 0000009F CD40                <1>  int 40h
+   117 000000A1 7311                    	jnc	short wait_success
+   118                                  
+   119                                  execution_error:
+   120 000000A3 BE[5E020000]            	mov 	esi, msg_err
+   121 000000A8 E8E1000000              	call 	print_msg
+   122                                  	sys	_exit
+    15                              <1>  %if %0 >= 2
+    16                              <1>  mov ebx, %2
+    17                              <1>  %if %0 >= 3
+    18                              <1>  mov ecx, %3
+    19                              <1>  %if %0 = 4
+    20                              <1>  mov edx, %4
+    21                              <1>  %endif
+    22                              <1>  %endif
+    23                              <1>  %endif
+    24 000000AD B801000000          <1>  mov eax, %1
+    25 000000B2 CD40                <1>  int 40h
+   123                                  
+   124                                  wait_success:
+   125 000000B4 3B05[C0010000]          	cmp 	eax, [cpid]		; Doğru çocuk süreç mi kontrol et
+   126 000000BA 75D9                    	jne 	short parent_wait	
+   127                                  
+   128 000000BC 53                      	push	ebx  			; Çıkış kodunu yığına güvenle at
+   129                                  
+   130                                  	; Başarı mesajlarını ve dinamik dosya adını yazdır (Yeşil/Sarı)
+   131 000000BD C605[BC010000]0A        	mov	byte [color], 0Ah
+   132 000000C4 BE[02020000]            	mov	esi, child_label
+   133 000000C9 E8C0000000              	call	print_msg
+   134 000000CE C605[BC010000]0E        	mov	byte [color], 0Eh
+   135 000000D5 BE[D8020000]            	mov	esi, prgfilename	; Statik değil, artık dinamik basıyor!
+   136 000000DA E8AF000000              	call	print_msg	
+   137                                  
+   138 000000DF C605[BC010000]07        	mov	byte [color], 07h
+   139 000000E6 BE[D1020000]            	mov	esi, CRLF
+   140 000000EB E89E000000              	call	print_msg
+   141                                  
+   142                                  	; Yığından exit code değerini geri al ve ASCII'ye çevir
+   143 000000F0 58                      	pop	eax
+   144 000000F1 E8AD000000              	call 	bin_to_decimal_str
+   145 000000F6 891D[57020000]          	mov 	[exitcode], ebx
+   146                                  
+   147 000000FC C605[BC010000]0F        	mov	byte [color], 0Fh 		; Parlak Beyaz
+   148 00000103 BE[2E020000]            	mov 	esi, child_exitcode_msg
+   149 00000108 E881000000              	call 	print_msg
+   150                                  
+   151                                  monitor_ok:
+   152 0000010D C605[BC010000]0A        	mov	byte [color], 0Ah
+   153 00000114 BE[73020000]            	mov 	esi, msg_ok
+   154 00000119 E870000000              	call 	print_msg
+   155                                  	sys	_exit
+    15                              <1>  %if %0 >= 2
+    16                              <1>  mov ebx, %2
+    17                              <1>  %if %0 >= 3
+    18                              <1>  mov ecx, %3
+    19                              <1>  %if %0 = 4
+    20                              <1>  mov edx, %4
+    21                              <1>  %endif
+    22                              <1>  %endif
+    23                              <1>  %endif
+    24 0000011E B801000000          <1>  mov eax, %1
+    25 00000123 CD40                <1>  int 40h
+   156                                  
+   157                                  pmsg_usage:
+   158 00000125 C605[BC010000]0E        	mov	byte [color], 0Eh
+   159                                  	sys	_msg, msg_usage, 255, [color]
+    15                              <1>  %if %0 >= 2
+    16 0000012C BB[97020000]        <1>  mov ebx, %2
+    17                              <1>  %if %0 >= 3
+    18 00000131 B9FF000000          <1>  mov ecx, %3
+    19                              <1>  %if %0 = 4
+    20 00000136 8B15[BC010000]      <1>  mov edx, %4
+    21                              <1>  %endif
+    22                              <1>  %endif
+    23                              <1>  %endif
+    24 0000013C B823000000          <1>  mov eax, %1
+    25 00000141 CD40                <1>  int 40h
+   160                                  	sys	_exit
+    15                              <1>  %if %0 >= 2
+    16                              <1>  mov ebx, %2
+    17                              <1>  %if %0 >= 3
+    18                              <1>  mov ecx, %3
+    19                              <1>  %if %0 = 4
+    20                              <1>  mov edx, %4
+    21                              <1>  %endif
+    22                              <1>  %endif
+    23                              <1>  %endif
+    24 00000143 B801000000          <1>  mov eax, %1
+    25 00000148 CD40                <1>  int 40h
+   161                                  
+   162                                  ; ============================================================================
+   163                                  ; CHILD LAUNCHER - ALT SÜREÇ TETİKLEYİCİSİ
+   164                                  ; ============================================================================
+   165                                  child_launcher:
+   166                                  	; Dinamik olarak yakalanan prgfilename ve arguments dizisini EXEC et!
+   167                                  	sys	_exec, prgfilename, prgp
+    15                              <1>  %if %0 >= 2
+    16 0000014A BB[D8020000]        <1>  mov ebx, %2
+    17                              <1>  %if %0 >= 3
+    18 0000014F B9[C4010000]        <1>  mov ecx, %3
+    19                              <1>  %if %0 = 4
+    20                              <1>  mov edx, %4
+    21                              <1>  %endif
+    22                              <1>  %endif
+    23                              <1>  %endif
+    24 00000154 B80B000000          <1>  mov eax, %1
+    25 00000159 CD40                <1>  int 40h
+   168 0000015B 7328                    	jnc	short child_exit_direct
+   169                                  
+   170                                  	; Eğer dosya bulunamadıysa disk hatası bas
+   171 0000015D 3C02                    	cmp	al, 2 
+   172 0000015F 0F853EFFFFFF            	jne	execution_error
+   173                                  
+   174 00000165 C605[BC010000]0C        	mov	byte [color], 0Ch
+   175 0000016C BE[D8020000]            	mov	esi, prgfilename
+   176 00000171 E818000000              	call	print_msg
+   177 00000176 BE[17020000]            	mov	esi, not_found
+   178 0000017B E80E000000              	call	print_msg
+   179                                  
+   180                                  child_fail_exit:
+   181 00000180 B8FF000000              	mov	eax, 0xFF
+   182                                  child_exit_direct:
+   183 00000185 89C3                    	mov	ebx, eax
+   184                                  	sys 	_exit
+    15                              <1>  %if %0 >= 2
+    16                              <1>  mov ebx, %2
+    17                              <1>  %if %0 >= 3
+    18                              <1>  mov ecx, %3
+    19                              <1>  %if %0 = 4
+    20                              <1>  mov edx, %4
+    21                              <1>  %endif
+    22                              <1>  %endif
+    23                              <1>  %endif
+    24 00000187 B801000000          <1>  mov eax, %1
+    25 0000018C CD40                <1>  int 40h
+   185                                  
+   186                                  ; ============================================================================
+   187                                  ; YARDIMCI FONKSİYONLAR
+   188                                  ; ============================================================================
+   189                                  print_msg:
+   190                                  	sys 	_msg, esi, 255, [color]
+    15                              <1>  %if %0 >= 2
+    16 0000018E 89F3                <1>  mov ebx, %2
+    17                              <1>  %if %0 >= 3
+    18 00000190 B9FF000000          <1>  mov ecx, %3
+    19                              <1>  %if %0 = 4
+    20 00000195 8B15[BC010000]      <1>  mov edx, %4
+    21                              <1>  %endif
+    22                              <1>  %endif
+    23                              <1>  %endif
+    24 0000019B B823000000          <1>  mov eax, %1
+    25 000001A0 CD40                <1>  int 40h
+   191 000001A2 C3                      	retn
+   192                                  
+   193                                  bin_to_decimal_str:
+   194 000001A3 B90A000000              	mov	ecx, 10
+   195 000001A8 31DB                    	xor	ebx, ebx
+   196                                  btd_loop:
+   197 000001AA 31D2                    	xor	edx, edx
+   198 000001AC F7F1                      	div	ecx
+   199 000001AE C1E308                  	shl	ebx, 8
+   200 000001B1 80C230                  	add	dl, '0'
+   201 000001B4 88D3                    	mov	bl, dl
+   202 000001B6 09C0                    	or	eax, eax
+   203 000001B8 75F0                    	jnz	short btd_loop
+   204 000001BA C3                      	retn
+   205                                  
+   206                                  ; ============================================================================
+   207                                  ; VERİ VE TANIMLAMALAR BÖLGESİ
+   208                                  ; ============================================================================
+   209 000001BB 90                      align 4
+   210 000001BC 00000000                color:		dd 0
+   211 000001C0 00000000                cpid:		dd 0
+   212                                  
+   213                                  ; Sizin exectest.s dosyanızdaki birebir prgp işaretçi hizalaması!
+   214                                  align 4
+   215 000001C4 [D8020000]              prgp:		dd prgfilename
+   216 000001C8 [28030000]              		dd arguments
+   217 000001CC 00000000                		dd 0
+   218                                  
+   219                                  ; İzleme Ekran İletileri
+   220                                  tcc_monitor_hdr:
+   221 000001D0 0D0A                    	db 0Dh, 0Ah
+   222 000001D2 5452444F5320333836-     	db 'TRDOS 386 v2 - TCC Flat PRG Exit Code Monitor'
+   222 000001DB 207632202D20544343-
+   222 000001E4 20466C617420505247-
+   222 000001ED 204578697420436F64-
+   222 000001F6 65204D6F6E69746F72 
+   223 000001FF 0D0A00                  	db 0Dh, 0Ah, 0
+   224                                  
+   225                                  child_label:
+   226 00000202 0D0A                    	db 0Dh, 0Ah
+   227 00000204 457865637574656420-     	db "Executed Program: ", 0
+   227 0000020D 50726F6772616D3A20-
+   227 00000216 00                 
+   228                                  
+   229                                  not_found:
+   230 00000217 206E6F7420666F756E-     	db " not found on disk! ", 0Dh, 0Ah, 0
+   230 00000220 64206F6E206469736B-
+   230 00000229 21200D0A00         
+   231                                  
+   232                                  child_exitcode_msg:
+   233 0000022E 3E3E3E20544343204D-     	db '>>> TCC MAIN() RETURN VALUE (EXIT CODE): '
+   233 00000237 41494E282920524554-
+   233 00000240 55524E2056414C5545-
+   233 00000249 20284558495420434F-
+   233 00000252 4445293A20         
+   234                                  exitcode:
+   235 00000257 30303030                	dd 30303030h  
+   236 0000025B 0D0A00                  	db 0Dh, 0Ah, 0
+   237                                  
+   238                                  msg_err:
+   239 0000025E 0D0A                    	db 0Dh, 0Ah 
+   240 00000260 457865637574696F6E-     	db 'Execution Error!'
+   240 00000269 204572726F7221     
+   241 00000270 0D0A00                  	db 0Dh, 0Ah, 0
+   242                                  
+   243                                  msg_ok:
+   244 00000273 0D0A                    	db 0Dh, 0Ah
+   245 00000275 4D6F6E69746F722046-     	db 'Monitor Finished Successfully. ', 0Dh, 0Ah, 0
+   245 0000027E 696E69736865642053-
+   245 00000287 75636365737366756C-
+   245 00000290 6C792E200D0A00     
+   246                                  
+   247                                  msg_usage:
+   248 00000297 0D0A                    	db 0Dh, 0Ah
+   249 00000299 55736167653A207463-     	db 'Usage: tccexec <target program file name> <arguments>'
+   249 000002A2 6365786563203C7461-
+   249 000002AB 726765742070726F67-
+   249 000002B4 72616D2066696C6520-
+   249 000002BD 6E616D653E203C6172-
+   249 000002C6 67756D656E74733E   
+   250 000002CE 0D0A00                  	db 0Dh, 0Ah, 0
+   251                                  
+   252                                  CRLF:
+   253 000002D1 0D0A00                  	db 0Dh, 0Ah, 0
+   254                                  
+   255                                  ; ============================================================================
+   256                                  ; UNINITIALIZED DATA - BAŞLANGIÇSIZ VERİ ALANI (BSS)
+   257                                  ; ============================================================================
+   258                                  bss_start:
+   259                                  ABSOLUTE bss_start
+   260                                  
+   261 000002D4 ??                      argc:		resb 1
+   262 000002D5 ??????                  		resb 3
+   263                                  
+   264 000002D8 <res 50h>               prgfilename:	resb 80  ; İlk parametreden dinamik doldurulan hedef dosya adı arabelleği
+   265 00000328 <res 80h>               arguments:	resb 128 ; Diğer parametrelerin birleştirildiği arabellek
+   266                                  
+   267                                  bss_end:
+   268                                  
