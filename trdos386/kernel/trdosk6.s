@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 21/05/2026  (Previous: 10/01/2026, v2.0.10)
+; Last Update: 10/07/2026  (Previous: 10/01/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -17354,6 +17354,7 @@ sysdrive_ok:
 	jmp	sysret
 
 sysdir: ; Get Current (Working) Drive & Directory (for user)
+        ; 10/07/2026 - TRDOS 386 v2.0.11 - BugFix! 
 	; 30/12/2017 (TRDOS 386 = TRDOS v2.0)
 	;
         ; INPUT ->
@@ -17371,12 +17372,17 @@ sysdir: ; Get Current (Working) Drive & Directory (for user)
 
 	mov	ebp, esp
 	sub	esp, 96
+	; 10/07/2026 - BugFix !
+	mov	esi, esp ; System's buffer address
 	push	ebx ; User's buffer address
 	xor	dl, dl ; 0 = current drive
   	call	get_current_directory
+        ; 10/7/2026
+        pop	edi  ; User's buffer address
 	jc	short sysdrive_err ; 'drive not ready !' error
-	mov	esi, esp ; System's buffer address
-	pop	edi  ; User's buffer address
+	; 10/7/2026
+	;mov	esi, esp ; System's buffer address
+	;pop	edi  ; User's buffer address
 	; ecx = transfer (byte) count (<=92)
 	call	transfer_to_user_buffer
 	mov	esp, ebp
