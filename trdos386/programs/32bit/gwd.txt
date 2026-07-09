@@ -1,0 +1,177 @@
+     1                                  ; ****************************************************************************
+     2                                  ; gwd.s (TRDOS 386, TRDOS v2.0.11 - CWD Verification Program, 'gwd.prg')
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; GWD.PRG ! 'sys_dir' (28) and 'sys_msg' (35) Test Program for TRDOS 386 !
+     5                                  ;
+     6                                  ; 09/07/2026 - Erdogan Tan & Google AI Collaborator
+     7                                  ; ****************************************************************************
+     8                                  ; Last Update: 10/7/2026
+     9                                  ; nasm gwd.s -l gwd.txt -o GWD.PRG
+    10                                  
+    11                                  ; TRDOS 386 Sistem Çağrı Numaraları (System Call Vectors)
+    12                                  _exit 	equ 1
+    13                                  _dir	equ 28
+    14                                  _msg    equ 35
+    15                                  
+    16                                  ; TRDOS 386 Kesme Makrosu Tasarımı (Sırtta gereksiz taş taşımama ilkesi)
+    17                                  %macro sys 1-4
+    18                                      %if %0 >= 2   
+    19                                          mov ebx, %2
+    20                                          %if %0 >= 3    
+    21                                              mov ecx, %3
+    22                                              %if %0 = 4
+    23                                                 mov edx, %4   
+    24                                              %endif
+    25                                          %endif
+    26                                      %endif
+    27                                      mov eax, %1
+    28                                      int 40h ; TRDOS 386 Yerel Çekirdek Kesmesi		   
+    29                                  %endmacro
+    30                                  
+    31                                  [BITS 32]   ; 32-bit Korumalı Mod Talimatları
+    32                                  
+    33                                  [ORG 0]     ; Kod doğrudan 0. bayttan başlar, kayma riski sıfırdır!
+    34                                  
+    35                                  START_CODE:
+    36                                  	; Program açılış mesajını ekrana mühürle
+    37 00000000 BE[92000000]            	mov	esi, msg_program
+    38 00000005 E877000000              	call	print_msg
+    39                                  
+    40                                  	; Tampon alanlarımızı sıfırlayarak RAM'deki çöp bayt kalıntılarını yok ediyoruz
+    41 0000000A BF[04010000]            	mov	edi, bss_start
+    42 0000000F B938000000              	mov	ecx, (bss_end-bss_start)/4
+    43 00000014 31C0                    	xor	eax, eax
+    44 00000016 F3AB                    	rep	stosd
+    45                                  
+    46                                  	; sys _dir (28) çağrısı ile o anki çalışma dizinini tampona çekiyoruz
+    47                                  	sys	_dir, dir_buffer
+    18                              <1>  %if %0 >= 2
+    19 00000018 BB[04010000]        <1>  mov ebx, %2
+    20                              <1>  %if %0 >= 3
+    21                              <1>  mov ecx, %3
+    22                              <1>  %if %0 = 4
+    23                              <1>  mov edx, %4
+    24                              <1>  %endif
+    25                              <1>  %endif
+    26                              <1>  %endif
+    27 0000001D B81C000000          <1>  mov eax, %1
+    28 00000022 CD40                <1>  int 40h
+    48 00000024 7240                    	jc	short sysdir_failed
+    49                                  
+    50                                  	; Sürücü harfini ve iki nokta üst üste işaretini mühürle
+    51 00000026 0441                    	add	al, 'A'             ; Harfe dönüştür
+    52 00000028 B43A                    	mov	ah, ':'
+    53 0000002A BF[64010000]            	mov	edi, output_str     ; Yazılacak hedef
+    54 0000002F 66AB                    	stosw                       ; 'D:'
+    55                                  
+    56                                  	; Kernel'ın doldurduğu tamponu çözüp output_str arkasına ekliyoruz
+    57 00000031 BE[04010000]            	mov	esi, dir_buffer     ; Okunacak tampon adresi
+    58                                  	
+    59                                  	; Dizin başlangıcına mutlaka bir '/' separator çak
+    60 00000036 B02F                    	mov	al, '/'
+    61 00000038 AA                      	stosb
+    62                                  
+    63 00000039 803E00                  	cmp	byte [esi], 0
+    64 0000003C 7408                    	jz	short close_output_str
+    65                                  
+    66                                  parse_cwd_path:
+    67                                  do_parse:
+    68 0000003E AC                      	lodsb			    ; Tampondan 1 bayt oku (AL'ye al)
+    69                                  write_char:
+    70 0000003F 20C0                    	and	al, al              ; Null-terminator (\0) mü?
+    71 00000041 7403                    	jz	short close_output_str
+    72 00000043 AA                      	stosb			    ; String arkasına ekle
+    73 00000044 EBF8                    	jmp	short do_parse
+    74                                  
+    75                                  close_output_str:
+    76                                  	; Dizgiyi sıfır ile bitir
+    77 00000046 C60700                  	mov	byte [edi], 0
+    78                                  	; Toplam karakter uzunluğunu hesapla (edi - output_str)
+    79 00000049 89F9                    	mov	ecx, edi
+    80 0000004B 81E9[64010000]          	sub	ecx, output_str
+    81                                  
+    82                                  	; sys _msg (35) çağrısı ile nihai CWD yolunu ekrana bas
+    83                                  	sys	_msg, output_str, ecx, 0000000Eh
+    18                              <1>  %if %0 >= 2
+    19 00000051 BB[64010000]        <1>  mov ebx, %2
+    20                              <1>  %if %0 >= 3
+    21 00000056 89C9                <1>  mov ecx, %3
+    22                              <1>  %if %0 = 4
+    23 00000058 BA0E000000          <1>  mov edx, %4
+    24                              <1>  %endif
+    25                              <1>  %endif
+    26                              <1>  %endif
+    27 0000005D B823000000          <1>  mov eax, %1
+    28 00000062 CD40                <1>  int 40h
+    84 00000064 EB0A                    	jmp	short terminate
+    85                                  
+    86                                  sysdir_failed:
+    87 00000066 BE[CF000000]            	mov	esi, msg_failed
+    88 0000006B E811000000              	call	print_msg
+    89                                  
+    90                                  terminate:
+    91 00000070 BE[FE000000]            	mov	esi, nextline
+    92 00000075 E807000000              	call	print_msg
+    93                                  
+    94                                  	; _exit (1) kesmesi ile kabuğa (shell) firesiz geri dönüş
+    95                                  	sys 	_exit
+    18                              <1>  %if %0 >= 2
+    19                              <1>  mov ebx, %2
+    20                              <1>  %if %0 >= 3
+    21                              <1>  mov ecx, %3
+    22                              <1>  %if %0 = 4
+    23                              <1>  mov edx, %4
+    24                              <1>  %endif
+    25                              <1>  %endif
+    26                              <1>  %endif
+    27 0000007A B801000000          <1>  mov eax, %1
+    28 0000007F CD40                <1>  int 40h
+    96                                  
+    97                                  ; Ekrana TTY formatında mesaj basma alt rutini (dirlfn2 standardı)
+    98                                  print_msg:
+    99 00000081 BB0F000000              	mov	ebx, 0000000Fh      ; Beyaz karakterler (bl), Video Sayfası 0 (bh)
+   100                                  _print_loop:
+   101 00000086 B40E                    	mov	ah, 0Eh             ; Teletype output kesme fonksiyonu
+   102 00000088 AC                      	lodsb
+   103 00000089 20C0                    	and	al, al
+   104 0000008B 7404                    	jz	short _print_done
+   105 0000008D CD31                    	int	31h                 ; Video kesmesi
+   106 0000008F EBF5                    	jmp	short _print_loop
+   107                                  _print_done:
+   108 00000091 C3                      	retn
+   109                                  
+   110                                  ; ----------------------------------------------------------------------------
+   111                                  ; Statik Mesaj Tanımlamaları (DATA)
+   112                                  ; ----------------------------------------------------------------------------
+   113                                  msg_program:
+   114 00000092 0D0A                    	db 0Dh, 0Ah
+   115 00000094 4757442E505247202F-     	db "GWD.PRG /// TRDOS 386 sys_dir (28) Canli Dogrulama Araci"
+   115 0000009D 2F2F205452444F5320-
+   115 000000A6 333836207379735F64-
+   115 000000AF 697220283238292043-
+   115 000000B8 616E6C6920446F6772-
+   115 000000C1 756C616D6120417261-
+   115 000000CA 6369               
+   116 000000CC 0D0A00                  	db 0Dh, 0Ah, 0
+   117                                  msg_failed:
+   118 000000CF 486174613A20737973-     	db "Hata: sys_dir sistem cagrisi basarisiz oldu!", 0Dh, 0Ah, 0
+   118 000000D8 5F6469722073697374-
+   118 000000E1 656D20636167726973-
+   118 000000EA 692062617361726973-
+   118 000000F3 697A206F6C6475210D-
+   118 000000FC 0A00               
+   119                                  nextline:
+   120 000000FE 0D0A00                  	db 0Dh, 0Ah, 0
+   121                                  
+   122                                  ; ----------------------------------------------------------------------------
+   123                                  ; Dinamik Bellek Alanları (BSS)
+   124                                  ; ----------------------------------------------------------------------------
+   125                                  bss:
+   126                                  ABSOLUTE bss
+   127                                  
+   128 00000101 ??????                  alignb 4
+   129                                  
+   130                                  bss_start:
+   131 00000104 <res 60h>               dir_buffer: resb 96  ; Kernel kuralları uyarınca ayrılan 92 baytlık CWD alanı
+   132 00000164 <res 80h>               output_str: resb 128 ; Ekrana basılacak olan "D:/TCC\r\n\0" formatındaki nihai string
+   133                                  bss_end:
