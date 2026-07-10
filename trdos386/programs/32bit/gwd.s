@@ -76,11 +76,10 @@ close_output_str:
 	; Dizgiyi sıfır ile bitir
 	mov	byte [edi], 0
 	; Toplam karakter uzunluğunu hesapla (edi - output_str)
-	mov	ecx, edi
-	sub	ecx, output_str
+	sub	edi, output_str
 
 	; sys _msg (35) çağrısı ile nihai CWD yolunu ekrana bas
-	sys	_msg, output_str, ecx, 0000000Eh
+	sys	_msg, output_str, edi, 0000000Eh
 	jmp	short terminate
 
 sysdir_failed:
