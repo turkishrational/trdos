@@ -5,7 +5,7 @@
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
-; Assembler: NASM version 2.15 (trdos386.s)
+; Assembler: NASM version 3.02 (trdos386.s)
 ; ----------------------------------------------------------------------------
 ; Derived from 'Retro UNIX 386 Kernel - v0.2.1.0' source code by Erdogan Tan
 ; u1.s (27/17/2015), u2.s (03/01/2016)
@@ -17371,16 +17371,17 @@ sysdir: ; Get Current (Working) Drive & Directory (for user)
 	;	(7*12 name chars + 7 slash + 0)
 
 	mov	ebp, esp
-	sub	esp, 96
-	; 10/07/2026 - BugFix !
+	;sub	esp, 96
+	sub     esp, 92
+        ; 10/07/2026 - BugFix !
 	mov	esi, esp ; System's buffer address
 	push	ebx ; User's buffer address
 	xor	dl, dl ; 0 = current drive
   	call	get_current_directory
-        ; 10/7/2026
+        ; 10/07/2026
         pop	edi  ; User's buffer address
 	jc	short sysdrive_err ; 'drive not ready !' error
-	; 10/7/2026
+	; 10/07/2026
 	;mov	esi, esp ; System's buffer address
 	;pop	edi  ; User's buffer address
 	; ecx = transfer (byte) count (<=92)

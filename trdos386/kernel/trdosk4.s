@@ -5,7 +5,7 @@
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
-; Assembler: NASM version 2.15 (trdos386.s)
+; Assembler: NASM version 3.02 (trdos386.s)
 ; ----------------------------------------------------------------------------
 ; Derived from TRDOS Operating System v1.0 (8086) source code by Erdogan Tan
 ; DIR.ASM (09/10/2011)
@@ -66,7 +66,7 @@ path_write_dirname1:
 	jna	short pass_write_dirname1
 	stosb
 	;cmp	edi, End_Of_Current_Dir_Str
-        ; 10/7/2026
+        ; 10/07/2026
 	cmp	edi, edx	
 	jnb	short pass_write_path
 	loop	path_write_dirname1
@@ -89,7 +89,7 @@ loc_check_dir_name_ext:
 	jna	short pass_write_dirname2
 	mov	[edi], al
 	;cmp	edi, End_Of_Current_Dir_Str
-        ; 10/7/2026
+        ; 10/07/2026
 	cmp	edi, edx
 	jnb	short pass_write_path
 	loop    loc_check_dir_name_ext
@@ -210,7 +210,7 @@ loc_get_current_drive_3:
         ; 10/07/2026 - BugFix ! ('sysdir' in 'trdosk6.s')
 	;call	set_current_directory_string
         ; max. permissible size of current directory string !    
-        lea     edx, [edi+96]
+        lea     edx, [edi+92]
         call	set_current_directory_string_@
         ;
 	mov	esi, edi
