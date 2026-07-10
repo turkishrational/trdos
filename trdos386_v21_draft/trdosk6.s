@@ -1,11 +1,11 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk6.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.1.0) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 25/01/2026  (Previous: 27/09/2024, v2.0.9)
+; Last Update: 10/07/2026  (Previous: 25/01/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
-; Assembler: NASM version 2.15 (trdos386.s)
+; Assembler: NASM version 3.02 (trdos386.s)
 ; ----------------------------------------------------------------------------
 ; Derived from 'Retro UNIX 386 Kernel - v0.2.1.0' source code by Erdogan Tan
 ; u1.s (27/17/2015), u2.s (03/01/2016)
@@ -18378,7 +18378,8 @@ sysdrive_ok:
 	jmp	sysret
 
 sysdir: ; Get Current (Working) Drive & Directory (for user)
-	; 16/05/2025 (TRDOS 386 v2.0.10)
+        ; 10/07/2026 - TRDOS 386 v2.1.0 - BugFix! 
+	; 16/05/2025 (TRDOS 386 v2.0.10) ((v2.1.0))
 	; 30/12/2017 (TRDOS 386 = TRDOS v2.0)
 	;
         ; INPUT ->
@@ -18400,15 +18401,20 @@ sysdir: ; Get Current (Working) Drive & Directory (for user)
 	;	;(8*12 name chars + 7 slash + 0)
 
 	mov	ebp, esp
-	;sub	esp, 96
+	;sub	esp, 92
 	; 16/05/2025
 	sub	esp, 104
+        ; 10/07/2026 - BugFix !
+	mov	esi, esp ; System's buffer address
 	push	ebx ; User's buffer address
 	xor	dl, dl ; 0 = current drive
   	call	get_current_directory
+        ; 10/07/2026
+        pop	edi  ; User's buffer address
 	jc	short sysdrive_err ; 'drive not ready !' error
-	mov	esi, esp ; System's buffer address
-	pop	edi  ; User's buffer address
+	; 10/07/2026
+	;mov	esi, esp ; System's buffer address
+	;pop	edi  ; User's buffer address
 	; 16/05/2025
 	;cmp	ecx, 104
 	;ja	short sysdir_err

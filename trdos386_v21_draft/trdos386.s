@@ -1,11 +1,11 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.10 (v2.1.0 pre-work)
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.1.0
 ; ----------------------------------------------------------------------------
-; Last Update: 10/02/2026 (Previous: 28/01/2025)
+; Last Update: 10/07/2026 (Previous: 10/02/2026)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
-; Assembler: NASM version 2.15 (trdos386.s)
+; Assembler: NASM version 3.02 (trdos386.s)
 ; ----------------------------------------------------------------------------
 ; Turkish Rational DOS
 ; Operating System Project v2.0 by ERDOGAN TAN (Beginning: 04/01/2016)
@@ -3783,7 +3783,7 @@ starting_msg:
 	;;;db "Turkish Rational DOS v2.0 [29/12/2024] ...", 0
 	;;db "Turkish Rational DOS v2.0 [28/01/2025] ...", 0
 	;db "Turkish Rational DOS v2.0 [24/04/2025] ...", 0
-	db "Turkish Rational DOS v2.1 [10/02/2026] ...", 0
+	db "Turkish Rational DOS v2.1 [10/07/2026] ...", 0
 
 NextLine:
 	db 0Dh, 0Ah, 0

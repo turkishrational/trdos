@@ -1,12 +1,12 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - INITIALIZED DATA : trdosk9.s
 ; ----------------------------------------------------------------------------
-; Last Update: 10/02/2026 (Previous: 29/12/2024 - Kernel v2.0.9)
+; Last Update: 10/07/2026 (Previous: 29/12/2024 - Kernel v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
 ; ----------------------------------------------------------------------------
-; Assembler: NASM version 2.15 (trdos386.s)
+; Assembler: NASM version 3.02 (trdos386.s)
 ; ----------------------------------------------------------------------------
 ; Derived from TRDOS Operating System v1.0 (8086) source code by Erdogan Tan
 ; TRDOS2.ASM (09/11/2011)
@@ -34,7 +34,7 @@ Magic_Bytes:
 		db 1
 mainprog_Version:
 		db 7
-		db "[TRDOS] Main Program v2.1.0 (10/02/2026)"
+		db "[TRDOS] Main Program v2.1.0 (10/07/2026)"
 		db 0Dh, 0Ah
 		db "(c) Erdogan Tan 2005-2026"
 		db 0Dh, 0Ah, 0
@@ -99,14 +99,14 @@ Cmd_Beep:	db "BEEP", 0
 ;  Numbers 0-9
 ;  Space (20h)
 ;  !, #, $, %, &, ', (, ), -, @, ^, _, `, {, }, ~
-;  Values 128–255
+;  Values 128 255
 ;
 ; This excludes the following ASCII characters:
 ;  ", *, +, ,, /, :, ;, <, =, >, ?, \, [, ], |
 ;  . (DOT) within name and extension fields,
 ;			 except in . and .. entries
-;  Lowercase letters a–z, stored as A–Z on FAT12/FAT16/FAT32
-;  Control characters 0–31
+;  Lowercase letters a z, stored as A Z on FAT12/FAT16/FAT32
+;  Control characters 0 31
 ;  Value 127 (DEL)
 
 	; 20/05/2025

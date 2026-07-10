@@ -1,11 +1,11 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - Directory Functions : trdosk4.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.1.0) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 26/01/2026 (Previous: 03/09/2024, v2.0.9)
+; Last Update: 10/07/2026 (Previous: 26/01/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
-; Assembler: NASM version 2.15 (trdos386.s)
+; Assembler: NASM version 3.02 (trdos386.s)
 ; ----------------------------------------------------------------------------
 ; Derived from TRDOS Operating System v1.0 (8086) source code by Erdogan Tan
 ; DIR.ASM (09/10/2011)
@@ -16,7 +16,6 @@
 ; FILE.ASM [ FILE FUNCTIONS ] Last Update: 09/10/2011
 
 change_prompt_dir_string:
-	; 16/06/2025 (TRDOS 386 Kernel v2.0.10)
 	; 05/10/2016
 	; 24/01/2016 (TRDOS 386 = TRDOS v2.0)
 	; 27/03/2011
@@ -27,8 +26,7 @@ change_prompt_dir_string:
 
 	mov	esi, PATH_Array
 change_prompt_dir_str: ; 05/10/2016 (call from 'set_working_path')
-	; 16/06/2025
-	;mov	edi, Current_Directory
+	mov	edi, Current_Directory
 	mov	ah, [Current_Dir_Level]
 	call	set_current_directory_string
 	mov	[Current_Dir_StrLen], cl
@@ -36,6 +34,7 @@ change_prompt_dir_str: ; 05/10/2016 (call from 'set_working_path')
 	retn
 
 set_current_directory_string:
+        ; 10/07/2026 - TRDOS 386 v2.1.0
 	; 16/06/2025
 	; 16/05/2025 (TRDOS 386 Kernel v2.0.10)
 	; 11/08/2022 (TRDOS 386 Kernel v2.0.5)
@@ -50,9 +49,9 @@ set_current_directory_string:
 	;    EDI = Current Directory String Buffer
 	;    ECX = Current Directory String Length
 
-	; 16/06/2025
-	mov	edi, Current_Directory
-
+	; 10/07/2026 - BugFix for 'sysdir' !
+	mov	edx, End_Of_Current_Dir_Str
+set_current_directory_string_@: ; 10/07/2026
 	push    edi
 	cmp     ah, 0
 	jna	short pass_write_path
@@ -70,7 +69,9 @@ path_write_dirname1:
 	cmp	al, 20h
 	jna	short pass_write_dirname1
 	stosb
-	cmp	edi, End_Of_Current_Dir_Str
+	;cmp	edi, End_Of_Current_Dir_Str
+        ; 10/7/2026
+	cmp	edi, edx
 	jnb	short pass_write_path
 	loop	path_write_dirname1
 	cmp	byte [esi], 20h
@@ -91,7 +92,9 @@ loc_check_dir_name_ext:
 	cmp	al, 20h
 	jna	short pass_write_dirname2
 	mov	[edi], al
-	cmp	edi, End_Of_Current_Dir_Str
+	;cmp	edi, End_Of_Current_Dir_Str
+        ; 10/7/2026
+	cmp	edi, edx
 	jnb	short pass_write_path
 	loop    loc_check_dir_name_ext
 	inc	edi
@@ -113,7 +116,8 @@ pass_write_path:
 	retn
 
 get_current_directory:
-	; 16/05/2025 (TRDOS 386 Kernel v2.0.10)
+        ; 10/07/2026 - TRDOS 386 v2.1.0 - BugFix!  
+	; 16/05/2025 (TRDOS 386 Kernel v2.0.10) ((2.1.0))
 	; 29/08/2023 (TRDOS 386 Kernel v2.0.6)
 	; 11/08/2022
 	; 28/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -209,9 +213,15 @@ loc_get_current_drive_3:
 	;mov	cl, 32
 	;rep	movsd
 	;pop	esi ; Path Array Address
+        ;
 	pop	edi ; pushed esi (current dir buffer offset)
 	;
-	call	set_current_directory_string
+        ; 10/07/2026 - BugFix ! ('sysdir' in 'trdosk6.s')
+	;call	set_current_directory_string
+        ; max. permissible size of current directory string !    
+        lea     edx, [edi+104]
+        call	set_current_directory_string_@
+        ;
 	mov	esi, edi
 
 loc_get_current_drive_4:
@@ -3333,7 +3343,7 @@ loc_mkdir_set_ff_dir_entry_2:
 	; Following modification has been done according to
 	; 'Microsoft Extensible Firmware Initiative
 	; FAT32 File System Specification' document,
-	; 'FAT: General Overview of On-Disk Format—Page 25'.
+	; 'FAT: General Overview of On-Disk Format Page 25'.
 	; "Finally, you set DIR_FstClusLO and DIR_FstClusHI
 	; for the dotdot entry (the second entry) to the
 	; first cluster number of the directory in which you
