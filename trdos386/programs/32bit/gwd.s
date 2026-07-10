@@ -5,7 +5,7 @@
 ;
 ; 09/07/2026 - Erdogan Tan & Google AI Collaborator
 ; ****************************************************************************
-; Last Update: 10/7/2026
+; Last Update: 10/07/2026
 ; nasm gwd.s -l gwd.txt -o GWD.PRG
 
 ; TRDOS 386 Sistem Çağrı Numaraları (System Call Vectors)
@@ -127,6 +127,11 @@ ABSOLUTE bss
 alignb 4
 
 bss_start:
-dir_buffer: resb 96  ; Kernel kuralları uyarınca ayrılan 92 baytlık CWD alanı
+                      ; 7 seviyede 12 byte noktalı dizin adı, 6 adet '/', 1 adet sıfır
+                      ; kullanılmayan 1 byte ve 'D:/' ve 0 (dword hizalama) -v2.0.11-
+;dir_buffer: resb 96  ; Kernel kuralları uyarınca ayrılan 92 baytlık CWD alanı
+                      ; 8 seviyede 12 byte noktalı dizin adı, 7 adet '/', 1 adet sıfır
+                      ; ve 'D:/' ve 0 (dword hizalama) -v2.1.0-			
+dir_buffer: resb 108  ; TRDOS 386 v2.1.0 (104 byte tampon sınırı = 8*12+7+1+4)
 output_str: resb 128 ; Ekrana basılacak olan "D:/TCC\r\n\0" formatındaki nihai string
 bss_end:

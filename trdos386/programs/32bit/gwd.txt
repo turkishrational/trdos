@@ -5,7 +5,7 @@
      5                                  ;
      6                                  ; 09/07/2026 - Erdogan Tan & Google AI Collaborator
      7                                  ; ****************************************************************************
-     8                                  ; Last Update: 10/7/2026
+     8                                  ; Last Update: 10/07/2026
      9                                  ; nasm gwd.s -l gwd.txt -o GWD.PRG
     10                                  
     11                                  ; TRDOS 386 Sistem Çağrı Numaraları (System Call Vectors)
@@ -39,7 +39,7 @@
     39                                  
     40                                  	; Tampon alanlarımızı sıfırlayarak RAM'deki çöp bayt kalıntılarını yok ediyoruz
     41 0000000A BF[00010000]            	mov	edi, bss_start
-    42 0000000F B938000000              	mov	ecx, (bss_end-bss_start)/4
+    42 0000000F B93B000000              	mov	ecx, (bss_end-bss_start)/4
     43 00000014 31C0                    	xor	eax, eax
     44 00000016 F3AB                    	rep	stosd
     45                                  
@@ -61,7 +61,7 @@
     50                                  	; Sürücü harfini ve iki nokta üst üste işaretini mühürle
     51 00000026 0441                    	add	al, 'A'             ; Harfe dönüştür
     52 00000028 B43A                    	mov	ah, ':'
-    53 0000002A BF[60010000]            	mov	edi, output_str     ; Yazılacak hedef
+    53 0000002A BF[6C010000]            	mov	edi, output_str     ; Yazılacak hedef
     54 0000002F 66AB                    	stosw                       ; 'D:'
     55                                  
     56                                  	; Kernel'ın doldurduğu tamponu çözüp output_str arkasına ekliyoruz
@@ -87,12 +87,12 @@
     76                                  	; Dizgiyi sıfır ile bitir
     77 00000046 C60700                  	mov	byte [edi], 0
     78                                  	; Toplam karakter uzunluğunu hesapla (edi - output_str)
-    79 00000049 81EF[60010000]          	sub	edi, output_str
+    79 00000049 81EF[6C010000]          	sub	edi, output_str
     80                                  
     81                                  	; sys _msg (35) çağrısı ile nihai CWD yolunu ekrana bas
     82                                  	sys	_msg, output_str, edi, 0000000Eh
     18                              <1>  %if %0 >= 2
-    19 0000004F BB[60010000]        <1>  mov ebx, %2
+    19 0000004F BB[6C010000]        <1>  mov ebx, %2
     20                              <1>  %if %0 >= 3
     21 00000054 89F9                <1>  mov ecx, %3
     22                              <1>  %if %0 = 4
@@ -171,6 +171,11 @@
    127 000000FF ??                      alignb 4
    128                                  
    129                                  bss_start:
-   130 00000100 <res 60h>               dir_buffer: resb 96  ; Kernel kuralları uyarınca ayrılan 92 baytlık CWD alanı
-   131 00000160 <res 80h>               output_str: resb 128 ; Ekrana basılacak olan "D:/TCC\r\n\0" formatındaki nihai string
-   132                                  bss_end:
+   130                                                        ; 7 seviyede 12 byte noktalı dizin adı, 6 adet '/', 1 adet sıfır
+   131                                                        ; kullanılmayan 1 byte ve 'D:/' ve 0 (dword hizalama) -v2.0.11-
+   132                                  ;dir_buffer: resb 96  ; Kernel kuralları uyarınca ayrılan 92 baytlık CWD alanı
+   133                                                        ; 8 seviyede 12 byte noktalı dizin adı, 7 adet '/', 1 adet sıfır
+   134                                                        ; ve 'D:/' ve 0 (dword hizalama) -v2.1.0-			
+   135 00000100 <res 6Ch>               dir_buffer: resb 108  ; TRDOS 386 v2.1.0 (104 byte tampon sınırı = 8*12+7+1+4)
+   136 0000016C <res 80h>               output_str: resb 128 ; Ekrana basılacak olan "D:/TCC\r\n\0" formatındaki nihai string
+   137                                  bss_end:
