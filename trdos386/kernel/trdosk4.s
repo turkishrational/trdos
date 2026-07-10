@@ -88,7 +88,9 @@ loc_check_dir_name_ext:
 	cmp	al, 20h
 	jna	short pass_write_dirname2
 	mov	[edi], al
-	cmp	edi, End_Of_Current_Dir_Str
+	;cmp	edi, End_Of_Current_Dir_Str
+        ; 10/7/2026
+	cmp	edi, edx
 	jnb	short pass_write_path
 	loop    loc_check_dir_name_ext
 	inc	edi
