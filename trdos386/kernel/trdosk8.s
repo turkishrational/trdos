@@ -1017,7 +1017,7 @@ loc_swp_retn:
 		; home/current drive & directory save/restore feature (for every process)
 		; (CWD optimization)
 
-		cmp	[u.cdrv], -1  ; invalidated (means that cdrv/cdir backup is needed)
+		cmp	byte [u.cdrv], -1  ; invalidated (means that cdrv/cdir backup is needed)
 		clc	; 13/07/2026
 		jne	short loc_swp_2 ; no, valid
 				 ; this process's current/home dir has ben backed up before  
@@ -1122,6 +1122,26 @@ loc_swp_drv:
 		; eax = 0
 
 loc_swp_change_directory:
+		;;;;
+		; 13/07/2026
+		; Restore process's current dir by the backup
+		mov	dl, [u.cdrv]
+		cmp	dl, [Current_Drv]
+		jne	short loc_swp_skip_rwd_from_u
+		mov	eax, [u.cdfcl]
+ 		cmp	eax, [Current_Dir_FCluster]
+		je	short loc_swp_skip_rwd_from_u
+		mov	[Current_Dir_FCluster], eax
+		sub	ecx, ecx
+		mov	cl, [u.cdlvl] ; sub dir level ; 0 to 7
+		mov	[Current_Dir_Level], cl
+		shl	cl, 2 ; * 16/4
+		add	cl, 4 ; + 16/4
+		mov	esi, u.cdir
+		mov	edi, PATH_Array
+		rep	movsd
+loc_swp_skip_rwd_from_u:
+		;;;;
 		cmp	byte [FindFile_Directory], 21h
 		cmc
 		jnc	loc_swp_retn
