@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 10/07/2026  (Previous: 10/01/2026, v2.0.10)
+; Last Update: 13/07/2026  (Previous: 10/01/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1202,6 +1202,7 @@ syswait_4:
 		; br syswait / wait on next process
 
 sysfork: ; < create a new process >
+	; 12/07/2026 - TRDOS 386 Kernel v2.0.11 (u.cdrv, u.cdir)
 	; 19/08/2024 - TRDOS 386 Kernel v2.0.9 (STDIN/STDOUT)
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 02/01/2017 (TRDOS 386 modification)
@@ -1387,7 +1388,9 @@ sysfork_3:
 	;mov	[u.getc], al ; 0
 	mov	[u.stdin], eax ; 0
 	;;;
-
+	; 12/07/2026 - TRDOS 386 v2.0.11
+	mov	byte [u.cdrv], -1 ; invalidate cdrv/cdir parameters
+				; (to force to be set by kernel later)
 	; 28/08/2015
 	;movzx	eax, byte [u.uno] ; parent process number
 	; 19/08/2024
@@ -11724,6 +11727,10 @@ sysvideo_31:
 	jmp	sysret
 
 sysexec:
+	; 13/07/2026
+	; 12/07/2026
+	; 11/07/2026
+	; 10/07/2026 - TRDOS 386 v2.0.11
 	; 07/07/2025 - TRDOS 386 v2.0.10
 	; 21/08/2024 - TRDOS 386 v2.0.9
 	; 23/07/2022 - TRDOS 386 v2.0.5
@@ -11740,7 +11747,7 @@ sysexec:
 	; pointed to by 'name' in the sysexec call.
 	; 'sysexec' performs the following operations:
 	;    1. obtains i-number of file to be executed via 'namei'.
-	;    2. obtains i-node of file to be exceuted via 'iget'.
+	;    2. obtains i-node of file to be executed via 'iget'.
 	;    3. sets trap vectors to system routines.
 	;    4. loads arguments to be passed to executing file into
 	;	highest locations of user's core
@@ -11808,9 +11815,13 @@ sysexec:
         ; 18/10/2015
 	mov     [argv], ecx  ; * ; argument 2
 
+	; 11/07/2026
+	; 10/07/2026
 	; 13/11/2017
-	mov	esi, ebx
+	mov	esi, ebx	; 12/07/2026
 	call	set_working_path_x
+	;mov	ax, 0CD01h           ; AH = 0CDh (Kalıcı CD zorlaması), AL = 1
+	;call	set_working_path     ; Artık ezebilir, yedeğimiz en başta mühürlendi!
 	jnc	short sysexec_0
 
 	;; 'bad command or file name'
@@ -12214,17 +12225,38 @@ sysexec_17:
 	;dec	al
 	; 21/08/2024
 	dec	eax
-	mov	[u.intr], ax ; -1 ; 0FFFFh ; enable CTRL+CRK
+	mov	[u.intr], ax ; -1 ; 0FFFFh ; enable CTRL+BRK
+	; 12/07/2026
+	;mov	[u.cdrv], al ; -1 ; invalidate current drive (and dir parameters)      
 	inc	eax
 	mov	[u.quit], ax ; 0 ; reset CTRL+BRK flag
 
-	;cmp	dword [u.ppgdir], 0  ; is the caller MainProg (kernel) ?
+	;cmp	dword [u.ppgdir], 0 ; is the caller MainProg (kernel) ?
 	cmp	[u.ppgdir], eax ; 0 ; 23/07/2022
 	ja	short sysexec_18 ; no, the caller is user process
 	; If the caller is kernel (MainProg), 'sysexec' will come here
 	mov	edx, [k_page_dir] ; kernel's page directory
 	mov	[u.ppgdir], edx ; next time 'sysexec' must not come here
 sysexec_18:
+	;;;;;
+	; 13/07/2026 - Erdogan Tan & Google AI
+	; backup active current directory structure to the new process U area
+	 
+	mov	cl, [Current_Drv]
+	mov	[u.cdrv], cl
+
+	mov	cl, [Current_Dir_Level]
+	mov	[u.cdlvl], cl
+
+	mov	ecx, [Current_Dir_FCluster]
+	mov	[u.cdfcl], ecx
+
+	mov	esi, PATH_Array
+	mov	edi, u.cdir
+	mov	ecx, 32
+	rep	movsd
+	;;;;
+
 	; 02/05/2016
 	; 24/04/2016 (TRDOS 386 = TRDOS v2.0)
 	; 18/10/2015 (Retro UNIX 386 v1)
@@ -13460,6 +13492,8 @@ glerr_3:
 	jmp	short glerr_1
 
 load_and_run_file:
+	; 11/07/2026
+	; 10/07/2026 - TRDOS 386 Kernel v2.0.11
 	; 10/01/2026
 	; 07/07/2025 - TRDOS 386 Kernel v2.0.10
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
@@ -13478,7 +13512,7 @@ load_and_run_file:
 	; [argc] = argument count
 	; [u.nread] = argument list length
 	; [esp] = return address to the caller (*)
-	;
+
 	mov	[argv], esi
 	mov	[i.size], edx
 	mov	[ii], eax
@@ -13486,7 +13520,10 @@ load_and_run_file:
 	;sti	; 07/01/2017
 	;mov	eax, [k_page_dir]
 	;mov	[u.pgdir], eax
-	xor 	eax, eax ; clc ; *** ; 04/01/2017
+	
+	; 11/07/2026 (cf=0)
+	;xor 	eax, eax ; clc ; *** ; 04/01/2017
+	
 	;mov	[u.r0], eax ; 0 ; 07/01/2017
 
 	; 06/05/2016
@@ -14344,7 +14381,7 @@ wswap:  ; < swap out, swap to disk >
 	;
 
 	; 28/02/2017
-	;cmp	byte [multi_tasking], 0  ; Musti tasking mode ?
+	;cmp	byte [multi_tasking], 0  ; Multi tasking mode ?
 	;jna	short wswp
 	cmp	byte [u.fpsave], 0 ; 28/02/2017
 	jna	short wswp
@@ -17083,6 +17120,10 @@ sysrmdir_9:
 	jmp	short sysrmdir_7
 
 syschdir: ; Change Current (Working) Drive & Directory (for user)
+	; 12/07/2026 - TRDOS 386 v2.0.11
+	;	Erdogan Tan & Google AI Collaborator
+	;	Explicit CHDIR Re-validation	
+	;
 	; 30/12/2017 (TRDOS 386 = TRDOS v2.0)
 	;
         ; INPUT ->
@@ -17121,11 +17162,14 @@ syschdir_err:
 	call 	reset_working_path
 	jmp	error
 syschdir_ok:
+	; 12/07/2026 - Erdogan Tan & Google AI
+	; Invalidate to enforce a fresh, updated CWD snapshot
+	mov	byte [u.cdrv], -1
+
 	xor	eax, eax ; 0
 	mov	[u.r0], eax
 	;mov	[u.error], eax
 	jmp	sysret
-
 
 syschmod: ; Get & Change File (or Directory) Attributes
 	; 26/09/2024 - TRDOS 386 v2.0.9

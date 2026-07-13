@@ -1,11 +1,11 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.9) - UNINITIALIZED USER DATA : ubss.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - UNINITIALIZED USER DATA : ubss.s
 ; ----------------------------------------------------------------------------
-; Last Update: 19/08/2024  (Previous: 07/08/2022)
+; Last Update: 12/07/2026  (Previous: 19/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
-; Assembler: NASM version 2.15 (trdos386.s)
+; Assembler: NASM version 3.02 (trdos386.s)
 ; ----------------------------------------------------------------------------
 ; Derived from 'Retro UNIX 386 Kernel - v0.2.1.0' source code by Erdogan Tan
 ; ux.s (04/12/2015)
@@ -235,6 +235,7 @@ sysflg:	resb 1
 alignb 4
 
 user:
+	; 12/07/2026 - TRDOS 386 Kernel v2.0.11
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 04/12/2021 - Retro UNIX 386 v1.2
 	; 13/01/2017
@@ -251,19 +252,21 @@ user:
 	; 11/05/2015
 	; 16/04/2015 (Retro UNIX 386 v1 - 32 bit modifications)
 	; 10/10/2013
-	; 11/03/2013.
+	; 11/03/2013
 	;Derived from UNIX v1 source code 'user' structure (ux).
 	;u.
 
 	u.sp:	  resd 1 ; esp (kernel stack at the beginning of 'sysent')
 	u.usp:	  resd 1 ; esp (kernel stack points to user's registers)
 	u.r0:	  resd 1 ; eax
-	u.cdir:	  resw 1
-		  resw 1 ; 23/07/2022
-	u.cdrv:	  resb 1 ; 23/07/2022
-		  resb 1
+	; 12/07/2026 - TRDOS 386 v2.0.11
+	;u.cdir:  resw 1
+	;	  resw 1 ; 23/07/2022
+	;u.cdrv:  resb 1 ; 23/07/2022
+	;	  resb 1
 	u.fp:	  resb 10
-	;u.fp:	  resb OPENFILES ; 23/07/202
+		  resw 1 ; 12/07/2026
+	;u.fp:	  resb OPENFILES ; 23/07/2022
 	u.fsp:	  ; 23/07/2022
 	u.fofp:	  resd 1
 	u.dirp:	  resd 1
@@ -280,7 +283,8 @@ user:
 	u.ttyn:	  resb 1 ; 28/07/2013 - Retro Unix 8086 v1 feature only !
 	u.mode:   resb 1 ; 23/07/2022
 	;u.resb:  resb 1 ; 10/01/2017 (TRDOS 386, temporary)
-	u.dirbuf: resb 16 ; 04/12/2015 (10 -> 16)
+	; 12/07/2026
+        ;u.dirbuf: resb 16 ; 04/12/2015 (10 -> 16)
 	;u.pri:	  resw 1 ; 14/02/2014
 	u.quant:  resb 1 ; Retro UNIX 8086 v1 Feature only ! (uquant)
 		  resb 1 ; 23/07/2022
@@ -325,8 +329,8 @@ user:
 	; 19/08/2024	 ; TRDOS 386 v2.0.9 ; STDIN/STDOUT/STDERR 
 	u.stdin:  resb 1 ; 0 is tty-r or > 0 is file (redirection)
 	u.stdout: resb 1 ; 0 is tty-w or > 0 is file (redirection)
-	u.ungetc: resb 1 ; u.getc is valid if u.ungetc > 0	
-	u.getc:	  resb 1 ; last char read on stdin	 	
+	u.ungetc: resb 1 ; u.getc is valid if u.ungetc > 0
+	u.getc:	  resb 1 ; last char read on stdin
 	;;;
 	; last error number
 	u.error:  resd 1 ; 28/07/2013 - 09/03/2015 
@@ -343,16 +347,24 @@ user:
 		; 28/02/2017 (TRDOS 386)
 	u.irqwait: resb 1 ; IRQ waiting for callback service flag (IRQ number, If > 0)
 	u.r_lock: resb 1 ; 'IRQ callback service is in progress' flag (IRQ lock)
-	u.r_mode: resb 1 ; running mode during hadware interrupt
+	u.r_mode: resb 1 ; running mode during hardware interrupt
 	; 23/07/2022
 	u.exit:	  resb 1 ; exit code
 	; 27/02/2017 (TRDOS 386)
 	u.fpsave: resb 1 ; TRDOS 386, 'save/restore FPU registers' flag
 alignb 4
 	; !! wrong sizing in TRDOS 386 v2.0.4 (in 'ubss.s', 28/02/2017) !!
-	;u.fpregs: resb 94 ; 94 byte area for saving and restoring FPU registers
+	;u.fpregs: resb 94 ; 94 bytes area for saving and restoring FPU registers
 	; 23/07/2022
-	u.fpregs: resb 108 ; 108 byte area for saving and restoring FPU registers
+	u.fpregs: resb 108 ; 108 bytes area for saving and restoring FPU registers
+
+;alignb 4
+	; 12/07/2026
+	u.reserved: resw 1
+	u.cdrv:	 resb 1 ; home/current drive and directory ... save/restore
+	u.cdlvl: resb 1 ; sub directory level (of the current directory) 	
+        u.cdfcl: resd 1 ; first cluster (of the current directory)
+	u.cdir:	 resb 128 ; 8*(12+4) sub directory array (current directory table)
 
 alignb 4
 

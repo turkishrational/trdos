@@ -1,11 +1,11 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 29/05/2026  (Previous: 28/01/2025, v2.0.10)
+; Last Update: 13/07/2026  (Previous: 28/01/2025, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
-; Assembler: NASM version 2.15 (trdos386.s)
+; Assembler: NASM version 3.02 (trdos386.s)
 ; ----------------------------------------------------------------------------
 ; Derived from 'Retro UNIX 386 Kernel - v0.2.1.0' source code by Erdogan Tan
 ; u0.s (20/11/2015), u4.s (14/10/2015)
@@ -913,6 +913,9 @@ set_working_path_xx: ; 30/12/2017 (syschdir)
 		mov	[FFF_Valid], ah ; 0 ; reset ; 17/10/2016
 
 set_working_path:
+		; 13/07/2026
+		; 12/07/2026
+		; 11/07/2026 - TRDOS 386 Kernel v2.0.11	
 		; 08/08/2022
 		; 29/07/2022 - TRDOS 386 Kernel v2.0.5
 		; 16/10/2016
@@ -964,8 +967,9 @@ set_working_path:
 		; Modified registers: EAX, EBX, ECX, EDX, ESI, EDI
 
 		mov	[SWP_Mode], ax
+		xor	eax, eax ; 0	; 12/07/2026	
 		mov	al, [Current_Drv]
-		xor	ah, ah
+		;xor	ah, ah
 		mov	[SWP_DRV], ax
 
 		; TRDOS 386 ring 3 (user's page directory)
@@ -977,7 +981,7 @@ set_working_path:
 		
 		;mov	ecx, 128 ; maximum path length = 128 bytes
 		; 29/07/2022
-		xor	ecx, ecx
+		xor	ecx, ecx ; 11/07/2026 ; ecx = 0
 		mov	cl, 128
 		sub	esp, ecx ; reserve 128 bytes (buffer) on stack
 		mov	edi, esp ; destination address (kernel space)
@@ -1004,7 +1008,76 @@ loc_swp_xor_retn:
 loc_swp_retn:
 		mov	esp, ebp
 		pop	ebp
+		
+		; 12/07/2026
+		jc	short loc_swp_2
+		; eax = 0
+; ...
+		; 12/07/2026 - TRDOS 386 v2.0.11
+		; home/current drive & directory save/restore feature (for every process)
+		; (CWD optimization)
 
+		cmp	[u.cdrv], -1  ; invalidated (means that cdrv/cdir backup is needed)
+		clc	; 13/07/2026
+		jne	short loc_swp_2 ; no, valid
+				 ; this process's current/home dir has ben backed up before  
+
+		; save/backup -or validate it for the restore phase-
+
+		; Save current drive as (default) working drive of the running process 
+		mov	al, [Current_Drv]
+		mov	[u.cdrv], al
+
+		; 12/07/2026
+		; If [u.uno] = 1, it is MainProg (Internal Command Interpreter)
+		; It is better to rely on the current directory structure in the LDRVT table
+		;    rather than the one in PATH_Array. !!!
+		; (LDRVT tables -multi logical disks have separate current directory records-
+		;  are directly controlled by the kernel. Ring 3 process has only one cdrv/cdir
+		;  backup. It is set here at the load & run stage of the PRG.)
+
+		push	esi  ; save the directory/path name address
+
+		mov	esi, PATH_Array
+
+		cmp	byte [u.uno], 1
+		ja	short loc_swp_1	 ; external program (PRG)
+
+		; this process is the internal command interperter (MainProg) 
+		; (cdir backup reference must be the LDRVT of the current logical disk)
+		
+		xor	ecx, ecx
+		mov	ch, al	; [Current_Drv]
+		mov	esi, Logical_DOSDisks+LD_CDirLevel ; current/last sub dir level
+		add	esi, ecx
+		; esi = LDRVT + 127
+		lodsb
+		; esi = LDRVT + LD_CurrentDirectory  ; LDRTV + 128
+		push	esi
+		mov	[Current_Dir_Level], al
+		; Save the current directory's first cluster
+		shl	eax, 4  ; * 16
+		add	eax, 12 ; skip sub directory name
+		add	esi, eax 
+		lodsd	; the First Cluster of the sub directory 
+		mov	[Current_Dir_FCluster], eax
+		pop	esi
+loc_swp_1:
+		; Save the current dir structure/table to the process's backup field
+		mov	edi, u.cdir ; current directory backup location
+		mov	ecx, 128/4
+		rep	movsd
+
+		pop	esi ; path (asciiz) -in the user's memory space-
+
+		; Save current directory (sub directory) level
+		mov	al, [Current_Dir_Level]
+		mov	[u.cdlvl], al
+		; Save the current directory's first cluster
+		mov	eax, [Current_Dir_FCluster]
+		mov	[u.cdfcl], eax			
+loc_swp_2:
+; ...
 		;mov	esi, FindFile_Drv
 		mov	esi, FindFile_Name ; 12/10/2016
 		retn 
@@ -1025,7 +1098,7 @@ loc_swp_checkfile_name:
 		; 10/10/2016 (valid file name checking)
 		mov	esi, FindFile_Name
 		cmp	byte [esi], 20h
-		jna	short loc_swp_xor_retn
+		jna	loc_swp_xor_retn
 
 		; 16/10/2016
 		mov	byte [SWP_inv_fname], 0 ; reset 
@@ -1045,74 +1118,96 @@ loc_swp_drv:
 
 		inc	byte [SWP_DRV_chg]
 		call	change_current_drive
-		jc	short loc_swp_retn ; eax = error code
+		jc	loc_swp_retn ; eax = error code
 		; eax = 0
 
 loc_swp_change_directory:
 		cmp	byte [FindFile_Directory], 21h
 		cmc
-		jnc	short loc_swp_retn
+		jnc	loc_swp_retn
 
 		inc	byte [SWP_DRV_chg]
 		inc	byte [Restore_CDIR]
 		mov	esi, FindFile_Directory
 		mov	ah, [SWP_Mode+1] 
 		call	change_current_directory
-		;jc	short loc_swp_retn ; eax = error code
+		; 12/07/2026
+		jc	loc_swp_retn ; eax = error code
 		; 08/08/2022
-		jnc	short loc_swp_change_prompt_dir_string
-		jmp	loc_swp_retn	
+		;jnc	short loc_swp_change_prompt_dir_string
+		;jmp	loc_swp_retn
 
 loc_swp_change_prompt_dir_string:
 		; esi = PATH_Array
 		; eax = Current Directory First Cluster
 		; edi = Logical DOS Drive Description Table
-		call	change_prompt_dir_str 
+		call	change_prompt_dir_str
 		sub	eax, eax ; 0
-		jmp	loc_swp_retn 
+		jmp	loc_swp_retn
 
 reset_working_path:
+		; 12/07/2026
+		; 11/07/2026 - TRDOS 386 v2.0.11
 		; 06/10/2016 - TRDOS 386 (TRDOS v2.0)
 		;
-		; TRDOS v1.0 (DIR.ASM, "proc_reset_working_path")
-		; 05/02/2011 - 08/02/2011
-		;
-		; Restores current drive and directory
-		; 
+		; Restores current drive and directory state. Overwrites the live 'PATH_Array'
+		; at the very end of the hardware flow to lock the running program's actual CWD.
 		; INPUT: none
 		; OUTPUT: DL = SWP_DRV, EAX = 0 -> OK
-		;
-		;    AX = 0 -> ESI = Logical Dos Drv Desc. Table
-		;
-		;    EAX, EBX, ECX, EDX, ESI, EDI will be changed
-		;
+		; Modified registers: EAX, EBX, ECX, EDX, ESI, EDI
 
-  
 		xor	eax, eax
 		dec	eax 
 
 		mov	dx, [SWP_DRV]
-		or	dh, dh
+		or	dh, dh	; [SWP_DRV_chg]
 		jz	short loc_rwp_return
 
 		cmp	dl, [Current_Drv]
 		je	short loc_rwp_restore_cdir
 loc_rwp_restore_cdrv:
-		call	change_current_drive 
-		jmp	short loc_rwp_restore_ok
+		call	change_current_drive	; + 'restore_working_directory'
+		;jmp	short loc_rwp_return
 loc_rwp_restore_cdir:
-		xor	ebx, ebx
-		mov	bh, dl
-		mov	esi, Logical_DOSDisks
-		add	esi, ebx
+		; 12/07/2026
+		dec	byte [SWP_DRV_chg]
+		jz	short loc_rwp_return
 
-		call	restore_current_directory
+		; 12/07/2026 - Major Modification
+		;xor	ebx, ebx
+		;mov	bh, dl
+		;mov	esi, Logical_DOSDisks
+		;add	esi, ebx
+		;	
+		;call	restore_current_directory
 
-loc_rwp_restore_ok:
+		; 12/07/2026
+		; Restore the home/current directory of the active/running process.
+		mov	ecx, [u.cdfcl] ; first cluster
+		cmp	ecx, [Current_Dir_FCluster] ; from 'restore_working_directory'
+		je	short loc_rwp_return ; same dir, skip
+		mov	al, [u.cdrv]
+		cmp	al, [Current_Drv]
+		jne	short loc_rwp_return ; nonsence !?, skip
+		;cmp	byte [u.uno], 1	; MainProg ? (Internal Command Interpreter)
+		;jna	short loc_rwp_return ; already restored in 'change_current_drive'
+		;			; .. because, MainProg's home/current dir setup is on the LDRVT.
+		mov	[Current_Dir_FCluster], ecx ; necessarry ?
+		mov	esi, u.cdir
+		mov	ecx, 128/4
+		mov	edi, PATH_Array
+		rep	movsd
+		mov	cl, [u.cdlvl]
+		mov	[Current_Dir_Level], cl
+;loc_rwp_restore_ok:
+		; Construct the clean ASCIIZ prompt string from the freshly overwritten PATH_Array
+		call	change_prompt_dir_string
+loc_rwp_return:
+		; 12/07/2026 (these are may not be necessary?)
 		mov	dx, [SWP_DRV]
 		xor	eax, eax  
-		mov	[SWP_DRV_chg], ax
-loc_rwp_return:
+		mov	[SWP_DRV_chg], al ; (BugFix!)
+
 		retn
 
 get_file_name:

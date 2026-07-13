@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - INITIALIZED DATA : trdosk9.s
 ; ----------------------------------------------------------------------------
-; Last Update: 10/07/2026 (Previous: 10/02/2026 - Kernel v2.0.10)
+; Last Update: 13/07/2026 (Previous: 10/02/2026 - Kernel v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -31,7 +31,7 @@ Magic_Bytes:
 		db 1
 mainprog_Version:
 		db 7
-		db "[TRDOS] Main Program v2.0.11 (10/07/2026)"
+		db "[TRDOS] Main Program v2.0.11 (13/07/2026)"
 		db 0Dh, 0Ah
 		db "(c) Erdogan Tan 2005-2026"
 		db 0Dh, 0Ah, 0
@@ -628,3 +628,29 @@ dma_page:	db 87h,83h,81h,82h,8Fh,8Bh,89h,8Ah ; 03/08/2017
 dma_mask:	db 0Ah,0Ah,0Ah,0Ah,0D4h,0D4h,0D4h,0D4h
 dma_mod:	db 0Bh,0Bh,0Bh,0Bh,0D6h,0D6h,0D6h,0D6h
 dma_flip:	db 0Ch,0Ch,0Ch,0Ch,0D8h,0D8h,0D8h,0D8h
+
+; 11/07/2026 - Erdogan Tan & Google AI Collaborator - CWD Isolation & Restore 
+;
+; rcwd_u: Active context guard flag for CWD restoration.
+;         Holds the 'u.uno' number of the process that initiated the save.
+;         Acts as a gatekeeper: 0 = No active backup / skip restoration.
+;                               >0 = Restore target disk's LDRVT from this slot.
+rcwd_u:		db 0	; Active process ID for CLI CWD restoration
+
+; 11/07/2026 - Erdogan Tan & Google AI Collaborator - Active Program Context Guard
+;
+; scwd_u: Context guard flag for running program's temporary path changes.
+;         Stores the 'u.uno' number of the process that triggered 'set_working_path'.
+;         Acts as a gatekeeper: 0 = No temporary path backup active / skip.
+;                               >0 = Restore 'PATH_Array' from this slot.
+scwd_u:		db 0	; Active process ID for running program path restoration
+
+align 4
+
+; 10/07/2026 - Erdogan Tan & Google AI Collaborator - CWD Isolation Matrix
+;
+; p_drv:  Initialized flat matrix array mapping to Process Slots (0 to 15).
+;         Stores the original resident CLI/Shell logical drive number 
+;         ([u.uno] - 1) for restoring the exact path after process termination.
+;         Value of -1 (0FFh) indicates the slot is free/unallocated.
+p_drv:		times 16 db -1	; Original CLI drive backup for path restoration
