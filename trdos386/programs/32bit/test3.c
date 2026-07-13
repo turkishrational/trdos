@@ -29,7 +29,7 @@ int main(int argc, char **argv)
     /* Enforce check: Verify if arguments are passed from the command line prompt */
     if (argc < 2) {
         write(1, "Usage status: No custom arguments detected inside prompt.\r\n", 59);
-        write(1, "Try passing parameters like: test3 arg1 arg2 trdos386\r\n", 57);
+        write(1, "Try passing parameters like: test3 arg1 arg2 trdos386\r\n", 55);
         return 10; /* Safe exit code marker targeting tccexec monitor */
     }
 
