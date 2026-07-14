@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 13/07/2026  (Previous: 28/01/2025, v2.0.10)
+; Last Update: 14/07/2026  (Previous: 28/01/2025, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -913,6 +913,7 @@ set_working_path_xx: ; 30/12/2017 (syschdir)
 		mov	[FFF_Valid], ah ; 0 ; reset ; 17/10/2016
 
 set_working_path:
+		; 14/07/2026
 		; 13/07/2026
 		; 12/07/2026
 		; 11/07/2026 - TRDOS 386 Kernel v2.0.11	
@@ -1011,7 +1012,6 @@ loc_swp_retn:
 		
 		; 12/07/2026
 		jc	short loc_swp_2
-		; eax = 0
 ; ...
 		; 12/07/2026 - TRDOS 386 v2.0.11
 		; home/current drive & directory save/restore feature (for every process)
@@ -1023,6 +1023,10 @@ loc_swp_retn:
 				 ; this process's current/home dir has ben backed up before  
 
 		; save/backup -or validate it for the restore phase-
+	
+		; 14/07/2026
+		;xor	eax, eax
+		; eax = 0
 
 		; Save current drive as (default) working drive of the running process 
 		mov	al, [Current_Drv]
@@ -1144,7 +1148,9 @@ loc_swp_skip_rwd_from_u:
 		;;;;
 		cmp	byte [FindFile_Directory], 21h
 		cmc
-		jnc	loc_swp_retn
+		;jnc	loc_swp_retn
+		; 14/07/2026
+		jnc	short loc_swp_retn_@
 
 		inc	byte [SWP_DRV_chg]
 		inc	byte [Restore_CDIR]
@@ -1162,10 +1168,12 @@ loc_swp_change_prompt_dir_string:
 		; eax = Current Directory First Cluster
 		; edi = Logical DOS Drive Description Table
 		call	change_prompt_dir_str
+loc_swp_retn_@:		; 14/07/2026
 		sub	eax, eax ; 0
 		jmp	loc_swp_retn
 
 reset_working_path:
+		; 14/07/2026
 		; 12/07/2026
 		; 11/07/2026 - TRDOS 386 v2.0.11
 		; 06/10/2016 - TRDOS 386 (TRDOS v2.0)
@@ -1181,7 +1189,8 @@ reset_working_path:
 
 		mov	dx, [SWP_DRV]
 		or	dh, dh	; [SWP_DRV_chg]
-		jz	short loc_rwp_return
+		;jz	short loc_rwp_return
+		jz	short loc_rwp_return_@ ; 14/07/2026
 
 		cmp	dl, [Current_Drv]
 		je	short loc_rwp_restore_cdir
@@ -1200,6 +1209,10 @@ loc_rwp_restore_cdir:
 		;add	esi, ebx
 		;	
 		;call	restore_current_directory
+
+		; 14/07/2026 (may not be necessary...)
+		;cmp	byte [Restore_CDIR], 0
+		;jna	short loc_rwp_return
 
 		; 12/07/2026
 		; Restore the home/current directory of the active/running process.
@@ -1222,12 +1235,19 @@ loc_rwp_restore_cdir:
 ;loc_rwp_restore_ok:
 		; Construct the clean ASCIIZ prompt string from the freshly overwritten PATH_Array
 		call	change_prompt_dir_string
-loc_rwp_return:
-		; 12/07/2026 (these are may not be necessary?)
-		mov	dx, [SWP_DRV]
-		xor	eax, eax  
-		mov	[SWP_DRV_chg], al ; (BugFix!)
 
+		; 14/07/2026 (may not be necessary...)
+		mov	byte [Restore_CDIR], 0
+	
+		; 12/07/2026 (these are may not be necessary?)
+loc_rwp_return:		; 14/07/2026
+		mov	dx, [SWP_DRV]
+loc_rwp_return_@:
+		xor	eax, eax
+		;mov	[SWP_DRV], ax
+		;mov	[SWP_DRV_chg], al ; (BugFix!)
+		; SWP_Mode (w), SWP_DRV (b), SWP_DRV_chg (b)
+		mov	[SWP_Mode], eax ; 0
 		retn
 
 get_file_name:

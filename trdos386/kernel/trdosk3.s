@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 19/12/2025  (Previous: 26/09/2024, TRDOS 386 v2.0.9)
+; Last Update: 14/07/2026  (Previous: 19/12/2025, TRDOS 386 v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
@@ -245,6 +245,7 @@ loc_ccdrv_reset_cdir_FAT_fcluster:
 	mov	edi, Current_Dir_Drv
 
 	mov	[Restore_CDIR], al ; 0
+
 	retn
 
 dos_prompt:
@@ -1712,6 +1713,7 @@ loc_gvsn_return:
 ; 29/01/2005
 
 command_interpreter:
+	; 14/07/2026 (TRDOS 386 Kernel v2.0.11)
 	; 26/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 16/10/2016
 	; 12/10/2016
@@ -2077,6 +2079,13 @@ cd_3:
 	mov	dl, al
 	call 	change_current_drive
 	jc	short cd_drive_not_ready
+	
+	; 14/07/2026 - TRDOS 386 v2.0.11
+	; invalidate (MainProg's) cdir backup
+	;	for the next 'set_working_path'
+	;
+	;mov	byte [u.cdrv], -1  ; Not necessary
+				   ; for current v2.0.11 configuration!?
 	retn
 
 cd_drive_not_ready:
