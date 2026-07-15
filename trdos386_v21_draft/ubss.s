@@ -1,11 +1,11 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED USER DATA : ubss.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.1.0) - UNINITIALIZED USER DATA : ubss.s
 ; ----------------------------------------------------------------------------
-; Last Update: 09/01/2026  (Previous: 19/08/2024, v2.0.9)
+; Last Update: 15/07/2026  (Previous: 09/01/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
-; Assembler: NASM version 2.15 (trdos386.s)
+; Assembler: NASM version 3.02 (trdos386.s)
 ; ----------------------------------------------------------------------------
 ; Derived from 'Retro UNIX 386 Kernel - v0.2.1.0' source code by Erdogan Tan
 ; ux.s (04/12/2015)
@@ -238,6 +238,8 @@ sysflg:	resb 1
 alignb 4
 
 user:
+	; 15/07/2026 - TRDOS 386 Kernel v2.1.0
+	; 12/07/2026 - TRDOS 386 Kernel v2.0.11
 	; 09/01/2026 - TRDOS 386 Kernel v2.0.10 (v2.1)
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 04/12/2021 - Retro UNIX 386 v1.2
@@ -269,9 +271,10 @@ user:
 	;	  resb 1
 	;
 	u.fp:	  resb 10
-	;u.fp:	  resb OPENFILES ; 23/07/202
+		  resw 1 ; 12/07/2026
+	;u.fp:	  resb OPENFILES ; 23/07/2022
 	;u.fsp:	  ; 23/07/2022
-		  resb 2 ; 09/01/2026
+		  ;resb 2 ; 09/01/2026
 	u.fofp:	  resd 1
 	; 09/01/2026
 	;u.dirp:  resd 1
@@ -370,6 +373,14 @@ alignb 4
 	;u.fpregs: resb 94 ; 94 byte area for saving and restoring FPU registers
 	; 23/07/2022
 	u.fpregs: resb 108 ; 108 byte area for saving and restoring FPU registers
+
+;alignb 4
+	; 12/07/2026 - TRDOS 386 v2.0.11 (& v2.1.0, 15/07/2026)
+	u.reserved: resw 1
+	u.cdrv:	 resb 1 ; home/current drive and directory ... save/restore
+	u.cdlvl: resb 1 ; sub directory level (of the current directory) 	
+        u.cdfcl: resd 1 ; first cluster (of the current directory)
+	u.cdir:	 resb 128 ; 8*(12+4) sub directory array (current directory table)
 
 alignb 4
 

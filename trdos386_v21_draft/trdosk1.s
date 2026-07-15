@@ -1,11 +1,11 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - SYS INIT : trdosk1.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.1.0) - SYS INIT : trdosk1.s
 ; ----------------------------------------------------------------------------
-; Last Update: 08/01/2026 (Previous: 26/09/2024, v2.0.9)
+; Last Update: 15/07/2026 (Previous: 08/01/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
-; Assembler: NASM version 2.15 (trdos386.s)
+; Assembler: NASM version 3.02 (trdos386.s)
 ; ----------------------------------------------------------------------------
 ; Derived from TRDOS Operating System v1.0 (8086) source code by Erdogan Tan
 ; TRDOS2.ASM (09/11/2011)
@@ -14,9 +14,12 @@
 ;
 
 sys_init:
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	; 03/05/2026
+	; 02/05/2026 (TRDOS 386 v2.0.11)
 	; 19/10/2025
 	; 08/05/2025
-	; 17/04/2025 (TRDOS 386 v2.0.10)
+	; 17/04/2025 - TRDOS 386 v2.0.10
 	; 26/09/2024 (TRDOS 386 v2.0.9)
 	; 18/04/2021 (TRDOS 386 v2.0.4)
 	; 20/01/2018  (v2.0.1)
@@ -38,9 +41,21 @@ sys_init:
 	out	40h, al ; LB
 	out	40h, al ; HB
  	;
+
+	; 02/05/2026 (TRDOS 386 v2.0.11)
+	; Set an initial value for the timer tick count
+	; according to the Real Time Clock.
+	;call	SET_TOD	; 'timer.s'
+			; ref: IBM PC XT286 BIOS 'test4.asm'
+	; 03/05/2026
+	; Re-initialize the tick count value
+	; using the real-time clock output (18.2 Hz).
+	call	rtc_to_tick_count
+	mov	[TIMER_LH], eax
+
 	; 30/03/2016
 	; Clear Logical DOS Disk Description Tables Area
-	;xor	eax, eax
+	xor	eax, eax
 	mov	edi, Logical_DOSDisks
 	mov	ecx, 6656/4 ; 26*256 = 6656 bytes
 	rep	stosd ; 1664 times 4 bytes
@@ -512,6 +527,8 @@ epoch:
 	call	get_rtc_date_time ; TRDOS 386 - 30/12/2017
 
 convert_to_epoch:
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	; 07/05/2026 (TRDOS 386 v2.0.11)
 	; 25/07/2022 (TRDOS 386 Kernel v2.0.5)
 	; 31/12/2017 (TRDOS 386 = TRDOS v2.0)
 	; 15/03/2015 (Retro UNIX 386 v1 - 32 bit modification)
@@ -547,11 +564,30 @@ convert_to_epoch:
 		; (year-1969)/4
 	add 	eax, edx
 			; + leap days since 1/1/1970
+	;;;;
+	; 07/05/2026 - TRDOS 386 Kernel v2.0.11
+	; ref: Google AI
+	; 2100 Leap Year Correction (Patch)
+	; ((The year 2100 is not a leap year
+	; because it is not divisible by 400.))
+	cmp	word [year], 2100
+	jb	short cte_fix_skip
+	dec	eax
+cte_fix_skip:
+	;;;;
+
 	cmp 	byte [month], 2	; if past february
 	jna 	short cte1
 	mov 	dx, [year]
 	and 	dx, 3 ; year mod 4
 	jnz 	short cte1
+	
+        ;;;;
+	; 07/05/2026
+    	; 2100 year exception check
+	cmp	dx, 2100
+	je	short cte1
+	;;;;
 			; and if leap year
 	;add 	eax, 1 	; add this year's leap day (february 29)
 	; 25/07/2022
@@ -577,6 +613,9 @@ cte1: 			; compute seconds since 1/1/1970
 
 ;set_date_time:
 convert_from_epoch:
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	; 12/05/2026 -BugFix!-
+	; 07/05/2026 (TRDOS 386 v2.0.11)
 	; 25/07/2022 (v2.0.5)
 	; 18/04/2021 (v2.0.4)
 	; 31/12/2017 (v2.0.0)
@@ -650,6 +689,17 @@ convert_from_epoch:
 	;add	eax, 1968
 	add 	ax, 1968     ; compute year
 	mov 	[year], ax
+	;;;;
+	; 07/05/2026 - TRDOS 386 v2.0.11
+	; ref: Google AI
+	; 2100 Leap Year Correction (Patch)
+	; ((The year 2100 is not a leap year
+	; because it is not divisible by 400.))
+	cmp	ax, 2100
+	jb	short cfe_fix_skip
+	inc	edx
+cfe_fix_skip:
+	;;;;
 	;mov 	cx, dx
 	; 25/07/2022
 	mov	ecx, edx
@@ -706,9 +756,11 @@ cfe3:
 	sub	ecx, edx
 	;inc 	cx
 	; 18/04/2021
-	inc	cl
-	;mov 	[day], cx
-	mov	[day], cl
+	;inc	cl
+	; 12/05/2026
+	inc	ecx
+	mov 	[day], cx
+	;mov	[day], cl
 
 	; eax, ebx, ecx, edx is changed at return
 	; output ->
@@ -717,6 +769,8 @@ cfe3:
 	retn	; 31/12/2017 (TRDOS 386)
 
 set_rtc_date_time:
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	; 12/05/2026 (v2.0.11) -BugFix!-
 	; 31/12/2017 (v2.0.0)
 	; 30/12/2017 (TRDOS 386)
 	; 15/03/2015 (Retro UNIX 386 v1 - 32 bit version)
@@ -730,6 +784,8 @@ set_rtc_date_time:
 
 ; 31/12/2017
 set_date_bcd:
+	; 12/05/2026 - BugFix !
+%if 0
         mov     al, [year+1]
 	aam 	; ah = al / 10, al = al mod 10
 	db 	0D5h, 10h    ; Undocumented inst. AAD
@@ -752,6 +808,72 @@ set_date_bcd:
 	; 18/04/2021
 	mov 	dl, al ; day (BCD)
 	retn	; 30/12/2017
+%else
+	; 12/05/2026
+	; ref: Google AI
+	;movzx	eax, word [year] ; EAX = 2026
+
+	;xor	edx, edx
+
+	;mov	ecx, 100
+
+	;div	ecx		; EAX = 20 (Century), EDX = 26 (Year)
+
+	; Convert Century to BCD (20 -> 0x20)
+	;mov	al, al
+
+	;aam
+
+	;shl	ah, 4
+
+	;or	al, ah
+	;mov	ch, al		; CH = 0x20 (BCD Century)
+
+	; Convert Year to BCD (26 -> 0x26)
+
+	;mov	al, dl
+	;aam
+	;shl	ah, 4
+
+	;or	al, ah
+	;mov	cl, al           ; CL = 0x26 (BCD Year)
+
+	mov	ax, [year]	; 2026
+	mov	cl, 100
+	div	cl		; al = 20 (century)
+				; ah = 26 (year)
+	mov	cl, ah
+	; Convert century to BCD (20 -> 20h)
+	aam			; ah = al / 10, al = al mod 10
+	;shl	ah, 4
+	;or	al, ah
+	db 	0D5h, 10h	; Undocumented inst. AAD
+				; AL = AH * 10h + AL
+	mov	ch, al	; century (BCD)
+
+	; Convert Year to BCD (26 -> 26h)
+
+	mov	al, cl
+	aam
+	db 	0D5h, 10h	; Undocumented inst. AAD
+				; AL = AH * 10h + AL
+	mov	cl, al	; year (BCD)
+
+	; Convert Month to BCD
+        mov 	al, [month]
+	aam 	; ah = al / 10, al = al mod 10
+	db 	0D5h, 10h    ; Undocumented inst. AAD
+			     ; AL = AH * 10h + AL
+	mov 	dh, al	; month (BCD)
+
+	; Convert Day to BCD
+	mov 	al, [day]
+	aam 	; ah = al / 10, al = al mod 10
+	db 	0D5h, 10h    ; Undocumented inst. AAD
+			     ; AL = AH * 10h + AL
+	mov 	dl, al ; day (BCD)
+	retn
+%endif
 
 ; 31/12/2017
 set_time_bcd:
@@ -785,6 +907,81 @@ stime1:
 			     ; AL = AH * 10h + AL
 	mov 	dh, al	     ; second (BCD)
 	retn	; 30/12/2017
+
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	; 15/05/2026
+	; 14/05/2026
+	; 03/05/2026 (TRDOS 386 v2.0.11)
+rtc_to_tick_count:
+	; convert current time to system timer ticks (18.2Hz)
+	;
+	;   input: none (real time clock)
+	;  output: eax = tick count (18.2 Hz)
+	; modified registers: eax, ebx, ecx, edx
+
+	call	get_rtc_date_time
+	movzx	ecx, byte [hour]
+	mov	eax, 60*60 ; 1 hour = 3600 seconds
+	mul	ecx
+	mov	ebx, eax
+	mov	cl, 60  ; 1 minute = 60 seconds
+	movzx	eax, byte [minute]
+	mul	ecx
+	add	eax, ebx
+	mov	cl, [second]
+	add	eax, ecx
+	;mov	cl, 182
+	;mul	ecx
+	;add	eax, 9
+	;adc	edx, 0
+	;mov	cl, 10
+	;div	ecx
+	; eax = ((182*seconds)+9)/10
+	; 14/05/2026
+	; (18.2065 Hz) ((1193182Hz/65536))
+	mov	ecx, 36413
+	mul	ecx
+	;add	eax, 1999
+	;adc	edx, 0
+	; 15/05/2026
+	add	eax, 1000
+	adc	edx, 0
+	mov	ecx, 2000
+	div	ecx	; (36413/2000 = 18.2065)
+dow_err:
+	retn
+
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	; 16/05/2026 (TRDOS 386 v2.0.11)
+get_day_of_week:
+	; input: none
+	; output: AL = day of week (1 = sunday, 7 = saturday)
+	;        (if cf = 1 -> error)
+	; modified registers: eax, ecx
+	xor	ecx, ecx ; ecx = 0
+set_day_of_week:
+	; input: CL = day of week (1 = sunday, 7 = saturday)
+	; output: none
+	;	 (if cf = 1 -> error)
+	; modified registers: eax
+
+	call	UPD_IPR			; CHECK FOR UPDATE IN PROCESS
+	;jnc	short sdow_@		; GO AROUND IF NO ERROR
+	;retn
+	jc	short dow_err
+sdow_@:
+	mov	al, CMOS_DAY_WEEK	; ADDRESS OF DAY OF WEEK BYTE
+	and	ecx, ecx
+	jz	short gdow_@
+	mov	ah, cl
+	;call	CMOS_WRITE
+	;retn
+	jmp	CMOS_WRITE
+
+gdow_@:
+	;call	CMOS_READ
+	;retn
+	jmp	CMOS_READ
 
 ; ----------------------------------------------------------------------
 

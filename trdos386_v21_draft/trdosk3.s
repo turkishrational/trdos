@@ -1,11 +1,11 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - MAIN PROGRAM : trdosk3.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.1.0) - MAIN PROGRAM : trdosk3.s
 ; ----------------------------------------------------------------------------
-; Last Update: 21/01/2026  (Previous: 26/09/2024, v2.0.9)
+; Last Update: 15/07/2026  (Previous: 21/01/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
-; Assembler: NASM version 2.15 (trdos386.s)
+; Assembler: NASM version 3.02 (trdos386.s)
 ; ----------------------------------------------------------------------------
 ; Derived from TRDOS Operating System v1.0 (8086) source code by Erdogan Tan
 ; MAINPROG.ASM (09/11/2011)
@@ -1763,6 +1763,8 @@ loc_gvsn_return:
 ; 29/01/2005
 
 command_interpreter:
+	; 15/07/2026 - TRDOS 386 Kernel v2.1.0
+	; 14/07/2026 (TRDOS 386 Kernel v2.0.11)
 	; 16/06/2025
 	; 14/06/2025 (TRDOS 386 Kernel v2.0.10)
 	; 26/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -2133,6 +2135,14 @@ cd_3:
 	mov	dl, al
 	call 	change_current_drive
 	jc	short cd_drive_not_ready
+
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	; 14/07/2026 - TRDOS 386 v2.0.11
+	; invalidate (MainProg's) cdir backup
+	;	for the next 'set_working_path'
+	;
+	;mov	byte [u.cdrv], -1  ; Not necessary
+				   ; for current v2.0.11 configuration!?
 	retn
 
 cd_drive_not_ready:

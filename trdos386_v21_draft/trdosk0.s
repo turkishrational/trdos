@@ -194,7 +194,7 @@ bs_FS_MediaAttrib equ 8 ; db 3
 bs_FS_PartitionID equ 9 ; db 0A1h
 bs_FS_VersionMaj equ 10 ; db 01h
 bs_FS_VersionMin equ 11 ; db 0
-bs_FS_BeginSector equ 12   ; dd 0 
+bs_FS_BeginSector equ 12 ; dd 0
 bs_FS_VolumeSize equ 16 ; dd 2880
 bs_FS_StartupFD equ 20 ; dd 0
 bs_FS_MATLocation equ 24 ; dd 1
@@ -204,9 +204,9 @@ bs_FS_SwapFD equ 36 ; dd 0
 bs_FS_UnDelDirD equ 40 ; dd 0
 bs_FS_DriveNumber equ 44 ; db 0
 bs_FS_LBA_Ready equ 45 ; db 0
-bs_FS_MagicWord equ 46 
+bs_FS_MagicWord equ 46
 bs_FS_SecPerTrack equ 46 ; db 0A1h
-bs_FS_Heads equ 47 ; db 01h 
+bs_FS_Heads equ 47 ; db 01h
 bs_FS_OperationSys equ 48 ; db "TR-SINGLIX v1.0b"
 bs_FS_Terminator equ 64 ; db 0
 bs_FS_BootCode equ 65 
@@ -674,7 +674,7 @@ struc dir_entry
 			; high word of first cluster number
 .dir_time:	resw 1	; time of last write
 .dir_date:	resw 1	; date of last write
-.dir_fclus:				
+.dir_fclus:
 .dir_first:	resw 1	; first cluster (alloc. unit) of file
 .dir_file_size:
 .dir_size_l:	resw 1	; low 16 bits of file size
@@ -694,7 +694,7 @@ struc LDIR
 .Name1:		resb 10 ; Chars 1-5 of the long name sub-component
 .Attr:		resb 1	; Attributes must be ATTR_LONG_NAME (0Fh)
 .Type:		resb 1	; Zero indicates long name sub-component
-.Chksum:	resb 1	; Checksum of name in short dir entry	
+.Chksum:	resb 1	; Checksum of name in short dir entry
 .Name2:		resb 12	; Chars 6-11 of the LFN sub-component
 .FstClusLO:	resw 1	; Must be ZERO
 .Name3:		resb 4	; Chars 12-13 of the LFN sub-component

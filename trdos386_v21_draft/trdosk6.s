@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.1.0) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 10/07/2026  (Previous: 25/01/2026, v2.0.10)
+; Last Update: 15/07/2026  (Previous: 25/01/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -18,6 +18,9 @@
 ; Ref: Retro UNIX 386 v1.2 Kernel (v0.2.2.3) - ux.s - 15/07/2022
 
 sysent: ; < enter to system call >
+	; 15/07/2026 - TRDOS 386 Kernel v2.1.0
+	; 01/05/2026 - TRDOS 386 Kernel v2.0.11
+	; 08/01/2026 - TRDOS 386 Kernel v2.0.10 (v2.1.0)
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 17/03/2017
 	; 03/03/2017
@@ -131,17 +134,20 @@ sysent1:
 	;jnb	short badsys
 		; bhis badsys / yes, bad system call
 	cmc
-	pushf
-	push	eax
- 	mov 	ebp, [u.sp] ; Kernel stack at the beginning of sys call
-	mov	al, 0FEh ; 11111110b
-	adc	al, 0 ; al = al + cf
-	and	[ebp+8], al ; flags (reset carry flag)
-		; bic $341,20.(sp) / set users processor priority to 0
-				 ; / and clear carry bit
-	pop	ebp ; eax
-	popf
+	; 01/05/2026 (CF -return- has already been cleared above))
+	;pushf
+	;push	eax
+ 	;mov 	ebp, [u.sp] ; Kernel stack at the beginning of sys call
+	;mov	al, 0FEh ; 11111110b
+	;adc	al, 0 ; al = al + cf
+	;and	[ebp+8], al ; flags (reset carry flag)
+	;	; bic $341,20.(sp) / set users processor priority to 0
+	;			 ; / and clear carry bit
+	;pop	ebp ; eax
+	;popf
         jc      short badsys ; 23/07/2022
+	; 01/05/2026
+	mov	ebp, eax
 	mov	eax, [u.r0]
 	; system call registers: EAX, EDX, ECX, EBX, ESI, EDI
 	jmp	dword [ebp+syscalls]
@@ -204,6 +210,8 @@ badsys:
 	jmp	sysexit_0FFh
 
 syscalls: ; 1:
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	; 21/05/2026 - TRDOS 386 v2.0.11
 	; 20/08/2024 - TRDOS 386 v2.0.9
 	; 31/12/2017
 	; 28/02/2017
@@ -271,6 +279,7 @@ syscalls: ; 1:
 			     ; 28/08/2017 (20/08/2017)
 	dd sysdma	; 45 ; TRDOS 386 - (ISA) DMA service
 	dd sysstdio	; 46 ; TRDOS 386 v2.0.9 (STDIN/STDOUT functions)
+	dd sysfstat	; 47 ; TRDOS 386 v2.0.11
 
 end_of_syscalls:
 
@@ -1199,6 +1208,8 @@ syswait_4:
 		; br syswait / wait on next process
 
 sysfork: ; < create a new process >
+	; 15/07/2026 - TRDOS 386 Kernel v2.1.0 
+	; 12/07/2026 - TRDOS 386 Kernel v2.0.11 (u.cdrv, u.cdir)
 	; 19/08/2024 - TRDOS 386 Kernel v2.0.9 (STDIN/STDOUT)
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 02/01/2017 (TRDOS 386 modification)
@@ -1384,7 +1395,9 @@ sysfork_3:
 	;mov	[u.getc], al ; 0
 	mov	[u.stdin], eax ; 0
 	;;;
-
+	; 12/07/2026 - TRDOS 386 v2.0.11
+	mov	byte [u.cdrv], -1 ; invalidate cdrv/cdir parameters
+				; (to force to be set by kernel later)
 	; 28/08/2015
 	;movzx	eax, byte [u.uno] ; parent process number
 	; 19/08/2024
@@ -1997,13 +2010,15 @@ syscreat_2:
 %endif
 
 sysopen: ;<open file>
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	; 20/05/2026 - TRDOS 386 v2.0.11
 	; 25/01/2026
 	; 17/01/2026
 	; 16/01/2026
 	; 02/01/2026
 	; 05/08/2025
 	; 07/07/2025
-	; 29/06/2025 - TRDOS 386 v2.0.10
+	; 29/06/2025 - TRDOS 386 v2.0.10 (v2.1.0)
 	; 03/09/2024
 	; 19/08/2024 - TRDOS 386 v2.0.9
 	; 23/07/2022 - TRDOS 386 v2.0.5
@@ -2315,7 +2330,28 @@ sysopen_7:
 	; 02/01/2026
 	mov	ebx, [FindFile_DirSector]
 	mov	[edi+OF_DIRSECTOR], ebx ; physical sector
-	shr	edi, 2
+
+	;;;	
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	; 20/05/2026 - TRDOS 386 v2.0.11 (sysfstat parameters)
+	;mov	ax, [FindFile_DirEntry+16] ; DIR_CrtDate
+	;shl	eax, 16
+	;mov	ax, [FindFile_DirEntry+14] ; DIR_CrtTime
+	mov	eax, [FindFile_DirEntry+14]
+	mov	[edi+OF_CDATETIME], eax
+	;mov	ax, [FindFile_DirEntry+24] ; DIR_WrtDate
+	;shl	eax, 16
+	;mov	ax, [FindFile_DirEntry+22] ; DIR_WrtTime
+	mov	eax, [FindFile_DirEntry+22]
+	;mov	[edi+OF_DATETIME], eax ; lw = time, hw = date
+	shr	edi, 1
+	mov	ax, [FindFile_DirEntry+18] ; DIR_LstAccDate
+	mov	[edi+OF_LADATE], ax
+	;;;
+
+	; 15/07/2026
+	;shr	edi, 2
+	shr	edi, 1
 	mov	bl, [FindFile_DirEntryNumber]
 	mov	[edi+OF_DIRPOS], bl ; dir entry index
 
@@ -2328,8 +2364,9 @@ sysopen_7:
 	mov	[edi+OF_OPENCOUNT], dl ; 0
 	mov	[edi+OF_STATUS], dl ; 0
 
-	; 16/01/2026
-	mov	[edi+OF_OPENCOUNT], dl ; 0
+	; 20/05/2026
+	mov	al, [FindFile_DirEntry+11] ; DIR_Attr
+	mov	[edi+OF_ATTRIB], al
 
 	mov	ebx, edi
 	inc	bl
@@ -2337,6 +2374,20 @@ sysopen_7:
 	mov	[esi+u.fp], bl ; Open File Entry Number
 	mov	[u.r0], esi ; move index to u.fp list
 			    ; into eax on stack
+
+	; 20/05/2026 - TRDOS 386 v2.0.11
+	;mov	esi, FindFile_DirEntry
+	;mov	eax, edi
+	;mov	ecx, 12
+	;mul	ecx
+	;add	eax, OF_NAME
+	;mov	edi, eax
+	;dec	ecx ; 11
+	;rep	stosb
+	;;mov	byte [edi], 0
+
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	
 	; 02/01/2026
 	; save file name (in directory entry format)
 	mov	esi, FindFile_DirEntry
@@ -2349,7 +2400,6 @@ sysopen_7:
 	call	reset_working_path
 
 	jmp	sysret
-
 
 ; fsp table (original UNIX v1)
 ;
@@ -12002,7 +12052,12 @@ sysvideo_31:
 	jmp	sysret
 
 sysexec:
-	; 07/07/2025 - TRDOS 386 v2.0.10
+	; 15/07/2026 - TRDOS 386 v2.1.0 
+	; 13/07/2026
+	; 12/07/2026
+	; 11/07/2026
+	; 10/07/2026 - TRDOS 386 v2.0.11
+	; 07/07/2025 - TRDOS 386 v2.0.10 ; (v2.1.0)
 	; 21/08/2024 - TRDOS 386 v2.0.9
 	; 23/07/2022 - TRDOS 386 v2.0.5
 	; 06/02/2022 - Retro UNIX 386 v1.2
@@ -12086,9 +12141,13 @@ sysexec:
         ; 18/10/2015
 	mov     [argv], ecx  ; * ; argument 2
 
+	; 11/07/2026
+	; 10/07/2026
 	; 13/11/2017
-	mov	esi, ebx
+	mov	esi, ebx	; 12/07/2026
 	call	set_working_path_x
+	;mov	ax, 0CD01h
+	;call	set_working_path
 	jnc	short sysexec_0
 
 	;; 'bad command or file name'
@@ -12494,7 +12553,9 @@ sysexec_17:
 	;dec	al
 	; 21/08/2024
 	dec	eax
-	mov	[u.intr], ax ; -1 ; 0FFFFh ; enable CTRL+CRK
+	mov	[u.intr], ax ; -1 ; 0FFFFh ; enable CTRL+BRK
+	; 12/07/2026
+	;mov	[u.cdrv], al ; -1 ; invalidate current drive (and dir parameters)      
 	inc	eax
 	mov	[u.quit], ax ; 0 ; reset CTRL+BRK flag
 
@@ -12505,6 +12566,26 @@ sysexec_17:
 	mov	edx, [k_page_dir] ; kernel's page directory
 	mov	[u.ppgdir], edx ; next time 'sysexec' must not come here
 sysexec_18:
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	;;;;;
+	; 13/07/2026 - TRDOS 386 v2.0.11 - Erdogan Tan & Google AI
+	; backup active current directory structure to the new process U area
+
+	mov	cl, [Current_Drv]
+	mov	[u.cdrv], cl
+
+	mov	cl, [Current_Dir_Level]
+	mov	[u.cdlvl], cl
+
+	mov	ecx, [Current_Dir_FCluster]
+	mov	[u.cdfcl], ecx
+
+	mov	esi, PATH_Array
+	mov	edi, u.cdir
+	mov	ecx, 32
+	rep	movsd
+	;;;;
+
 	; 02/05/2016
 	; 24/04/2016 (TRDOS 386 = TRDOS v2.0)
 	; 18/10/2015 (Retro UNIX 386 v1)
@@ -13787,8 +13868,12 @@ glerr_3:
 	jmp	short glerr_1
 
 load_and_run_file:
+	; 15/07/2026 - TRDOS 386 Kernel v2.1.0
+	; 14/07/2026
+	; 11/07/2026
+	; 10/07/2026 - TRDOS 386 Kernel v2.0.11
 	; 10/01/2026
-	; 07/07/2025 - TRDOS 386 Kernel v2.0.10
+	; 07/07/2025 - TRDOS 386 Kernel v2.0.10 (v2.1.0)
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 18/11/2017
 	; 22/01/2017
@@ -13813,7 +13898,12 @@ load_and_run_file:
 	;sti	; 07/01/2017
 	;mov	eax, [k_page_dir]
 	;mov	[u.pgdir], eax
-	xor 	eax, eax ; clc ; *** ; 04/01/2017
+
+	; 14/07/2026
+	clc	; ***
+	; 11/07/2026 (cf=0)
+	;xor 	eax, eax ; clc ; *** ; 04/01/2017
+	
 	;mov	[u.r0], eax ; 0 ; 07/01/2017
 
 	; 06/05/2016
@@ -14626,7 +14716,7 @@ swap_0: ; 1: / search runq table for highest priority process
 	;xor	ebx, ebx ; 02/05/2016
 	and 	ax, ax ; are there any processes to run in this Q entry
 	jnz	short swap_2
-	; 21/05/2026
+	; 21/05/2016
 	; runq_normal = runq+2, runq_background = runq+4
 	dec	byte [priority] ; 3 -> 3, 2 -> 1, 1-> 0
 	jnz	short swap_0
@@ -15224,7 +15314,7 @@ tfub_2:
 
 sysfff: ; <Find First File>
 	; 25/05/2025
-	; 18/05/2025 (TRDOS 386 Kernel v2.0.10)
+	; 18/05/2025 (TRDOS 386 Kernel v2.0.10) ((v2.1.0))
 	; 25/08/2024 (TRDOS 386 Kernel v2.0.9)
 	; 08/08/2022
 	; 30/07/2022 (TRDOS 386 Kernel v2.0.5)
@@ -15765,7 +15855,7 @@ sysfnf_11:
 sysfnf: ; <Find Next File>
 	; 25/05/2025
 	; 19/05/2025
-	; 18/05/2025 (TRDOS 386 Kernel v2.0.10)
+	; 18/05/2025 (TRDOS 386 Kernel v2.0.10) ((v2.1.0))
 	; 25/08/2024 (TRDOS 386 Kernel v2.0.9)
 	; 29/08/2023 (TRDOS 386 Kernel v2.0.6)
 	; 08/08/2022
@@ -18078,6 +18168,11 @@ sysrmdir_9:
 %endif
 
 syschdir: ; Change Current (Working) Drive & Directory (for user)
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	; 12/07/2026 - TRDOS 386 v2.0.11
+	;	Erdogan Tan & Google AI Collaborator
+	;	Explicit CHDIR Re-validation	
+	;
 	; 30/12/2017 (TRDOS 386 = TRDOS v2.0) 
 	;
         ; INPUT ->
@@ -18116,6 +18211,10 @@ syschdir_err:
 	call 	reset_working_path
 	jmp	error
 syschdir_ok:
+	; 12/07/2026 - Erdogan Tan & Google AI
+	; Invalidate to enforce a fresh, updated CWD snapshot
+	mov	byte [u.cdrv], -1
+
 	xor	eax, eax ; 0
 	mov	[u.r0], eax
 	;mov	[u.error], eax
@@ -18462,17 +18561,44 @@ sysldrvt: ; Get copy of Logical DOS Drive Description Table
 	jmp	short sysdir_ok
 
 systime: ; Get System Date&Time
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	; 16/05/2026
+	; 15/05/2026
+	; 03/05/2026
+	; 01/05/2026 - TRDOS 386 v2.0.11
 	; 30/12/2017 (TRDOS 386 = TRDOS v2.0)
 	;
         ; INPUT -> BL =
 	;	    0 = Get Date&Time in Unix/Epoch format
 	;	    1 = Get Time in MSDOS format
-	;	    2 = Get Date in MSDOS format
-	;	    3 = Get Date&Time in MSDOS format
-	;	    4 & other values =
+	;	    2 = Get Date in MSDOS format (1980->1980)
+	;	    3 = Get Date&Time in MSDOS format (1980->1980)
+	;	01/05/2026
+	;	    4 = Get/Return System Timer Ticks (18.2 Hz)
+	;		Note: If the system timer frequency is 100 Hz
+	;	             (18.2 Hz for the current kernel version),
+	; 		     the carry flag will be set on return.
+	;		-However, even if the system is running at 100 Hz,
+	;		 the number of ticks converted to 18.2 Hz will
+        ;		 be returned-
+	;		100Hz to 18.2Hz conversion: int(timerticks*182/1000)
+	;	    5 = Get/Return System Timer Ticks (100 Hz)
+	;		Note: carry flag will be set at return
+	;		      if system timer frequency is NOT 100 Hz
+	;		(it is 18.2 Hz for current kernel version)
+	;		-However, even if the system is running at 18.2 Hz,
+	;		 the number of ticks converted to 100 Hz will
+        ;		 be returned-
+	;		18.2Hz to 100Hz conversion: int(timerticks*1000/182)
+	;	    6 = Get Date&Time in MSDOS packed (direntry) format
+	;		(1980->0)
+	;	16/05/2026
+	;	    7 = Get Timer Ticks OVERFLOW Status
+	; 	    8 = Get Day Of The Week
+	;
+	;	    9 & other values (>9) =
 	;		System timer ticks will be returned
 	;		in EAX and Carry Flag will be set.
-	;		(CF will not be set if BL = 4)
 	; OUTPUT ->
 	;	For BL input = 3
 	;          EAX = Current Time (RTC)
@@ -18486,9 +18612,9 @@ systime: ; Get System Date&Time
 	;
 	;	For BL input = 2
 	;	   EAX = Current System Date (RTC)
-	;		DL = Day (DL in MSDOS)
-	;		DH = Month (DH in MSDOS)
-	;		HW of EDX = Year (CX in MSDOS)
+	;		AL = Day (DL in MSDOS)
+	;		AH = Month (DH in MSDOS)
+	;		HW of EAX = Year (CX in MSDOS)
 	;
 	;	For BL input = 1
 	;          EAX = Current Time (RTC)
@@ -18499,11 +18625,52 @@ systime: ; Get System Date&Time
 	;	For BL input = 0
 	;          EAX = Unix (Epoch) Time Ticks/Seconds
 	;
-	;	For BL input  = 4
-	;	   EAX = System timer ticks
+	;	01/05/2026
+	;	For BL input = 4
+	;	   EAX = System timer tick count (18.2 Hz)
+	;	   if CF = 1 -> system is running at 100 Hz
+	;	      and tick count is converted to 18.2 Hz
+	;	      Conversion: int(timerticks*182/1000)
+	;	   0 = midnight, 00:00:00:00
+	;          if CF = 0 -> system timer is running at 18.2 Hz
+	;	      and tick count is actual on the system side
 	;
-	;	If CF = 1 (for other values of BL input)
-	;	   EAX = System timer ticks (no error code!)
+	;	For BL input = 5
+	;	   EAX = System timer tick count (100 Hz)
+	;	   if CF = 1 -> system is running at 18.2 Hz
+	;	      and tick count is converted to 100 Hz
+	;	      Conversion: int(timerticks*1000/182)
+	;	   0 = midnight, 00:00:00:00
+	;          if CF = 0 -> system timer is running at 100 Hz
+	;	      and tick count is actual on the system side
+	;
+	;	For BL input = 6
+	;	   EAX = Date&Time in MSDOS/direntry (packed) format
+	;		AX (time) bits = hhhhhmmmmmmsssss
+	;			bits 0-4: seconds divided by 2, 0-28
+	;			bits 5-10: minute (0-59)
+	;			bits 11-15: hour (0-23)
+	;		HW of EAX (date) bits = yyyyyyymmmmddddd
+	;			bit 0-4: day of the month (1-31)
+	;			bit 5-8: Month (1-12)
+	;			bit 9-15: Year (0-127) [Year-1980]
+	;	16/05/2026
+	;	For BL input = 7
+	;	    EAX = Timer OVERFLOW ([TIMER_OFL]) Status
+	;	        = 1 -> overflow occurred
+	;               = 0 -> no overflow occurred
+	;	For BL input = 8
+	; 	    EAX = Day of the week (1= sunday, 7 = saturday)
+	;	    NOTE: Each time the RTC date is updated/written,
+	;		  ("RTC_55:" in 'timer.s')
+	;	          the dow value in CMOS_DAY_WEEK will
+	;		  be reset/invalidated
+	;	    if CF = 1 or EAX = 0 -> error (invalid)
+	;
+	;	For BL input = 9 (or BL input > 9)
+	;	    CF = 1 (always.. for current kernel version)
+	;	    EAX = System timer ticks (no error code!)
+	;
 	;
 	; Modified Registers: EAX, (EDX)
 	;		 (at the return of system call)
@@ -18516,8 +18683,9 @@ systime_0:
 	mov	[u.r0], eax
 	jmp	sysret
 systime_1:
-	cmp	bl, 4
-	jb	short systime_2
+	; 03/05/2026
+	;cmp	bl, 4
+	;jb	short systime_4
 	mov	eax, [TIMER_LH] ; 18.2 Hz timer ticks
 				; Note: [TIMER_LH] may be set
 				; to wrong timer value due to
@@ -18525,16 +18693,90 @@ systime_1:
 				; (This value must not be
 				; accepted as [TIMER_LH]/18.2
 				; seconds since the midnight.)
-	jna	short systime_0
-	mov	[u.r0], eax
-	jmp	error ; cf = 1 & [u.r0] = eax = timer ticks
+	;jna	short systime_0
+
+	cmp	bl, 6
+	ja	short systime_2	; invalid sub function
+	je	short systime_3	; (return packed date&time)
+	cmp	bl, 4
+	jb	short systime_4	; 3, 2, 1
+	je	short systime_0 ; 4 (return 18.2 Hz tick count)
+
+	; 02/05/2026
+	;mov	eax, [TIMER_LH]
+	; bl = 5
+	;call	convert_to_100hz
+convert_to_100hz:
+	; eax = timer tick count (18.2 Hz)
+	;mov	ecx, 1000
+	; 15/05/2026
+	mov	ecx, 200000 ; 2000*100
+	mul	ecx
+	;mov	ecx, 182
+        mov	ecx, 36413	; 18.2065 Hz = 36413/2000
+	div	ecx
+	; eax = quotient, edx = remainder
+	;cmp	edx, 91
+	cmp	edx, 18207
+	jb	short cnv_to_100hz_ok
+	inc	eax
+cnv_to_100hz_ok:
+	; eax = timer tick count (100 Hz)
+	;retn
+	;mov	[u.r0], eax
+	;;mov	dword [u.error], 0 ; not an actual error
+	; "100 Hz is not the system timer frequency"
+	;jmp	error	; return with cf = 1
+	; 16/05/2026
+	jmp	short systime_9 ; (return 100 Hz tick count)
 
 systime_2:
+	; 16/05/2026
+	cmp	bl, 8
+	ja	short systime_9	; invalid sub function
+	jb	short systime_7	; get timer overflow status
+
+	call	get_day_of_week
+	jc	short systime_8
+
+	movzx	eax, al
+	; eax = 1 -> sunday
+	; eax = 7 -> saturday
+	jmp	short systime_0
+
+	; 16/05/2026
+systime_7:
+	; bl = 7
+	movzx	eax, byte [TIMER_OFL]
+	; eax = timer -ticks- overflow status
+	;       1 = overflow occurred
+	;       0 = no overflow occurred
+	jmp	short systime_0
+
+systime_8:
+	sub	eax, eax ; 0 ; 0 -> error (invalid)
+systime_9:
+	mov	[u.r0], eax
+	jmp	error	; cf = 1 & [u.r0] = eax = timer ticks
+
+	; 01/05/2026
+systime_3:
+	; convert current RTC date & time
+	;	to msdos/direntry (packed) format
+	call	convert_current_date_time
+	; OUTPUT -> DX = Date in dos dir entry format
+        ; 	    AX = Time in dos dir entry format
+	mov	[u.r0+2], dx
+	mov	[u.r0], ax
+	jmp	sysret
+
+systime_4:
+	; return system/current date&time
 	;push	ebx
 	call	get_rtc_date_time
 	;pop	ebx
 	test	bl, 1
-	jz	short systime_4
+	jz	short systime_6	; bl = 2
 	xor	ah, ah
 	mov	al, [hour]
 	mov	dl, al
@@ -18542,80 +18784,142 @@ systime_2:
 	mov	al, [second]
 	mov	ah, [minute]
 	test	bl, 2
-	jz	short systime_0
+	jz	systime_0	; bl = 1 (return time)
+	; bl = 3
 	; Check time & date match risk
 	; (23:59:59 may cause to wrong
 	; date -new day with previous date-...)
 	cmp	dl, 23
-	jb	short systime_3
+	jb	short systime_5
 	cmp	ax, (59*256)+59 ; if hour is 23:59:59
-	jnb	short systime_2 ; wait for 1 second
-systime_3:
+	jnb	short systime_4 ; wait for 1 second
+systime_5:
 	; eax = time
 	mov	esi, eax
-systime_4:
+systime_6:
 	mov	ax, [year]
 	shl	eax, 16
 	mov	al, [day]
 	mov	ah, [month]
 	; eax = date
 	and	bl, 1
-	jz	short systime_0
+	jz	systime_0 ; bl = 2 (return date)
 	xchg	esi, eax
 	; eax = time, esi = date
 	mov	ebp, [u.usp]  ; EBP points to user's registers
 	; (user) edx <-- (system) esi
 	mov	[ebp+20], esi ; return to user with EDX value
-	jmp	short systime_0
+	jmp	systime_0	; bl = 3 (return date & time)
 
 sysstime: ; Set System Date&Time
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	; 21/05/2026
+	; 17/05/2026
+	; 16/05/2026
+	; 15/05/2026
+	; 14/05/2026
+	; 12/05/2026
+	; 03/05/2026
+	; 01/05/2026 - TRDOS 386 v2.0.11
 	; 31/12/2017
 	; 30/12/2017 (TRDOS 386 = TRDOS v2.0)
 	;
-        ; INPUT -> BL =
+	; INPUT -> BL =
 	;	    0 = Set Date&Time in Unix/Epoch format
 	;	    1 = Set Time in MSDOS format
 	;	    2 = Set Date in MSDOS format
 	;	    3 = Set Date&Time in MSDOS format
-	;	    4 = Set System Timer (Ticks)
+	;	    4 = Set System Timer (Ticks) - 18.2 Hz -
 	;	    5 = Convert/Save current time to/as
 	;		18.2 Hz system timer ticks
 	;	    6 = Convert MSDOS Date&Time to UNIX format
 	;		without setting system date&time ; (test)
 	;	    7 = Convert UNIX Date&Time to MSDOS format
 	;		without setting system date&time ; (test)
-	;	   8-0FFh = invalid !
+	;	01/05/2026
+	;	    8 = Convert packed MSDOS Date&Time to UNIX format
+	;		without setting system date&time ; (test)
+	;		ECX = packed MSDOS date&time
+	;		ECX (time) bits = hhhhhmmmmmmsssss
+	;			bits 0-4: seconds divided by 2, 0-28
+	;			bits 5-10: minute (0-59)
+	;			bits 11-15: hour (0-23)
+	;		HW of ECX (date) bits = yyyyyyymmmmddddd
+	;			bit 0-4: day of the month (1-31)
+	;			bit 5-8: Month (1-12)
+	;			bit 9-15: Year (0-127) [Year-1980]
+	;	    9 = Convert UNIX Date&Time to packed MSDOS format
+	;		without setting system date&time ; (test)
+	;		ECX = Unix Epoch Time
+	;	   10 = Set System Timer (Ticks) - 100 Hz input -
+	;		((conversion: input*182/1000))
+	;	16/05/2026
+	;	   11 = Set Day Of The Week
+	;		ECX = day of the week (to be set)
+	;		    = 1 -> sunday
+	;		    = 7 -> saturday
+	;
+	;	   12-0FFh = invalid !
+	;
 	;	  ECX = Time (or Timer) value in selected format
 	;	  EDX = Date value in MSDOS format if BL=2,3,6
 	;
 	; OUTPUT ->
-	;	If CF = 0 ->
-	;          EAX = Set value
-	;	If CF = 1 -> (invalid BL input)
-	;	   EAX = Ticks count [TIMER_LH]
+	;	If CF = 0 -> (if BL input < 11 --> CF = 0)
+	;	   For BL input = 0,1,2,3,4,5,10
+	;			-> EAX = tick count (18.2 Hz)
+	;	   For BL input = 6,8 -> EAX = unix epoch time
+	;	   For BL input = 7 -> EAX = Time, EDX = Date
+	;			AL = second (0-29)
+	;			AH = minute (0-59)
+	;		 HW of EAX = hour (0-23)
+	;			DL = day (1-31)
+	;			DH = month (1-12)
+	;		 HW of EDX = year (any, 16 bit)
+	;	   For BL input = 9 -> EAX = packed date&time
+	;			AX = msdos/direntry time (packed)
+	;		 HW of EAX = msdos/direntry date (packed)
+	;	   16/05/2026
+	;	   For BL input = 11
+	;		 EAX = day of the week (in AL)
+	;		     = ECX input (CL)
+	;	       if CF = 1 -> EAX = 0
+	;			   (invalid set value or error)
+	;
+	;	If CF = 1 -> (invalid BL input, >= 12)
+	;	   EAX = ticks count [TIMER_LH] ; 18.2 Hz
 	;
 
 	and	bl, bl ; 0
-	jnz	short sysstime_0
+	jnz	short sysstime_6
 	mov	eax, ecx
+	;mov	[u.r0], eax	; 03/05/2026
 	call	convert_from_epoch
-	call	set_rtc_date_time
-	jmp	sysret
 sysstime_0:
-	cmp	bl, 8
-	jb	short sysstime_1
-	; invalid input (>7)
-	mov	eax, [TIMER_LH] ; 18.2 Hz timer ticks
-				; Note: [TIMER_LH] may be set
-				; to wrong timer value due to
-				; program functions.
-				; (This value must not be
-				; accepted as [TIMER_LH]/18.2
-				; seconds since the midnight.)
+	call	set_rtc_date_time
+	;jmp	sysret
+sysstime_1:
+	; 03/05/2026
+	call	rtc_to_tick_count
+	; eax = ((182*seconds)+9)/10 ; 18.2 Hz tick count
+	; 15/05/2026
+	; eax = ((36413*seconds)+1000)/2000 ; 18.2065 Hz tick count
+sysstime_2:
+	cli
+	mov	[TIMER_LH], eax ; 18.2 * seconds (18.2065 Hz)
+	; 16/05/2026
+	; reset timer overflow flag
+	mov	byte [TIMER_OFL],0
+	sti
+sysstime_3:
 	mov	[u.r0], eax
-	jmp	error ; cf = 1 & [u.r0] = eax = timer ticks
+	jmp	sysret
 
-sysstime_8:
+sysstime_4:
+	mov	eax, ecx	; tick count
+	jmp	short sysstime_2
+
+sysstime_5:
 	; BL = 7
 	mov	eax, ecx ; seconds since 1/1/1970 00:00:00
 	call	convert_from_epoch
@@ -18624,43 +18928,72 @@ sysstime_8:
 	shl	eax, 16
 	mov	al, [second]
 	mov	ah, [minute]
-	jmp	short systime_3
+	jmp	systime_5
 
-sysstime_1:
+sysstime_6:
+	cmp	bl, 8
+	jb	short sysstime_7
+	; 01/05/2026
+	;cmp	bl, 11
+	; 16/05/2026
+	cmp	bl, 12
+	jb	sysstime_12
+	;
+	; invalid input (>11)
+	mov	eax, [TIMER_LH] ; 18.2 Hz timer ticks
+				; Note: [TIMER_LH] may be set
+				; to wrong timer value due to
+				; program functions.
+				; (This value must not be
+				; accepted as [TIMER_LH]/18.2
+				; seconds since the midnight.)
+	mov	[u.r0], eax
+	jmp	error ; cf = 1 & [u.r0] = eax = timer ticks
+
+sysstime_7:
+	; 14/05/2026
 	cmp	bl, 4
-	je	short sysstime_2 ; set system timer ticks
+	je	short sysstime_4 ; set system timer ticks
 	cmp	bl, 5
-	jne	short sysstime_4
-	; convert current time to system timer ticks (18.2Hz)
-	call	get_rtc_date_time
-	movzx	ecx, byte [hour]
-	mov	eax, 60*60 ; 1 hour = 3600 seconds
-	mul	ecx
-	mov	ebx, eax
-	mov	cl, 60  ; 1 minute = 60 seconds
-	movzx	eax, byte [minute]
-	mul	ecx
-	add	eax, ebx
-	mov	cl, [second]
-	add	eax, ecx
-	mov	cl, 182
-	mul	ecx
-	add	eax, 9
-	adc	edx, 0
-	mov	cl, 10
-	div	ecx
-	; eax = ((182*seconds)+9)/10
-	mov	ecx, eax
-sysstime_2:
-	mov	[TIMER_LH], ecx ; 18.2 * seconds
-sysstime_3:
-	mov	[u.r0], ecx
-	jmp	sysret
-sysstime_4:
-	cmp	bl, 6
-	ja	short sysstime_8
+	;jne	short sysstime_8
+	je	short sysstime_1
 
-	mov	[u.r0], ecx
+;sysstime_1:	; 03/05/2026
+;	; convert current time to system timer ticks (18.2Hz)
+;	;call	get_rtc_date_time
+;	;movzx	ecx, byte [hour]
+;	;mov	eax, 60*60 ; 1 hour = 3600 seconds
+;	;mul	ecx
+;	;mov	ebx, eax
+;	;mov	cl, 60  ; 1 minute = 60 seconds
+;	;movzx	eax, byte [minute]
+;	;mul	ecx
+;	;add	eax, ebx
+;	;mov	cl, [second]
+;	;add	eax, ecx
+;	;mov	cl, 182
+;	;mul	ecx
+;	;add	eax, 9
+;	;adc	edx, 0
+;	;mov	cl, 10
+;	;div	ecx
+;	; 03/05/2026
+;	call	rtc_to_tick_count ; trdosk1.s
+;	; eax = ((182*seconds)+9)/10
+;	mov	ecx, eax
+;sysstime_2:
+;	cli
+;	mov	[TIMER_LH], ecx ; 18.2 * seconds
+;	sti
+;sysstime_3:
+;	mov	[u.r0], ecx
+;	jmp	sysret
+
+sysstime_8:
+	cmp	bl, 6
+	ja	short sysstime_5 ; bl = 7
+
+	;mov	[u.r0], ecx
 
 	mov	[second], cl
 	mov	[minute], ch
@@ -18668,37 +19001,236 @@ sysstime_4:
 	mov	[hour], cl
 	; BL = 1,2,3,6
 	cmp	bl, 1
-	jna	short sysstime_5
+	jna	short sysstime_9
 	; BL = 2,3,6
 	mov	[day], dl
 	mov	[month], dh
 	shr	edx, 16
 	mov	[year], dx
-	and	bl, 3
-	jz	short sysstime_7 ; 6
+	; 17/05/2026  
+	cmp	bl, 3
+	ja	short sysstime_10 ; 6
 	; BL = 2,3
-	test	bl, 1
-	jz	short sysstime_6 ; 2
+	;test	bl, 1
+	;jz	short sysstime_11 ; 2
+	jb	short sysstime_11
 	; BL = 3
-	call	set_rtc_date_time
-	jmp	sysret
-sysstime_5:
+	;call	set_rtc_date_time
+	;jmp	sysret
+	; 03/05/2026
+	jmp	sysstime_0
+
+sysstime_9:
 	; BL = 1
 	call	set_time_bcd
 	call	set_rtc_time
-	jmp	sysret
-sysstime_6:
-	; BL = 2
-	call	set_date_bcd
-	call	set_rtc_date
-	jmp	sysret
-sysstime_7:
+	;jmp	sysret
+	; 03/05/2026
+	jmp	sysstime_1
+
+sysstime_10:
 	; BL = 6
 	; [year], [month], [day],
 	; [hour], [minute], [second]
 	call	convert_to_epoch
-	mov	ecx, eax ; seconds since 1/1/1970 00:00:00
+	; eax = seconds since 1/1/1970 00:00:00
 	jmp	sysstime_3
+
+sysstime_11:
+	; BL = 2
+	call	set_date_bcd
+	call	set_rtc_date
+	;jmp	sysret
+	; 03/05/2026
+	jmp	sysstime_1
+
+sysstime_15:
+	; 16/05/2026
+	; BL = 11
+	; set day of the week
+	; ecx (cl) = 1 -> sunday
+	;          = 7 -> saturday
+	;or	ecx, ecx
+	;jz	short sysstime_16
+	cmp	ecx, 7
+	ja	short sysstime_16
+	call	set_day_of_week
+	jc	short sysstime_16
+	mov	[u.r0], ecx	; cl -> day of the week
+	jmp	sysret	; return -> eax = day of the week
+sysstime_16:
+	sub	eax, eax
+	mov	[u.r0], eax	; 0 -> invalid
+	jmp	error
+
+	; 01/05/2026
+sysstime_12:
+	cmp	bl, 9
+	ja	short sysstime_13 ; 16/05/2026
+	jb	short sysstime_14
+			; convert packed msdos format to epoch
+	; BL = 9
+	; convert the given epoch to packed msdos/direntry format
+	mov	eax, ecx ; 17/05/2026
+	call	convert_from_epoch
+	xor	ecx, ecx
+	mov	ax, [year]
+	sub	ax, 1980
+	;and	eax, 127
+	mov	cl, al		; 0:000000000YYYYYYYb
+	shl	ecx, 4		; 0:00000YYYYYYY0000b
+	mov	al, [month]
+	;and	al, 15
+	or	cl, al		; 0:00000YYYYYYYMMMMb
+	shl	ecx, 5		; 0:YYYYYYYMMMM00000b
+	mov	al, [day]
+	;and	al, 31
+	or	cl, al		; 0:YYYYYYYMMMMDDDDDb
+	shl	ecx, 16		; move packed date to high word
+				; YYYYYYYMMMMDDDDDb:0
+	xor	edx, edx
+	mov	dl, [hour]
+	;and	dl, 31		; 0:00000000000hhhhhb
+	shl	edx, 6		; 0:00000hhhhh000000b
+	mov	al, [minute]	;
+	;and	al, 63
+	or	dl, al		; 0:00000hhhhhmmmmmmb
+	shl	edx, 5		; 0:hhhhhmmmmmm00000b
+	mov	al, [second]
+	shr	al, 1		; seconds/2
+	;and	al, 31
+	or	dl, al		; 0:hhhhhmmmmmmsssssb
+	or	ecx, edx
+	mov	[u.r0], ecx	; return the packed date&time
+	jmp	sysret
+
+sysstime_13:
+	; 16/05/2026
+	cmp	bl, 11
+	je	sysstime_15
+	; 01/05/2026
+	; BL = 10
+	; set system timer ticks for 100 Hz input
+	; (at first, convert it to 18.2 Hz)
+	; (current kernel version uses 18.2 Hz timer ticks)
+	;
+	; ecx = timer tick count in 100 Hz
+	;call	convert_to_18hz
+convert_to_18hz:
+	;mov	eax, 182
+	; 15/05/2026
+	mov	eax, 36413 ; 18.2065 Hz = 36413/2000
+	mul	ecx
+	;mov	ecx, 1000
+        mov	ecx, 200000 ; 2000*100
+	div	ecx
+	; eax = quotient, edx = remainder
+	; 16/05/2026
+	;;cmp	edx, 500
+	;cmp	edx, 100000
+	;jb	short cnv_to_18hz_ok
+	;inc	eax
+cnv_to_18hz_ok:
+	; eax = timer tick count (18.2 Hz)
+	;retn
+	; eax = system timer tick count (18.2 Hz)
+	jmp	sysstime_2	; set system timer ticks
+
+	; 21/05/2026
+	; 01/05/2026
+sysstime_14:
+	; BL = 8
+	; convert msdos/direntry (packed) format
+	; date&time to unix epoch time
+	;
+	; ECX (time) bits = hhhhhmmmmmmsssss
+	;	bits 0-4: seconds divided by 2, 0-28
+	;	bits 5-10: minute (0-59)
+	;	bits 11-15: hour (0-23)
+	; HW of ECX (date) bits = yyyyyyymmmmddddd
+	;	bit 0-4: day of the month (1-31)
+	;	bit 5-8: Month (1-12)
+	;	bit 9-15: Year (0-127) [Year-1980]
+
+	;mov	al, cl
+	;and	al, 31
+	;shl	al, 1
+	;mov	[second], al
+	;shr	ecx, 5
+	;mov	al, cl
+	;and	al, 63
+	;mov	[minute], al
+	;shr	ecx, 6
+	;mov	al, cl
+	;and	al, 31
+	;mov	[hour], al
+	;shr	ecx, 5
+	;mov	al, cl
+	;and	al, 31
+	;mov	[day], al
+	;shr	ecx, 5
+	;mov	al, cl
+	;and	al, 15
+	;mov	[month], al
+	;shr	ecx, 4
+	;mov	eax, ecx
+	;;and	ax, 127
+	;add	ax, 1980
+	;mov	[year], ax
+
+	;call	convert_to_epoch
+
+	; 21/05/2026
+	call	packed_time_to_epoch
+
+	;mov	[u.r0], eax ; seconds since 1/1/1970 00:00:00
+	;jmp	sysret
+	jmp	sysstime_3
+
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	; 21/05/2026 - TRDOS 386 v2.0.11
+packed_time_to_epoch:
+	; convert msdos/direntry (packed) format
+	; date&time to unix epoch time
+	;
+	; ECX (time) bits = hhhhhmmmmmmsssss
+	;	bits 0-4: seconds divided by 2, 0-28
+	;	bits 5-10: minute (0-59)
+	;	bits 11-15: hour (0-23)
+	; HW of ECX (date) bits = yyyyyyymmmmddddd
+	;	bit 0-4: day of the month (1-31)
+	;	bit 5-8: Month (1-12)
+	;	bit 9-15: Year (0-127) [Year-1980]
+
+	mov	al, cl
+	and	al, 31
+	shl	al, 1
+	mov	[second], al
+	shr	ecx, 5
+	mov	al, cl
+	and	al, 63
+	mov	[minute], al
+	shr	ecx, 6
+	mov	al, cl
+	and	al, 31
+	mov	[hour], al
+	shr	ecx, 5
+	mov	al, cl
+	and	al, 31
+	mov	[day], al
+	shr	ecx, 5
+	mov	al, cl
+	and	al, 15
+	mov	[month], al
+	shr	ecx, 4
+	mov	eax, ecx
+	;and	ax, 127
+	add	ax, 1980
+	mov	[year], ax
+
+	;call	convert_to_epoch
+	;retn
+	jmp	convert_to_epoch
 
 sysrename: ; Rename File (or Directory)
 	; 22/09/2025

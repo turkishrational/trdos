@@ -1,11 +1,11 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.1.0) - MAIN PROGRAM : trdosk8.s
 ; ----------------------------------------------------------------------------
-; Last Update: 29/04/2026  (Previous: 07/07/2025, v2.0.10)
+; Last Update: 15/07/2026  (Previous: 07/07/2025, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
-; Assembler: NASM version 2.15 (trdos386.s)
+; Assembler: NASM version 3.02 (trdos386.s)
 ; ----------------------------------------------------------------------------
 ; Derived from 'Retro UNIX 386 Kernel - v0.2.1.0' source code by Erdogan Tan
 ; u0.s (20/11/2015), u4.s (14/10/2015)
@@ -235,6 +235,8 @@ clk_1:
 clk_2:
 	retn   ; return to (hardware) timer interrupt routine
 
+; 29/05/2026 - TRDOS 386 v2.0.11
+; 	(Corrected by Google AI)
 ; 12/10/2017
 ; 15/01/2017
 ; 14/01/2017
@@ -261,7 +263,7 @@ int34h: ; #IOCTL# (I/O port access support for ring 3)
 	;	; 12/10/2017
 	;	AH = 6 -> read port (physical IO port) twice -byte-
 	;	AH = 7 -> write port (physical IO port) twice -byte-
-	;		BX = data word
+	;		BX = data word	
 	;
 	;	DX = Port number (<= 0FFFFh)
 	;
@@ -287,9 +289,10 @@ int34h: ; #IOCTL# (I/O port access support for ring 3)
 	; 14/01/2017
 	; 02/01/2017
 	;;mov	byte [ss:intflg], 34h	; IOCTL interrupt
-	sti
 
+	; 29/05/2026
 	;sti	; enable interrupts
+
 	and	byte [esp+8], 11111110b	; clear carry bit of eflags register
 
 	cmp	ah, 1
@@ -307,7 +310,7 @@ int34h_iret:
 	;cli	; 07/01/2017
 	;; 15/01/2017
 	;;mov	byte [ss:intflg], 0 ; reset
-	iretd 
+	iretd
 
 int34h_1:
 	test	ah, 1
@@ -722,7 +725,7 @@ sp_i3:
 					; of the divisor value
 	out	dx, al ; 0
 	JMP	$+2			; I/O DELAY
-	;	
+	;
 	mov	al, ch ; 3		; 8 data bits, 1 stop bit, no parity
 	;and	al, 1Fh ; Bits 0,1,2,3,4	
 	add	dl, 2	; 3FBh (2FBh)	; Line control register
@@ -831,7 +834,7 @@ sp_setp2:
 	; 29/07/2022
 	ja	short sp_i5
 	jmp	sp_i6
-sp_i5: 
+sp_i5:
 	; 29/07/2022
 	; 07/11/2015
 	; 26/10/2015
@@ -894,6 +897,7 @@ wakeup:
 	retn
 
 set_working_path_x:
+	; 15/07/2026
 	; 07/07/2025
 	; 29/06/2025 - TRDOS 386 Kernel v2.0.10
 	; 17/10/2016 (TRDOS 386 - FFF & FNF)
@@ -912,8 +916,11 @@ set_working_path_xx: ; 30/12/2017 (syschdir)
 	mov	[FFF_Valid], ah ; 0 ; reset ; 17/10/2016
 
 set_working_path:
+	; 15/07/2026 - TRDOS 386 Kernel v2.1.0	
+	; 14/07/2026
+	; 11/07/2026 - TRDOS 386 Kernel v2.0.11	
 	; 07/07/2025
-	; 29/06/2025 - TRDOS 386 Kernel v2.0.10
+	; 29/06/2025 - TRDOS 386 Kernel v2.0.10 (v2.1.0)
 	; 08/08/2022
 	; 29/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 16/10/2016
@@ -965,8 +972,9 @@ set_working_path:
 	; Modified registers: EAX, EBX, ECX, EDX, ESI, EDI
 
 	mov	[SWP_Mode], ax
+	xor	eax, eax ; 0	; 12/07/2026
 	mov	al, [Current_Drv]
-	xor	ah, ah
+	;xor	ah, ah
 	mov	[SWP_DRV], ax
 
 	; TRDOS 386 ring 3 (user's page directory)
@@ -1013,7 +1021,82 @@ loc_swp_xor_retn:
 loc_swp_retn:
 	mov	esp, ebp
 	pop	ebp
+		
+	; 12/07/2026
+	jc	short loc_swp_2
+; ...
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	; 14/07/2026
+	; 13/07/2026
+	; 12/07/2026 - TRDOS 386 v2.0.11
+	; home/current drive & directory save/restore feature (for every process)
+	; (CWD optimization)
 
+	cmp	byte [u.cdrv], -1  ; invalidated (means that cdrv/cdir backup is needed)
+	clc	; 13/07/2026
+	jne	short loc_swp_2 ; no, valid
+			 ; this process's current/home dir has ben backed up before  
+
+	; save/backup -or validate it for the restore phase-
+
+	; 14/07/2026
+	;xor	eax, eax
+	; eax = 0
+
+	; Save current drive as (default) working drive of the running process 
+	mov	al, [Current_Drv]
+	mov	[u.cdrv], al
+
+	; 12/07/2026
+	; If [u.uno] = 1, it is MainProg (Internal Command Interpreter)
+	; It is better to rely on the current directory structure in the LDRVT table
+	;    rather than the one in PATH_Array. !!!
+	; (LDRVT tables -multi logical disks have separate current directory records-
+	;  are directly controlled by the kernel. Ring 3 process has only one cdrv/cdir
+	;  backup. It is set here at the load & run stage of the PRG.)
+
+	push	esi  ; save the directory/path name address
+
+	mov	esi, PATH_Array
+
+	cmp	byte [u.uno], 1
+	ja	short loc_swp_1	 ; external program (PRG)
+
+	; this process is the internal command interpreter (MainProg)
+	; (cdir backup reference must be the LDRVT of the current logical disk)
+
+	xor	ecx, ecx
+	mov	ch, al	; [Current_Drv]
+	mov	esi, Logical_DOSDisks+LD_CDirLevel ; current/last sub dir level
+	add	esi, ecx
+	; esi = LDRVT + 127
+	lodsb
+	; esi = LDRVT + LD_CurrentDirectory  ; LDRVT + 128
+	push	esi
+	mov	[Current_Dir_Level], al
+	; Save the current directory's first cluster
+	shl	eax, 4  ; * 16
+	add	eax, 12 ; skip sub directory name
+	add	esi, eax 
+	lodsd	; the First Cluster of the sub directory 
+	mov	[Current_Dir_FCluster], eax
+	pop	esi
+loc_swp_1:
+	; Save the current dir structure/table to the process's backup field
+	mov	edi, u.cdir ; current directory backup location
+	mov	ecx, 128/4
+	rep	movsd
+
+	pop	esi ; path (asciiz) -in the user's memory space-
+
+	; Save current directory (sub directory) level
+	mov	al, [Current_Dir_Level]
+	mov	[u.cdlvl], al
+	; Save the current directory's first cluster
+	mov	eax, [Current_Dir_FCluster]
+	mov	[u.cdfcl], eax
+loc_swp_2:
+; ...
 	;;mov	esi, FindFile_Drv
 	;mov	esi, FindFile_Name ; 12/10/2016
 	; 29/06/2025
@@ -1039,7 +1122,7 @@ loc_swp_checkfile_name:
 	; 29/06/2025
 	mov	esi, Path_FileName
 	cmp	byte [esi], 20h
-	jna	short loc_swp_xor_retn
+	jna	loc_swp_xor_retn
 
 	; 16/10/2016
 	mov	byte [SWP_inv_fname], 0 ; reset
@@ -1077,15 +1160,38 @@ loc_swp_drv:
 
 	inc	byte [SWP_DRV_chg]
 	call	change_current_drive
-	jc	short loc_swp_retn ; eax = error code
+	jc	loc_swp_retn ; eax = error code
 	; eax = 0
 
 loc_swp_change_directory:
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	;;;;
+	; 13/07/2026 - TRDOS 386 v2.0.11
+	; Restore process's current dir by the backup
+	mov	dl, [u.cdrv]
+	cmp	dl, [Current_Drv]
+	jne	short loc_swp_skip_rwd_from_u
+	mov	eax, [u.cdfcl]
+ 	cmp	eax, [Current_Dir_FCluster]
+	je	short loc_swp_skip_rwd_from_u
+	mov	[Current_Dir_FCluster], eax
+	sub	ecx, ecx
+	mov	cl, [u.cdlvl] ; sub dir level ; 0 to 7
+	mov	[Current_Dir_Level], cl
+	shl	cl, 2 ; * 16/4
+	add	cl, 4 ; + 16/4
+	mov	esi, u.cdir
+	mov	edi, PATH_Array
+	rep	movsd
+loc_swp_skip_rwd_from_u:
+	;;;;
 	;cmp	byte [FindFile_Directory], 21h
 	; 29/06/2025
 	cmp	byte [Path_Directory], 21h
 	cmc
-	jnc	short loc_swp_retn
+	;jnc	loc_swp_retn
+	; 14/07/2026
+	jnc	short loc_swp_retn_@
 
 	inc	byte [SWP_DRV_chg]
 	inc	byte [Restore_CDIR]
@@ -1107,10 +1213,15 @@ loc_swp_change_prompt_dir_string:
 	; eax = Current Directory First Cluster
 	; edi = Logical DOS Drive Description Table
 	call	change_prompt_dir_str
+loc_swp_retn_@:		; 14/07/2026
 	sub	eax, eax ; 0
 	jmp	loc_swp_retn
 
 reset_working_path:
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	; 14/07/2026
+	; 12/07/2026
+	; 11/07/2026 - TRDOS 386 v2.0.11
 	; 06/10/2016 - TRDOS 386 (TRDOS v2.0)
 	;
 	; TRDOS v1.0 (DIR.ASM, "proc_reset_working_path")
@@ -1131,97 +1242,136 @@ reset_working_path:
 
 	mov	dx, [SWP_DRV]
 	or	dh, dh
-	jz	short loc_rwp_return
+	;jz	short loc_rwp_return
+	jz	short loc_rwp_return_@ ; 14/07/2026
 
 	cmp	dl, [Current_Drv]
 	je	short loc_rwp_restore_cdir
 loc_rwp_restore_cdrv:
-	call	change_current_drive
-	jmp	short loc_rwp_restore_ok
+	call	change_current_drive	; + 'restore_working_directory'
+	;jmp	short loc_rwp_return
 loc_rwp_restore_cdir:
-	xor	ebx, ebx
-	mov	bh, dl
-	mov	esi, Logical_DOSDisks
-	add	esi, ebx
+	; 12/07/2026
+	dec	byte [SWP_DRV_chg]
+	jz	short loc_rwp_return
+	
+	; 12/07/2026 - Major Modification
+	;xor	ebx, ebx
+	;mov	bh, dl
+	;mov	esi, Logical_DOSDisks
+	;add	esi, ebx
+	;
+	;call	restore_current_directory
 
-	call	restore_current_directory
+	; 14/07/2026 (may not be necessary...)
+	;cmp	byte [Restore_CDIR], 0
+	;jna	short loc_rwp_return
 
-loc_rwp_restore_ok:
+	; 12/07/2026
+	; Restore the home/current directory of the active/running process.
+	mov	ecx, [u.cdfcl] ; first cluster
+	cmp	ecx, [Current_Dir_FCluster] ; from 'restore_working_directory'
+	je	short loc_rwp_return ; same dir, skip
+	mov	al, [u.cdrv]
+	cmp	al, [Current_Drv]
+	jne	short loc_rwp_return ; nonsence !?, skip
+	;cmp	byte [u.uno], 1	; MainProg ? (Internal Command Interpreter)
+	;jna	short loc_rwp_return ; already restored in 'change_current_drive'
+	;			; .. because, MainProg's home/current dir setup is on the LDRVT.
+	mov	[Current_Dir_FCluster], ecx ; necessarry ?
+	mov	esi, u.cdir
+	mov	ecx, 128/4
+	mov	edi, PATH_Array
+	rep	movsd
+	mov	cl, [u.cdlvl]
+	mov	[Current_Dir_Level], cl
+;loc_rwp_restore_ok:
+	; Construct the clean ASCIIZ prompt string from the freshly overwritten PATH_Array
+	call	change_prompt_dir_string
+
+	; 14/07/2026 (may not be necessary...)
+	mov	byte [Restore_CDIR], 0
+
+	; 12/07/2026 (these are may not be necessary?)
+loc_rwp_return:		; 14/07/2026
 	mov	dx, [SWP_DRV]
+loc_rwp_return_@:
 	xor	eax, eax
-	mov	[SWP_DRV_chg], ax
-loc_rwp_return:
+	;mov	[SWP_DRV], ax
+	;mov	[SWP_DRV_chg], al ; (BugFix!)
+	; SWP_Mode (w), SWP_DRV (b), SWP_DRV_chg (b)
+	mov	[SWP_Mode], eax ; 0
 	retn
 
 get_file_name:
-		; 29/04/2026 (TRDOS 386 Kernel v2.0.11)
-		;	BugFix!
-		; 25/08/2024 (TRDOS 386 Kernel v2.0.9)
-		; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
-		; 15/10/2016 - TRDOS 386 (TRDOS v2.0)
-		; Convert file name 
-		;	from directory entry format
-                ; 	to (8.3) dot file name format
-		;
-		; TRDOS v1.0 (DIR.ASM, "get_file_name")
-                ; 2005 - 09/10/2011
-		; INPUT: 
-		;	DS:SI -> Directory Entry Format File Name
-		;       ES:DI -> DOS Dot File Name Address
-		; OUTPUT:
-		;	DS:SI -> DOS Dot File Name Address
-                ;	ES:DI -> Directory Entry Format File Name
-		;	
-		; TRDOS 386 (15/10/2016)
-		; INPUT:
-		;	ESI = File name addr in dir entry format
-		;	EDI = Dot file name address (destination)
-		; OUTPUT: 
-		;	File name is converted and moved
-		;	to destination (as 8.3 dot filename)
-		;  
-		; Modified registers: EAX, ECX
+	; 29/04/2026 (TRDOS 386 Kernel v2.0.11)
+	;	BugFix!
+	; 25/08/2024 (TRDOS 386 Kernel v2.0.9)
+	; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
+	; 15/10/2016 - TRDOS 386 (TRDOS v2.0)
+	; Convert file name
+	;	from directory entry format
+        ;	to (8.3) dot file name format
+	;
+	; TRDOS v1.0 (DIR.ASM, "get_file_name")
+        ; 2005 - 09/10/2011
+	; INPUT:
+	;	DS:SI -> Directory Entry Format File Name
+	;	ES:DI -> DOS Dot File Name Address
+	; OUTPUT:
+	;	DS:SI -> DOS Dot File Name Address
+        ;	ES:DI -> Directory Entry Format File Name
+	;
+	; TRDOS 386 (15/10/2016)
+	; INPUT:
+	;	ESI = File name addr in dir entry format
+	;	EDI = Dot file name address (destination)
+	; OUTPUT:
+	;	File name is converted and moved
+	;	to destination (as 8.3 dot filename)
+	;
+	; Modified registers: EAX, ECX
 
-                ; 2005 (TRDOS 8086) - 2016 (TRDOS 386)
+        ; 2005 (TRDOS 8086) - 2016 (TRDOS 386)
 
-		push	edi
-		push	esi
-		; 25/08/2024
-		xor	ecx, ecx ; 0
-		; 29/04/2026
-		mov	cl, 8
+	push	edi
+	push	esi
+	; 25/08/2024
+	xor	ecx, ecx ; 0
+	; 29/04/2026
+	mov	cl, 8
 gfn_basename:
-		lodsb
-		cmp	al, 20h
-		ja	short gfn_nextchar
-		add	esi, ecx
-		dec	esi
-		jmp	short gfn_chk_ext
+	lodsb
+	cmp	al, 20h
+	ja	short gfn_nextchar
+	add	esi, ecx
+	dec	esi
+	jmp	short gfn_chk_ext
 gfn_nextchar:
-		stosb		; ?*
-		loop	gfn_basename
+	stosb		; ?*
+	loop	gfn_basename
 gfn_chk_ext:
-		cmp	byte [esi], 20h
-		jna	short gfn_ok
-		mov	al, '.' ; ?*.
-		stosb
-		movsb		; .?
-		lodsb
-		cmp	al, 20h
-		jna	short gfn_ok
-		stosb		; .??
-		lodsb
-		cmp	al, 20h
-		jna	short gfn_ok
-		stosb		; .???
+	cmp	byte [esi], 20h
+	jna	short gfn_ok
+	mov	al, '.' ; ?*.
+	stosb
+	movsb		; .?
+	lodsb
+	cmp	al, 20h
+	jna	short gfn_ok
+	stosb		; .??
+	lodsb
+	cmp	al, 20h
+	jna	short gfn_ok
+	stosb		; .???
 gfn_ok:
-		xor	al, al
-		stosb
-		pop	esi
-		pop	edi
-		; 25/08/2024
-		; ecx <= 7
-		retn
+	xor	al, al
+	stosb
+	pop	esi
+	pop	edi
+	; 25/08/2024
+	; ecx <= 7
+	retn
 
 set_hardware_int_vector:
 	; 18/03/2017
@@ -1519,7 +1669,7 @@ set_IRQ_callback_addr:
 	;	For example:
 	;
 	;	audio_IRQ_callback:
-	;	    ...	 
+	;	    ...
 	;	    <load DMA buffer with audio data>
 	;	    ...
 	;	    mov eax, 39 ; 'sysrele'
@@ -1555,7 +1705,7 @@ IRQsrv_6:
 	;cli		; disable interrupts till stack cleared
 	;out	INTA00, al ; end of interrupt to 8259 - 1
 	out	20h, al
-IRQsrv_7:	
+IRQsrv_7:
 	;; 13/06/2017
 	;or	word [ebp+8], 200h ; force enabling interrupts
 	;
@@ -2651,7 +2801,7 @@ sndc_init2:
 	and	cl, ~1 ; truncated for word alignment
 	cmp	al, 3 ; VT8233
 	jnb	short sndc_init22
-	; al = 2 ; AC'97 	
+	; al = 2 ; AC'97
 	and	cl, ~7 ; truncated for 8 byte (8x) alignment
 sndc_init22:
 	; 05/06/2024
@@ -2678,7 +2828,7 @@ sndc_init22:
 	je	short sndc_init20 ; it isn't an allocated mem buff
 
 	xchg	ecx, edx
-	; 26/11/2023 
+	; 26/11/2023
 	; round up (always -rounded up- page count is allocated)
 	; ((so deallocation must be done for the rounded up value))
 	;add	ecx, PAGE_SIZE - 1   ; 4095
@@ -2686,7 +2836,7 @@ sndc_init22:
 	; 04/06/2024
 	;call	deallocate_memory_block_x
 	;		; deallocate ((ecx+4095)>>12) pages
-	call	deallocate_memory_block	
+	call	deallocate_memory_block
 
 	xchg	edx, ecx
 sndc_init20:
@@ -2703,7 +2853,7 @@ sndc_init3:
 	;xor	eax, eax
 	;mov	[u.r0], eax ; 0 = no error, successful
 sndc_init5:	; 29/07/2022
-	retn 
+	retn
 
 sndc_init4:
 	; 02/12/2023 - TRDOS 386 v2.0.7
@@ -2812,7 +2962,7 @@ sndc_init18:
 	jmp	set_ac97_bdl
 
 sound_play:
-	; FUNCTION = 4 
+	; FUNCTION = 4
 	; bl = Mode 
 	;      bit 0 = mono/stereo (1 = stereo)
 	;      bit 1 = 8 bit / 16 bit (1 = 16 bit)
@@ -2871,8 +3021,8 @@ snd_play_3:
 	mov	al, 8
 	test	bl, 2 ; bits per sample (1= 16 bit)
 	jz	short snd_play_bps
-	shl	al, 1  
-snd_play_bps:	
+	shl	al, 1
+snd_play_bps:
 	mov	[audio_bps], al
 
 	; Transfer ring 3 (user's) audio buffer content to dma buffer
@@ -2957,7 +3107,7 @@ snd_play_0:
 	; 30/07/2022
 	jmp	SbInit_play	; sb16_start_play
 
-snd_play_1:	
+snd_play_1:
 	;call	vt8233_start_play
 	;retn
 	; 30/07/2022
@@ -3502,7 +3652,7 @@ sound_data_0:
 	and	ecx, ecx
 	;jnz	short sound_data_1 ; sample transfer
 
-	; Return only DMA Buffer pointer/offset... 
+	; Return only DMA Buffer pointer/offset...
 	; (If DMA Buffer has been mapped to user's
 	;  memory space; program can get graphics
 	;  data by using only this pointer value.)
@@ -3826,7 +3976,7 @@ set_irq_callback_service:
 	; INPUT ->
 	;	If AL = 0, the caller is 'syscalbac';
 	;	   otherwise, the caller is 'sysaudio' or ...
-	;	   (AL = user number) 
+	;	   (AL = user number)
 	;
 	;	BL = IRQ number (Hardware interrupt request number)
 	;	     (0 to 15 but IRQ 0,1,2,6,8,14,15 are prohibited)
@@ -3861,7 +4011,7 @@ set_irq_callback_service:
 	;	CF = 1 & EAX > 0 -> IRQ is prohibited or locked
 	;			by another process
 	;		 eax = ERR_PERM_DENIED -> prohibited or locked
-	;		 eax = ERR_INV_PARAMETER -> 
+	;		 eax = ERR_INV_PARAMETER ->
 	;		       invalid parameter/option or bad address
 	;
 	; TRDOS 386 - IRQ CALLBACK structures (parameters):
@@ -4479,7 +4629,7 @@ sysdma_4:
 	and	ah, ah
 	jnz	short sysdma_42
 
-sysdma_41:	
+sysdma_41:
 	; Not a valid dma channel (in use)
 	mov	dword [u.r0], -1 ; 0FFFFFFFFh
 	jmp	sysret
@@ -4820,7 +4970,7 @@ redirstdout:
 	jnz	short redirstdout_0
 	mov	[u.stdout], cl ; 0 ; reset STDOUT to keyboard
 	jmp	short redirstdout_3
-redirstdout_0: 
+redirstdout_0:
 	mov	al, cl
 	call	getf
 	; eax = first cluster
@@ -5046,6 +5196,179 @@ ungetchar:
 	mov	[u.getc], cl
 	mov	[u.r0],cl
 	jmp	sysret
+
+sysfstat: ; Return Open File Status (Parameters)
+	; 15/07/2026 - TRDOS 386 v2.1.0
+	; 22/05/2026
+	; 21/05/2026 - TRDOS 386 Kernel v2.0.11
+	; ref: Google AI (27/04/2026) ((TRDOS 386 LIBC, gcc port))
+	;
+	; Input:
+	;	EBX = File Descriptor (Handle)
+	;	ECX = Pointer to stat structure (User Buffer)
+	;
+	; Output:
+	;	If cf = 0 -> EAX = 0
+	;	If cf = 1 -> EAX = error code (= -1)
+
+	; 22/05/2026 - ref: tcc (include/sys) stat.h ((modified))
+	; stat structure:
+	; 	st_dev:   resd 1 ; 0
+	;	st_ino:	  resd 1 ; 4
+	;	st_mode:  resw 1 ; 8
+	;	st_nlink: resw 1 ; 10
+	;	st_uid:   resw 1 ; 12
+	;	st_gid:   resw 1 ; 14
+	;	st_rdev:  resd 1 ; 16
+	;	st_size:  resd 1 ; 20
+	;		  resd 1 ; 24
+	;	st_atime: resd 1 ; 28
+	;	st_mtime: resd 1 ; 32
+	;	st_ctime: resd 1 ; 36
+
+	cmp	ebx, 10
+	jae	short sysfstat_err
+
+	; Is the file open? (0 = empty/closed)
+	mov	bl, [u.fp + ebx]
+	or	bl, bl
+	;jz	short sysfstat_err
+	jnz	short sysfstat_@
+
+sysfstat_err:
+	;mov	eax, ERR_FILE_NOT_OPEN ; 10
+	mov	eax, -1
+	dec	eax ; -1
+	mov	[u.error], eax
+	mov	[u.r0], eax
+	jmp	error
+
+sysfstat_@:
+	mov	ebp, ecx ; user's stat buffer address
+
+	;xor	eax, eax
+	mov	al, 0
+	mov	ecx, 40		; stat structure size
+	sub	esp, ecx
+	mov	edi, esp
+	push	edi
+	rep	stosb		; clear fields
+	pop	edi
+
+	; ebx = 1 based file (open file index) number
+	dec	ebx ; zero based file (open file index) number
+	mov	esi, ebx
+	shl	esi, 2 ; * 4
+
+	; --- Fill Stat Structure---
+	; [edi+0]	; st_dev (word)
+	;movzx	eax, byte [OF_DRIVE + ebx]
+	; ah = 0
+	mov	al, [OF_DRIVE + ebx]
+	;mov	[edi], ax
+	stosd
+
+	; [edi+4]	; st_ino (dword)
+	mov	eax, [OF_FCLUSTER + esi]
+	;mov	[edi+4], eax
+	stosd
+
+	; [edi+8]	; st_mode (word)
+	mov	al, [OF_ATTRIB + ebx]
+	call	fat_attr_to_unix_mode ; FAT Attrib to UNIX Mode
+	;mov	[edi+8], ax
+	stosw
+	; edi = stat structure start address + 10
+
+	;xor	eax, eax ; 0
+	;mov	[edi+10], ax ; number of links
+	;mov	[edi+12], ax ; uid
+	;mov	[edi+14], ax ; gid
+	;mov	[edi+16], eax ; st_rdev (root device)
+
+ 	; [edi+20]	; st_size (dword)
+	mov	eax, [OF_SIZE + esi]
+	;mov	[edi+20], eax
+
+	add	edi, 10
+	stosd
+
+	;sub	eax, eax
+	;mov	[edi+24], eax ; 0  ; high dword of file size
+
+	shr	esi, 1
+
+	; [edi+28]	; st_atime (dword - Epoch)
+	mov	cx, [OF_LADATE + esi] ; last access date
+	shl	ecx, 16	
+	; last access time = 12:00:00 (default)
+	mov	cx, 6000h
+
+	; ECX (time) bits = hhhhhmmmmmmsssss
+	;	bits 0-4: seconds divided by 2, 0-28
+	;	bits 5-10: minute (0-59)
+	;	bits 11-15: hour (0-23)
+	; HW of ECX (date) bits = yyyyyyymmmmddddd
+	;	bit 0-4: day of the month (1-31)
+	;	bit 5-8: Month (1-12)
+	;	bit 9-15: Year (0-127) [Year-1980]
+
+	call	packed_time_to_epoch
+
+	; EAX = Unix Epoch TimeStamp
+
+	;mov	[edi+28], eax   ; atime (Last Access)
+	add	edi, 4
+	stosd
+
+	; [edi+28]	; st_atime (dword - Epoch)
+
+	; 15/07/2026
+	shl	esi, 1
+
+	mov	ecx, [OF_DATETIME + esi]
+	; lw = last modification time (write time)
+	; hw = last modification date (write time)
+
+	call	packed_time_to_epoch
+
+	;mov	[edi+32], eax   ; mtime (Last Modif)
+	stosd
+
+	; 15/07/2026
+	mov	ecx, [OF_CDATETIME + esi]
+	; lw = create time
+	; hw = create date
+
+	call	packed_time_to_epoch
+
+	;mov	[edi+36], eax   ; ctime (Creation)
+	stosd
+
+	mov	esi, esp ; source address in system space
+	mov	edi, ebp ; user's buffer address
+	mov	ecx, 40	 ; transfer (byte) count
+	; [u.pgdir] = user's page directory
+	call	transfer_to_user_buffer
+	; if carry flag = 1 -> transfer count < 40
+	mov	ebp, 40
+	add	esp, ebp
+	cmp	ecx, ebp	; transfer count check
+	jb	sysfstat_err
+
+	xor	eax, eax	; successful
+	mov	[u.r0], eax	; 0
+	jmp	sysret
+
+	; FAT Attrib (AL) -> UNIX Mode (AX)
+fat_attr_to_unix_mode:
+	test	al, 1Fh ; readonly, hidden, system, volume, dir
+	jnz	short fatum_ro
+	mov	ax, 81A4h	; Normal: rw-r--r-- ; octal 644
+	retn
+fatum_ro:
+	mov	ax, 8124h	; Readonly: r--r--r-- ; octal 444
+	retn
 
 	; 18/09/2024
 charbuf: db 0

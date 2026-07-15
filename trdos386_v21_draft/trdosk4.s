@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.1.0) - Directory Functions : trdosk4.s
 ; ----------------------------------------------------------------------------
-; Last Update: 10/07/2026 (Previous: 26/01/2026, v2.0.10)
+; Last Update: 15/07/2026 (Previous: 26/01/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -70,7 +70,7 @@ path_write_dirname1:
 	jna	short pass_write_dirname1
 	stosb
 	;cmp	edi, End_Of_Current_Dir_Str
-        ; 10/7/2026
+        ; 10/07/2026
 	cmp	edi, edx
 	jnb	short pass_write_path
 	loop	path_write_dirname1
@@ -93,7 +93,7 @@ loc_check_dir_name_ext:
 	jna	short pass_write_dirname2
 	mov	[edi], al
 	;cmp	edi, End_Of_Current_Dir_Str
-        ; 10/7/2026
+        ; 10/07/2026
 	cmp	edi, edx
 	jnb	short pass_write_path
 	loop    loc_check_dir_name_ext
@@ -116,7 +116,10 @@ pass_write_path:
 	retn
 
 get_current_directory:
-        ; 10/07/2026 - TRDOS 386 v2.1.0 - BugFix!  
+	; 15/07/2026 - TRDOS 386 Kernel v2.1.0
+	; 12/07/2026
+	; 11/07/2026 - Erdogan Tan & Google AI Collaborator 
+        ; 10/07/2026 - TRDOS 386 v2.0.11 - BugFix!  
 	; 16/05/2025 (TRDOS 386 Kernel v2.0.10) ((2.1.0))
 	; 29/08/2023 (TRDOS 386 Kernel v2.0.6)
 	; 11/08/2022
@@ -144,50 +147,24 @@ get_current_directory:
 	;   cf = 0 -> AL = 0
 	;   cf = 1 -> error code in AL
 
-loc_get_current_drive_0:
-	; 29/08/2023
-	sub	eax, eax ; 0
-	;cmp	dl, 0
-	cmp	dl, al
-	ja	short loc_get_current_drive_1
+	; 12/07/2026
+	sub	eax, eax
+	dec	dl
+	jns	short loc_get_current_drive_1
+	; default/current (0 -> -1)
+	mov	dl, [u.cdrv]
+	cmp	dl, -1
+	jne	short loc_get_current_drive_2 ; valid
+	; invalid
 	mov	dl, [Current_Drv]
-	; 29/08/2023
-	;jmp	short loc_get_current_drive_2
-
-loc_get_current_drive_2:
-	; 29/08/2023
-	;xor	eax, eax
-	; eax = 0
-	mov	ah, dl
-	push	esi ; (*)
-	mov	esi, Logical_DOSDisks
-	add	esi, eax
-	mov	al, [esi+LD_Name]
-	cmp	al, 'A'
-	jb	short loc_get_current_drive_not_ready_retn
-
-	; 28/07/2022
-	xor	ecx, ecx
-
-	mov	ah, [esi+LD_CDirLevel]
-	or	ah, ah
-	jnz	short loc_get_current_drive_3
-
-	;xor	ah, ah ; mov ah, 0
-
-	; 11/08/2022 - BugFix (*)
-	pop	esi ; (*) Current Directory Buffer address
-
-	mov	[esi], ah ; 0
-	; 28/07/2022
-	;xor	ecx, ecx
 	jmp	short loc_get_current_drive_4
 
 	; 29/08/2023
-loc_get_current_drive_1:
-	dec 	dl
+loc_get_current_drive_inv:
+	;dec 	dl
+	; 12/07/2026
 	cmp	dl, [Last_DOS_DiskNo]
-	jna	short loc_get_current_drive_2
+	jna	short loc_get_current_drive_3
 	;mov	eax, 0Fh ; Invalid drive (Drive not ready!)
 	;cmc 	; stc
 	; 28/07/2022
@@ -197,25 +174,61 @@ loc_get_current_drive_1:
 	stc
 	retn
 
-loc_get_current_drive_not_ready_retn:
-	pop	esi
+loc_get_current_drive_1:
+	cmp	dl, [Last_DOS_DiskNo]
+	ja	short loc_get_current_drive_inv
+
+	cmp	byte [u.cdrv], dl
+	jne	short loc_get_current_drive_4 ; not same drive
+
+loc_get_current_drive_2:
+	mov	ah, [u.cdlvl]
+	and	ah, ah
+	jz	short loc_get_current_drive_3
+	mov	edi, u.cdir
+	jmp	short loc_get_current_drive_6
+
+loc_get_current_drive_3:
+	; 12/07/2026
+	;xor	al, al ; success (cf=0)
+	mov	[esi], al ; 0
+	retn
+
+loc_get_current_drive_4:
+	; 12/07/2026
+	;sub	eax, eax
+	; 29/08/2023
+	; eax = 0
+	mov	ah, dl
+	mov	edi, Logical_DOSDisks
+	add	edi, eax
+
+	mov	al, [edi+LD_Name]
+	cmp	al, 'A'
+	jnb	short loc_get_current_drive_5
+	; cf = 1
+loc_get_current_drive_not_ready:
+	; 11/07/2026
 	;mov	eax, 15
 	mov	ax, 15 ; Drive not ready
 	retn
 
-loc_get_current_drive_3:
-	; 16/05/2025
-	;mov	edi, PATH_Array
-	;push	edi
-	add	esi, LD_CurrentDirectory
-	;;mov	ecx, 32
-	;; 28/07/2022
-	;mov	cl, 32
-	;rep	movsd
-	;pop	esi ; Path Array Address
-        ;
-	pop	edi ; pushed esi (current dir buffer offset)
-	;
+loc_get_current_drive_5:
+	add	edi, LD_CDirLevel ; current/last sub dir level
+	; edi = LDRVT + 127
+	mov	ah, [edi]	; current (sub) directory level
+	or	ah, ah
+	jz	short loc_get_current_drive_3
+	inc	edi
+	; edi = LDRVT + LD_CurrentDirectory  ; LDRVT + 128
+
+loc_get_current_drive_6:
+	; 12/07/2026
+	xchg	esi, edi
+	; edi = Current Directory Buffer (Target)
+	; esi = Current Directory Structure/Table (Source)
+	;  ah = Current (Sub) Directory Level
+
         ; 10/07/2026 - BugFix ! ('sysdir' in 'trdosk6.s')
 	;call	set_current_directory_string
         ; max. permissible size of current directory string !    
@@ -223,9 +236,12 @@ loc_get_current_drive_3:
         call	set_current_directory_string_@
         ;
 	mov	esi, edi
+	; esi = Current Directory buffer (filled with asciiz text))
+	; ecx = asciiz text (directory string) length
+	;			  including zero tail (<=104 is proper)
 
-loc_get_current_drive_4:
-	xor	al, al
+	; 15/07/2026
+	xor	eax, eax ; success (cf=0)
 	retn
 
 ; 14/06/2025 - TRDOS 386 v2.0.10

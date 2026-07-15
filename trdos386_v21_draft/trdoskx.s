@@ -1,11 +1,11 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.10) - UNINITIALIZED DATA : trdoskx.s
+; TRDOS386.ASM (TRDOS 386 Kernel - v2.1.0) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 10/02/2026 (Previous: 01/09/2024 - Kernel v2.0.9)
+; Last Update: 15/07/2026 (Previous: 10/02/2026 - Kernel v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
-; Assembler: NASM version 2.15 (trdos386.s)
+; Assembler: NASM version 3.02 (trdos386.s)
 ; ----------------------------------------------------------------------------
 ; Derived from TRDOS Operating System v1.0 (8086) source code by Erdogan Tan
 ; TRDOS2.ASM (09/11/2011)
@@ -738,6 +738,9 @@ SWP_DRV_chg:	resb 1	; Set Working Path - Drive Change
 ; 27/02/2017
 fpready:	resb 1	; '80387 fpu is ready' flag
 
+; 29/05/2026
+kb_beep_count:	resb 1	; TRDOS 386 v2.0.11
+
 ; 17/04/2021
 ; (DEVICE parameters is disabled as temporary)
 
@@ -864,7 +867,7 @@ OF_VOLUMEID:	resd OPENFILES  ; Vol ID for removable drives of open files
 ; 24/10/2016
 ;OF_DIRENTRY:	resw OPENFILES  ; Directory entry index no. in dir cluster
 				; Sector index = entry index / 16
-; 21/04/2025 - TRDOS 386 v2.0.10
+; 21/04/2025 - TRDOS 386 v2.0.10 (v2.1.0)
 OF_DIRSECTOR:	resd OPENFILES	; Directory Sector Numbers of open files
 OF_DIRPOS:	resb OPENFILES	; Directory entry index in directory sector
 ; 24/04/2025
@@ -873,6 +876,17 @@ OF_ATTRIB:	resb OPENFILES	; File attributes
 OF_DATETIME:	resd OPENFILES	; Last modification time (LW) and date (hw)
 ; 11/07/2025
 ;OF_LCLUSTER:	resd OPENFILES  ; Last clusters of open files
+
+; 15/07/2026 - TRDOS 386 v2.1.0
+; 20/05/2026 - TRDOS 386 v2.0.11
+;OF_ATTRIB:	resb OPENFILES	; File attributes
+;OF_CRTTIME:	resw OPENFILES	; Time file was created
+;OF_CRTDATE:	resw OPENFILES	; Date file was created
+OF_CDATETIME:	resd OPENFILES	; time (lw) & date (hw) file was created
+OF_LADATE:	resw OPENFILES	; Last access date
+;OF_WRTTIME:	resw OPENFILES	; Time of last write
+;OF_WRTDATE:	resw OPENFILES	; Date of last write
+;;OF_NAME	resb 12*OPENFILES ; Short name of file
 
 ;alignb 2
 
