@@ -18,6 +18,7 @@
 ; Ref: Retro UNIX 386 v1.2 Kernel (v0.2.2.3) - ux.s - 15/07/2022
 
 sysent: ; < enter to system call >
+	; 01/05/2026 - TRDOS 386 Kernel v2.0.11
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 17/03/2017
 	; 03/03/2017
@@ -1829,6 +1830,7 @@ syscreat_2:
 	jmp	short sysopen_2
 
 sysopen: ;<open file>
+	; 20/05/2026 - TRDOS 386 v2.0.11
 	; 19/12/2025 - TRDOS 386 v2.0.10
 	; 03/09/2024
 	; 19/08/2024 - TRDOS 386 v2.0.9
@@ -11820,8 +11822,8 @@ sysexec:
 	; 13/11/2017
 	mov	esi, ebx	; 12/07/2026
 	call	set_working_path_x
-	;mov	ax, 0CD01h           ; AH = 0CDh (Kalıcı CD zorlaması), AL = 1
-	;call	set_working_path     ; Artık ezebilir, yedeğimiz en başta mühürlendi!
+	;mov	ax, 0CD01h
+	;call	set_working_path
 	jnc	short sysexec_0
 
 	;; 'bad command or file name'
@@ -12241,7 +12243,7 @@ sysexec_18:
 	;;;;;
 	; 13/07/2026 - Erdogan Tan & Google AI
 	; backup active current directory structure to the new process U area
-	 
+
 	mov	cl, [Current_Drv]
 	mov	[u.cdrv], cl
 
@@ -13492,6 +13494,7 @@ glerr_3:
 	jmp	short glerr_1
 
 load_and_run_file:
+	; 14/07/2026
 	; 11/07/2026
 	; 10/07/2026 - TRDOS 386 Kernel v2.0.11
 	; 10/01/2026
@@ -14266,7 +14269,7 @@ swap_0: ; 1: / search runq table for highest priority process
 	;xor	ebx, ebx ; 02/05/2016
 	and 	ax, ax ; are there any processes to run in this Q entry
 	jnz	short swap_2
-	; 21/05/2026
+	; 21/05/2016
 	; runq_normal = runq+2, runq_background = runq+4
 	dec	byte [priority] ; 3 -> 3, 2 -> 1, 1-> 0
 	jnz	short swap_0
@@ -14576,7 +14579,7 @@ sysver:
 syspri: ; change running priority (of the process)
 	; 23/07/2022 - TRDOS 386 v2.0.5
 	; 21/05/2016
-	; 20/05/2026 - TRDOS 386 (TRDOS v2.0)
+	; 20/05/2016 - TRDOS 386 (TRDOS v2.0)
 	; INPUT ->
 	;	BL = priority level
 	;	   0 = low running priority (running on background)

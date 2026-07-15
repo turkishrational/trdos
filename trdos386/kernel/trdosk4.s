@@ -211,7 +211,7 @@ loc_get_current_drive_5:
 	or	ah, ah
 	jz	short loc_get_current_drive_3
 	inc	edi
-	; edi = LDRVT + LD_CurrentDirectory  ; LDRTV + 128
+	; edi = LDRVT + LD_CurrentDirectory  ; LDRVT + 128
 
 loc_get_current_drive_6:
 	; 12/07/2026

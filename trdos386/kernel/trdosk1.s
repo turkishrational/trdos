@@ -801,9 +801,7 @@ set_date_bcd:
 
 	;div	ecx		; EAX = 20 (Century), EDX = 26 (Year)
 
-
-
-	; Convert Century yo BCD yap (20 -> 0x20)
+	; Convert Century to BCD (20 -> 0x20)
 	;mov	al, al
 
 	;aam
@@ -812,7 +810,6 @@ set_date_bcd:
 
 	;or	al, ah
 	;mov	ch, al		; CH = 0x20 (BCD Century)
-
 
 	; Convert Year to BCD (26 -> 0x26)
 

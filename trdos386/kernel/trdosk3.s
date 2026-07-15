@@ -5,7 +5,7 @@
 ; ----------------------------------------------------------------------------
 ; Beginning: 06/01/2016
 ; ----------------------------------------------------------------------------
-; Assembler: NASM version 2.15 (trdos386.s)
+; Assembler: NASM version 3.02 (trdos386.s)
 ; ----------------------------------------------------------------------------
 ; Derived from TRDOS Operating System v1.0 (8086) source code by Erdogan Tan
 ; MAINPROG.ASM (09/11/2011)
@@ -2079,7 +2079,7 @@ cd_3:
 	mov	dl, al
 	call 	change_current_drive
 	jc	short cd_drive_not_ready
-	
+
 	; 14/07/2026 - TRDOS 386 v2.0.11
 	; invalidate (MainProg's) cdir backup
 	;	for the next 'set_working_path'

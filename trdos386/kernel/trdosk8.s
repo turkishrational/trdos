@@ -32,13 +32,13 @@ set_run_sequence:
 	;	[u.pri] = priority of present process
 	;
 	;	DL = priority (queue)
-	;	     0 = background (low) ; run on background 
+	;	     0 = background (low) ; run on background
 	;	     1 = regular (normal) ; run as regular
 	;	     2 = event (high)     ; run for event
 	;
 	;	1) If the requested process is already running:
-	;	   a) If present priority is high ([u.pri]=2) 
-	;	      and requested priority is also high, 
+	;	   a) If present priority is high ([u.pri]=2)
+	;	      and requested priority is also high,
 	;	      there is nothing to do! Because it has been
 	;	      done already (before this attempt).
 	;	   b) If present priority is high ([u.pri]=2)
@@ -93,8 +93,8 @@ set_run_sequence:
 	;	[u.pri] = priority of present process
 	;
 	;	cf = 1, if the request could not be fulfilled.
-	;			 	     	  
-	;	NOTE: 
+	;
+	;	NOTE:
         ;          * Processes in 'run as regular' queue can run
 	;	     if there is no process in 'run for event' queue
 	;	     ('run for event' processes have higher priority)
@@ -133,7 +133,7 @@ srunseq_2:
 				; process and priority of requested
 				; process is not high (event),
 				; there is nothing to do!
-	
+
 	; requested process is not present process
 	; & priority of requested process is high
 	cmp	dl, [u.pri] 	; priority of present process
@@ -160,8 +160,8 @@ srunseq_5:
 
 srunseq_6:
 	; present priority of the process is not high
-	
-	mov	[u.pri], dl ; new priority 
+
+	mov	[u.pri], dl ; new priority
 			    ; (will be used by 'tswap')
 
 	cmp	dl, 2 		; high priority ?
@@ -385,7 +385,7 @@ INT4Ah:
 ; Last Modification: 20/11/2015
 
 com2_int:
-	; 07/11/2015 
+	; 07/11/2015
 	; 24/10/2015
 	; 23/10/2015
 	; 14/03/2015 (Retro UNIX 386 v1 - Beginning)
@@ -437,7 +437,7 @@ comm_int:
 	; Interrupt identification register
 	mov	dx, 2FAh ; COM2
 	;
-	cmp 	al, 8 
+	cmp 	al, 8
 	ja 	short com_i0
 	;
 	; 20/11/2015
@@ -472,7 +472,7 @@ com_i0:
 	;JMP	$+2	   	; I/O DELAY
 	; 08/11/2015
 	; 07/11/2015
-	mov	esi, ebx 
+	mov	esi, ebx
 	mov	edi, ebx
 	add 	esi, rchar - 8 ; points to last received char
 	add	edi, schar - 8 ; points to last sent char
@@ -502,13 +502,13 @@ com_i1:
 	; reset request for response status (again)
         dec     byte [ebx+req_resp-8] ; 0 
 	jmp	short com_eoi
-com_i2:	
+com_i2:
 	; 08/11/2015
 	cmp 	al, 0FFh	; (response ?)
 	je	short com_i3	; (check for response signal)
 	; 07/11/2015
 	cmp	al, 04h	; EOT
-	jne	short com_i4	
+	jne	short com_i4
 	; EOT = 04h (End of Transmit) - 'CTRL + D'
 	;(an EOT char is supposed as a ctrl+brk from the terminal)
 	; 08/11/2015
@@ -518,7 +518,7 @@ com_i2:
 	xchg	[ptty], bl ; (restore ptty value and BL value)
 	;mov	al, 04h ; EOT
 	; 08/11/2015
-	jmp	short com_i4	
+	jmp	short com_i4
 com_i3:
 	; 08/11/2015
 	; If 0FFh has been received just after a query
@@ -597,7 +597,7 @@ sp_init:
 	; INPUT:  (29/06/2015)
 	;	AL = 0 for COM1
 	;	     1 for COM2
-	;	AH = Communication parameters	
+	;	AH = Communication parameters
 	;
 	;  (*) Communication parameters (except BAUD RATE):
 	;	Bit	4	3	2	1	0
@@ -707,7 +707,7 @@ sp_i3:
 	out	dx, al			; disable serial port interrupt
 	JMP	$+2			; I/O DELAY
 	add	dl, 2 	; 3FBh (2FBh)	; COM1 Line control register (3FBh)
-	mov	al, 80h			
+	mov	al, 80h
 	out	dx, al			; SET DLAB=1 ; divisor latch access bit
 	;-----	SET BAUD RATE DIVISOR
 	; 26/10/2015
@@ -735,7 +735,7 @@ sp_i3:
 	dec 	dl 	; 3FAh (2FAh)	; FIFO Control register (16550/16750)
 	xor	al, al			; 0
 	out	dx, al			; Disable FIFOs (reset to 8250 mode)
-	JMP	$+2	
+	JMP	$+2
 sp_i4:
 ;A18:	;-----	COMM PORT STATUS ROUTINE
 	; 29/06/2015 (line status after modem status)
@@ -777,7 +777,7 @@ sp_setp: ; Set serial port communication parameters
 	;		 'invalid parameter !'
 	;		 	 or
 	;		 'device not ready !' error
-	;	
+	;
 	;  (*) Communication parameters (except BAUD RATE):
 	;	Bit	4	3	2	1	0
 	;		-PARITY--   STOP BIT  -WORD LENGTH-
@@ -790,12 +790,12 @@ sp_setp: ; Set serial port communication parameters
 	;		------------------------
 	;	value	0    0    0  | Default (Divisor = 1)
 	;		0    0    1  | 9600 (12)
-	;		0    1    0  | 19200 (6) 
-	;		0    1	  1  | 38400 (3) 
+	;		0    1    0  | 19200 (6)
+	;		0    1	  1  | 38400 (3)
 	;		1    0	  0  | 14400 (8)
 	;		1    0	  1  | 28800 (4)
 	;		1    1    0  | 57600 (2)
-	;		1    1    1  | 115200 (1) 
+	;		1    1    1  | 115200 (1)
 	;
 	; (COM1 base port address = 3F8h, COM1 Interrupt = IRQ 4)
 	; (COM2 base port address = 2F8h, COM1 Interrupt = IRQ 3)
@@ -898,7 +898,7 @@ wakeup:
 
 set_working_path_x:
 		; 17/10/2016 (TRDOS 386 - FFF & FNF)
-		;mov	ax, 1 
+		;mov	ax, 1
 			; File name is needed/forced (AL=1)
 			; Change directory as temporary (AH=0)
 		; 29/07/2022
@@ -916,7 +916,7 @@ set_working_path:
 		; 14/07/2026
 		; 13/07/2026
 		; 12/07/2026
-		; 11/07/2026 - TRDOS 386 Kernel v2.0.11	
+		; 11/07/2026 - TRDOS 386 Kernel v2.0.11
 		; 08/08/2022
 		; 29/07/2022 - TRDOS 386 Kernel v2.0.5
 		; 16/10/2016
@@ -925,24 +925,24 @@ set_working_path:
 		; 05/10/2016 - TRDOS 386 (TRDOS v2.0)
 		;
 		; TRDOS v1.0 (DIR.ASM, "proc_set_working_path")
-                ; 27/01/2011 - 08/02/2011 
+                ; 27/01/2011 - 08/02/2011
 		; Set/Changes current drive, directory and file
 		; depending on command tail
 		; (procedure is derivated from CMD_INTR.ASM 
 		; file or dir locating code of internal commands)
-		; (This procedure is prepared for INT 21H file/dir 
-		; functions and also to get compact code for 
+		; (This procedure is prepared for INT 21H file/dir
+		; functions and also to get compact code for
 		; internal mainprog -command interpreter- commands)
 		; 
 		; INPUT: DS:SI -> Command tail (ASCIIZ string)
 		; AL = 0 -> any, AL > 0 -> file name is forced
-		; AH = CD -> Change directory permanently 
-		; AH <> CD -> Change directory as temporary    
+		; AH = CD -> Change directory permanently
+		; AH <> CD -> Change directory as temporary
 		; 
 		; OUTPUT: ES=DS, FindFile structure has been set
-		;        RUN_CDRV points previous current drive  
+		;        RUN_CDRV points previous current drive
 		;        DS:SI = FindFile structure address
-		;        (DS=CS)       
+		;        (DS=CS)
 		;        AX, BX, CX, DX, DI will be changed
 		;   cf = 1 -> Error code in AX (AL)
 		;        stc & AX = 0 -> Bad command or path name
@@ -964,11 +964,11 @@ set_working_path:
 		;
 		;       cf = 1 -> Error code in EAX (AL)
 		;       stc & EAX = 0 -> Bad command or path name
-		;  
+		;
 		; Modified registers: EAX, EBX, ECX, EDX, ESI, EDI
 
 		mov	[SWP_Mode], ax
-		xor	eax, eax ; 0	; 12/07/2026	
+		xor	eax, eax ; 0	; 12/07/2026
 		mov	al, [Current_Drv]
 		;xor	ah, ah
 		mov	[SWP_DRV], ax
@@ -979,7 +979,7 @@ set_working_path:
 
 		push	ebp
 		mov	ebp, esp
-		
+
 		;mov	ecx, 128 ; maximum path length = 128 bytes
 		; 29/07/2022
 		xor	ecx, ecx ; 11/07/2026 ; ecx = 0
@@ -1009,7 +1009,7 @@ loc_swp_xor_retn:
 loc_swp_retn:
 		mov	esp, ebp
 		pop	ebp
-		
+
 		; 12/07/2026
 		jc	short loc_swp_2
 ; ...
@@ -1023,7 +1023,7 @@ loc_swp_retn:
 				 ; this process's current/home dir has ben backed up before  
 
 		; save/backup -or validate it for the restore phase-
-	
+
 		; 14/07/2026
 		;xor	eax, eax
 		; eax = 0
@@ -1047,16 +1047,16 @@ loc_swp_retn:
 		cmp	byte [u.uno], 1
 		ja	short loc_swp_1	 ; external program (PRG)
 
-		; this process is the internal command interperter (MainProg) 
+		; this process is the internal command interpreter (MainProg)
 		; (cdir backup reference must be the LDRVT of the current logical disk)
-		
+
 		xor	ecx, ecx
 		mov	ch, al	; [Current_Drv]
 		mov	esi, Logical_DOSDisks+LD_CDirLevel ; current/last sub dir level
 		add	esi, ecx
 		; esi = LDRVT + 127
 		lodsb
-		; esi = LDRVT + LD_CurrentDirectory  ; LDRTV + 128
+		; esi = LDRVT + LD_CurrentDirectory  ; LDRVT + 128
 		push	esi
 		mov	[Current_Dir_Level], al
 		; Save the current directory's first cluster
@@ -1079,12 +1079,12 @@ loc_swp_1:
 		mov	[u.cdlvl], al
 		; Save the current directory's first cluster
 		mov	eax, [Current_Dir_FCluster]
-		mov	[u.cdfcl], eax			
+		mov	[u.cdfcl], eax
 loc_swp_2:
 ; ...
 		;mov	esi, FindFile_Drv
 		mov	esi, FindFile_Name ; 12/10/2016
-		retn 
+		retn
 
 ;loc_swp_fchar_next:
 ;		inc	esi
@@ -1207,7 +1207,7 @@ loc_rwp_restore_cdir:
 		;mov	bh, dl
 		;mov	esi, Logical_DOSDisks
 		;add	esi, ebx
-		;	
+		;
 		;call	restore_current_directory
 
 		; 14/07/2026 (may not be necessary...)
@@ -1238,7 +1238,7 @@ loc_rwp_restore_cdir:
 
 		; 14/07/2026 (may not be necessary...)
 		mov	byte [Restore_CDIR], 0
-	
+
 		; 12/07/2026 (these are may not be necessary?)
 loc_rwp_return:		; 14/07/2026
 		mov	dx, [SWP_DRV]
@@ -1256,27 +1256,27 @@ get_file_name:
 		; 25/08/2024 (TRDOS 386 Kernel v2.0.9)
 		; 29/07/2022 (TRDOS 386 Kernel v2.0.5)
 		; 15/10/2016 - TRDOS 386 (TRDOS v2.0)
-		; Convert file name 
+		; Convert file name
 		;	from directory entry format
-                ; 	to (8.3) dot file name format
+		; 	to (8.3) dot file name format
 		;
 		; TRDOS v1.0 (DIR.ASM, "get_file_name")
-                ; 2005 - 09/10/2011
-		; INPUT: 
+		; 2005 - 09/10/2011
+		; INPUT:
 		;	DS:SI -> Directory Entry Format File Name
-		;       ES:DI -> DOS Dot File Name Address
+		;	ES:DI -> DOS Dot File Name Address
 		; OUTPUT:
 		;	DS:SI -> DOS Dot File Name Address
-                ;	ES:DI -> Directory Entry Format File Name
-		;	
+ 		;	ES:DI -> Directory Entry Format File Name
+		;
 		; TRDOS 386 (15/10/2016)
 		; INPUT:
 		;	ESI = File name addr in dir entry format
 		;	EDI = Dot file name address (destination)
-		; OUTPUT: 
+		; OUTPUT:
 		;	File name is converted and moved
 		;	to destination (as 8.3 dot filename)
-		;  
+		;
 		; Modified registers: EAX, ECX
 
                 ; 2005 (TRDOS 8086) - 2016 (TRDOS 386)
@@ -1355,7 +1355,7 @@ shintv_2:
 		; 03/03/2017
 		shl	al, 1 ; IRQ number * 8 
 		; 18/03/2017
-		movzx	edi, al 
+		movzx	edi, al
 		add	edi, idt + (8*32) ; IRQ 0 offset = idt + 256
 		
 		mov	eax, edx ; IRQ handler address
@@ -1455,7 +1455,7 @@ IRQsrv_0:
 		;js	IRQsrv_5 ; not available to use here!?
 		; 29/07/2022
 		js	short IRQsrv_j5  ; (jump to IRQsrv_5)
-		;		 
+		;
 		cmp	byte [ebx+IRQ.method], 80h ; using by a dev or kernel? 
 		jb	short IRQsrv_1 ; no
 
@@ -1520,7 +1520,7 @@ IRQsrv_4:
 
 		; Check if an IRQ callback service already in progress
 		cmp	byte [u.r_lock], 0
-		;ja	IRQsrv_5 ; nothing to do !  
+		;ja	IRQsrv_5 ; nothing to do !
 				     ; (we need to complete prev callback)
 		; 29/07/2022
 		ja	short IRQsrv_j5  ; (jump to IRQsrv_5)
@@ -1537,7 +1537,7 @@ IRQsrv_4:
 		mov	cl, [sysflg]   ; (system call) mode flag (kernel/user)
 		mov	[u.r_mode], cl ; system mode (0) or user mode (FFh)
 
-		; 
+		;
 		mov	ebp, [tss.esp0] ; kernel stack address (for ring 0)
 		sub	ebp, 20		; eip, cs, eflags, esp, ss
 	 	mov	[u.sp], ebp
@@ -1570,7 +1570,7 @@ IRQsrv_4:
 		mov	[u.usp], edi
 		mov	ecx, ((ESPACE/4) - 4) ; except DS, ES, FS, GS
 		rep	movsd
-		mov	cl, 4	
+		mov	cl, 4
 		rep	stosd
 		mov	[u.sp], edi
 		mov	esi, ebp
@@ -1622,10 +1622,10 @@ set_IRQ_callback_addr:
 		;	    mov eax, 39 ; 'sysrele'
 		;	    int 40h ; TRDOS 386 system call (interrupt)
 		;
-		
+
 		;mov	edx, [edx+IRQ.addr] ; Callback service address
 		;			    ; (Virtual address)
-		
+
 		mov	ebp, [u.sp]; kernel's stack, points to EIP (user)
 		mov	[ebp], edx
 IRQsrv_5:
@@ -1651,8 +1651,8 @@ IRQsrv_6:
 		;mov	al, 20h ; 01/08/2020
 		;cli		; disable interrupts till stack cleared
 		;out	INTA00, al ; end of interrupt to 8259 - 1
-		out	20h, al	
-IRQsrv_7:	
+		out	20h, al
+IRQsrv_7:
 		;; 13/06/2017
 		;or	word [ebp+8], 200h ; force enabling interrupts
 		;
@@ -1677,9 +1677,9 @@ IRQsrv_7:
 ;		;
 ;		; This procedure compares name of requested
 ;		; device with kernel device names and
-;		; installable device names. If names match, 
-;		; the relevant device index (entry) number 
-;		; will be returned the caller (sysopen) 
+;		; installable device names. If names match,
+;		; the relevant device index (entry) number
+;		; will be returned the caller (sysopen)
 ;		; for the requested device.
 ;		;
 ;		; NOTE: Installable device drivers must
@@ -1690,7 +1690,7 @@ IRQsrv_7:
 ;		;    ESI = device name address (ASCIIZ)
 ;		;         (in kernel's memory space)  
 ;  		;    max name length = 8 without '/dev/')
-;		;    Device name will be capitalized 
+;		;    Device name will be capitalized
 ;		;    and if there is, '/dev/' will be
 ;		;    removed from name before comparising)
 ;		;
@@ -1776,11 +1776,11 @@ IRQsrv_7:
 ;		jb	short gdn_9
 ;gdn_12:
 ;		; search for installable device names
-;		; esi = offset device_name 
+;		; esi = offset device_name
 ;		mov	edi, IDEV_NAME
 ;		sub	al, al ; 0
 ;gdn_13:
-;		cmpsd	
+;		cmpsd
 ;		jne	short gdn_14
 ;		cmpsd
 ;		jne	short gdn_15
@@ -1800,7 +1800,7 @@ IRQsrv_7:
 ;
 ;gdn_17:	; name match (with one of kernel device names)
 ;		;
-;		; convert KDEV_NAME index to 
+;		; convert KDEV_NAME index to
 ;		; KDEV_NUMBER index
 ;		; (different names are used for same devices)
 ;		; (example: "COM1" & "TTY8" = device number 18)
@@ -1857,7 +1857,7 @@ IRQsrv_7:
 ;	;	   esi = esi+1
 ;	;	   edi = edi+1	
 ;	; 
-;	lodsb	
+;	lodsb
 ;	cmp	al, 61h
 ;    	jb	short lodsb_cap_retn
 ;     	cmp	al, 7Ah
@@ -1874,7 +1874,7 @@ IRQsrv_7:
 ;	; 08/10/2016 - TRDOS 386 (TRDOS v2.0)
 ;	; Complete device opening work for sysopen (device)
 ;	;
-;	; INPUT -> 
+;	; INPUT ->
 ;	;	EAX = Device Number (AL)
 ;	;        CL = Open mode (1 = read, 2 = write)
 ;	;	 CH = Device access byte (bit 0 = 0)
@@ -2035,7 +2035,7 @@ sysaudio: ; AUDIO FUNCTIONS
 	;
 	; 	BH = 2 -> ALLOCATE AUDIO BUFFER (for user)
 	;		ECX = Audio Buffer Size (must be equal to
-	;		      the half of DMA buffer size) 
+	;		      the half of DMA buffer size)
 	;		EDX = Virtual Address of the buffer
 	;		      (This is not DMA buffer!)
 	;
@@ -2099,7 +2099,7 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	BH = 13 -> MAP DMA BUFFER TO USER
 	;	    (for direct access to system's dma buffer)
 	;
-	;	     ECX = map size in bytes 
+	;	     ECX = map size in bytes
 	;		  (will be rounded up to page borders)
 	;	     EDX = Virtual Address of the buffer
 	;		  (Will be rounded up to page borders)
@@ -2125,7 +2125,7 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	BH = 16 -> UPDATE DMA BUFFER DATA
 	;		   (by using the Audio Buffer content)
 	;	     BL = 0 : Update dma half buffer in sequence
-	;		      (automatic destination)	
+	;		      (automatic destination)
 	;		  1 : Update 1st half of the dma buffer
 	;		  2 : Update 2nd half of the dma buffer
 	;		  3-FEh: Invalid!
@@ -2217,7 +2217,7 @@ sysaudio: ; AUDIO FUNCTIONS
 	;	     AX bit 0 - VRA bit
 	;	     HW of EAX = PCM output sample rate (HZ)
 	;	    EBX = VENDOR ID 1 (BX), VENDOR ID 2 (HW)
-	;	    (if CF = 1 -> Error code in EAX)	
+	;	    (if CF = 1 -> Error code in EAX)
 	;	                 (ERR_DEV_NOT_RDY = 15)
 	;	    Note: EAX & EBX = 0 (for SB16,VIA,HDA)
  	;
@@ -2406,7 +2406,7 @@ sound_alloc:
 	; 28/01/2025
 	; 27/01/2025 (BugFix)
 	; 15/01/2025
-	; 12/01/2025	
+	; 12/01/2025
 	; 25/11/2023
 	; 27/07/2020
 	; 28/05/2027
@@ -2509,7 +2509,7 @@ snd_alloc_1:
 	mov	edx, ecx
 	; 15/05/2017
 	; EAX = Beginning address (physical)
-	; EAX = 0 -> Allocate mem block from the 1st proper aperture	
+	; EAX = 0 -> Allocate mem block from the 1st proper aperture
 	; ECX = Number of bytes to be allocated
 	call	allocate_memory_block
 	jc	short sound_buff_error
@@ -2735,7 +2735,7 @@ sndc_init10:
 sndc_init2:
 	; 21/04/2017
 	mov	ecx, [audio_buff_size] ; audio buffer size
-	; 05/06/2024	
+	; 05/06/2024
 	;shl	ecx, 1 ; *2
 	
 	; 05/06/2024
@@ -2745,7 +2745,7 @@ sndc_init2:
 	and	cl, ~1 ; truncated for word alignment
 	cmp	al, 3 ; VT8233  
 	jnb	short sndc_init22
-	; al = 2 ; AC'97 	
+	; al = 2 ; AC'97
 	and	cl, ~7 ; truncated for 8 byte (8x) alignment
 sndc_init22:
 	; 05/06/2024
@@ -2755,7 +2755,7 @@ sndc_init22:
 	;;;
 	; 04/06/2024
 	add	ecx, 4095  ; PAGE_SIZE - 1
-	and	cx, ~4095  ; ~PAGE_OFF	
+	and	cx, ~4095  ; ~PAGE_OFF
 	; ecx = page border aligned DMA buffer size (required) (*)
 	;;;
 
@@ -2797,7 +2797,7 @@ sndc_init3:
 	;xor	eax, eax
 	;mov	[u.r0], eax ; 0 = no error, successful
 sndc_init5:	; 29/07/2022
-	retn 
+	retn
 
 sndc_init4:
 	; 02/12/2023 - TRDOS 386 v2.0.7
@@ -2906,7 +2906,7 @@ sndc_init18:
 	jmp	set_ac97_bdl
 
 sound_play:
-	; FUNCTION = 4 
+	; FUNCTION = 4
 	; bl = Mode 
 	;      bit 0 = mono/stereo (1 = stereo)
 	;      bit 1 = 8 bit / 16 bit (1 = 16 bit)
@@ -2965,7 +2965,7 @@ snd_play_3:
 	mov	al, 8
 	test	bl, 2 ; bits per sample (1= 16 bit)
 	jz	short snd_play_bps
-	shl	al, 1  
+	shl	al, 1
 snd_play_bps:	
 	mov	[audio_bps], al
 
@@ -3623,7 +3623,7 @@ sound_data_1:
 	; 30/07/2022
 	jna	short sound_data_6
 sound_data_5:
-	jmp	sound_buff_error	
+	jmp	sound_buff_error
 sound_data_6:
 	mov	eax, edx
 	and	eax, PAGE_OFF ; 4095 (0FFFh)
@@ -3730,7 +3730,7 @@ sound_update:
 	;       -flag will have same value-
 	;     If BL input is 1, return value will be 1 (1 xor 0)
 	;     IF BL input is 2, return value will be 0 (1 xor 1)
-	
+
 	; 28/12/2024
 	; 05/06/2024
 	; 30/07/2022
@@ -3894,7 +3894,7 @@ sound_dmaclear:
 	mov	[u.r0], ecx
 	shl	ecx, 1 ; full buffer size in bytes
 	mov	al, bl
-	rep	stosb	
+	rep	stosb
 
 snd_dma_clear_ok:
 	retn
@@ -3920,7 +3920,7 @@ set_irq_callback_service:
 	; INPUT ->
 	;	If AL = 0, the caller is 'syscalbac';
 	;	   otherwise, the caller is 'sysaudio' or ...
-	;	   (AL = user number) 
+	;	   (AL = user number)
 	;
 	;	BL = IRQ number (Hardware interrupt request number)
 	;	     (0 to 15 but IRQ 0,1,2,6,8,14,15 are prohibited)
@@ -3934,14 +3934,14 @@ set_irq_callback_service:
 	;	    >3 = invalid 
 	;		 (syscallback version will return to user)
 	;
-	;	CL = Signal Return/Response Byte value 
+	;	CL = Signal Return/Response Byte value
 	;
 	;	If BH = 3, kernel will put a counter value ; 03/08/2020
 	;	          (into the S.R.B. addr)
 	;		  between 0 to 255. (start value = CL+1)
 	;	
 	;	NOTE: counter value, for example: even and odd numbers
-	;	      may be used for -audio- DMA buffer switch 
+	;	      may be used for -audio- DMA buffer switch
 	;	      within double buffer method, etc.
 	;
 	;	EDX = Signal return (Response) byte address
@@ -3998,10 +3998,10 @@ set_irq_callback_service:
 	;
 	;	   (x) = 3,4,5,7,9,10,11,12,13
 	;
-	
+
 	cmp	bl, 15
 	ja	short scbs_2
-	
+
 	cmp	bh, 3
 	ja	short scbs_2  ; invalid parameter
 
@@ -4097,9 +4097,9 @@ scbs_6:
 	jz	short scbs_7  ; the caller is 'syscalbac'
 	; AL = user number ([u.uno] or [audio.user] or ...)
 	; The caller is 'sysaudio' or ...
-	;	
+	;
 	; bh = method (0 = signal response byte, 1 = callback)
-	;	      (2 = auto increment of signal response byte) 
+	;	      (2 = auto increment of signal response byte)
 
 	or	bh, 80h		; Kernel extension flag !
 	jmp	short scbs_8
@@ -4804,8 +4804,8 @@ sysstdio: ; STDIN/STDOUT/STDERR functions
 	;	For BL = 15, 19
 	;	    CL = byte/character to r/w
 	;	For BL = 17
-	;	    If ECX = 0 -> clear redirection	
-	;	    If  CH & 80h = 80h 
+	;	    If ECX = 0 -> clear redirection
+	;	    If  CH & 80h = 80h
 	;		CL = file handle (descriptor index)
 	;	    If  CH & 80h = 0
 	;		CL = console (pseudo) tty number,
@@ -4813,7 +4813,7 @@ sysstdio: ; STDIN/STDOUT/STDERR functions
 	;	For BL = 18
 	;	    If CL = 0 -> initialize printer (command=0)
 	;	       CL > 0 -> configuration/command byte
-	;			 (reserved, not used)		
+	;			 (reserved, not used)
 	;
 	; Outputs:
 	;
@@ -4830,7 +4830,7 @@ sysstdio: ; STDIN/STDOUT/STDERR functions
 	;
 	;	07/09/2024
 	;	For BL = 10 to 19
-	;	    IF CF = 1, EAX/AL = error code 		
+	;	    IF CF = 1, EAX/AL = error code
 	;    .. If CF = 0 ...
 	;	For BL = 10 & 16
 	;	    AL (EAX) = status
@@ -4845,11 +4845,11 @@ sysstdio: ; STDIN/STDOUT/STDERR functions
 	;		  EAX/AL = ctrl/cfg byte
 	;	For BL = 14
 	;	    EAX/AL = byte/character
-	;			
+	;
 
 	cmp	bl, (end_of_stdiofuncs-stdiofuncs)>>2
 	jb	short sysstdio_0
-	
+
 	; invalid parameter (invalid sub function number)
 	mov	eax, ERR_INV_PARAMETER
 sysstdio_err:
@@ -4859,7 +4859,7 @@ sysstdio_err:
 
 sysstdio_0:
 	xor	eax, eax ; 0
-	mov	[u.error], eax ; clear previous error code	
+	mov	[u.error], eax ; clear previous error code
 	mov	[u.r0], eax ; clear previous return code
 
 	movzx	esi, bl
@@ -5136,7 +5136,7 @@ writestdout_2:
 
 ungetchar:
 	; put a character back in u.getc STDIN buffer
-	mov	byte [u.ungetc], 1 
+	mov	byte [u.ungetc], 1
 	mov	[u.getc], cl
 	mov	[u.r0],cl
 	jmp	sysret

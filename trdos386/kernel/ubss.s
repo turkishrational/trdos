@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - UNINITIALIZED USER DATA : ubss.s
 ; ----------------------------------------------------------------------------
-; Last Update: 12/07/2026  (Previous: 19/08/2024, v2.0.9)
+; Last Update: 15/07/2026  (Previous: 19/08/2024, v2.0.9)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -235,6 +235,7 @@ sysflg:	resb 1
 alignb 4
 
 user:
+	; 15/07/2026
 	; 12/07/2026 - TRDOS 386 Kernel v2.0.11
 	; 23/07/2022 - TRDOS 386 Kernel v2.0.5
 	; 04/12/2021 - Retro UNIX 386 v1.2
@@ -267,9 +268,9 @@ user:
 	u.fp:	  resb 10
 		  resw 1 ; 12/07/2026
 	;u.fp:	  resb OPENFILES ; 23/07/2022
-	u.fsp:	  ; 23/07/2022
+	;u.fsp:	  ; 23/07/2022
 	u.fofp:	  resd 1
-	u.dirp:	  resd 1
+	;u.dirp:  resd 1 ; 15/07/2026
 	u.namep:  resd 1
 	u.off:	  resd 1
 	;	  resd 1 ; 23/07/2022 (64 bit fptr)
@@ -279,17 +280,19 @@ user:
 	u.break:  resd 1 ; break
 	; 10/01/2017 (TRDOS 386, relocation and dword alignment)
 	; tty number (rtty, rcvt, wtty)
-	u.ttyp:	  resw 1 
-	u.ttyn:	  resb 1 ; 28/07/2013 - Retro Unix 8086 v1 feature only !
-	u.mode:   resb 1 ; 23/07/2022
+	; 15/07/2026
+	;u.ttyp:  resw 1 
+	;u.ttyn:  resb 1 ; 28/07/2013 - Retro Unix 8086 v1 feature only !
+	;u.mode:  resb 1 ; 23/07/2022
 	;u.resb:  resb 1 ; 10/01/2017 (TRDOS 386, temporary)
 	; 12/07/2026
         ;u.dirbuf: resb 16 ; 04/12/2015 (10 -> 16)
 	;u.pri:	  resw 1 ; 14/02/2014
 	u.quant:  resb 1 ; Retro UNIX 8086 v1 Feature only ! (uquant)
-		  resb 1 ; 23/07/2022
+	;	  resb 1 ; 23/07/2022
 	u.pri:	  resb 1 ; Modification: 21/05/2016 (priority levels: 0, 1, 2)
-		  resb 1 ; 23/07/2022
+	; 15/07/2026
+	;	  resb 1 ; 23/07/2022
 	u.intr:	  resw 1
 	u.quit:	  resw 1
 	;u.emt:	  resw 1 ; 10/10/2013
@@ -305,7 +308,12 @@ user:
 	; 23/07/2022
 	;u.procp: resd 1 ; /* pointer to proc structure */
 	u.uid:	  resb 1 ; uid
-	u.ruid:   resb 1
+	;u.ruid:  resb 1 ; 15/07/2026
+	; 15/07/2026
+	; tty number (rtty, rcvt, wtty)
+	u.ttyn:	  resb 1 ; 28/07/2013 - Retro Unix 8086 v1 feature only !
+	u.ttyp:	  resw 1
+	;
         u.upage:  resd 1 ; 16/04/2015 - Retro Unix 386 v1 feature only !
 	u.pgdir:  resd 1 ; 09/03/2015 (page dir addr of process)
 	u.ppgdir: resd 1 ; 06/05/2015 (page dir addr of the parent process)
@@ -313,11 +321,13 @@ user:
 	u.pcount: resw 1 ; 20/05/2015 (byte -transfer- count for page)
 	;u.pncount: resw 1
 		; 16/06/2015 (byte -transfer- count for page, 'namei', 'mkdir')
-	;u.pnbase:  resd 1
+	;u.pnbase: resd 1
 		; 16/06/2015 (physical base/transfer address, 'namei', 'mkdir')
 			 ; 09/06/2015
 	u.kcall:  resb 1 ; The caller is 'namei' (dskr) or 'mkdir' (dskw) sign
-	u.brwdev: resb 1 ; Block device number for direct I/O (bread & bwrite)
+		  resb 1  ; 15/07/2026
+	; 15/07/2026
+	;u.brwdev: resb 1 ; Block device number for direct I/O (bread & bwrite)
 			 ; 24/07/2015 - 24/06/2015
 	;u.args:  resd 1 ; arguments list (line) offset from start of [u.upage]
 			 ; (arg list/line is from offset [u.args] to 4096 in [u.upage])
@@ -362,7 +372,7 @@ alignb 4
 	; 12/07/2026
 	u.reserved: resw 1
 	u.cdrv:	 resb 1 ; home/current drive and directory ... save/restore
-	u.cdlvl: resb 1 ; sub directory level (of the current directory) 	
+	u.cdlvl: resb 1 ; sub directory level (of the current directory)
         u.cdfcl: resd 1 ; first cluster (of the current directory)
 	u.cdir:	 resb 128 ; 8*(12+4) sub directory array (current directory table)
 

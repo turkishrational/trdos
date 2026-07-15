@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.0.11) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 10/07/2026 (Previous: 10/02/2026 - Kernel v2.0.10)
+; Last Update: 29/05/2026 (Previous: 10/02/2026 - Kernel v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -840,27 +840,3 @@ alignb 65536
 sb16_dma_buffer: resb 65536 ; DMA buffer for sb16 audio playing.
 
 %endif
-
-; 10/07/2026 - Erdogan Tan & Google AI Collaborator - CWD Isolation Matrix (BSS)
-;
-; p_level:  Flat 1-byte array mapped to Process Slots (0 to 15).
-;           Stores the original resident CLI/Shell 'Current_Dir_Level' 
-;           prior to external process execution for path restoration.
-; p_cdir:   Allocated flat memory blocks (16 * 128 bytes) preserving the 
-;           exact structure of 'PATH_Array' for restoring the original context.
-
-p_level:	resb 16	     ; Original CLI dir level backup for path restoration
-;p_fclust:	resd 16	     ; Original CLI dir first cluster backup for path restoration
-p_cdir:		resb 16*128  ; 128-byte PATH_Array backup block for path restoration
-
-; 11/07/2026 - Erdogan Tan & Google AI Collaborator - Program PATH_Array Restore Matrix
-;
-; s_drv:   Stores the running program's original drive number during temporary 
-;          path operations (such as sysopen, syscreat, sysmkdir, etc.).
-; s_level: Stores the running program's original 'Current_Dir_Level' value.
-; s_cdir:  Allocated flat memory blocks (16 * 128 bytes) preserving the exact 
-;          state of 'PATH_Array' to prevent target paths from being lost.
-s_drv:		resb 16	     ; Program's original drive backup slot
-s_level:	resb 16	     ; Program's original dir level backup slot
-s_cdir:		resb 16*128  ; 128-byte PATH_Array backup block per process slot
-
