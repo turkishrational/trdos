@@ -1,3 +1,4 @@
+/* 22/07/2026 */
 /* 21/07/2026 */ 
 /* 20/07/2026 - Google AI - ref: aclock5.s - Erdogan Tan */
 /* =========================================================================
@@ -11,16 +12,13 @@ int main(void) {
     unsigned char no_beep = 0;
     int i;
 
-    trdos_print_msg("TRDOS 386 TCC Port - VESA Analog Saat Baslatiliyor...\n");
+    trdos_print_msg("TRDOS 386 TCC Port - VESA Analog Saat Baslatiliyor...\r\n");
 
     /* VESA Mod 105h Geçişi (1024x768, 256 Renk) */
     if (trdos_set_video_mode(0x08FF, 0x105) == 0) {
-        trdos_print_msg("Hata: VESA Mod 105h yuklenemedi!\n");
+        trdos_print_msg("Hata: VESA Mod 105h yuklenemedi!\r\n");
         return 1;
     }
-
-    /* ARKA PLANI SADECE BİR KEZ ÇİZ (Döngü Öncesi Mühür) */
-    draw_background(); 
 
     /* İlk zaman parametrelerini al ve önceki değerleri eşitle */
     trdos_get_time(&curr_time);
@@ -29,6 +27,12 @@ int main(void) {
     unsigned int phour = curr_time.hour;
     unsigned int pminute = curr_time.minute;
     unsigned int psecond = curr_time.second;
+
+    /* ARKA PLANI SADECE BİR KEZ ÇİZ (Döngü Öncesi Mühür) */
+    draw_background();
+
+    /* 22/07/2026 */
+    goto initial; 
 
     /* ANA SAAT DÖNGÜSÜ (Sil - Çiz Algoritması) */
     while (1) {
@@ -45,12 +49,12 @@ int main(void) {
             phour = curr_time.hour;
             pminute = curr_time.minute;
             psecond = curr_time.second;
-
+initial:
             /* B. YENİ İBRELERİ RENKLİ ÇİZ (Draw Stage) */
             radius = 140; color = 0x0F; draw_line((450 - (phour % 12 * 30 + pminute / 2)) % 360); /* Beyaz Akrep */
             radius = 175; color = 0x0F; draw_line((450 - (pminute * 6)) % 360);                 /* Beyaz Yelkovan */
             radius = 165; color = 0x0C; draw_line((450 - (psecond * 6)) % 360);                 /* Kırmızı Saniye */
-            
+
             /* Merkez beyaz göbeği tazele */
             draw_centermark();
 
@@ -68,9 +72,11 @@ int main(void) {
         if (key != 0) {
             if (key == 0x20) no_beep = !no_beep; /* Spacebar */
             // else break; /* Herhangi bir tuş çıkış yapar */
+        else { 
             /* 22/07/2026 - Google AI */
             trdos_set_video_mode(0x0803, 0);
             trdos_sysexit();
+             }
         }
     }
 
