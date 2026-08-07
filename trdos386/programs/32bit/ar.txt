@@ -1,0 +1,336 @@
+     1                                  ; =======================================================================
+     2                                  ; TRDOS 386 - Native Static Library Archiver (AR.PRG)
+     3                                  ; Date: 16/07/2026 - Developer: Erdogan Tan & Google AI
+     4                                  ; Format: NASM (Pure Flat 32-bit Protected Mode Binary)
+     5                                  ; Standard: UNIX/ELF Static Archive (.a) Generator
+     6                                  ; =======================================================================
+     7                                  
+     8                                  [BITS 32]
+     9                                  [ORG 0]
+    10                                  
+    11                                  ; -----------------------------------------------------------------------
+    12                                  ; TRDOS 386 System Call Interface Constants
+    13                                  ; -----------------------------------------------------------------------
+    14                                  SYS_EXIT    equ 1
+    15                                  SYS_OPEN    equ 5
+    16                                  SYS_CLOSE   equ 6
+    17                                  SYS_READ    equ 3
+    18                                  SYS_WRITE   equ 4
+    19                                  SYS_SEEK    equ 19
+    20                                  SYS_CREAT   equ 8
+    21                                  SYS_MSG     equ 35
+    22                                  
+    23                                  ; =======================================================================
+    24                                  ; CODE SECTION
+    25                                  ; =======================================================================
+    26                                  SECTION .text
+    27                                  
+    28                                  global _start
+    29                                  _start:
+    30                                      ; TRDOS 386 Stack Architecture on Program Entry:
+    31                                      ; [esp]   = argc
+    32                                      ; [esp+4] = argv[0] (Program Name: AR.PRG)
+    33                                      ; [esp+8] = argv[1] (Output Archive Name: libc.a)
+    34                                      ; [esp+12]= argv[2] (First Object Module: printf.o)
+    35                                      ; [esp+16]= argv[3] (Second Object Module: string.o) ...
+    36                                  
+    37                                      ; 1. ADIM: BSS Alanını Temizle (Erdoğan Tan Standart Rutini)
+    38                                      ;sub eax, eax ; 0
+    39 00000000 BF[00000000]                mov edi, bss_start
+    40 00000005 B915040000                  mov ecx, (bss_end - bss_start)/4
+    41 0000000A F3AB                        rep stosd
+    42                                      
+    43                                      ; 2. ADIM: Komut Satırı Argümanlarını Tarama (2016 Mimariniz)
+    44 0000000C 89E6                        mov esi, esp
+    45 0000000E AD                          lodsd                   ; EAX = Toplam argc sayısı
+    46 0000000F A3[00000000]                mov [argc], eax
+    47 00000014 83F803                      cmp eax, 3              ; En az: ar libc.a printf.o (argc >= 3)
+    48 00000017 7D11                        jge .continue_parse
+    49                                      
+    50                                      ; Yetersiz argüman hatası bas ve çık
+    51 00000019 BE[18000000]                mov esi, msg_usage
+    52 0000001E E81E020000                  call print_string
+    53 00000023 B801000000                  mov eax, SYS_EXIT
+    54 00000028 CD40                        int 40h
+    55                                  
+    56                                  .continue_parse:
+    57 0000002A AD                          lodsd                   ; 2. LODSD: EAX = argv[0] pointer ("AR.PRG" kendi adını atla)
+    58                                  
+    59 0000002B AD                          lodsd                   ; 3. LODSD: EAX = argv[1] pointer (Hedef kütüphane adı, örn: "libc.a")
+    60                                  
+    61                                      ; TRDOS SYS_CREAT Kuralı: Dosya adı string adresi EBX'te olmalı!
+    62 0000002C 89C3                        mov ebx, eax            ; ebx = Doğrudan "libc.a" adresi (Köşeli parantez YOK)
+    63 0000002E B808000000                  mov eax, SYS_CREAT
+    64 00000033 B900000000                  mov ecx, 0              ; Normal dosya özniteliği
+    65 00000038 CD40                        int 40h
+    66 0000003A 0F8241010000                jc .err_create
+    67 00000040 A3[08000000]                mov [out_fd], eax
+    68                                  
+    69                                      ; 3. ADIM: Global Arşiv Sihirli Numarasını Yaz ("!<arch>\n")
+    70 00000045 B804000000                  mov eax, SYS_WRITE
+    71 0000004A 8B1D[08000000]              mov ebx, [out_fd]
+    72 00000050 B9[00000000]                mov ecx, msg_magic
+    73 00000055 BA08000000                  mov edx, 8              ; Sihirli numara tam 8 byte
+    74 0000005A CD40                        int 40h
+    75 0000005C 0F8226010000                jc .err_write
+    76                                  
+    77                                      ; ESI şu an tam argv[2] (yani ilk nesne dosyası: *printf.o) adresinde bekliyor!
+    78 00000062 C705[04000000]0200-         mov dword [current_idx], 2
+    78 0000006A 0000               
+    79                                  
+    80                                  .loop_objects:
+    81 0000006C A1[00000000]                mov eax, [argc]
+    82 00000071 3905[04000000]              cmp [current_idx], eax  ; Tüm dosyalar bitti mi?
+    83 00000077 0F8DE4000000                jge .close_and_exit
+    84                                  
+    85 0000007D AD                          lodsd                   ; Döngüsel LODSD: EAX = Sıradaki .o dosyasının adresi
+    86 0000007E A3[14000000]                mov [current_obj_name], eax
+    87                                  
+    88                                      ; TRDOS SYS_OPEN Kuralı: Dosya adı string adresi EBX'te olmalı!
+    89 00000083 89C3                        mov ebx, eax            ; ebx = "printf.o" adresi (Direkt adres!)
+    90 00000085 B805000000                  mov eax, SYS_OPEN
+    91 0000008A B900000000                  mov ecx, 0              ; Open for read
+    92 0000008F CD40                        int 40h
+    93 00000091 0F82F8000000                jc .err_open_obj
+    94 00000097 A3[0C000000]                mov [in_fd], eax
+    95                                  
+    96                                      ; Girdi dosyasının boyutunu bulmak için sona seek at
+    97 0000009C B813000000                  mov eax, SYS_SEEK
+    98 000000A1 8B1D[0C000000]              mov ebx, [in_fd]
+    99 000000A7 31C9                        xor ecx, ecx            ; offset = 0
+   100 000000A9 BA02000000                  mov edx, 2              ; SEEK_END = 2
+   101 000000AE CD40                        int 40h
+   102 000000B0 A3[10000000]                mov [obj_size], eax     ; eax dosya boyutunu döner
+   103                                  
+   104                                      ; Dosya göstericisini tekrar başa al
+   105 000000B5 B813000000                  mov eax, SYS_SEEK
+   106 000000BA 8B1D[0C000000]              mov ebx, [in_fd]
+   107 000000C0 31C9                        xor ecx, ecx
+   108 000000C2 BA00000000                  mov edx, 0              ; SEEK_SET = 0
+   109 000000C7 CD40                        int 40h
+   110                                  
+   111                                      ; 4. ADIM: Temiz UNIX/ELF 60-byte Arşiv Başlığı Hazırla
+   112 000000C9 E8DE000000                  call prepare_ar_header
+   113                                  
+   114                                      ; Hazırlanan 60 byte başlığı arşiv dosyasına yaz
+   115 000000CE B804000000                  mov eax, SYS_WRITE
+   116 000000D3 8B1D[08000000]              mov ebx, [out_fd]
+   117 000000D9 B9[18000000]                mov ecx, ar_header
+   118 000000DE BA3C000000                  mov edx, 60
+   119 000000E3 CD40                        int 40h
+   120 000000E5 0F829D000000                jc .err_write
+   121                                  
+   122                                      ; 5. ADIM: Nesne Kodunun İçeriğini Arşive Kopyala
+   123                                  .read_write_loop:
+   124 000000EB B803000000                  mov eax, SYS_READ
+   125 000000F0 8B1D[0C000000]              mov ebx, [in_fd]
+   126 000000F6 B9[54000000]                mov ecx, io_buffer
+   127 000000FB BA00100000                  mov edx, 4096           ; 4KB chunk'lar halinde oku
+   128 00000100 CD40                        int 40h
+   129 00000102 09C0                        or eax, eax
+   130 00000104 741E                        jz .object_done         ; EOF ulaştık
+   131 00000106 0F828A000000                jc .err_read
+   132                                  
+   133 0000010C 89C2                        mov edx, eax            ; edx = okunan byte miktarı
+   134 0000010E B804000000                  mov eax, SYS_WRITE
+   135 00000113 8B1D[08000000]              mov ebx, [out_fd]
+   136 00000119 B9[54000000]                mov ecx, io_buffer
+   137 0000011E CD40                        int 40h
+   138 00000120 7266                        jc .err_write
+   139 00000122 EBC7                        jmp .read_write_loop
+   140                                  
+   141                                  .object_done:
+   142 00000124 B806000000                  mov eax, SYS_CLOSE
+   143 00000129 8B1D[0C000000]              mov ebx, [in_fd]
+   144 0000012F CD40                        int 40h
+   145                                  
+   146                                      ; UNIX Standardı: Eğer nesne boyutu tek sayı ise, araya boşluk ('\n') ekle
+   147 00000131 A1[10000000]                mov eax, [obj_size]
+   148 00000136 A901000000                  test eax, 1
+   149 0000013B 7419                        jz .next_object
+   150                                      
+   151 0000013D B804000000                  mov eax, SYS_WRITE
+   152 00000142 8B1D[08000000]              mov ebx, [out_fd]
+   153 00000148 B9[07000000]                mov ecx, msg_pad
+   154 0000014D BA01000000                  mov edx, 1
+   155 00000152 CD40                        int 40h
+   156 00000154 7232                        jc .err_write
+   157                                  
+   158                                  .next_object:
+   159 00000156 FF05[04000000]              inc dword [current_idx]
+   160 0000015C E90BFFFFFF                  jmp .loop_objects
+   161                                  
+   162                                  .close_and_exit:
+   163 00000161 B806000000                  mov eax, SYS_CLOSE
+   164 00000166 8B1D[08000000]              mov ebx, [out_fd]
+   165 0000016C CD40                        int 40h
+   166                                  
+   167 0000016E BE[61000000]                mov esi, msg_success
+   168 00000173 E8C9000000                  call print_string
+   169 00000178 31DB                        xor ebx, ebx            ; Exit code = 0
+   170 0000017A B801000000                  mov eax, SYS_EXIT
+   171 0000017F CD40                        int 40h
+   172                                  
+   173                                  ; -----------------------------------------------------------------------
+   174                                  ; Hata Bildirim Alanları
+   175                                  ; -----------------------------------------------------------------------
+   176                                  .err_create:
+   177 00000181 BE[99000000]                mov esi, err_msg_create
+   178 00000186 EB13                        jmp .die
+   179                                  .err_write:
+   180 00000188 BE[CE000000]                mov esi, err_msg_write
+   181 0000018D EB0C                        jmp .die
+   182                                  .err_open_obj:
+   183 0000018F BE[FF000000]                mov esi, err_msg_open
+   184 00000194 EB05                        jmp .die
+   185                                  .err_read:
+   186 00000196 BE[2E010000]                mov esi, err_msg_read
+   187                                  .die:
+   188 0000019B E8A1000000                  call print_string
+   189 000001A0 BB01000000                  mov ebx, 1              ; Exit code = 1
+   190 000001A5 B801000000                  mov eax, SYS_EXIT
+   191 000001AA CD40                        int 40h
+   192                                  
+   193                                  ; -----------------------------------------------------------------------
+   194                                  ; Alt Rutin: 60-byte UNIX Standart Arşiv Başlığı Hazırlama
+   195                                  ; -----------------------------------------------------------------------
+   196                                  prepare_ar_header:
+   197 000001AC 60                          pusha
+   198                                      
+   199 000001AD BF[18000000]                mov edi, ar_header
+   200 000001B2 B93C000000                  mov ecx, 60
+   201 000001B7 B020                        mov al, ' '
+   202 000001B9 F3AA                        rep stosb
+   203                                  
+   204                                      ; 1. Dosya Adı (16 byte) - Sona '/' eklenmeli
+   205 000001BB 8B35[14000000]              mov esi, [current_obj_name]
+   206 000001C1 BF[18000000]                mov edi, ar_header
+   207 000001C6 B90F000000                  mov ecx, 15             ; Sınır
+   208                                  .copy_name:
+   209 000001CB AC                          lodsb
+   210 000001CC 08C0                        or al, al
+   211 000001CE 7407                        jz .name_done
+   212 000001D0 3C20                        cmp al, ' '
+   213 000001D2 7403                        je .name_done
+   214 000001D4 AA                          stosb
+   215 000001D5 E2F4                        loop .copy_name
+   216                                  .name_done:
+   217 000001D7 C6072F                      mov byte [edi], '/'
+   218                                  
+   219                                      ; 2. Zaman Damgası (12 byte)
+   220 000001DA BF[28000000]                mov edi, ar_header + 16
+   221 000001DF BE[08000000]                mov esi, static_date
+   222 000001E4 B90A000000                  mov ecx, 10
+   223 000001E9 F3A4                        rep movsb
+   224                                  
+   225                                      ; 3. Owner & Group ID (6 + 6 byte)
+   226 000001EB C605[34000000]30            mov byte [ar_header + 28], '0'
+   227 000001F2 C605[3A000000]30            mov byte [ar_header + 34], '0'
+   228                                  
+   229                                      ; 4. Dosya İzin Maskesi (8 byte)
+   230 000001F9 BF[40000000]                mov edi, ar_header + 40
+   231 000001FE BE[12000000]                mov esi, static_mode
+   232 00000203 B906000000                  mov ecx, 6
+   233 00000208 F3A4                        rep movsb
+   234                                  
+   235                                      ; 5. Dosya Boyutu Metin Dönüşümü (10 byte)
+   236 0000020A A1[10000000]                mov eax, [obj_size]
+   237 0000020F BF[48000000]                mov edi, ar_header + 48
+   238 00000214 83C709                      add edi, 9
+   239 00000217 B90A000000                  mov ecx, 10
+   240 0000021C BB0A000000                  mov ebx, 10
+   241                                  .num_to_ascii:
+   242 00000221 31D2                        xor edx, edx
+   243 00000223 F7F3                        div ebx
+   244 00000225 80C230                      add dl, '0'
+   245 00000228 8817                        mov [edi], dl
+   246 0000022A 4F                          dec edi
+   247 0000022B 09C0                        or eax, eax
+   248 0000022D 7402                        jz .ascii_done
+   249 0000022F E2F0                        loop .num_to_ascii
+   250                                  .ascii_done:
+   251                                  
+   252                                      ; 6. Arşiv Başlığı Kapanış İmzası (2 byte) - "`\n"
+   253 00000231 C605[52000000]60            mov byte [ar_header + 58], 0x60
+   254 00000238 C605[53000000]0A            mov byte [ar_header + 59], 0x0A
+   255                                  
+   256 0000023F 61                          popa
+   257 00000240 C3                          ret
+   258                                  
+   259                                  ; -----------------------------------------------------------------------
+   260                                  ; Yardımcı Fonksiyon: TRDOS 386 Ekrana String Basma
+   261                                  ; -----------------------------------------------------------------------
+   262                                  print_string:
+   263                                      ;pusha
+   264 00000241 B823000000                  mov eax, SYS_MSG
+   265 00000246 89F3                        mov	ebx, esi
+   266 00000248 B9FF000000                  mov ecx, 255 ; string limit (max. possible sasciiz string length)
+   267 0000024D BA07000000                  mov edx, 7              ; Beyaz renk
+   268 00000252 CD40                        int 40h
+   269                                      ;popa
+   270 00000254 C3                          ret
+   271                                  
+   272                                  ; =======================================================================
+   273                                  ; DATA & BSS SECTIONS (Erdoğan Tan Bellek Yönetimi)
+   274                                  ; =======================================================================
+   275                                  SECTION .data
+   276 00000000 213C617263683E          msg_magic         db "!<arch>"
+   277 00000007 0A                      msg_pad           db 0x0A
+   278 00000008 313738343135373130-     static_date       db "1784157100"
+   278 00000011 30                 
+   279 00000012 313030363434            static_mode       db "100644"
+   280                                  
+   281 00000018 5452444F5320333836-     msg_usage         db "TRDOS 386 Archiver v1.0", 0x0D, 0x0A
+   281 00000021 204172636869766572-
+   281 0000002A 2076312E300D0A     
+   282 00000031 55736167653A204152-                       db "Usage: AR <archive.a> <file1.o> [file2.o] ...", 0x0D, 0x0A, 0
+   282 0000003A 203C61726368697665-
+   282 00000043 2E613E203C66696C65-
+   282 0000004C 312E6F3E205B66696C-
+   282 00000055 65322E6F5D202E2E2E-
+   282 0000005E 0D0A00             
+   283                                  
+   284 00000061 5B4F4B5D2053746174-     msg_success       db "[OK] Static ELF archive library created successfully.", 0x0D, 0x0A, 0
+   284 0000006A 696320454C46206172-
+   284 00000073 6368697665206C6962-
+   284 0000007C 726172792063726561-
+   284 00000085 746564207375636365-
+   284 0000008E 737366756C6C792E0D-
+   284 00000097 0A00               
+   285 00000099 5B4552524F525D2043-     err_msg_create    db "[ERROR] Could not create destination archive file!", 0x0D, 0x0A, 0
+   285 000000A2 6F756C64206E6F7420-
+   285 000000AB 637265617465206465-
+   285 000000B4 7374696E6174696F6E-
+   285 000000BD 206172636869766520-
+   285 000000C6 66696C65210D0A00   
+   286 000000CE 5B4552524F525D2057-     err_msg_write     db "[ERROR] Write error occurred on target device!", 0x0D, 0x0A, 0
+   286 000000D7 72697465206572726F-
+   286 000000E0 72206F636375727265-
+   286 000000E9 64206F6E2074617267-
+   286 000000F2 657420646576696365-
+   286 000000FB 210D0A00           
+   287 000000FF 5B4552524F525D2054-     err_msg_open      db "[ERROR] Target object module file not found!", 0x0D, 0x0A, 0
+   287 00000108 6172676574206F626A-
+   287 00000111 656374206D6F64756C-
+   287 0000011A 652066696C65206E6F-
+   287 00000123 7420666F756E64210D-
+   287 0000012C 0A00               
+   288 0000012E 5B4552524F525D2052-     err_msg_read      db "[ERROR] Read failure inside object code cluster!", 0x0D, 0x0A, 0
+   288 00000137 656164206661696C75-
+   288 00000140 726520696E73696465-
+   288 00000149 206F626A6563742063-
+   288 00000152 6F646520636C757374-
+   288 0000015B 6572210D0A00       
+   289                                  
+   290                                  SECTION .bss
+   291                                  bss_start:
+   292 00000000 ????????                argc              resd 1
+   293 00000004 ????????                current_idx       resd 1
+   294 00000008 ????????                out_fd            resd 1
+   295 0000000C ????????                in_fd             resd 1
+   296 00000010 ????????                obj_size          resd 1
+   297 00000014 ????????                current_obj_name  resd 1
+   298                                  
+   299 00000018 <res 3Ch>               ar_header         resb 60
+   300 00000054 <res 1000h>             io_buffer         resb 4096
+   301                                  bss_end:
