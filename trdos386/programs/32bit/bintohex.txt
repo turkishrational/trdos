@@ -1,0 +1,418 @@
+     1                                  ; ****************************************************************************
+     2                                  ; bintohex.asm - TRDOS 386 v2 - sysopen & syscreat & & sysread & syswrite TEST
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; 04/09/2026 - Erdogan Tan
+     5                                  ; ****************************************************************************
+     6                                  ; convert binary file to hex file (binfilehex.exe compatible hex output)
+     7                                  ; ----------------------------------------------------------------------------
+     8                                  ; nasm bintohex.asm -l bintohex.txt -o BINTOHEX.PRG -Z error.txt
+     9                                  
+    10                                  ; TRDOS 386 Sytem Calls
+    11                                  _ver 	equ 0
+    12                                  _exit 	equ 1
+    13                                  _fork 	equ 2
+    14                                  _read 	equ 3
+    15                                  _write	equ 4
+    16                                  _open	equ 5
+    17                                  _close 	equ 6
+    18                                  _wait 	equ 7
+    19                                  _create	equ 8
+    20                                  _rename	equ 9
+    21                                  _delete	equ 10
+    22                                  _exec	equ 11
+    23                                  _chdir	equ 12
+    24                                  _time 	equ 13
+    25                                  _mkdir 	equ 14
+    26                                  _chmod	equ 15
+    27                                  _rmdir	equ 16
+    28                                  _break	equ 17
+    29                                  _drive	equ 18
+    30                                  _seek	equ 19
+    31                                  _tell 	equ 20
+    32                                  _memory	equ 21
+    33                                  _prompt	equ 22
+    34                                  _path	equ 23
+    35                                  _env	equ 24
+    36                                  _stime	equ 25
+    37                                  _quit	equ 26
+    38                                  _intr	equ 27
+    39                                  _dir	equ 28
+    40                                  _emt 	equ 29
+    41                                  _ldrvt 	equ 30
+    42                                  _video 	equ 31
+    43                                  _audio	equ 32
+    44                                  _timer	equ 33
+    45                                  _sleep	equ 34
+    46                                  _msg    equ 35
+    47                                  _geterr	equ 36
+    48                                  _fpstat	equ 37
+    49                                  _pri	equ 38
+    50                                  _rele	equ 39
+    51                                  _fff	equ 40
+    52                                  _fnf	equ 41
+    53                                  _alloc	equ 42
+    54                                  _dalloc equ 43
+    55                                  _calbac equ 44
+    56                                  _dma	equ 45
+    57                                  _stdio	equ 46
+    58                                  _fstat	equ 47
+    59                                  
+    60                                  %macro sys 1-4
+    61                                      %if %0 >= 2   
+    62                                          mov ebx, %2
+    63                                          %if %0 >= 3    
+    64                                              mov ecx, %3
+    65                                              %if %0 = 4
+    66                                                 mov edx, %4   
+    67                                              %endif
+    68                                          %endif
+    69                                      %endif
+    70                                      mov eax, %1
+    71                                      int 40h 
+    72                                  %endmacro
+    73                                  
+    74                                  ; ============================================================================
+    75                                  ; CODE
+    76                                  ; ============================================================================
+    77                                  
+    78                                  [BITS 32] 
+    79                                  [ORG 0] 
+    80                                  
+    81                                  START_CODE:
+    82                                  	; Clear BSS section
+    83                                  	;mov	di, bss_start
+    84                                  	;mov	ecx, (bss_end - bss_start)/4
+    85                                  	;rep	stosd
+    86                                  
+    87                                  GetCommandLineArgs:
+    88 00000000 89E6                    	mov	esi, esp
+    89 00000002 AD                      	lodsd				; EAX = Number of arguments (argc)
+    90 00000003 83F802                  	cmp	eax, 2			; Two arguments are needed: "bintohex filename.ext"
+    91 00000006 0F8214010000            	jb	pmsg_usage		; Show usage message
+    92                                  
+    93 0000000C AD                      	lodsd				; Skip "bintohex.prg" file name address (argv[0])
+    94                                  
+    95 0000000D AD                      	lodsd				; EAX = Binary file name addr to be converted (argv[1])
+    96 0000000E 89C6                    	mov	esi, eax
+    97 00000010 BF[70020000]            	mov	edi, binfilename
+    98                                  
+    99                                  .scan_target_name:
+   100 00000015 AC                      	lodsb
+   101 00000016 3C20                    	cmp	al, 20h			; Boşluk kontrolü
+   102 00000018 74FB                    	je	short .scan_target_name
+   103 0000001A 0F8200010000            	jb	pmsg_usage
+   104 00000020 AA                      	stosb
+   105                                  
+   106                                  .copy_target_name:
+   107 00000021 AC                      	lodsb
+   108 00000022 3C20                    	cmp	al, 20h
+   109 00000024 7603                    	jna	short .target_name_done
+   110 00000026 AA                      	stosb
+   111 00000027 EBF8                    	jmp	short .copy_target_name
+   112                                  
+   113                                  .target_name_done:
+   114 00000029 30C0                    	xor	al, al
+   115 0000002B AA                      	stosb				; Hedef dosya adını NULL ile sonlandır
+   116                                  
+   117                                  	; Open file
+   118                                          sys	_open, binfilename, 0   ; Open for read
+    61                              <1>  %if %0 >= 2
+    62 0000002C BB[70020000]        <1>  mov ebx, %2
+    63                              <1>  %if %0 >= 3
+    64 00000031 B900000000          <1>  mov ecx, %3
+    65                              <1>  %if %0 = 4
+    66                              <1>  mov edx, %4
+    67                              <1>  %endif
+    68                              <1>  %endif
+    69                              <1>  %endif
+    70 00000036 B805000000          <1>  mov eax, %1
+    71 0000003B CD40                <1>  int 40h
+   119 0000003D 0F82FA000000                    jc	err_open
+   120 00000043 A3[68020000]                    mov	[in_fd], eax
+   121                                  
+   122                                          ; create file  with same file name and with "hex" extension
+   123 00000048 BE[70020000]                    mov	esi, binfilename
+   124 0000004D BF[C0020000]                    mov	edi, hexfilename
+   125                                  copy_file_name:
+   126 00000052 AC                              lodsb
+   127 00000053 3C2E                            cmp	al, '.'
+   128 00000055 7407                            je	.hex_extension
+   129 00000057 08C0                            or	al, al
+   130 00000059 7403                            je	.hex_extension
+   131 0000005B AA                              stosb
+   132 0000005C EBF4                            jmp	copy_file_name 
+   133                                  
+   134                                  .hex_extension:
+   135 0000005E B82E686578                      mov	eax, '.hex'
+   136 00000063 AB                              stosd
+   137 00000064 C60700                          mov	byte [edi], 0
+   138                                  
+   139                                          ; Create file
+   140                                          sys	_create, hexfilename, 0  ; (attributes) ecx = 0 : Normal file
+    61                              <1>  %if %0 >= 2
+    62 00000067 BB[C0020000]        <1>  mov ebx, %2
+    63                              <1>  %if %0 >= 3
+    64 0000006C B900000000          <1>  mov ecx, %3
+    65                              <1>  %if %0 = 4
+    66                              <1>  mov edx, %4
+    67                              <1>  %endif
+    68                              <1>  %endif
+    69                              <1>  %endif
+    70 00000071 B808000000          <1>  mov eax, %1
+    71 00000076 CD40                <1>  int 40h
+   141 00000078 0F82C6000000                    jc	err_create
+   142 0000007E A3[6C020000]                    mov	[out_fd], eax
+   143                                  
+   144                                  	; read one row (16 bytes) from binary file
+   145                                  read_one_row:
+   146                                  	sys	_read, [in_fd], readbuffer, 16
+    61                              <1>  %if %0 >= 2
+    62 00000083 8B1D[68020000]      <1>  mov ebx, %2
+    63                              <1>  %if %0 >= 3
+    64 00000089 B9[10030000]        <1>  mov ecx, %3
+    65                              <1>  %if %0 = 4
+    66 0000008E BA10000000          <1>  mov edx, %4
+    67                              <1>  %endif
+    68                              <1>  %endif
+    69                              <1>  %endif
+    70 00000093 B803000000          <1>  mov eax, %1
+    71 00000098 CD40                <1>  int 40h
+   147 0000009A 0F82AB000000            	jc	err_read
+   148                                  
+   149 000000A0 83F801                  	cmp	eax, 1
+   150 000000A3 7244                            jb	.end_of_file
+   151                                  
+   152 000000A5 89C1                            mov	ecx, eax
+   153                                  
+   154 000000A7 BE[10030000]                    mov	esi, readbuffer
+   155 000000AC BF[24030000]                    mov	edi, writebuffer
+   156                                  
+   157                                  .read_next_byte:
+   158 000000B1 AC                              lodsb
+   159 000000B2 E8EA000000                      call	byte_to_hex
+   160 000000B7 66AB                    	stosw
+   161                                  
+   162 000000B9 49                              dec	ecx
+   163 000000BA 7405                            jz	.end_of_row
+   164                                  
+   165 000000BC B020                            mov	al, 20h			; space
+   166 000000BE AA                              stosb
+   167                                  
+   168 000000BF EBF0                            jmp	.read_next_byte
+   169                                  
+   170                                  .end_of_row:
+   171 000000C1 B80D0A0000                      mov	eax, 0A0Dh              ; CRLF
+   172 000000C6 66AB                    	stosw
+   173                                         
+   174 000000C8 81EF[24030000]                  sub	edi, writebuffer  
+   175                                   
+   176                                  	; write one row (47+CRLF bytes) to hex file            
+   177                                          sys	_write, [out_fd], writebuffer, edi
+    61                              <1>  %if %0 >= 2
+    62 000000CE 8B1D[6C020000]      <1>  mov ebx, %2
+    63                              <1>  %if %0 >= 3
+    64 000000D4 B9[24030000]        <1>  mov ecx, %3
+    65                              <1>  %if %0 = 4
+    66 000000D9 89FA                <1>  mov edx, %4
+    67                              <1>  %endif
+    68                              <1>  %endif
+    69                              <1>  %endif
+    70 000000DB B804000000          <1>  mov eax, %1
+    71 000000E0 CD40                <1>  int 40h
+   178 000000E2 726E                    	jc	err_write
+   179                                          
+   180 000000E4 83FA31                          cmp	edx, 49
+   181 000000E7 739A                            jnb	read_one_row
+   182                                  
+   183                                  .end_of_file:
+   184                                  	sys	_close, [in_fd]
+    61                              <1>  %if %0 >= 2
+    62 000000E9 8B1D[68020000]      <1>  mov ebx, %2
+    63                              <1>  %if %0 >= 3
+    64                              <1>  mov ecx, %3
+    65                              <1>  %if %0 = 4
+    66                              <1>  mov edx, %4
+    67                              <1>  %endif
+    68                              <1>  %endif
+    69                              <1>  %endif
+    70 000000EF B806000000          <1>  mov eax, %1
+    71 000000F4 CD40                <1>  int 40h
+   185                                          sys	_close, [out_fd]
+    61                              <1>  %if %0 >= 2
+    62 000000F6 8B1D[6C020000]      <1>  mov ebx, %2
+    63                              <1>  %if %0 >= 3
+    64                              <1>  mov ecx, %3
+    65                              <1>  %if %0 = 4
+    66                              <1>  mov edx, %4
+    67                              <1>  %endif
+    68                              <1>  %endif
+    69                              <1>  %endif
+    70 000000FC B806000000          <1>  mov eax, %1
+    71 00000101 CD40                <1>  int 40h
+   186 00000103 C605[67020000]07        	mov	byte [color], 07h
+   187 0000010A BE[51020000]            	mov	esi, msg_ok
+   188 0000010F E878000000              	call	print_msg
+   189                                          sys	_exit, 0 
+    61                              <1>  %if %0 >= 2
+    62 00000114 BB00000000          <1>  mov ebx, %2
+    63                              <1>  %if %0 >= 3
+    64                              <1>  mov ecx, %3
+    65                              <1>  %if %0 = 4
+    66                              <1>  mov edx, %4
+    67                              <1>  %endif
+    68                              <1>  %endif
+    69                              <1>  %endif
+    70 00000119 B801000000          <1>  mov eax, %1
+    71 0000011E CD40                <1>  int 40h
+   190                                  
+   191                                  pmsg_usage:
+   192 00000120 C605[67020000]0E        	mov	byte [color], 0Eh
+   193 00000127 BE[B9010000]            	mov	esi, msg_usage
+   194 0000012C E85B000000              	call	print_msg
+   195                                  	sys	_exit, 0
+    61                              <1>  %if %0 >= 2
+    62 00000131 BB00000000          <1>  mov ebx, %2
+    63                              <1>  %if %0 >= 3
+    64                              <1>  mov ecx, %3
+    65                              <1>  %if %0 = 4
+    66                              <1>  mov edx, %4
+    67                              <1>  %endif
+    68                              <1>  %endif
+    69                              <1>  %endif
+    70 00000136 B801000000          <1>  mov eax, %1
+    71 0000013B CD40                <1>  int 40h
+   196                                  
+   197                                  err_open:
+   198 0000013D BE[E0010000]            	mov	esi, err_msg_open
+   199 00000142 EB2D                    	jmp	print_and_terminate
+   200                                  err_create:
+   201 00000144 BE[00020000]            	mov	esi, err_msg_create
+   202 00000149 EB19                    	jmp	close_print_terminate_1
+   203                                  err_read:
+   204 0000014B BE[2A020000]            	mov	esi, err_msg_read
+   205 00000150 EB05                    	jmp	close_print_terminate_2
+   206                                  err_write:
+   207 00000152 BE[3D020000]            	mov	esi, err_msg_write
+   208                                  close_print_terminate_2:
+   209                                          sys	_close, [out_fd]
+    61                              <1>  %if %0 >= 2
+    62 00000157 8B1D[6C020000]      <1>  mov ebx, %2
+    63                              <1>  %if %0 >= 3
+    64                              <1>  mov ecx, %3
+    65                              <1>  %if %0 = 4
+    66                              <1>  mov edx, %4
+    67                              <1>  %endif
+    68                              <1>  %endif
+    69                              <1>  %endif
+    70 0000015D B806000000          <1>  mov eax, %1
+    71 00000162 CD40                <1>  int 40h
+   210                                  close_print_terminate_1:
+   211                                          sys	_close, [in_fd]
+    61                              <1>  %if %0 >= 2
+    62 00000164 8B1D[68020000]      <1>  mov ebx, %2
+    63                              <1>  %if %0 >= 3
+    64                              <1>  mov ecx, %3
+    65                              <1>  %if %0 = 4
+    66                              <1>  mov edx, %4
+    67                              <1>  %endif
+    68                              <1>  %endif
+    69                              <1>  %endif
+    70 0000016A B806000000          <1>  mov eax, %1
+    71 0000016F CD40                <1>  int 40h
+   212                                  print_and_terminate:
+   213 00000171 C605[67020000]0F        	mov	byte [color], 0Fh
+   214 00000178 E80F000000              	call	print_msg
+   215                                  	sys	_exit, 1
+    61                              <1>  %if %0 >= 2
+    62 0000017D BB01000000          <1>  mov ebx, %2
+    63                              <1>  %if %0 >= 3
+    64                              <1>  mov ecx, %3
+    65                              <1>  %if %0 = 4
+    66                              <1>  mov edx, %4
+    67                              <1>  %endif
+    68                              <1>  %endif
+    69                              <1>  %endif
+    70 00000182 B801000000          <1>  mov eax, %1
+    71 00000187 CD40                <1>  int 40h
+   216                                  hang:
+   217 00000189 90                      	nop
+   218 0000018A EBFD                    	jmp	hang
+   219                                  
+   220                                  print_msg:
+   221                                  	sys	_msg, esi, 255, [color]
+    61                              <1>  %if %0 >= 2
+    62 0000018C 89F3                <1>  mov ebx, %2
+    63                              <1>  %if %0 >= 3
+    64 0000018E B9FF000000          <1>  mov ecx, %3
+    65                              <1>  %if %0 = 4
+    66 00000193 8B15[67020000]      <1>  mov edx, %4
+    67                              <1>  %endif
+    68                              <1>  %endif
+    69                              <1>  %endif
+    70 00000199 B823000000          <1>  mov eax, %1
+    71 0000019E CD40                <1>  int 40h
+   222 000001A0 C3                      	retn
+   223                                  
+   224                                  byte_to_hex:
+   225 000001A1 0FB6D8                  	movzx	ebx, al
+   226 000001A4 80E30F                          and	bl, 0Fh
+   227 000001A7 8AA3[57020000]                  mov	ah, [ebx+hexchars]
+   228 000001AD 88C3                            mov	bl, al
+   229 000001AF C0EB04                          shr	bl, 4
+   230 000001B2 8A83[57020000]                  mov	al, [ebx+hexchars]
+   231 000001B8 C3                              retn
+   232                                  
+   233                                  ; ============================================================================
+   234                                  ; DATA
+   235                                  ; ============================================================================
+   236                                  
+   237                                  msg_usage:
+   238 000001B9 0D0A                    	db 0Dh, 0Ah
+   239 000001BB 55736167653A206269-     	db 'Usage: bintohex <binary file name>'
+   239 000001C4 6E746F686578203C62-
+   239 000001CD 696E6172792066696C-
+   239 000001D6 65206E616D653E     
+   240                                  CRLF:
+   241 000001DD 0D0A00                  	db 0Dh, 0Ah, 0
+   242                                  
+   243 000001E0 5B4552524F525D2049-     err_msg_open: db "[ERROR] Input file not found!", 0Dh, 0Ah, 0
+   243 000001E9 6E7075742066696C65-
+   243 000001F2 206E6F7420666F756E-
+   243 000001FB 64210D0A00         
+   244 00000200 5B4552524F525D204F-     err_msg_create: db "[ERROR] Output file can not be created!", 0Dh, 0Ah, 0
+   244 00000209 75747075742066696C-
+   244 00000212 652063616E206E6F74-
+   244 0000021B 206265206372656174-
+   244 00000224 6564210D0A00       
+   245 0000022A 46696C652072656164-     err_msg_read: db "File read error!", 0Dh, 0Ah, 0
+   245 00000233 206572726F72210D0A-
+   245 0000023C 00                 
+   246 0000023D 46696C652077726974-     err_msg_write: db "File write error!", 0Dh, 0Ah, 0
+   246 00000246 65206572726F72210D-
+   246 0000024F 0A00               
+   247                                  
+   248                                  msg_ok:
+   249                                  	;db 0Dh, 0Ah
+   250 00000251 4F4B2E0D0A00                    db "OK.", 0Dh, 0Ah, 0
+   251                                  
+   252 00000257 303132333435363738-     hexchars: db "0123456789ABCDEF"
+   252 00000260 39414243444546     
+   253                                  
+   254 00000267 00                      color: db 0
+   255                                  
+   256                                  ; ============================================================================
+   257                                  ; UNINITIALIZED DATA
+   258                                  ; ============================================================================
+   259                                  bss_start:
+   260                                  ABSOLUTE bss_start
+   261                                  
+   262 00000268 ????????                in_fd: resd 1
+   263 0000026C ????????                out_fd: resd 1
+   264 00000270 <res 50h>               binfilename: resb 80
+   265 000002C0 <res 50h>               hexfilename: resb 80
+   266                                  
+   267 00000310 <res 14h>               readbuffer: resb 20  ; 16 bytes + 0 will be used (one row)
+   268 00000324 <res 34h>               writebuffer: resb 52 ; 49 bytes + 0 will be used (one row)
+   269                                  
+   270                                  bss_end:
+   271                                  
