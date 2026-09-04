@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.1.0) - MAIN PROGRAM : trdosk6.s
 ; ----------------------------------------------------------------------------
-; Last Update: 15/07/2026  (Previous: 25/01/2026, v2.0.10)
+; Last Update: 05/09/2026  (Previous: 25/01/2026, v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 24/01/2016
 ; ----------------------------------------------------------------------------
@@ -1548,6 +1548,7 @@ sysfork_5: ; 2:
 		; br sysret1
 
 syscreat: ; < create file >
+	; 05/09/2026 - TRDOS 386 v2.1.0
 	; 15/01/2026
 	; 13/01/2026
 	; 03/01/2026
@@ -1902,7 +1903,8 @@ syscreat_4:
 
 	;mov	bl, [FindFile_DirEntry+11]
 	mov	bl, [edi+DirEntry_Attr] ; OF_ATTRIB
-	jmp	sysopen_2
+	
+        jmp	sysopen_2
 
 sysmkdir_err:
 	; 1 = write, 2 = read & write, >2 = invalid
@@ -2010,6 +2012,7 @@ syscreat_2:
 %endif
 
 sysopen: ;<open file>
+	; 05/09/2026
 	; 15/07/2026 - TRDOS 386 v2.1.0
 	; 20/05/2026 - TRDOS 386 v2.0.11
 	; 25/01/2026
@@ -2364,9 +2367,10 @@ sysopen_7:
 	mov	[edi+OF_OPENCOUNT], dl ; 0
 	mov	[edi+OF_STATUS], dl ; 0
 
+	; 05/09/2026
 	; 20/05/2026
-	mov	al, [FindFile_DirEntry+11] ; DIR_Attr
-	mov	[edi+OF_ATTRIB], al
+	;mov	al, [FindFile_DirEntry+11] ; DIR_Attr
+	;mov	[edi+OF_ATTRIB], al
 
 	mov	ebx, edi
 	inc	bl
@@ -2383,17 +2387,26 @@ sysopen_7:
 	;add	eax, OF_NAME
 	;mov	edi, eax
 	;dec	ecx ; 11
-	;rep	stosb
+	;rep	movsb
 	;;mov	byte [edi], 0
+
+	; 05/09/2026
+        mov	eax, edi
+	mov	ecx, 12
+	mul	ecx
+	; eax = filename offset from OF_NAME
 
 	; 15/07/2026 - TRDOS 386 v2.1.0
 	
 	; 02/01/2026
 	; save file name (in directory entry format)
 	mov	esi, FindFile_DirEntry
-	lea	edi, [edi+OF_NAME]
-	xor	ecx, ecx
-	mov	cl, 11
+        ; 05/09/2026 
+	;lea	edi, [edi+OF_NAME]
+   	;xor	ecx, ecx
+	;mov	cl, 11
+        lea	edi, [edi+OF_NAME]
+        dec	ecx ; 12 -> 11
 	rep	movsb
 	mov	[edi], cl ; 0
 
@@ -2808,6 +2821,7 @@ sysread_0:
 	; same removable drive check
 	call 	check_openfile_volumeid
 	jc	short sysrw_err ; eax = ERR_DRV_NOT_SAME
+	; eax = First cluster of the file
 
 	call	readi
 	; 08/12/2025
@@ -2895,6 +2909,7 @@ syswrite: ; < write to file >
 	jc	short device_write ; write data to device
 	; EAX = First cluster of the file
 	; EBX = File number (Open file number) ; 23/10/2016
+	; [i.size] = file size
 
 	; 08/12/2025 - TRDOS 386 v2.0.10 (v2.1)
 	; ref: RetroDOS v5.0, kernel.s, DOS_READ (PCDOS 7.1)
@@ -2919,6 +2934,7 @@ syswrite_0:
 	; same removable drive check
 	call	check_openfile_volumeid
 	jc	short sysrw_err ; eax = ERR_DRV_NOT_SAME
+        ; eax = First cluster of the file
 
 	; 01/01/2026
 	call	writei	; 24/08/2024 ('mget_w' modification)
