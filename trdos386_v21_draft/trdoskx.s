@@ -1,7 +1,7 @@
 ; ****************************************************************************
 ; TRDOS386.ASM (TRDOS 386 Kernel - v2.1.0) - UNINITIALIZED DATA : trdoskx.s
 ; ----------------------------------------------------------------------------
-; Last Update: 15/07/2026 (Previous: 10/02/2026 - Kernel v2.0.10)
+; Last Update: 06/09/2026 (Previous: 10/02/2026 - Kernel v2.0.10)
 ; ----------------------------------------------------------------------------
 ; Beginning: 04/01/2016
 ; ----------------------------------------------------------------------------
@@ -621,29 +621,26 @@ readi.fclust:	resd 1 ; first cluster of the current cluster
 ; 02/01/2026
 writei.ofn:	resb 1 ; open file number (to be written) ; 23/10/2016
 writei.valid:	resb 1 ; valid data (>0 = valid for writei)
-writei.drv:	resb 1 ; drive number (0, 1,2,3,4..)
-;writei.spc:	resb 1 ; sectors per cluster for 'writei' drive
+;writei.drv:	resb 1 ; drive number (0, 1,2,3,4..)
 writei.s_index: resb 1 ; sector index in current cluster (buffer)
-; 01/01/2026
-;writei.sector:	resd 1 ; current disk sector
-;writei.bpc:	resw 1 ; bytes per cluster - 1
-;writei.offset:	resw 1 ; byte offset in cluster buffer
+		resb 1
+; 06/09/2026
+writei.ldrvt:	resd 1 ; logical drive description table addr (save/restore)
 ; 08/12/2025
 writei.bpc:	resd 1 ; bytes per cluster
-;writei.offset:	resd 1 ; byte offset in cluster buffer
-writei.cluster: resd 1 ; current cluster number
+; 06/09/2026
+writei.fofp:	resd 1 ; file offset pointer (save/restore)
 writei.c_index:	resd 1 ; cluster index of the current cluster (0,1,2,3..)
 writei.fclust:  resd 1 ; first cluster of the current cluster
-;writei.fs_index: resd 1 ; sector index in disk/file section (for Singlix FS)
-;writei.buffer:	resd 1 ; writei sector buffer address
 writei.lclust:	resd 1 ; writei last cluster (mget_w) ; 23/10/2016
-;writei.l_index: resd 1 ; writei last cluster index (mget_w) ; 23/10/2016
 ; 01/01/2026
 writei.n_clust: resd 1 ; 1st of added clusters
 writei.lc_index: resd 1 ; new last cluster's index number
 writei.nc_count: resd 1 ; new (added) cluster count
-writei.pc_index: resd 1 ; previous last cluster index
-writei.p_cluster: resd 1 ; previous last cluster
+; 06/09/2026
+writei.pc_index: resd 1 ; previous last/current cluster index
+writei.p_clust: resd 1 ; previous last/current cluster
+writei.b_count:	resd 1 ; byte count to write in one time (sioreg)
 
 alignb 4
 
