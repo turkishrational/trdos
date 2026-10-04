@@ -1,7 +1,7 @@
 ; ****************************************************************************
-; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.5 - keyboard.s
+; TRDOS386.ASM (TRDOS 386 Kernel) - v2.0.11 - keyboard.s
 ; ----------------------------------------------------------------------------
-; Last Update: 07/08/2022 (Previous: 12/04/2021)
+; Last Update: 06/06/2026 (Previous: 07/08/2022, v2.0.5)
 ; ----------------------------------------------------------------------------
 ; Beginning: 17/01/2016
 ; ----------------------------------------------------------------------------
@@ -13,14 +13,14 @@
 ; Derived from 'Retro UNIX 386 Kernel - v0.2.1.0' source code by Erdogan Tan
 ; keyboard.inc (17/10/2015)
 ;
-; Derived from 'IBM PC-XT-286' BIOS source code (1986)
+; Derived from 'IBM PC-XT-286' BIOS source code (1986) 
 ; ****************************************************************************
 
 ; Ref: Retro UNIX 386 v1.2 - keyboard.s - 11/06/2022
 
 ; Retro UNIX 386 v1 Kernel - KEYBOARD.INC
 ; Last Modification: 17/10/2015
-;		    (Keyboard Data is in 'KYBDATA.INC')
+;		    (Keyboard Data is in 'KYBDATA.INC')	
 ;
 ; ///////// KEYBOARD FUNCTIONS (PROCEDURES) ///////////////
 
@@ -61,8 +61,9 @@ _K3E:                                   ; GET THE EXTENDED SHIFT STATUS FLAGS
 _K3:
 	mov	al, [KB_FLAG]		; GET THE SHIFT STATUS FLAGS
 	; 24/07/2022
-	jmp	short _KIO_EXIT		; RETURN TO CALLER
+	jmp	_KIO_EXIT ; 06/06/2026	; RETURN TO CALLER
 
+	; 06/06/2026 - TRDOS 386 v2.0.11
 getc_int:
 	; 28/02/2015
 	; 03/12/2014 (derivation from pc-xt-286 bios source code -1986-,
@@ -145,13 +146,26 @@ getc_int:
 	;-----------------------------------------------------------------------------:
 	;	(AH)= 11H  EXTENDED ASCII STATUS FOR THE ENHANCED KEYBOARD,           :
 	;		   OTHERWISE SAME AS FUNCTION AH=1                            :
-	;-----------------------------------------------------------------------------:	
+	;-----------------------------------------------------------------------------:
 	;	(AH)= 12H  RETURN THE EXTENDED SHIFT STATUS IN AX REGISTER            :
 	;		   AL = BITS FROM KB_FLAG, AH = BITS FOR LEFT AND RIGHT       :
 	;		   CTL AND ALT KEYS FROM KB_FLAG_1 AND KB_FLAG_3              :
+	;-----------------------------------------------------------------------------:
+	;	; 06/06/2026 - TRDOS 386 v2.0.11                                      :
+	;	(AH)= 13H  RETURN KEYBOARD BUFFER STATUS                              :
+	;		   If AL input = 0 -> no beep                                 :
+	;		      AL input = 1 -> buffer full beep                        :
+	;		      AL input = 2 -> buffer not empty (character) beep	      :
+	;		      AL input > 2 -> invalid function !                      :
+	;		   If Carry Flag = 1 -> EAX = -1 -> buffer full ((beep))      :
+	;		   If Zero Flag = 1 -> buffer empty, EAX = 0                  :
+	;		   (EAX = available chars in buffer, -1 -> buffer full)       :
+	; ----------------------------------------------------------------------------:
 	; OUTPUT					                              :
 	;	AS NOTED ABOVE, ONLY (AX) AND FLAGS CHANGED	                      :
 	;	ALL REGISTERS RETAINED		                                      :
+	;	; 06/06/2026                                                          :
+	;	If CF = 1 and EAX = 0 -> invalid function                             :
 	;------------------------------------------------------------------------------
 
 ; 07/08/2022
@@ -164,7 +178,7 @@ getc_int:
 ; 29/04/2016 - TRDOS 386 (TRDOS v2.0)
 int32h:  ; Keyboard BIOS
 
-KEYBOARD_IO_1:	
+KEYBOARD_IO_1:
 	;sti				; INTERRUPTS BACK ON
 	; 29/05/2016
         and     byte [esp+8], 10111110b ; clear zero flag and cary flag
@@ -195,21 +209,23 @@ KEYBOARD_IO_1:
 	jnz	short _KIO1
 	jmp	_K500
 _KIO1:
-	sub	ah, 11			; AH =  10H
+	sub	ah, 11			; AH = 10H
 	jz	short _K1E		; EXTENDED ASCII READ
 	dec	ah			; CHECK FOR (AH)= 11H
 	jz	short _K2E		; EXTENDED_ASCII_STATUS
 	dec	ah			; CHECK FOR (AH)= 12H
 	jz	short _K3E		; EXTENDED_SHIFT_STATUS
-_KIO_EXIT:
-	; 02/01/2017
-	cli
-	;;mov	byte [intflg], 0 ;; 15/01/2017
-	;
-	;pop	ecx			; RECOVER REGISTER
-	pop	ebx			; RECOVER REGISTER
-	pop	ds			; RECOVER SEGMENT
-	iretd				; INVALID COMMAND, EXIT
+
+	; 06/06/2026
+	dec	ah
+	jz	_K13h			; AH = 13h -> Keyboard buffer status
+_K13h_invalid:
+	sub	eax, eax ; 0
+_K13h_stc:
+	stc				; Invalid function
+	; 06/06/2026
+	;jmp	short _K13h_exit	; set carry flag at return (to the user code)
+	jmp	short _K2B
 
 ; 24/07/2022
 ;
@@ -244,7 +260,7 @@ _K1A:
 	jmp	short _KIO_EXIT         ; RETURN TO CALLER
 
 	;-----	ASCII STATUS
-_K2E:	
+_K2E:
 	call	_K2S			; TEST FOR CHARACTER IN BUFFER (EXTENDED)
 	jz	short _K2B		; RETURN IF BUFFER EMPTY
 	pushf				; SAVE ZF FROM TEST
@@ -259,8 +275,41 @@ _K2:
 	popf				; INVALID CODE FOR THIS TYPE OF CALL
 	call	_K1S			; THROW THE CHARACTER AWAY
 	jmp	short _K2		; GO LOOK FOR NEXT CHAR, IF ANY
+
+	; 24/07/2022
+	;-----	SET TYPAMATIC RATE AND DELAY
+_K300:
+	cmp	al, 5			; CORRECT FUNCTION CALL?
+	jne	short _KIO_EXIT		; NO, RETURN
+	test	bl, 0E0h		; TEST FOR OUT-OF-RANGE RATE
+	jnz	short _KIO_EXIT		; RETURN IF SO
+	test	bh, 0FCh		; TEST FOR OUT-OF-RANGE DELAY
+	jnz	short _KIO_EXIT		; RETURN IF SO
+	mov	al, KB_TYPA_RD		; COMMAND FOR TYPAMATIC RATE/DELAY
+	call	SND_DATA		; SEND TO KEYBOARD
+	;mov	cx, 5			; SHIFT COUNT
+	;shl	bh, cl			; SHIFT DELAY OVER
+	shl	bh, 5
+	mov	al, bl			; PUT IN RATE
+	or	al, bh			; AND DELAY
+	call	SND_DATA		; SEND TO KEYBOARD
+     	; 06/06/2026
+	;jmp	short _KIO_EXIT		; RETURN TO CALLER
+
+	; 06/06/2026
+_KIO_EXIT:
+	; 02/01/2017
+	cli
+	;;mov	byte [intflg], 0 ;; 15/01/2017
+	;
+	;pop	ecx			; RECOVER REGISTER
+	pop	ebx			; RECOVER REGISTER
+	pop	ds			; RECOVER SEGMENT
+	iretd				; INVALID COMMAND, EXIT
+
 _K2A:
 	popf				; RESTORE ZF FROM TEST
+
 _K2B:
 	; 02/01/2017
 	cli
@@ -276,16 +325,17 @@ _K2B:
 	or	byte [esp+8], 01000000b	; set zero flag bit of eflags register
 _k2c:
 	iretd
+
 _k2d:
 	; 29/05/2016 -set carry flag on stack-
 	; [esp] = EIP
 	; [esp+4] = CS
 	; [esp+8] = E-FLAGS
-	or	byte [esp+8], 1  ; set carry bit of eflags register
+	or	byte [esp+8], 1		; set carry bit of eflags register
 	; [esp+12] = ESP (user)
 	; [esp+16] = SS (User)
 	iretd
-	
+
 	; (*) 29/05/2016 - 'retf 4' intruction causes to stack fault
 	; (OUTER-PRIVILEGE-LEVEL)
 	; INTEL 80386 PROGRAMMER'S REFERENCE MANUAL 1986
@@ -305,29 +355,10 @@ _k2d:
 	;
 	; //
 
-	; 24/07/2022
-	;-----	SET TYPAMATIC RATE AND DELAY
-_K300:
-	cmp	al, 5			; CORRECT FUNCTION CALL?
-	jne	short _KIO_EXIT		; NO, RETURN
-	test	bl, 0E0h		; TEST FOR OUT-OF-RANGE RATE
-	jnz	short _KIO_EXIT		; RETURN IF SO
-	test	bh, 0FCh		; TEST FOR OUT-OF-RANGE DELAY
-	jnz	short _KIO_EXIT		; RETURN IF SO
-	mov	al, KB_TYPA_RD		; COMMAND FOR TYPAMATIC RATE/DELAY
-	call	SND_DATA		; SEND TO KEYBOARD
-	;mov	cx, 5			; SHIFT COUNT
-	;shl	bh, cl			; SHIFT DELAY OVER
-	shl	bh, 5
-	mov	al, bl			; PUT IN RATE
-	or	al, bh			; AND DELAY
-	call	SND_DATA		; SEND TO KEYBOARD
-        jmp     _KIO_EXIT               ; RETURN TO CALLER
-
 	;-----	WRITE TO KEYBOARD BUFFER
 _K500:
 	push	esi			; SAVE SI (esi)
-	cli				; 
+	cli				;
      	mov	ebx, [BUFFER_TAIL]	; GET THE 'IN TO' POINTER TO THE BUFFER
 	mov	esi, ebx		; SAVE A COPY IN CASE BUFFER NOT FULL
 	call	_K4			; BUMP THE POINTER TO SEE IF BUFFER IS FULL
@@ -342,7 +373,59 @@ _K502:
 _K504:
 	sti
 	pop	esi			; RECOVER SI (esi)
-        jmp     _KIO_EXIT               ; RETURN TO CALLER WITH STATUS IN AL
+	; 06/06/2026
+        jmp	short _KIO_EXIT		; RETURN TO CALLER WITH STATUS IN AL
+
+	; 06/06/2026 - TRDOS 386 v2.0.11
+	; Get Keyboard Buffer Status (Only)
+_K13h:
+	cmp	al, 2
+	ja	_K13h_invalid		; invalid function
+
+	test	byte [KB_BUFFER_FULL], -1
+	jnz	short _K13h_bf_beep_check
+
+	mov	bl, al
+
+	mov	eax, [BUFFER_TAIL]
+	sub	eax, [BUFFER_HEAD]
+	;jz	short _K13h_exit	; eax = 0, zf = 1 
+	jz	short _K2B	
+
+	cmp	bl, 2			; buffer not empty beep (request) -AL input-
+	jne	short _K13h_skip_beep
+
+	push	eax
+	call	_K13h_beep
+	pop	eax
+		
+_K13h_skip_beep:
+	or	eax, eax
+	; zf = 0, cf = 0
+	; eax = count of characters in the buffer (zf = 0)
+	;jmp	short _K13h_exit	; set zero flag at return (to the user code)
+	jmp	short _K2B
+
+_K13h_bf_beep_check:
+	cmp	al, 1			; buffer full beep (request)
+	jne	short _K13h_no_beep
+	call	_K13h_beep
+_K13h_no_beep:
+	mov	eax, -1
+	stc
+	;jmp	short _K13h_exit
+
+_K13h_exit: ; 06/06/2026
+	jmp	short _K2B
+
+	; 06/06/2026 - TRDOS 386 v2.0.11
+_K13h_beep:
+	push	ecx
+	mov	cx, 678			; DIVISOR FOR 1760 HZ
+	mov	bl, 4			; SHORT BEEP COUNT (1/16 + 1/64 DELAY)
+	call	beep			; GO TO COMMON BEEP HANDLER
+	pop	ecx
+ 	retn
 
 	;-----	READ THE KEY TO FIGURE OUT WHAT TO DO -----
 _K1S:
@@ -382,6 +465,8 @@ _K1V:
 	mov	ax, [ebx] 		; GET SCAN CODE AND ASCII CODE
         call    _K4                     ; MOVE POINTER TO NEXT POSITION
         mov     [BUFFER_HEAD], ebx      ; STORE VALUE IN VARIABLE
+	; 06/06/2026
+	mov	byte [KB_BUFFER_FULL], 0 ; Reset keyboard b uffer full flag
 	retn				; RETURN
 
 	;-----	READ THE KEY TO SEE IF ONE IS PRESENT -----
@@ -415,7 +500,7 @@ _KIO_E_XLAT:
         or 	ah, ah			; AH = 0 IS SPECIAL CASE
         jz	short _KIO_E_RET        ; PASS THIS ON UNCHANGED
 	xor	al, al			; OTHERWISE SET AL = 0
-_KIO_E_RET:				
+_KIO_E_RET:
 	retn				; GO BACK
 
 	;-----	ROUTINE TO TRANSLATE SCAN CODE PAIRS FOR STANDARD CALLS -----
@@ -431,7 +516,7 @@ _kio_ret: ; 03/12/2014
 	clc
 	retn
 	;jmp	short _KIO_USE		; GIVE TO CALLER
-_KIO_S1:				
+_KIO_S1:
 	mov	ah, 1Ch			; CONVERT TO COMPATIBLE OUTPUT
 	;jmp	short _KIO_USE		; GIVE TO CALLER
 	retn
@@ -453,7 +538,7 @@ _KIO_S3:
 	;jmp	short _KIO_USE		; PASS IT ON TO CALLER
 _KIO_USE:
 	;clc				; CLEAR CARRY TO INDICATE GOOD CODE
-	retn				; RETURN	
+	retn				; RETURN
 _KIO_DIS:
 	stc				; SET CARRY TO INDICATE DISCARD CODE
 	retn				; RETURN
@@ -475,7 +560,7 @@ _K5:
 ; KEYBOARD (HARDWARE) INTERRUPT -  IRQ LEVEL 1
 ; (INT_09h - Retro UNIX 8086 v1 - U9.ASM, 07/03/2014)
 ;
-; Derived from "KB_INT_1" procedure of IBM "pc-at"
+; Derived from "KB_INT_1" procedure of IBM "pc-at" 
 ; rombios source code (06/10/1985)
 ; 'keybd.asm', HARDWARE INT 09h - (IRQ Level 1)
 
@@ -562,6 +647,8 @@ INTA00		equ	020h		; 8259 PORT
 
 kb_int:
 
+; 06/06/2026
+; 05/06/2026 - TRDOS 386 v2.0.11 (with Google AI support)
 ; 24/07/2022 - TRDOS 386 v2.0.5
 ; 12/04/2021 - TRDOS 386 v2.0.3 (32 bit push/pop)
 ; 17/10/2015 ('ctrlbrk') 
@@ -577,25 +664,39 @@ kb_int:
 ;										;
 ;--------------------------------------------------------------------------------
 
+;----------------------------------------------------------------------------
+; KEYBOARD (HARDWARE) INTERRUPT - IRQ LEVEL 1
+; Derived from "KB_INT_1" procedure of IBM "pc-at" / "xt-286" rombios code
+;----------------------------------------------------------------------------
+
+	; 06/06/2026
 KB_INT_1:
-	sti				; ENABLE INTERRUPTS
-	;push	ebp
-	push	eax
-	push	ebx
-	push	ecx
-	push	edx
-	push	esi
-	push	edi
-	push	ds
-	push	es
-	cld				; FORWARD DIRECTION
+	; 05/06/2026 (32 bit register push/pop migration)
+	PUSHAD				; SAVE ALL 32-BIT GENERAL REGISTERS
+	PUSH	DS			; SAVE SEGMENT REGISTERS
+	PUSH	ES
+
+	cld				; FORCE FORWARD DIRECTION ON STRING OPERATIONS
 	mov	ax, KDATA
 	mov	ds, ax
 	mov	es, ax
-	;
+
+	; 05/06/2026 (mouse injection & 8042 buffer flush block)
+	IN	AL, 64H			; READ 8042 STATUS REGISTER
+
+	TEST	AL, 01H			; CHECK BIT 0 (OUTPUT BUFFER FULL)
+	JZ	KB_EXIT			; IF BUFFER EMPTY, NOTHING TO READ, EXIT
+	TEST	AL, 20H			; CHECK BIT 5 (OBF_AUX - MOUSE DATA)
+	JZ	SHORT K1B_KBD		; IF 0, IT IS GENUINE KEYBOARD DATA
+
+	; data is from mouse, read port 60h to flush and prevent lockups
+	IN	AL, 60H			; READ MOUSE DATA TO CLEAR 8042 BUFFER
+	JMP	KB_EXIT			; FAREWELL, DO NOT PROCESS AS KEYSTROKE
+
+K1B_KBD:
 	;-----	WAIT FOR KEYBOARD DISABLE COMMAND TO BE ACCEPTED
-	mov	al, DIS_KBD		; DISABLE THE KEYBOARD COMMAND
-	call	SHIP_IT			; EXECUTE DISABLE
+	MOV	AL, 0ADH		; DISABLE THE KEYBOARD COMMAND (DIS_KBD = ADh)
+	CALL	SHIP_IT			; EXECUTE DISABLE
 	cli				; DISABLE INTERRUPTS
 	mov	ecx, 10000h		; SET MAXIMUM TIMEOUT
 KB_INT_01:
@@ -639,7 +740,7 @@ KB_INT_4:
         ;jmp	K26                     ; RETURN IF NOT ACK RETURNED FOR DATA)
 	; 12/04/2021
 	jmp	short ID_EX  ; K26
-	;
+
 ;-----	UPDATE MODE INDICATORS IF CHANGE IN STATE
 KB_INT_2:
 	;push 	ax			; SAVE DATA IN
@@ -701,17 +802,18 @@ KX_BIT:
 ID_EX:	jmp     K26			; EXIT
 	;
 NOT_ID:
+	; 05/06/2026 (real hardware extended key fix injected in native position)
 	cmp	al, MC_E0		; IS THIS THE GENERAL MARKER CODE?
 	jne	short TEST_E1
 	or	byte [KB_FLAG_3], LC_E0+KBX ; SET FLAG BIT, SET KBX, AND
-	jmp	short EXIT		; THROW AWAY THIS CODE
+	jmp	short KB_EXIT		; THROW AWAY THIS CODE USING KB_EXIT
 	; 12/04/2021
 	;jmp	K26A
 TEST_E1:
 	cmp	al, MC_E1		; IS THIS THE PAUSE KEY?
 	jne	short NOT_HC
 	or	byte [KB_FLAG_3], LC_E1+KBX ; SET FLAG BIT, SET KBX, AND
-EXIT:	jmp	K26A			; THROW AWAY THIS CODE
+	jmp	short KB_EXIT		; THROW AWAY THIS CODE USING KB_EXIT
 	;
 NOT_HC:
 	and	al, 07Fh		; TURN OFF THE BREAK BIT
@@ -731,10 +833,11 @@ NOT_HC:
 NOT_LC_E0:
 	test	bh, LC_E1		; LAST CODE THE E1 MARKER CODE?
 	jz	short T_SYS_KEY		; JUMP IF NOT
+	; 05/06/2026 (32 bit repne scasb adaptation)
 	mov	ecx, 4			; LENGHT OF SEARCH
 	mov	edi, _K6+4		; IS THIS AN ALT, CTL, OR SHIFT?
 	repne	scasb			; CHECK IT
-	je	short EXIT		; THROW AWAY IF SO
+	je	KB_EXIT			; THROW AWAY IF SO
 	; 12/04/2021
 	;je	K26A
 	;
@@ -762,7 +865,7 @@ T_SYS_KEY:
 	jnz	short K16C		; DO NOT TOUCH SYSTEM INDICATOR IF TRUE
 	;
 	test	byte [KB_FLAG_1], SYS_SHIFT ; SEE IF IN SYSTEM KEY HELD DOWN
-	jnz	short K16B		; IF YES, DO NOT PROCESS SYSTEM INDICATOR	
+	jnz	short K16B		; IF YES, DO NOT PROCESS SYSTEM INDICATOR
 	; 12/04/2021
 	;jnz	K26
 	;
@@ -777,9 +880,12 @@ T_SYS_KEY:
 	;STI				; MAKE SURE INTERRUPTS ENABLED
 	;INT	15H			; USER INTERRUPT
         jmp     K27A                    ; END PROCESSING
-	;
-K16B:	jmp	K26			; IGNORE SYSTEM KEY
-	;
+K16B:
+	jmp	K26			; IGNORE SYSTEM KEY
+
+KB_EXIT:				; 05/06/2026
+	JMP	K26A			; GO TO EOI AND CLEANUP ROUTINE
+
 K16C:
 	and	byte [KB_FLAG_1], ~SYS_SHIFT ; TURN OFF SHIFT KEY HELD DOWN
 	mov	al, EOI			; END OF INTERRUPT COMMAND
@@ -791,10 +897,10 @@ K16C:
 	;MOV	AX, 8501H		; FUNCTION VALUE FOR BREAK OF SYSTEM KEY
 	;STI				; MAKE SURE INTERRUPTS ENABLED
 	;INT	15H			; USER INTERRUPT
-	;JMP	K27A			; IGNORE SYSTEM KEY
+	;JMP	K27A			; INGONRE SYSTEM KEY
 	;
 	jmp     K27			; IGNORE SYSTEM KEY
-	;
+
 	;-----	TEST FOR SHIFT KEYS
 K16A:
 	mov	bl, [KB_FLAG]		; PUT STATE FLAGS IN BL
@@ -861,7 +967,7 @@ K18A:
 K18B:
 	test	bh, LC_E0 ;20/02/2015	; IS THIS NEW INSERT KEY?
 	jnz	short K22		; YES, THIS ONE'S NEVER A '0'
-K19:	
+K19:
 	test	bl, NUM_STATE 		; CHECK FOR BASE STATE
 	jnz	short K21		; JUMP IF NUM LOCK IS ON
 	test	bl, LEFT_SHIFT+RIGHT_SHIFT ; TEST FOR SHIFT STATE
@@ -927,7 +1033,7 @@ K23B:
 K23D:
 	cmp	al, ALT_KEY+80h		; IS THIS ALTERNATE SHIFT RELEASE
 	jne	short K26		; INTERRUPT RETURN
-	;
+	;	
 	;-----	ALTERNATE SHIFT KEY RELEASED, GET THE VALUE INTO BUFFER
 	mov	al, [ALT_INPUT]
 	mov	ah, 0			; SCAN CODE OF 0
@@ -952,28 +1058,28 @@ K25:					; NO-SHIFT-FOUND
 	cmp	al, NUM_KEY
 	je	short K26		; CAN'T END HOLD ON NUM_LOCK
 	and	byte [KB_FLAG_1], ~HOLD_STATE ; TURN OFF THE HOLD STATE BIT
+
+;----------------------------------------------------------------------------
+; INTERRUPT EXIT TIMING AND CLEANUP BLOCK
+;----------------------------------------------------------------------------
+
 K26:
-	and	byte [KB_FLAG_3], ~(LC_E0+LC_E1) ; RESET LAST CHAR H.C. FLAG
+	AND	BYTE [KB_FLAG_3], ~(LC_E0+LC_E1) ; RESET LAST CHAR H.C. FLAG
 K26A:					; INTERRUPT-RETURN
-	cli				; TURN OFF INTERRUPTS
-	mov	al, EOI			; END OF INTERRUPT COMMAND
-	out	20h, al	;out INTA00, al	; SEND COMMAND TO INTERRUPT CONTROL PORT
+	CLI				; TURN OFF INTERRUPTS
+	MOV	AL, 20H			; END OF INTERRUPT COMMAND (EOI = 20H)
+	OUT	20H, AL			; SEND COMMAND TO INTERRUPT CONTROL PORT
 K27:					; INTERRUPT-RETURN-NO-EOI
-	mov	al, ENA_KBD		; INSURE KEYBOARD IS ENABLED
-	call	SHIP_IT			; EXECUTE ENABLE
+	MOV	AL, 0AEH		; INSURE KEYBOARD IS ENABLED (ENA_KBD = AEH)
+	CALL	SHIP_IT			; EXECUTE ENABLE
 K27A:
-	cli				; DISABLE INTERRUPTS
+	CLI				; DISABLE INTERRUPTS
 	;;mov	byte [intflg], 0 ; 07/01/2017 ;; 15/01/2017
-	pop	es			; RESTORE REGISTERS
-	pop	ds
-	pop	edi
-	pop	esi
-	pop	edx
-	pop	ecx
-	pop	ebx
-	pop	eax
-	;pop	ebp
-	iretd				; RETURN
+	POP	ES			; RESTORE REGISTERS
+	POP	DS
+	; 05/06/2026 (32 bit register push/pop migration)
+	POPAD				; RESTORE ALL 32-BIT GENERAL REGISTERS (EAX-EDI)
+	IRETD				; 32-BIT RETURN FROM INTERRUPT
 
 	;-----	NOT IN	HOLD STATE
 K28:					; NO-HOLD-STATE
@@ -1197,7 +1303,7 @@ K41:					; NO-PAUSE
 	jz	short K41A		; NO, CTL-PRTSC IS VALID
 	test	bh, LC_E0		; YES, WAS LAST CODE AN E0?
 	jz	short K42B		; NO, TRANSLATE TO A FUNCTION
-K41A:	
+K41A:
 	mov	ax, 114*256		; START/STOP PRINTING SWITCH
         jmp     K57                     ; BUFFER_FILL
 	;
@@ -1210,8 +1316,8 @@ K42:					; NOT-KEY-55
 	test	bh, LC_E0		; YES, IS IT FROM THE KEY PAD?
 	jz	short K42A		; NO, JUST TRANSLATE
 	mov	ax, 9500h		; YES, SPECIAL CODE FOR THIS ONE
-	jmp	K57			; BUFFER FILL
-K42A: 
+	jmp	K57			; BUFFER FILL	
+K42A:
 	;;mov	ebx, _K8		; SET UP TO TRANSLATE CTL
 	cmp	al, 59			; IS IT IN CHARACTER TABLE?
         ;jb	short K45F              ; YES, GO TRANSLATE CHAR
@@ -1301,7 +1407,7 @@ K48:
 	je	short K45E		; GO TRANSLATE
 	test	bh, LC_E0		; IS THIS ONE OFTHE NEW KEYS?
 	jnz	short K49		; YES, TRANSLATE TO BASE STATE
-	;
+	;		
 	test 	bl, NUM_STATE		; ARE WE IN NUM LOCK
 	jnz	short K50		; TEST FOR SURE
 	test	bl, LEFT_SHIFT+RIGHT_SHIFT ; ARE WE IN SHIFT STATE?
@@ -1407,16 +1513,25 @@ K61:					; NOT-CAPS-STATE
 	;int	15h			; PERFORM OTHER FUNCTION
 	;;and	byte [KB_FLAG_3],~(LC_E0+LC_E1) ; RESET LAST CHAR H.C. FLAG
 	;jmp	K27A			; INTERRUPT_RETURN
-	;;jmp   K27                    
+	;;jmp   K27
 	;
 	;-----	BUFFER IS FULL SOUND THE BEEPER
 K62:
-	mov	al, EOI			; ENABLE INTERRUPT CONTROLLER CHIP
-	out	INTA00, al
-	mov	cx, 678			; DIVISOR FOR 1760 HZ
-	mov	bl, 4			; SHORT BEEP COUNT (1/16 + 1/64 DELAY)
-	call	beep			; GO TO COMMON BEEP HANDLER
-	jmp     K27			; EXIT
+	;mov	al, EOI			; ENABLE INTERRUPT CONTROLLER CHIP
+	;out	INTA00, al
+	;mov	cx, 678			; DIVISOR FOR 1760 HZ
+	;mov	bl, 4			; SHORT BEEP COUNT (1/16 + 1/64 DELAY)
+	;call	beep			; GO TO COMMON BEEP HANDLER
+	;jmp     K27			; EXIT
+
+	; 05/06/2026
+	; (removed flush & beep, safely drop overflow keystroke with flag)
+
+	; Signal to the kernel that the keyboard buffer is completely full
+
+	MOV	BYTE [KB_BUFFER_FULL], 0FFH ; Set buffer full flag to -1 (0FFh)
+
+	JMP	K26A			; Bypass buffer insertions, go straight to EOI!
 
 SHIP_IT:
 	;---------------------------------------------------------------------------------
@@ -1425,7 +1540,7 @@ SHIP_IT:
 	;	TO THE KEYBOARD CONTROLLER.
 	;---------------------------------------------------------------------------------
 	;
-	
+
 	;push	ax			; SAVE DATA TO SEND
 	; 12/04/2021
 	push	eax
@@ -1433,7 +1548,7 @@ SHIP_IT:
 	;-----	WAIT FOR COMMAND TO ACCEPTED
 	cli				; DISABLE INTERRUPTS TILL DATA SENT
 	; xor	ecx, ecx		; CLEAR TIMEOUT COUNTER
-	mov	ecx, 10000h			
+	mov	ecx, 10000h
 S10:
 	in	al, STATUS_PORT		; READ KEYBOARD CONTROLLER STATUS
 	test	al, INPT_BUF_FULL	; CHECK FOR ITS INPUT BUFFER BUSY
@@ -1558,6 +1673,5 @@ MAKE_LED:
 	retn				; RETURN TO CALLER
 
 ; % include 'kybdata.s'   ; KEYBOARD DATA
-
 
 ; /// End Of KEYBOARD FUNCTIONS ///
