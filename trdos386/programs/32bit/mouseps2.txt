@@ -1,0 +1,417 @@
+     1                                  ; ============================================================================
+     2                                  ; TRDOS 386 Flat Binary VESA VBE Mode 105h PS/2 Mouse Demo (LFB Method)
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; Siyah zemin üzerine beyaz Microsoft tipi fare oku (Çizgili/Dolgulu).
+     5                                  ; INT 34h IOCTL arayüzü ile port polling ve doğrudan LFB bellek erişimi.
+     6                                  ; ============================================================================
+     7                                  ; 04/10/2026 - Google AI
+     8                                  
+     9                                  [bits 32]
+    10                                  [org 0x0]
+    11                                  
+    12                                  ; TRDOS 386 Sistem Çağrı Sabitleri
+    13                                  _exit 	equ 1
+    14                                  _video 	equ 31
+    15                                  
+    16                                  START_CODE:
+    17                                  	; BSS Alanını temizle (Flat binary'de BSS başlangıcını sıfırlıyoruz)
+    18 00000000 BF[F8030000]            	mov	edi, bss_start
+    19 00000005 B942000000              	mov	ecx, (bss_end - bss_start)/4
+    20 0000000A 31C0                    	xor	eax, eax
+    21 0000000C F3AB                    	rep	stosd
+    22                                  
+    23                                  	; 1. VESA Mode 105h Ayarla (1024x768, 256 Renk) ve LFB Adresini Al
+    24                                  	; TRDOS 386 sys _video, 08FFh fonksiyonu başarılıysa EDX = LFB Info addresidir.
+    25 0000000E BA[F8030000]                    mov	edx, LFB_Info
+    26 00000013 BBFF080000              	mov	ebx, 08FFh
+    27 00000018 B905010000              	mov	ecx, 105h
+    28 0000001D B81F000000              	mov	eax, _video
+    29 00000022 CD40                    	int	40h
+    30 00000024 09C0                    	or	eax, eax
+    31 00000026 0F8410010000            	jz	near terminate
+    32                                  	
+    33                                  	; Kernel'dan dönen LFB Info Structure'ındaki LFB_Adress kullanılacak
+    34                                  
+    35                                  	; Kullanıcının video bellek adresini LFB adresine eşitle (haritala)
+    36 0000002C BB020A0000                      mov	ebx, 0A02h  ; VIDEO MEMORY MAPPING (svga, LFB)
+    37 00000031 8B0D[FA030000]                  mov	ecx, [LFB_Address]  ; Kullanıcının sanal adresi = LFB fiziksel adresi
+    38 00000037 BA00000C00               	mov	edx, 1024*768*1
+    39 0000003C B81F000000              	mov	eax, _video
+    40 00000041 CD40                    	int	40h
+    41 00000043 09C0                    	or	eax, eax
+    42 00000045 0F84F1000000            	jz	near terminate
+    43                                  
+    44                                  		; 2. Siyah Arka Plan Oluştur (Bütün ekranı temizle)
+    45 0000004B 8B3D[FA030000]          	mov	edi, [LFB_Address] ; LFB_Info+2
+    46 00000051 B900000300              	mov	ecx, (1024 * 768) / 4
+    47 00000056 31C0                    	xor	eax, eax
+    48 00000058 F3AB                    	rep	stosd
+    49                                  
+    50                                  	; 3. PS/2 Fare Donanımını Başlat (INT 34h IOCTL Port Erişimi ile)
+    51 0000005A E8EA000000              	call	init_ps2_mouse
+    52                                  
+    53                                  	; Fare Başlangıç Koordinatları (Ekran Ortası)
+    54 0000005F C705[08040000]0002-     	mov	dword [mouse_x], 1024 / 2
+    54 00000067 0000               
+    55 00000069 C705[0C040000]8001-     	mov	dword [mouse_y], 768 / 2
+    55 00000071 0000               
+    56 00000073 C705[10040000]0002-     	mov	dword [prev_mouse_x], 1024 / 2
+    56 0000007B 0000               
+    57 0000007D C705[14040000]8001-     	mov	dword [prev_mouse_y], 768 / 2
+    57 00000085 0000               
+    58                                  
+    59                                  	; İlk konumdaki arka planı sakla ve ilk imleci çiz
+    60 00000087 E8DB010000              	call	save_background
+    61 0000008C E844020000              	call	draw_mouse_arrow
+    62 00000091 C605[1D040000]01        	mov	byte [mouse_drawn], 1
+    63                                  
+    64                                  mouse_loop:
+    65                                  	; Klavye Kontrolü (ESC tuşuna basılırsa çık)
+    66 00000098 B401                    	mov	ah, 1
+    67 0000009A CD32                    	int	32h
+    68 0000009C 740C                    	jz	short .poll_mouse
+    69 0000009E 30E4                    	xor	ah, ah
+    70 000000A0 CD32                    	int	32h
+    71 000000A2 3C1B                    	cmp	al, 1Bh			; ESC tuşu mu?
+    72 000000A4 0F8492000000            	je	terminate
+    73                                  
+    74                                  .poll_mouse:
+    75                                  	; Fare Durum Kontrolü (Port 64h okuma)
+    76 000000AA 66BA6400                	mov	dx, 0x64
+    77 000000AE B400                    	mov	ah, 0			; read byte
+    78 000000B0 CD34                    	int	34h
+    79 000000B2 A801                    	test	al, 01h			; Output buffer dolu mu?
+    80 000000B4 74E2                    	jz	short mouse_loop	; Veri yoksa beklemeye devam et
+    81                                  
+    82                                  	; Fare Veri Portunu Oku (Port 60h okuma)
+    83 000000B6 66BA6000                	mov	dx, 0x60
+    84 000000BA B400                    	mov	ah, 0			; read byte
+    85 000000BC CD34                    	int	34h
+    86                                  
+    87                                  	; 3 Byte'lık PS/2 paketini tamamla
+    88 000000BE 31DB                    	xor	ebx, ebx
+    89 000000C0 8A1D[18040000]          	mov	bl, [packet_count]
+    90 000000C6 8883[19040000]          	mov	[mouse_packet + ebx], al
+    91 000000CC FE05[18040000]          	inc	byte [packet_count]
+    92 000000D2 803D[18040000]03        	cmp	byte [packet_count], 3
+    93 000000D9 75BD                    	jne	short mouse_loop	; Paket henüz bitmediyse döngüye dön
+    94                                  
+    95                                  	; Paket tamamlandı, sayacı sıfırla
+    96 000000DB C605[18040000]00        	mov	byte [packet_count], 0
+    97                                  
+    98                                  	; Koordinatları Güncelle (Delta X ve Delta Y analizi)
+    99 000000E2 E8E0000000              	call	update_position
+   100                                  
+   101                                  	; Hareket var mı kontrol et?
+   102 000000E7 A1[08040000]            	mov	eax, [mouse_x]
+   103 000000EC 8B1D[0C040000]          	mov	ebx, [mouse_y]
+   104 000000F2 3B05[10040000]          	cmp	eax, [prev_mouse_x]
+   105 000000F8 7508                    	jne	short .update_screen
+   106 000000FA 3B1D[14040000]          	cmp	ebx, [prev_mouse_y]
+   107 00000100 7496                    	je	short mouse_loop	; Hareket yoksa çizim yapma
+   108                                  
+   109                                  .update_screen:
+   110                                  	; Eğer ekranda çizili bir imleç varsa önce onu sil (Arka planı geri yükle)
+   111 00000102 803D[1D040000]01        	cmp	byte [mouse_drawn], 1
+   112 00000109 7505                    	jne	short .draw_new
+   113 0000010B E888010000              	call	delete_mouse_arrow
+   114                                  
+   115                                  .draw_new:
+   116                                  	; Yeni koordinatları "geçtiğimiz konum" olarak güncelle
+   117 00000110 A1[08040000]            	mov	eax, [mouse_x]
+   118 00000115 8B1D[0C040000]          	mov	ebx, [mouse_y]
+   119 0000011B A3[10040000]            	mov	[prev_mouse_x], eax
+   120 00000120 891D[14040000]          	mov	[prev_mouse_y], ebx
+   121                                  
+   122                                  	; Yeni konumun altındaki zemini kaydet, ardından imleci çiz
+   123 00000126 E83C010000              	call	save_background
+   124 0000012B E8A5010000              	call	draw_mouse_arrow
+   125 00000130 C605[1D040000]01        	mov	byte [mouse_drawn], 1
+   126                                  
+   127 00000137 E95CFFFFFF              	jmp	mouse_loop
+   128                                  
+   129                                  terminate:
+   130                                  	; Çıkmadan önce ekranı metin moduna (Mode 3) geri al
+   131 0000013C 30E4                    	xor    ah, ah
+   132 0000013E B003                    	mov    al, 3                        
+   133 00000140 CD31                    	int    31h
+   134                                  	
+   135                                  	; TRDOS 386 Program Sonlandırma Çağrısı
+   136 00000142 B801000000              	mov	eax, _exit
+   137 00000147 CD40                    	int	40h
+   138                                  
+   139                                  ; ============================================================================
+   140                                  ; SÜRÜCÜ VE YARDIMCI FONKSİYONLAR
+   141                                  ; ============================================================================
+   142                                  
+   143                                  init_ps2_mouse:
+   144                                  	; Fareyi Etkinleştir (Cmd 0xA8 -> Port 64h)
+   145 00000149 66BA6400                	mov	dx, 0x64
+   146 0000014D B0A8                    	mov	al, 0xA8
+   147 0000014F B401                    	mov	ah, 1 ; write byte
+   148 00000151 CD34                    	int	34h
+   149                                  
+   150                                  	; Komut Byte'ını Oku (Cmd 0x20 -> Port 64h)
+   151 00000153 B020                    	mov	al, 0x20
+   152 00000155 B401                    	mov	ah, 1
+   153 00000157 CD34                    	int	34h
+   154 00000159 E84E000000              	call	wait_read
+   155 0000015E 66BA6000                	mov	dx, 0x60
+   156 00000162 B400                    	mov	ah, 0
+   157 00000164 CD34                    	int	34h
+   158 00000166 0C02                    	or	al, 0x02		; IRQ 12'yi aktif et
+   159 00000168 50                      	push	eax
+   160                                  
+   161                                  	; Komut Byte'ını Yaz (Cmd 0x60 -> Port 64h)
+   162 00000169 66BA6400                	mov	dx, 0x64
+   163 0000016D B060                    	mov	al, 0x60
+   164 0000016F B401                    	mov	ah, 1
+   165 00000171 CD34                    	int	34h
+   166 00000173 58                      	pop	eax
+   167 00000174 66BA6000                	mov	dx, 0x60
+   168 00000178 B401                    	mov	ah, 1
+   169 0000017A CD34                    	int	34h
+   170                                  
+   171                                  	; Varsayılan Ayarları Yükle (0xF6 -> Fareye)
+   172 0000017C E81C000000              	call	write_mouse_cmd
+   173 00000181 B0F6                    	mov	al, 0xF6
+   174 00000183 B401                    	mov	ah, 1
+   175 00000185 CD34                    	int	34h
+   176 00000187 E82D000000              	call	wait_ack
+   177                                  
+   178                                  	; Veri Akışını Başlat (0xF4 -> Fareye)
+   179 0000018C E80C000000              	call	write_mouse_cmd
+   180 00000191 B0F4                    	mov	al, 0xF4
+   181 00000193 B401                    	mov	ah, 1
+   182 00000195 CD34                    	int	34h
+   183 00000197 E81D000000              	call	wait_ack
+   184 0000019C C3                      	retn
+   185                                  
+   186                                  write_mouse_cmd:
+   187 0000019D 66BA6400                	mov	dx, 0x64
+   188 000001A1 B0D4                    	mov	al, 0xD4		; Fareye komut yollanacağını bildirir
+   189 000001A3 B401                    	mov	ah, 1
+   190 000001A5 CD34                    	int	34h
+   191 000001A7 66BA6000                	mov	dx, 0x60
+   192 000001AB C3                      	retn
+   193                                  
+   194                                  wait_read:
+   195 000001AC 66BA6400                	mov	dx, 0x64
+   196 000001B0 B400                    .l:	mov	ah, 0
+   197 000001B2 CD34                    	int	34h
+   198 000001B4 A801                    	test	al, 01h
+   199 000001B6 74F8                    	jz	short .l
+   200 000001B8 C3                      	retn
+   201                                  
+   202                                  wait_ack:
+   203 000001B9 E8EEFFFFFF              	call	wait_read
+   204 000001BE 66BA6000                	mov	dx, 0x60
+   205 000001C2 B400                    	mov	ah, 0
+   206 000001C4 CD34                    	int	34h			; ACK (0xFA) değerini yut
+   207 000001C6 C3                      	retn
+   208                                  
+   209                                  update_position:
+   210 000001C7 A0[19040000]            	mov	al, [mouse_packet]
+   211 000001CC A840                    	test	al, 0x40		; X taşma kontrolü
+   212 000001CE 0F8592000000            	jnz	.done
+   213 000001D4 A880                    	test	al, 0x80		; Y taşma kontrolü
+   214 000001D6 0F858A000000            	jnz	.done
+   215                                  
+   216                                  	; Delta X
+   217 000001DC 0FB61D[1A040000]        	movzx	ebx, byte [mouse_packet + 1]
+   218 000001E3 F605[19040000]10        	test	byte [mouse_packet], 0x10 ; X işaret biti?
+   219 000001EA 7406                    	jz	short .x_pos
+   220 000001EC 81CB00FFFFFF            	or	ebx, 0xFFFFFF00
+   221                                  .x_pos:
+   222 000001F2 011D[08040000]          	add	[mouse_x], ebx
+   223                                  
+   224                                  	; Delta Y (PS/2 dY verisi aşağıdan yukarı doğrudur, ekran ise yukarıdan aşağıya)
+   225 000001F8 0FB61D[1B040000]        	movzx	ebx, byte [mouse_packet + 2]
+   226 000001FF F605[19040000]20        	test	byte [mouse_packet], 0x20 ; Y işaret biti?
+   227 00000206 7406                    	jz	short .y_pos
+   228 00000208 81CB00FFFFFF            	or	ebx, 0xFFFFFF00
+   229                                  .y_pos:
+   230 0000020E 291D[0C040000]          	sub	[mouse_y], ebx
+   231                                  
+   232                                  	; Sınır Kontrolleri (Screen Clipping 1024x768)
+   233 00000214 833D[08040000]00        	cmp	dword [mouse_x], 0
+   234 0000021B 7D0A                    	jge	short .c1
+   235 0000021D C705[08040000]0000-     	mov	dword [mouse_x], 0
+   235 00000225 0000               
+   236 00000227 813D[08040000]F403-     .c1:	cmp	dword [mouse_x], 1012	; İmleç genişliğini düşerek kırpıyoruz (1024 - 12)
+   236 0000022F 0000               
+   237 00000231 7E0A                    	jle	short .c2
+   238 00000233 C705[08040000]F403-     	mov	dword [mouse_x], 1012
+   238 0000023B 0000               
+   239 0000023D 833D[0C040000]00        .c2:	cmp	dword [mouse_y], 0
+   240 00000244 7D0A                    	jge	short .c3
+   241 00000246 C705[0C040000]0000-     	mov	dword [mouse_y], 0
+   241 0000024E 0000               
+   242 00000250 813D[0C040000]ED02-     .c3:	cmp	dword [mouse_y], 749	; İmleç yüksekliğini düşerek kırpıyoruz (768 - 19)
+   242 00000258 0000               
+   243 0000025A 7E0A                    	jle	short .done
+   244 0000025C C705[0C040000]ED02-     	mov	dword [mouse_y], 749
+   244 00000264 0000               
+   245                                  .done:
+   246 00000266 C3                      	retn
+   247                                  
+   248                                  ; ============================================================================
+   249                                  ; LFB GRAFİK EKRAN MOTORUFONKSİYONLARI
+   250                                  ; ============================================================================
+   251                                  
+   252                                  save_background:
+   253                                  	; İmlecin çizileceği alanın altındaki orijinal pikselleri yedekler
+   254 00000267 8B35[FA030000]          	mov	esi, [LFB_Address]
+   255 0000026D BF[1E040000]            	mov	edi, back_buffer
+   256 00000272 31C9                    	xor	ecx, ecx		; Y sayacı
+   257                                  .y_loop:
+   258 00000274 51                      	push	ecx
+   259 00000275 A1[14040000]            	mov	eax, [prev_mouse_y]
+   260 0000027A 01C8                    	add	eax, ecx
+   261 0000027C C1E00A                  	shl	eax, 10			; Y * 1024
+   262 0000027F 0305[10040000]          	add	eax, [prev_mouse_x]	; + X
+   263 00000285 8D1406                  	lea	edx, [esi + eax]	; Doğrudan LFB üzerindeki adres
+   264                                  	
+   265 00000288 B90C000000              	mov	ecx, 12			; 12 piksel genişlik kopyala
+   266                                  .x_loop:
+   267 0000028D A4                      	movsb
+   268 0000028E E2FD                    	loop	.x_loop
+   269                                  	
+   270 00000290 59                      	pop	ecx
+   271 00000291 41                      	inc	ecx
+   272 00000292 83F913                  	cmp	ecx, 19			; 19 satır yüksekliğinde
+   273 00000295 75DD                    	jne	short .y_loop
+   274 00000297 C3                      	retn
+   275                                  
+   276                                  delete_mouse_arrow:
+   277                                  	; Yedeklenen orijinal arka planı ekrana geri yazar (İmleci siler)
+   278 00000298 8B3D[FA030000]          	mov	edi, [LFB_Address]
+   279 0000029E BE[1E040000]            	mov	esi, back_buffer
+   280 000002A3 31C9                    	xor	ecx, ecx
+   281                                  .y_loop:
+   282 000002A5 51                      	push	ecx
+   283 000002A6 A1[14040000]            	mov	eax, [prev_mouse_y]
+   284 000002AB 01C8                    	add	eax, ecx
+   285 000002AD C1E00A                  	shl	eax, 10			; Y * 1024
+   286 000002B0 0305[10040000]          	add	eax, [prev_mouse_x]
+   287 000002B6 8D3C07                  	lea	edi, [edi + eax]	; Hedef LFB adresi
+   288                                  	
+   289 000002B9 B90C000000              	mov	ecx, 12
+   290 000002BE F3A4                    	rep	movsb			; 12 pikseli geri yaz
+   291                                  	
+   292 000002C0 8B3D[FA030000]          	mov	edi, [LFB_Address]	; EDI'yi sıfırla/tazele
+   293 000002C6 59                      	pop	ecx
+   294 000002C7 41                      	inc	ecx
+   295 000002C8 83F913                  	cmp	ecx, 19
+   296 000002CB 75D8                    	jne	short .y_loop
+   297 000002CD C605[1D040000]00        	mov	byte [mouse_drawn], 0
+   298 000002D4 C3                      	retn
+   299                                  
+   300                                  draw_mouse_arrow:
+   301                                  	; Fare okunu doğrudan LFB üzerine çizer
+   302 000002D5 8B3D[FA030000]          	mov	edi, [LFB_Address]
+   303 000002DB BE[13030000]            	mov	esi, mouse_arrow
+   304 000002E0 31C9                    	xor	ecx, ecx		; Y satır sayacı
+   305                                  .y_loop:
+   306 000002E2 51                      	push	ecx
+   307 000002E3 A1[14040000]            	mov	eax, [prev_mouse_y]
+   308 000002E8 01C8                    	add	eax, ecx
+   309 000002EA C1E00A                  	shl	eax, 10			; Y * 1024
+   310 000002ED 0305[10040000]          	add	eax, [prev_mouse_x]
+   311 000002F3 8D3C07                  	lea	edi, [edi + eax]	; LFB hedef piksel adresi
+   312                                  	
+   313 000002F6 B90C000000              	mov	ecx, 12			; Sütun sayacı
+   314                                  .x_loop:
+   315 000002FB AC                      	lodsb				; Maske byte'ını oku
+   316 000002FC 3C00                    	cmp	al, 0
+   317 000002FE 7402                    	je	short .transparent	; 0 ise çizme (Şeffaf arka plan)
+   318                                  	
+   319                                  	; 256 renk paletinde renk belirleme:
+   320                                  	; 15 = Beyaz (İmleç içi dolgu)
+   321                                  	; 0  = Siyah (İmleç dış siyah çizgisi)
+   322                                  	; Kodumuzda şablon verisinde belirtilen renk değerini doğrudan basarız.
+   323 00000300 8807                    	mov	[edi], al		
+   324                                  
+   325                                  .transparent:
+   326 00000302 47                      	inc	edi
+   327 00000303 E2F6                    	loop	.x_loop
+   328                                  	
+   329 00000305 8B3D[FA030000]          	mov	edi, [LFB_Address]	; EDI'yi sıfırla
+   330 0000030B 59                      	pop	ecx
+   331 0000030C 41                      	inc	ecx
+   332 0000030D 83F913                  	cmp	ecx, 19
+   333 00000310 75D0                    	jne	short .y_loop
+   334 00000312 C3                      	retn
+   335                                  
+   336                                  ; ============================================================================
+   337                                  ; MOUSE ARROW SPRITE DATA (12 x 19 piksel, 256 Renkli Ekran İçin)
+   338                                  ; ============================================================================
+   339                                  ; Sabit Değer Tanımlamaları (Ok okunabilirliğini artırmak için siyah kenarlıklı beyaz iç dolgu)
+   340                                  _W equ 15	; Beyaz Dolgu/Çizgi
+   341                                  _B equ 0	; Siyah Dış Hat Çizgisi
+   342                                  __ equ 0	; Transparan / Şeffaf Alan (LFB'ye yazılmaz)
+   343                                  
+   344                                  mouse_arrow:
+   345 00000313 000000000000000000-     	db _B, _B, __, __, __, __, __, __, __, __, __, __
+   345 0000031C 000000             
+   346 0000031F 000F00000000000000-     	db _B, _W, _B, __, __, __, __, __, __, __, __, __
+   346 00000328 000000             
+   347 0000032B 000F0F000000000000-     	db _B, _W, _W, _B, __, __, __, __, __, __, __, __
+   347 00000334 000000             
+   348 00000337 000F0F0F0000000000-     	db _B, _W, _W, _W, _B, __, __, __, __, __, __, __
+   348 00000340 000000             
+   349 00000343 000F0F0F0F00000000-     	db _B, _W, _W, _W, _W, _B, __, __, __, __, __, __
+   349 0000034C 000000             
+   350 0000034F 000F0F0F0F0F000000-     	db _B, _W, _W, _W, _W, _W, _B, __, __, __, __, __
+   350 00000358 000000             
+   351 0000035B 000F0F0F0F0F0F0000-     	db _B, _W, _W, _W, _W, _W, _W, _B, __, __, __, __
+   351 00000364 000000             
+   352 00000367 000F0F0F0F0F0F0F00-     	db _B, _W, _W, _W, _W, _W, _W, _W, _B, __, __, __
+   352 00000370 000000             
+   353 00000373 000F0F0F0F0F0F0F0F-     	db _B, _W, _W, _W, _W, _W, _W, _W, _W, _B, __, __
+   353 0000037C 000000             
+   354 0000037F 000F0F0F0F0F0F0F0F-     	db _B, _W, _W, _W, _W, _W, _W, _W, _W, _W, _B, __
+   354 00000388 0F0000             
+   355 0000038B 000F0F0F0F0F0F0000-     	db _B, _W, _W, _W, _W, _W, _W, _B, _B, _B, _B, _B
+   355 00000394 000000             
+   356 00000397 000F0F000F0F0F0000-     	db _B, _W, _W, _B, _W, _W, _W, _B, __, __, __, __
+   356 000003A0 000000             
+   357 000003A3 000F0000000F0F0F00-     	db _B, _W, _B, __, _B, _W, _W, _W, _B, __, __, __
+   357 000003AC 000000             
+   358 000003AF 00000000000F0F0F00-     	db _B, _B, __, __, _B, _W, _W, _W, _B, __, __, __
+   358 000003B8 000000             
+   359 000003BB 0000000000000F0F00-     	db __, __, __, __, __, _B, _W, _W, _B, __, __, __
+   359 000003C4 000000             
+   360 000003C7 0000000000000F0F00-     	db __, __, __, __, __, _B, _W, _W, _B, __, __, __
+   360 000003D0 000000             
+   361 000003D3 000000000000000F00-     	db __, __, __, __, __, __, _B, _W, _B, __, __, __
+   361 000003DC 000000             
+   362 000003DF 000000000000000F00-     	db __, __, __, __, __, __, _B, _W, _B, __, __, __
+   362 000003E8 000000             
+   363 000003EB 000000000000000000-     	db __, __, __, __, __, __, __, _B, __, __, __, __
+   363 000003F4 000000             
+   364                                  
+   365                                  ; ============================================================================
+   366                                  ; BSS - DİNAMİK BELLEK ALANI (FLAT BINARY SONRASI)
+   367                                  ; ============================================================================
+   368                                  bss:
+   369                                  ABSOLUTE bss
+   370 000003F7 ??                      alignb 4
+   371                                  bss_start:
+   372                                  
+   373 000003F8 ????                    LFB_Info:		resw 1	; Linear Frame Buffer Info Structure
+   374 000003FA ????????                LFB_Address:		resd 1
+   375 000003FE <res Ah>                                        resb 10
+   376 00000408 ????????                mouse_x:		resd 1	; Güncel X koordinatı
+   377 0000040C ????????                mouse_y:		resd 1	; Güncel Y koordinatı
+   378 00000410 ????????                prev_mouse_x:		resd 1	; Bir önceki X koordinatı
+   379 00000414 ????????                prev_mouse_y:		resd 1	; Bir önceki Y koordinatı
+   380                                  
+   381 00000418 ??                      packet_count:		resb 1	; Alınan fare byte sayacı
+   382 00000419 ????????                mouse_packet:		resb 4	; PS/2 ham veri tamponu
+   383 0000041D ??                      mouse_drawn:		resb 1	; İmleç ekrandaysa 1 olur
+   384                                  
+   385                                  ; İmlecin altındaki zemini yedeklemek için ayrılan alan (12 genişlik * 19 yükseklik)
+   386 0000041E <res E4h>               back_buffer:		resb (12 * 19)
+   387                                  
+   388                                  bss_end:

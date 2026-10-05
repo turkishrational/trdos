@@ -1,0 +1,419 @@
+     1                                  ; ****************************************************************************
+     2                                  ; mouse15.asm - TRDOS 386 Ring 3 VESA Mode 105h PS/2 Mouse Demo
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; NASM ile derleme komutu:
+     5                                  ; nasm mouse15.asm -o MOUSE15.PRG
+     6                                  ; ****************************************************************************
+     7                                  ; 04/10/2026 - Google AI
+     8                                  
+     9                                  ; TRDOS 386 (v2.0) Sistem Çağrı Sabitleri
+    10                                  _exit 	equ 1
+    11                                  _video 	equ 31
+    12                                  
+    13                                  %macro sys 1-4
+    14                                      %if %0 >= 2   
+    15                                          mov ebx, %2
+    16                                          %if %0 >= 3    
+    17                                              mov ecx, %3
+    18                                              %if %0 = 4
+    19                                                 mov edx, %4   
+    20                                              %endif
+    21                                          %endif
+    22                                      %endif
+    23                                      mov eax, %1
+    24                                      int 40h ; TRDOS 386 Sistem Kesmesi
+    25                                  %endmacro
+    26                                  
+    27                                  [BITS 32]
+    28                                  [ORG 0] 
+    29                                  
+    30                                  START_CODE:
+    31                                  	; BSS Alanını Sıfırla
+    32 00000000 BF[DC020000]            	mov	edi, bss_start
+    33 00000005 B987000000              	mov	ecx, (bss_end - bss_start)/4
+    34 0000000A 31C0                    	xor	eax, eax
+    35 0000000C F3AB                    	rep	stosd
+    36                                  
+    37                                  	; 1. VESA Mode 105h Ayarla (1024x768, 256 Renk)
+    38                                  	sys	_video, 08FFh, 105h
+    14                              <1>  %if %0 >= 2
+    15 0000000E BBFF080000          <1>  mov ebx, %2
+    16                              <1>  %if %0 >= 3
+    17 00000013 B905010000          <1>  mov ecx, %3
+    18                              <1>  %if %0 = 4
+    19                              <1>  mov edx, %4
+    20                              <1>  %endif
+    21                              <1>  %endif
+    22                              <1>  %endif
+    23 00000018 B81F000000          <1>  mov eax, %1
+    24 0000001D CD40                <1>  int 40h
+    39 0000001F 09C0                    	or	eax, eax
+    40 00000021 0F8491000000            	jz	near terminate
+    41                                  
+    42                                  	; 2. PS/2 Fare Donanımını Başlat (INT 34h IOCTL ile Port Erişimi)
+    43 00000027 E899000000              	call	init_ps2_mouse
+    44                                  
+    45                                  	; Fare Başlangıç Koordinatları (Ekran Ortası)
+    46 0000002C C705[DC020000]0002-     	mov	dword [mouse_x], 1024 / 2
+    46 00000034 0000               
+    47 00000036 C705[E0020000]8001-     	mov	dword [mouse_y], 768 / 2
+    47 0000003E 0000               
+    48                                  
+    49                                  main_loop:
+    50                                  	; Klavye Kontrolü (ESC tuşuna basılırsa çık)
+    51 00000040 B401                    	mov	ah, 1
+    52 00000042 CD32                    	int	32h	; TRDOS 386 Klavye Durum Kesmesi
+    53 00000044 7408                    	jz	short check_mouse
+    54 00000046 30E4                    	xor	ah, ah
+    55 00000048 CD32                    	int	32h	; Karakteri Oku
+    56 0000004A 3C1B                    	cmp	al, 1Bh	; ESC Key
+    57 0000004C 746A                    	je	short terminate
+    58                                  
+    59                                  check_mouse:
+    60                                  	; Fare verisi hazır mı kontrol et (Port 64h okuma)
+    61 0000004E E8E1000000              	call	mouse_status
+    62 00000053 A801                    	test	al, 01h			; Çıkış tamponu dolu mu?
+    63 00000055 741C                    	jz	short render_mouse	; Veri yoksa çizime geç
+    64                                  
+    65 00000057 A802                    	test	al, 02h			; Fare verisi mi (Auxiliary Device)?
+    66                                  	; Eğer sisteminizde klavye/fare ayrımı katıysa kontrolü aktif edebilirsiniz.
+    67                                  	
+    68                                  	; Fare paketini oku (3 Byte)
+    69 00000059 E8FD000000              	call	read_mouse_packet
+    70 0000005E 803D[EC020000]03        	cmp	byte [packet_count], 3
+    71 00000065 750C                    	jne	short render_mouse
+    72                                  
+    73                                  	; Paket tamamlandıysa koordinatları güncelle
+    74 00000067 E81A010000              	call	update_mouse_position
+    75 0000006C C605[EC020000]00        	mov	byte [packet_count], 0	; Sayacı sıfırla
+    76                                  
+    77                                  render_mouse:
+    78                                  	; Sadece fare hareket ettiyse ekrandaki görüntüyü güncelle
+    79 00000073 A1[DC020000]            	mov	eax, [mouse_x]
+    80 00000078 8B1D[E0020000]          	mov	ebx, [mouse_y]
+    81 0000007E 3B05[E4020000]          	cmp	eax, [prev_mouse_x]
+    82 00000084 7508                    	jne	short redraw
+    83 00000086 3B1D[E8020000]          	cmp	ebx, [prev_mouse_y]
+    84 0000008C 7420                    	je	short delay_loop	; Hareket yoksa döngüye devam et
+    85                                  
+    86                                  redraw:
+    87                                  	; 1. Eski imleci temizle (Siyah renkle üzerine çizerek)
+    88 0000008E E8AA010000              	call	erase_old_mouse
+    89                                  	
+    90                                  	; 2. Yeni koordinatları kaydet
+    91 00000093 A1[DC020000]            	mov	eax, [mouse_x]
+    92 00000098 8B1D[E0020000]          	mov	ebx, [mouse_y]
+    93 0000009E A3[E4020000]            	mov	[prev_mouse_x], eax
+    94 000000A3 891D[E8020000]          	mov	[prev_mouse_y], ebx
+    95                                  
+    96                                  	; 3. Yeni imleci beyaz renkle çiz
+    97 000000A9 E882010000              	call	draw_new_mouse
+    98                                  
+    99                                  delay_loop:
+   100                                  	; İşlemciyi çok yormamak için kısa bir döngü gecikmesi veya NOP
+   101 000000AE B950C30000              	mov	ecx, 50000
+   102                                  .wait:
+   103 000000B3 90                      	nop
+   104 000000B4 E2FD                    	loop	.wait
+   105 000000B6 EB88                    	jmp	main_loop
+   106                                  
+   107                                  terminate:
+   108                                  	; Metin moduna geri dön ve çık
+   109 000000B8 30E4                    	xor    ah, ah
+   110 000000BA B003                    	mov    al, 3                        
+   111 000000BC CD31                    	int    31h ; TRDOS Video Kesmesi
+   112                                  	sys	_exit
+    14                              <1>  %if %0 >= 2
+    15                              <1>  mov ebx, %2
+    16                              <1>  %if %0 >= 3
+    17                              <1>  mov ecx, %3
+    18                              <1>  %if %0 = 4
+    19                              <1>  mov edx, %4
+    20                              <1>  %endif
+    21                              <1>  %endif
+    22                              <1>  %endif
+    23 000000BE B801000000          <1>  mov eax, %1
+    24 000000C3 CD40                <1>  int 40h
+   113                                  
+   114                                  ; ============================================================================
+   115                                  ; PS/2 FARE SÜRÜCÜ FONKSİYONLARI (INT 34h IOCTL KULLANIMI)
+   116                                  ; ============================================================================
+   117                                  
+   118                                  init_ps2_mouse:
+   119                                  	; Fareyi Etkinleştir (Command: 0xA8 to Port 64h)
+   120 000000C5 66BA6400                	mov	dx, 0x64
+   121 000000C9 B0A8                    	mov	al, 0xA8
+   122 000000CB E85B010000              	call	io_write_byte
+   123                                  
+   124                                  	; Fare Komut Bloğunu Aktif Et (Command: 0x20 to Port 64h)
+   125 000000D0 B020                    	mov	al, 0x20
+   126 000000D2 E854010000              	call	io_write_byte
+   127 000000D7 E862000000              	call	mouse_wait_read
+   128 000000DC 66BA6000                	mov	dx, 0x60
+   129 000000E0 E841010000              	call	io_read_byte
+   130 000000E5 0C02                    	or	al, 0x02		; Enable IRQ12 (Mouse)
+   131 000000E7 50                      	push	eax
+   132                                  	
+   133                                  	; Güncellenmiş Komutu Geri Yaz (Command: 0x60 to Port 64h)
+   134 000000E8 66BA6400                	mov	dx, 0x64
+   135 000000EC B060                    	mov	al, 0x60
+   136 000000EE E838010000              	call	io_write_byte
+   137 000000F3 58                      	pop	eax
+   138 000000F4 66BA6000                	mov	dx, 0x60
+   139 000000F8 E82E010000              	call	io_write_byte
+   140                                  
+   141                                  	; Varsayılan Fare Ayarlarını Yükle (0xF6 to Port 60h via 64h/A4h wrapper if needed)
+   142 000000FD B0D4                    	mov	al, 0xD4
+   143 000000FF 66BA6400                	mov	dx, 0x64
+   144 00000103 E823010000              	call	io_write_byte
+   145 00000108 B0F6                    	mov	al, 0xF6		; Set default settings
+   146 0000010A 66BA6000                	mov	dx, 0x60
+   147 0000010E E818010000              	call	io_write_byte
+   148 00000113 E834000000              	call	mouse_ack
+   149                                  
+   150                                  	; Veri Akışını Başlat (0xF4 to Port 60h)
+   151 00000118 B0D4                    	mov	al, 0xD4
+   152 0000011A 66BA6400                	mov	dx, 0x64
+   153 0000011E E808010000              	call	io_write_byte
+   154 00000123 B0F4                    	mov	al, 0xF4		; Enable data reporting
+   155 00000125 66BA6000                	mov	dx, 0x60
+   156 00000129 E8FD000000              	call	io_write_byte
+   157 0000012E E819000000              	call	mouse_ack
+   158 00000133 C3                      	retn
+   159                                  
+   160                                  mouse_status:
+   161 00000134 66BA6400                	mov	dx, 0x64
+   162 00000138 E8E9000000              	call	io_read_byte
+   163 0000013D C3                      	retn
+   164                                  
+   165                                  mouse_wait_read:
+   166 0000013E 66BA6400                	mov	dx, 0x64
+   167                                  .wait:
+   168 00000142 E8DF000000              	call	io_read_byte
+   169 00000147 A801                    	test	al, 01h
+   170 00000149 74F7                    	jz	short .wait
+   171 0000014B C3                      	retn
+   172                                  
+   173                                  mouse_ack:
+   174 0000014C E8EDFFFFFF              	call	mouse_wait_read
+   175 00000151 66BA6000                	mov	dx, 0x60
+   176 00000155 E8CC000000              	call	io_read_byte	; ACK (0xFA) oku ve temizle
+   177 0000015A C3                      	retn
+   178                                  
+   179                                  read_mouse_packet:
+   180 0000015B 66BA6400                	mov	dx, 0x64
+   181 0000015F E8C2000000              	call	io_read_byte
+   182 00000164 A801                    	test	al, 01h			; Veri var mı?
+   183 00000166 741D                    	jz	short .no_data
+   184                                  	
+   185 00000168 66BA6000                	mov	dx, 0x60
+   186 0000016C E8B5000000              	call	io_read_byte
+   187                                  	
+   188 00000171 31DB                    	xor	ebx, ebx
+   189 00000173 8A1D[EC020000]          	mov	bl, [packet_count]
+   190 00000179 8883[ED020000]          	mov	[mouse_raw_packet + ebx], al
+   191 0000017F FE05[EC020000]          	inc	byte [packet_count]
+   192                                  .no_data:
+   193 00000185 C3                      	retn
+   194                                  
+   195                                  update_mouse_position:
+   196                                  	; Paket 0: Butonlar ve İşaret Bitleri
+   197                                  	; Paket 1: Delta X
+   198                                  	; Paket 2: Delta Y
+   199 00000186 A0[ED020000]            	mov	al, [mouse_raw_packet]
+   200 0000018B A840                    	test	al, 0x40		; X Taşma (Overflow) kontrolü
+   201 0000018D 0F8592000000            	jnz	.skip_x
+   202 00000193 A880                    	test	al, 0x80		; Y Taşma (Overflow) kontrolü
+   203 00000195 0F858A000000            	jnz	.skip_x
+   204                                  
+   205                                  	; Delta X Güncelleme
+   206 0000019B 0FB61D[EE020000]        	movzx	ebx, byte [mouse_raw_packet + 1]
+   207 000001A2 F605[ED020000]10        	test	byte [mouse_raw_packet], 0x10 ; X Sign bit?
+   208 000001A9 7406                    	jz	short .pos_x
+   209 000001AB 81CB00FFFFFF            	or	ebx, 0xFFFFFF00		; Negatif yap
+   210                                  .pos_x:
+   211 000001B1 011D[DC020000]          	add	[mouse_x], ebx
+   212                                  
+   213                                  	; Delta Y Güncelleme (PS/2 yönü ile ekran yönü terstir)
+   214 000001B7 0FB61D[EF020000]        	movzx	ebx, byte [mouse_raw_packet + 2]
+   215 000001BE F605[ED020000]20        	test	byte [mouse_raw_packet], 0x20 ; Y Sign bit?
+   216 000001C5 7406                    	jz	short .pos_y
+   217 000001C7 81CB00FFFFFF            	or	ebx, 0xFFFFFF00
+   218                                  .pos_y:
+   219 000001CD 291D[E0020000]          	sub	[mouse_y], ebx		; Ekranda yukarı gitmesi için çıkarıyoruz
+   220                                  
+   221                                  	; Ekran Sınır Kontrolleri (Clip to 1024x768)
+   222                                  .clip_bounds:
+   223 000001D3 833D[DC020000]00        	cmp	dword [mouse_x], 0
+   224 000001DA 7D0A                    	jge	short .check_max_x
+   225 000001DC C705[DC020000]0000-     	mov	dword [mouse_x], 0
+   225 000001E4 0000               
+   226                                  .check_max_x:
+   227 000001E6 813D[DC020000]FF03-     	cmp	dword [mouse_x], 1023
+   227 000001EE 0000               
+   228 000001F0 7E0A                    	jle	short .check_min_y
+   229 000001F2 C705[DC020000]FF03-     	mov	dword [mouse_x], 1023
+   229 000001FA 0000               
+   230                                  
+   231                                  .check_min_y:
+   232 000001FC 833D[E0020000]00        	cmp	dword [mouse_y], 0
+   233 00000203 7D0A                    	jge	short .check_max_y
+   234 00000205 C705[E0020000]0000-     	mov	dword [mouse_y], 0
+   234 0000020D 0000               
+   235                                  .check_max_y:
+   236 0000020F 813D[E0020000]FF02-     	cmp	dword [mouse_y], 767
+   236 00000217 0000               
+   237 00000219 7E0A                    	jle	short .skip_x
+   238 0000021B C705[E0020000]FF02-     	mov	dword [mouse_y], 767
+   238 00000223 0000               
+   239                                  .skip_x:
+   240 00000225 C3                      	retn
+   241                                  
+   242                                  ; ============================================================================
+   243                                  ; INT 34h IOCTL PORT ERİŞİM WRAPPER FONKSİYONLARI
+   244                                  ; ============================================================================
+   245                                  io_read_byte:
+   246                                  	; DX = Port
+   247                                  	; Output: AL = Data
+   248 00000226 B400                    	mov	ah, 0
+   249 00000228 CD34                    	int	34h
+   250 0000022A C3                      	retn
+   251                                  
+   252                                  io_write_byte:
+   253                                  	; DX = Port, AL = Data
+   254 0000022B B401                    	mov	ah, 1
+   255 0000022D CD34                    	int	34h
+   256 0000022F C3                      	retn
+   257                                  
+   258                                  ; ============================================================================
+   259                                  ; GÖRSEL RENDER FONKSİYONLARI (Gönderdiğiniz sys _video, 0305h mantığı)
+   260                                  ; ============================================================================
+   261                                  
+   262                                  draw_new_mouse:
+   263 00000230 C605[F1020000]0F        	mov	byte [draw_color], 15	; Beyaz Renk (VGA Standart Palette)
+   264 00000237 E80E000000              	call	build_and_send_mouse
+   265 0000023C C3                      	retn
+   266                                  
+   267                                  erase_old_mouse:
+   268 0000023D C605[F1020000]00        	mov	byte [draw_color], 0	; Siyah Renk (Arka Plan Rengi)
+   269 00000244 E801000000              	call	build_and_send_mouse
+   270 00000249 C3                      	retn
+   271                                  
+   272                                  build_and_send_mouse:
+   273                                  	; İmlecin çizileceği başlangıç ofsetlerini hesapla ve piksel dizisini hazırla
+   274 0000024A B8[F9020000]            	mov	eax, pixel_array
+   275 0000024F A3[F5020000]            	mov	[pixel_ptr], eax
+   276 00000254 31C9                    	xor	ecx, ecx		; satır sayacı (Y)
+   277                                  
+   278                                  .line_loop:
+   279 00000256 51                      	push	ecx
+   280 00000257 A1[E8020000]            	mov	eax, [prev_mouse_y]
+   281 0000025C 01C8                    	add	eax, ecx		; Mevcut ekran Y koordinatı
+   282 0000025E 3D00030000              	cmp	eax, 768
+   283 00000263 733C                    	jnb	short .next_line	; Ekran dışındaysa satırı atla
+   284                                  
+   285                                  	; Satırın bit maskesini yükle
+   286 00000265 8A99[CD020000]          	mov	bl, [mouse_sprite + ecx]
+   287 0000026B 31D2                    	xor	edx, edx		; sütun sayacı (X)
+   288                                  
+   289                                  .pixel_loop:
+   290 0000026D D0E3                    	shl	bl, 1
+   291 0000026F 732A                    	jnc	short .skip_pixel	; Bit 0 ise piksel koyma (Saydam)
+   292                                  
+   293 00000271 8B2D[E4020000]          	mov	ebp, [prev_mouse_x]
+   294 00000277 01D5                    	add	ebp, edx		; Mevcut ekran X koordinatı
+   295 00000279 81FD00040000            	cmp	ebp, 1024
+   296 0000027F 731A                    	jnb	short .skip_pixel
+   297                                  
+   298                                  	; Ekran Ofsetini Hesapla: (Y * 1024) + X
+   299 00000281 52                      	push	edx
+   300 00000282 50                      	push	eax
+   301 00000283 BA00040000              	mov	edx, 1024
+   302 00000288 F7E2                    	mul	edx
+   303 0000028A 01E8                    	add	eax, ebp
+   304                                  	
+   305                                  	; Ofseti piksel arabelleğine kaydet
+   306 0000028C 8B3D[F5020000]          	mov	edi, [pixel_ptr]
+   307 00000292 AB                      	stosd
+   308 00000293 893D[F5020000]          	mov	[pixel_ptr], edi
+   309 00000299 58                      	pop	eax
+   310 0000029A 5A                      	pop	edx
+   311                                  
+   312                                  .skip_pixel:
+   313 0000029B 42                      	inc	edx
+   314 0000029C 83FA08                  	cmp	edx, 8			; Ok genişliği 8 piksel
+   315 0000029F 75CC                    	jne	short .pixel_loop
+   316                                  
+   317                                  .next_line:
+   318 000002A1 59                      	pop	ecx
+   319 000002A2 41                      	inc	ecx
+   320 000002A3 83F90C                  	cmp	ecx, 12			; Ok yüksekliği 12 piksel
+   321 000002A6 75AE                    	jne	short .line_loop
+   322                                  
+   323                                  	; Hazırlanan Göreceli Piksel Array'ini Kernel'a Gönder
+   324 000002A8 BE[F9020000]            	mov	esi, pixel_array
+   325 000002AD 8B15[F5020000]          	mov	edx, [pixel_ptr]
+   326 000002B3 29F2                    	sub	edx, esi
+   327 000002B5 C1EA02                  	shr	edx, 2			; Piksel Sayısı = Toplam Byte / 4
+   328 000002B8 7412                    	jz	short .done		; Çizilecek piksel yoksa atla
+   329                                  	
+   330                                  	sys	_video, 0305h, [draw_color] ; Kernel Üzerinden Toplu Çizim Çağrısı
+    14                              <1>  %if %0 >= 2
+    15 000002BA BB05030000          <1>  mov ebx, %2
+    16                              <1>  %if %0 >= 3
+    17 000002BF 8B0D[F1020000]      <1>  mov ecx, %3
+    18                              <1>  %if %0 = 4
+    19                              <1>  mov edx, %4
+    20                              <1>  %endif
+    21                              <1>  %endif
+    22                              <1>  %endif
+    23 000002C5 B81F000000          <1>  mov eax, %1
+    24 000002CA CD40                <1>  int 40h
+   331                                  
+   332                                  .done:
+   333 000002CC C3                      	retn
+   334                                  
+   335                                  ; ============================================================================
+   336                                  ; SABİT VERİLER VE SPRITE TANIMLAMALARI
+   337                                  ; ============================================================================
+   338                                  
+   339                                  ; Microsoft Tipi Klasik Mouse Oku Grafiği (12 Satır, 8 Bit Genişlik)
+   340                                  ; 1 = Beyaz Piksel, 0 = Şeffaf / Siyah Arka Plan
+   341                                  mouse_sprite:
+   342 000002CD 80                      	db 10000000b
+   343 000002CE C0                      	db 11000000b
+   344 000002CF E0                      	db 11100000b
+   345 000002D0 F0                      	db 11110000b
+   346 000002D1 F8                      	db 11111000b
+   347 000002D2 FC                      	db 11111100b
+   348 000002D3 FE                      	db 11111110b
+   349 000002D4 F8                      	db 11111000b
+   350 000002D5 D8                      	db 11011000b
+   351 000002D6 8C                      	db 10001100b
+   352 000002D7 0C                      	db 00001100b
+   353 000002D8 00                      	db 00000000b
+   354                                  
+   355                                  ; ============================================================================
+   356                                  ; BSS - DİNAMİK DEĞİŞKEN ALANI
+   357                                  ; ============================================================================
+   358                                  bss:
+   359                                  ABSOLUTE bss
+   360 000002D9 ??????                  alignb 4
+   361                                  bss_start:
+   362                                  
+   363 000002DC ????????                mouse_x:		resd 1
+   364 000002E0 ????????                mouse_y:		resd 1
+   365 000002E4 ????????                prev_mouse_x:		resd 1
+   366 000002E8 ????????                prev_mouse_y:		resd 1
+   367                                  
+   368 000002EC ??                      packet_count:		resb 1
+   369 000002ED ????????                mouse_raw_packet:	resb 4
+   370 000002F1 ??                      draw_color:		resb 1
+   371 000002F2 ??????                                          resb 3
+   372 000002F5 ????????                pixel_ptr:		resd 1
+   373                                  
+   374                                  ; En fazla 12*8 = 96 piksel pozisyonu saklayacak array (Her biri dword)
+   375 000002F9 <res 200h>              pixel_array:		resd 128
+   376                                  
+   377                                  bss_end:
+   378                                  

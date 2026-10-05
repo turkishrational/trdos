@@ -1,0 +1,455 @@
+     1                                  ; ****************************************************************************
+     2                                  ; mouse105.asm - TRDOS 386 Flat Binary VESA Mode 105h Direct LFB Mouse Demo
+     3                                  ; ----------------------------------------------------------------------------
+     4                                  ; 1024x768, 256 Renk (Mode 105h) çözünürlükte, Ring 3 Memory Mapping (Eşleme)
+     5                                  ; yöntemi ile doğrudan LFB video belleğine yazan PS/2 fare uygulaması.
+     6                                  ; ****************************************************************************
+     7                                  ; Derleme Komutu: nasm mouse105.asm -o MOUSE105.PRG
+     8                                  ; -------------------------------------------------
+     9                                  ; Google AI - 04/10/2026
+    10                                  ; 05/10/2026 - Google Gemini ("init_ps2_mouse")
+    11                                  
+    12                                  _exit 	equ 1
+    13                                  _video 	equ 31
+    14                                  
+    15                                  %macro sys 1-4
+    16                                      %if %0 >= 2
+    17                                          mov ebx, %2
+    18                                          %if %0 >= 3
+    19                                              mov ecx, %3
+    20                                              %if %0 = 4
+    21                                                 mov edx, %4
+    22                                              %endif
+    23                                          %endif
+    24                                      %endif
+    25                                      mov eax, %1
+    26                                      int 40h
+    27                                  %endmacro
+    28                                  
+    29                                  [BITS 32]
+    30                                  [ORG 0] 
+    31                                  
+    32                                  START_CODE:
+    33                                  	; 1. BSS Alanını Sıfırla
+    34 00000000 BF[34040000]            	mov	edi, bss_start
+    35 00000005 B93F000000              	mov	ecx, (bss_end - bss_start)/4
+    36 0000000A 31C0                    	xor	eax, eax
+    37 0000000C F3AB                    	rep	stosd
+    38                                  
+    39                                  	; 2. VESA Mode 105h Aktif Et
+    40                                  	sys	_video, 08FFh, 105h
+    16                              <1>  %if %0 >= 2
+    17 0000000E BBFF080000          <1>  mov ebx, %2
+    18                              <1>  %if %0 >= 3
+    19 00000013 B905010000          <1>  mov ecx, %3
+    20                              <1>  %if %0 = 4
+    21                              <1>  mov edx, %4
+    22                              <1>  %endif
+    23                              <1>  %endif
+    24                              <1>  %endif
+    25 00000018 B81F000000          <1>  mov eax, %1
+    26 0000001D CD40                <1>  int 40h
+    41 0000001F 09C0                    	or	eax, eax
+    42 00000021 0F841B010000            	jz	near terminate_error
+    43                                  
+    44                                  	; 3. Ring 3 Bellek Eşlemesi (Memory Mapping)
+    45                                  	sys	_video, 06FFh
+    16                              <1>  %if %0 >= 2
+    17 00000027 BBFF060000          <1>  mov ebx, %2
+    18                              <1>  %if %0 >= 3
+    19                              <1>  mov ecx, %3
+    20                              <1>  %if %0 = 4
+    21                              <1>  mov edx, %4
+    22                              <1>  %endif
+    23                              <1>  %endif
+    24                              <1>  %endif
+    25 0000002C B81F000000          <1>  mov eax, %1
+    26 00000031 CD40                <1>  int 40h
+    46 00000033 09C0                    	or	eax, eax
+    47 00000035 0F8407010000            	jz	near terminate_error
+    48 0000003B A3[34040000]            	mov	[LFB_ADDR], eax
+    49                                  
+    50                                  	; 4. Ekranı Temizle (Siyah Zemin Yap)
+    51 00000040 8B3D[34040000]          	mov	edi, [LFB_ADDR]
+    52 00000046 B900000300              	mov	ecx, (1024 * 768) / 4
+    53 0000004B 31C0                    	xor	eax, eax
+    54 0000004D F3AB                    	rep	stosd
+    55                                  
+    56                                  	; 5. PS/2 Fare Donanımını Başlat
+    57 0000004F E8F5000000              	call	init_ps2_mouse
+    58                                  
+    59                                  	; Başlangıç Koordinatları
+    60 00000054 C705[38040000]0002-     	mov	dword [mouse_x], 1024 / 2
+    60 0000005C 0000               
+    61 0000005E C705[3C040000]8001-     	mov	dword [mouse_y], 768 / 2
+    61 00000066 0000               
+    62 00000068 C705[40040000]0002-     	mov	dword [prev_mouse_x], 1024 / 2
+    62 00000070 0000               
+    63 00000072 C705[44040000]8001-     	mov	dword [prev_mouse_y], 768 / 2
+    63 0000007A 0000               
+    64                                  
+    65 0000007C E820020000              	call	save_background
+    66 00000081 E88C020000              	call	draw_mouse_arrow
+    67 00000086 C605[4D040000]01        	mov	byte [mouse_drawn], 1
+    68                                  
+    69                                  mouse_loop:
+    70                                  	; === KERNEL SEVİYESİ KLAVYE / FARE ÇAKIŞMA ÇÖZÜMÜ (PORT POLLING) ===
+    71 0000008D 66BA6400                	mov	dx, 0x64
+    72 00000091 B400                    	mov	ah, 0			; read byte
+    73 00000093 CD34                    	int	34h			; AL = Status Register
+    74 00000095 A801                    	test	al, 01h			; Output buffer dolu mu? (Okunacak veri var mı?)
+    75 00000097 74F4                    	jz	short mouse_loop	; Veri yoksa döngüye devam et
+    76                                  
+    77                                  	; Gelen veri fareye mi yoksa klavyeye mi ait?
+    78 00000099 A820                    	test	al, 20h			; Bit 5 = 1 ise Fare (Aux Device), 0 ise Klavye
+    79 0000009B 0F8486000000            	jz	.handle_keyboard_data	; Bit 5 sıfırsa klavye verisidir, el ile işle!
+    80                                  
+    81                                  	; Veri Fareye ait, Port 0x60'tan fare paketini oku
+    82 000000A1 66BA6000                	mov	dx, 0x60
+    83 000000A5 B400                    	mov	ah, 0			; read byte
+    84 000000A7 CD34                    	int	34h
+    85                                  
+    86                                  	; 3 Byte'lık PS/2 Paketini Birleştir
+    87 000000A9 31DB                    	xor	ebx, ebx
+    88 000000AB 8A1D[48040000]          	mov	bl, [packet_count]
+    89 000000B1 8883[49040000]          	mov	[mouse_packet + ebx], al
+    90 000000B7 FE05[48040000]          	inc	byte [packet_count]
+    91 000000BD 803D[48040000]03        	cmp	byte [packet_count], 3
+    92 000000C4 75C7                    	jne	short mouse_loop
+    93                                  
+    94 000000C6 C605[48040000]00        	mov	byte [packet_count], 0	; Sayacı sıfırla
+    95                                  
+    96                                  	; Koordinat Güncelleme
+    97 000000CD E82F010000              	call	update_position
+    98                                  
+    99                                  	; Fare hareket etti mi?
+   100 000000D2 A1[38040000]            	mov	eax, [mouse_x]
+   101 000000D7 8B1D[3C040000]          	mov	ebx, [mouse_y]
+   102 000000DD 3B05[40040000]          	cmp	eax, [prev_mouse_x]
+   103 000000E3 7508                    	jne	short .update_screen
+   104 000000E5 3B1D[44040000]          	cmp	ebx, [prev_mouse_y]
+   105 000000EB 74A0                    	je	short mouse_loop
+   106                                  
+   107                                  .update_screen:
+   108 000000ED 803D[4D040000]01        	cmp	byte [mouse_drawn], 1
+   109 000000F4 7505                    	jne	short .draw_new
+   110 000000F6 E8DA010000              	call	delete_mouse_arrow
+   111                                  
+   112                                  .draw_new:
+   113 000000FB A1[38040000]            	mov	eax, [mouse_x]
+   114 00000100 8B1D[3C040000]          	mov	ebx, [mouse_y]
+   115 00000106 A3[40040000]            	mov	[prev_mouse_x], eax
+   116 0000010B 891D[44040000]          	mov	[prev_mouse_y], ebx
+   117                                  
+   118 00000111 E88B010000              	call	save_background
+   119 00000116 E8F7010000              	call	draw_mouse_arrow
+   120 0000011B C605[4D040000]01        	mov	byte [mouse_drawn], 1
+   121 00000122 E966FFFFFF              	jmp	mouse_loop
+   122                                  
+   123                                  .handle_keyboard_data:
+   124                                  	; Port 0x60'tan klavye scan kodunu oku ve tamponu rahatlat (EOI işlevini taklit eder)
+   125 00000127 66BA6000                	mov	dx, 0x60
+   126 0000012B B400                    	mov	ah, 0			; read byte
+   127 0000012D CD34                    	int	34h			; AL = Scan Code (Klavye Donanım Kodu)
+   128                                  
+   129 0000012F 3C01                    	cmp	al, 0x01		; 0x01 = ESC tuşu basılma (Make Code)
+   130 00000131 7409                    	je	short terminate		; ESC ise doğrudan çıkış yap
+   131                                  
+   132 00000133 3C46                    	cmp	al, 0x46		; 0x46 = Scroll Lock / CTRL+BREAK kontrolü için tarama
+   133 00000135 7405                            je	short terminate
+   134                                  
+   135                                  	; Buraya diğer kritik klavye kombinasyonlarını ekleyebilirsiniz.
+   136                                  
+   137 00000137 E951FFFFFF              	jmp	mouse_loop
+   138                                  
+   139                                  terminate:
+   140 0000013C 30E4                    	xor    ah, ah
+   141 0000013E B003                    	mov    al, 3
+   142 00000140 CD31                    	int    31h
+   143                                  terminate_error:
+   144                                  	sys	_exit
+    16                              <1>  %if %0 >= 2
+    17                              <1>  mov ebx, %2
+    18                              <1>  %if %0 >= 3
+    19                              <1>  mov ecx, %3
+    20                              <1>  %if %0 = 4
+    21                              <1>  mov edx, %4
+    22                              <1>  %endif
+    23                              <1>  %endif
+    24                              <1>  %endif
+    25 00000142 B801000000          <1>  mov eax, %1
+    26 00000147 CD40                <1>  int 40h
+   145                                  
+   146                                  ; ============================================================================
+   147                                  ; FARE BAŞLATMA VE PROTOKOL FONKSİYONLARI (KORUNMUŞTUR)
+   148                                  ; ============================================================================
+   149                                  
+   150                                  init_ps2_mouse:
+   151                                      ; 1. Fare portunu (Auxiliary Device) etkinleştir
+   152 00000149 66BA6400                    mov     dx, 0x64
+   153 0000014D B0A8                        mov     al, 0xA8
+   154 0000014F B401                        mov     ah, 1
+   155 00000151 CD34                        int     34h
+   156                                  
+   157                                      ; 2. 8042 Kontrolcü Konfigürasyon Baytını Oku
+   158 00000153 66BA6400                    mov     dx, 0x64
+   159 00000157 B020                        mov     al, 0x20
+   160 00000159 B401                        mov     ah, 1
+   161 0000015B CD34                        int     34h
+   162 0000015D E884000000                  call    wait_read
+   163                                      
+   164 00000162 66BA6000                    mov     dx, 0x60
+   165 00000166 B400                        mov     ah, 0
+   166 00000168 CD34                        int     34h             ; AL = Mevcut Config Baytı
+   167                                      
+   168                                      ; 3. Klavye IRQ (Bit 0), Fare IRQ (Bit 1) ve Translation (Bit 6) aktif et
+   169 0000016A 0C03                        or      al, 0x03        ; Klavye ve Fare kesmelerini aç
+   170 0000016C 0C40                        or      al, 0x40        ; Scancode translation aktif et (Bit 6)
+   171 0000016E 50                          push    eax
+   172                                  
+   173                                      ; 4. Yeni Konfigürasyon Baytını Geri Yaz
+   174 0000016F 66BA6400                    mov     dx, 0x64
+   175 00000173 B060                        mov     al, 0x60
+   176 00000175 B401                        mov     ah, 1
+   177 00000177 CD34                        int     34h
+   178                                      
+   179 00000179 58                          pop     eax
+   180 0000017A 66BA6000                    mov     dx, 0x60
+   181 0000017E B401                        mov     ah, 1
+   182 00000180 CD34                        int     34h
+   183                                  
+   184                                      ; 5. FAREYE RESET AT (0xFF) - (En Kritik Eksik Adım)
+   185 00000182 E850000000                  call    write_mouse_cmd
+   186 00000187 B0FF                        mov     al, 0xFF        ; Reset Mouse
+   187 00000189 B401                        mov     ah, 1
+   188 0000018B CD34                        int     34h
+   189 0000018D E861000000                  call    wait_ack        ; ACK (0xFA) beklet
+   190 00000192 E84F000000                  call    wait_read       ; Self-Test sonucu (0xAA) ve Device ID okuyup temizle
+   191 00000197 66BA6000                    mov     dx, 0x60
+   192 0000019B B400                        mov     ah, 0
+   193 0000019D CD34                        int     34h
+   194                                      
+   195 0000019F E842000000                  call    wait_read       ; İkinci byte (genellikle Device ID 0x00)
+   196 000001A4 66BA6000                    mov     dx, 0x60
+   197 000001A8 B400                        mov     ah, 0
+   198 000001AA CD34                        int     34h
+   199                                  
+   200                                      ; 6. Varsayılan Ayarları Yükle (Set Defaults - 0xF6)
+   201 000001AC E826000000                  call    write_mouse_cmd
+   202 000001B1 B0F6                        mov     al, 0xF6
+   203 000001B3 B401                        mov     ah, 1
+   204 000001B5 CD34                        int     34h
+   205 000001B7 E837000000                  call    wait_ack
+   206                                  
+   207                                      ; 7. Fare Veri Akışını Başlat (Enable Data Reporting - 0xF4)
+   208 000001BC E816000000                  call    write_mouse_cmd
+   209 000001C1 B0F4                        mov     al, 0xF4
+   210 000001C3 B401                        mov     ah, 1
+   211 000001C5 CD34                        int     34h
+   212 000001C7 E827000000                  call    wait_ack
+   213                                  
+   214                                      ; 8. Klavye Portunu ve Kesmesini Garantiye Al
+   215 000001CC 66BA6400                    mov     dx, 0x64
+   216 000001D0 B0AE                        mov     al, 0xAE        ; Enable Keyboard Port
+   217 000001D2 B401                        mov     ah, 1
+   218 000001D4 CD34                        int     34h
+   219                                  
+   220 000001D6 C3                          retn
+   221                                  
+   222                                  write_mouse_cmd:
+   223 000001D7 66BA6400                    mov     dx, 0x64
+   224 000001DB B0D4                        mov     al, 0xD4        ; Sonraki verinin fareye gideceğini bildir
+   225 000001DD B401                        mov     ah, 1
+   226 000001DF CD34                        int     34h
+   227 000001E1 66BA6000                    mov     dx, 0x60        ; Veri portu
+   228 000001E5 C3                          retn
+   229                                  
+   230                                  wait_read:
+   231 000001E6 66BA6400                    mov     dx, 0x64
+   232 000001EA B400                    .l: mov     ah, 0
+   233 000001EC CD34                        int     34h
+   234 000001EE A801                        test    al, 01h         ; Output buffer dolu mu?
+   235 000001F0 74F8                        jz      short .l
+   236 000001F2 C3                          retn
+   237                                  
+   238                                  wait_ack:
+   239 000001F3 E8EEFFFFFF                  call    wait_read
+   240 000001F8 66BA6000                    mov     dx, 0x60
+   241 000001FC B400                        mov     ah, 0
+   242 000001FE CD34                        int     34h             ; Gelen ACK (0xFA) değerini oku
+   243 00000200 C3                          retn
+   244                                  
+   245                                  update_position:
+   246 00000201 A0[49040000]            	mov	al, [mouse_packet]
+   247 00000206 A840                    	test	al, 0x40
+   248 00000208 0F8592000000            	jnz	.done
+   249 0000020E A880                    	test	al, 0x80
+   250 00000210 0F858A000000            	jnz	.done
+   251                                  
+   252 00000216 0FB61D[4A040000]        	movzx	ebx, byte [mouse_packet + 1]
+   253 0000021D F605[49040000]10        	test	byte [mouse_packet], 0x10
+   254 00000224 7406                    	jz	short .x_pos
+   255 00000226 81CB00FFFFFF            	or	ebx, 0xFFFFFF00
+   256                                  .x_pos:
+   257 0000022C 011D[38040000]          	add	[mouse_x], ebx
+   258                                  
+   259 00000232 0FB61D[4B040000]        	movzx	ebx, byte [mouse_packet + 2]
+   260 00000239 F605[49040000]20        	test	byte [mouse_packet], 0x20
+   261 00000240 7406                    	jz	short .y_pos
+   262 00000242 81CB00FFFFFF            	or	ebx, 0xFFFFFF00
+   263                                  .y_pos:
+   264 00000248 291D[3C040000]          	sub	[mouse_y], ebx
+   265                                  
+   266 0000024E 833D[38040000]00        	cmp	dword [mouse_x], 0
+   267 00000255 7D0A                    	jge	short .c1
+   268 00000257 C705[38040000]0000-     	mov	dword [mouse_x], 0
+   268 0000025F 0000               
+   269 00000261 813D[38040000]F403-     .c1:	cmp	dword [mouse_x], 1012
+   269 00000269 0000               
+   270 0000026B 7E0A                    	jle	short .c2
+   271 0000026D C705[38040000]F403-     	mov	dword [mouse_x], 1012
+   271 00000275 0000               
+   272 00000277 833D[3C040000]00        .c2:	cmp	dword [mouse_y], 0
+   273 0000027E 7D0A                    	jge	short .c3
+   274 00000280 C705[3C040000]0000-     	mov	dword [mouse_y], 0
+   274 00000288 0000               
+   275 0000028A 813D[3C040000]ED02-     .c3:	cmp	dword [mouse_y], 749
+   275 00000292 0000               
+   276 00000294 7E0A                    	jle	short .done
+   277 00000296 C705[3C040000]ED02-     	mov	dword [mouse_y], 749
+   277 0000029E 0000               
+   278                                  .done:
+   279 000002A0 C3                      	retn
+   280                                  
+   281                                  save_background:
+   282 000002A1 8B35[34040000]          	mov	esi, [LFB_ADDR]
+   283 000002A7 BF[4E040000]            	mov	edi, back_buffer
+   284 000002AC 31C9                    	xor	ecx, ecx
+   285                                  .y_loop:
+   286 000002AE 51                      	push	ecx
+   287 000002AF A1[44040000]            	mov	eax, [prev_mouse_y]
+   288 000002B4 01C8                    	add	eax, ecx
+   289 000002B6 C1E00A                  	shl	eax, 10
+   290 000002B9 0305[40040000]          	add	eax, [prev_mouse_x]
+   291 000002BF 8D1406                  	lea	edx, [esi + eax]
+   292 000002C2 56                      	push	esi
+   293 000002C3 89D6                    	mov	esi, edx
+   294 000002C5 B90C000000              	mov	ecx, 12
+   295 000002CA F3A4                    	rep	movsb
+   296 000002CC 5E                      	pop	esi
+   297 000002CD 59                      	pop	ecx
+   298 000002CE 41                      	inc	ecx
+   299 000002CF 83F913                  	cmp	ecx, 19
+   300 000002D2 75DA                    	jne	short .y_loop
+   301 000002D4 C3                      	retn
+   302                                  
+   303                                  delete_mouse_arrow:
+   304 000002D5 8B3D[34040000]          	mov	edi, [LFB_ADDR]
+   305 000002DB BE[4E040000]            	mov	esi, back_buffer
+   306 000002E0 31C9                    	xor	ecx, ecx
+   307                                  .y_loop:
+   308 000002E2 51                      	push	ecx
+   309 000002E3 A1[44040000]            	mov	eax, [prev_mouse_y]
+   310 000002E8 01C8                    	add	eax, ecx
+   311 000002EA C1E00A                  	shl	eax, 10
+   312 000002ED 0305[40040000]          	add	eax, [prev_mouse_x]
+   313 000002F3 8D3C07                  	lea	edi, [edi + eax]
+   314 000002F6 B90C000000              	mov	ecx, 12
+   315 000002FB F3A4                    	rep	movsb
+   316 000002FD 8B3D[34040000]          	mov	edi, [LFB_ADDR]
+   317 00000303 59                      	pop	ecx
+   318 00000304 41                      	inc	ecx
+   319 00000305 83F913                  	cmp	ecx, 19
+   320 00000308 75D8                    	jne	short .y_loop
+   321 0000030A C605[4D040000]00        	mov	byte [mouse_drawn], 0
+   322 00000311 C3                      	retn
+   323                                  
+   324                                  draw_mouse_arrow:
+   325 00000312 8B3D[34040000]          	mov	edi, [LFB_ADDR]
+   326 00000318 BE[50030000]            	mov	esi, mouse_arrow
+   327 0000031D 31C9                    	xor	ecx, ecx
+   328                                  .y_loop:
+   329 0000031F 51                      	push	ecx
+   330 00000320 A1[44040000]            	mov	eax, [prev_mouse_y]
+   331 00000325 01C8                    	add	eax, ecx
+   332 00000327 C1E00A                  	shl	eax, 10
+   333 0000032A 0305[40040000]          	add	eax, [prev_mouse_x]
+   334 00000330 8D3C07                  	lea	edi, [edi + eax]
+   335 00000333 B90C000000              	mov	ecx, 12
+   336                                  .x_loop:
+   337 00000338 AC                      	lodsb
+   338 00000339 3CEE                    	cmp	al, 0xEE
+   339 0000033B 7402                    	je	short .transparent
+   340 0000033D 8807                    	mov	[edi], al
+   341                                  .transparent:
+   342 0000033F 47                      	inc	edi
+   343 00000340 E2F6                    	loop	short .x_loop
+   344 00000342 8B3D[34040000]          	mov	edi, [LFB_ADDR]
+   345 00000348 59                      	pop	ecx
+   346 00000349 41                      	inc	ecx
+   347 0000034A 83F913                  	cmp	ecx, 19
+   348 0000034D 75D0                    	jne	short .y_loop
+   349 0000034F C3                      	retn
+   350                                  
+   351                                  ; ============================================================================
+   352                                  ; SPRITE VE BSS ALANI
+   353                                  ; ============================================================================
+   354                                  _W equ 15
+   355                                  _B equ 0
+   356                                  __ equ 0xEE
+   357                                  
+   358                                  mouse_arrow:
+   359 00000350 0000EEEEEEEEEEEEEE-     	db _B, _B, __, __, __, __, __, __, __, __, __, __
+   359 00000359 EEEEEE             
+   360 0000035C 000F00EEEEEEEEEEEE-     	db _B, _W, _B, __, __, __, __, __, __, __, __, __
+   360 00000365 EEEEEE             
+   361 00000368 000F0F00EEEEEEEEEE-     	db _B, _W, _W, _B, __, __, __, __, __, __, __, __
+   361 00000371 EEEEEE             
+   362 00000374 000F0F0F00EEEEEEEE-     	db _B, _W, _W, _W, _B, __, __, __, __, __, __, __
+   362 0000037D EEEEEE             
+   363 00000380 000F0F0F0F00EEEEEE-     	db _B, _W, _W, _W, _W, _B, __, __, __, __, __, __
+   363 00000389 EEEEEE             
+   364 0000038C 000F0F0F0F0F00EEEE-     	db _B, _W, _W, _W, _W, _W, _B, __, __, __, __, __
+   364 00000395 EEEEEE             
+   365 00000398 000F0F0F0F0F0F00EE-     	db _B, _W, _W, _W, _W, _W, _W, _B, __, __, __, __
+   365 000003A1 EEEEEE             
+   366 000003A4 000F0F0F0F0F0F0F00-     	db _B, _W, _W, _W, _W, _W, _W, _W, _B, __, __, __
+   366 000003AD EEEEEE             
+   367 000003B0 000F0F0F0F0F0F0F0F-     	db _B, _W, _W, _W, _W, _W, _W, _W, _W, _B, __, __
+   367 000003B9 00EEEE             
+   368 000003BC 000F0F0F0F0F0F0F0F-     	db _B, _W, _W, _W, _W, _W, _W, _W, _W, _W, _B, __
+   368 000003C5 0F00EE             
+   369 000003C8 000F0F0F0F0F0F0000-     	db _B, _W, _W, _W, _W, _W, _W, _B, _B, _B, _B, _B
+   369 000003D1 000000             
+   370 000003D4 000F0F000F0F0F00EE-     	db _B, _W, _W, _B, _W, _W, _W, _B, __, __, __, __
+   370 000003DD EEEEEE             
+   371 000003E0 000F00000F0F0F00EE-     	db _B, _W, _B, _B, _W, _W, _W, _B, __, __, __, __
+   371 000003E9 EEEEEE             
+   372 000003EC 0000EE00000F0F0F00-     	db _B, _B, __, _B, _B, _W, _W, _W, _B, __, __, __
+   372 000003F5 EEEEEE             
+   373 000003F8 EEEEEEEE000F0F0F00-     	db __, __, __, __, _B, _W, _W, _W, _B, __, __, __
+   373 00000401 EEEEEE             
+   374 00000404 EEEEEEEE000F0F0F0F-     	db __, __, __, __, _B, _W, _W, _W, _W, _B, __, __
+   374 0000040D 00EEEE             
+   375 00000410 EEEEEEEEEE000F0F00-     	db __, __, __, __, __, _B, _W, _W, _B, __, __, __
+   375 00000419 EEEEEE             
+   376 0000041C EEEEEEEEEE000F00EE-     	db __, __, __, __, __, _B, _W, _B, __, __, __, __
+   376 00000425 EEEEEE             
+   377 00000428 EEEEEEEEEE0000EEEE-     	db __, __, __, __, __, _B, _B, __, __, __, __, __
+   377 00000431 EEEEEE             
+   378                                  
+   379                                  bss:
+   380                                  ABSOLUTE bss
+   381                                  alignb 4
+   382                                  bss_start:
+   383 00000434 ????????                LFB_ADDR:		resd 1
+   384 00000438 ????????                mouse_x:		resd 1
+   385 0000043C ????????                mouse_y:		resd 1
+   386 00000440 ????????                prev_mouse_x:		resd 1
+   387 00000444 ????????                prev_mouse_y:		resd 1
+   388 00000448 ??                      packet_count:		resb 1
+   389 00000449 ????????                mouse_packet:		resb 4
+   390 0000044D ??                      mouse_drawn:		resb 1
+   391 0000044E <res E4h>               back_buffer:		resb (12 * 19)
+   392                                  bss_end:
+   393                                  
