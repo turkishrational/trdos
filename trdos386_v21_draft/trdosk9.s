@@ -34,7 +34,7 @@ Magic_Bytes:
 		db 1
 mainprog_Version:
 		db 7
-		db "[TRDOS] Main Program v2.1.0 (04/10/2026)"
+		db "[TRDOS] Main Program v2.1.0 (05/10/2026)"
 		db 0Dh, 0Ah
 		db "(c) Erdogan Tan 2005-2026"
 		db 0Dh, 0Ah, 0
