@@ -1,0 +1,658 @@
+     1                                  ;BEEF MOUSE (THE COW OF MOUSE DRIVERS)
+     2                                  ;PS/2 MOUSE DRIVER FOR ANY OS
+     3                                  ;Tested in FreeDOS
+     4                                  ;converted to FASM by Shawn T. Cook (Bugs fixed!)
+     5                                  ;Version 3.0
+     6                                  ;runs smoother now.
+     7                                  
+     8                                  ; ****************************************************************************
+     9                                  ; ps2mouse.asm (32 bit version by Erdogan Tan) for TRDOS 386 
+    10                                  ; ----------------------------------------------------------------------------
+    11                                  ; Assembling: nasm ps2mouse.asm -l ps2mouse.txt -o PS2MOUSE.PRG
+    12                                  ; ****************************************************************************
+    13                                  ; 10/10/2026
+    14                                  
+    15                                  [BITS 32]
+    16                                  [ORG 0] 
+    17                                  
+    18                                  ;mov ah, 0        ; set video mode to 13h
+    19                                  ;mov al, 13h
+    20 00000000 B813000000              mov eax, 13h
+    21                                  ;int 10h
+    22 00000005 CD31                    int 31h
+    23                                  
+    24                                  ;I will use the NASM syntax!! CONVERTED TO FASM!
+    25                                  ;I made this code for a Logitech M-S48a mouse. (normal PS/2 Code)
+    26                                  ;For some reason the keyboard wil stall after program is terminated :S
+    27                                  
+    28                                  ;If you have problems understandig this code take a look at my mouseprog for the COM-mouse
+    29                                  
+    30                                  ;(Piece of disclaimer)
+    31                                  ;(I do NOT give any guarantee or what so ever on this piece of code.)
+    32                                  ;(I am not responsible for any damage whatsoever                    )
+    33                                  ;(By using this code u accept the two lines above                   )
+    34                                  ;(USAGE IS AT YOUR OWN RISK                                         )
+    35                                  
+    36 00000007 E932010000              JMP MAINP
+    37                                  
+    38                                  ;***********************************************************************
+    39                                  ;Activate mouse port (PS/2)
+    40                                  ;***********************************************************************
+    41                                  PS2SET:
+    42 0000000C B0A8                      mov al, 0xa8    ; enable mouse port
+    43                                    ;out 0x64, al   ; write to keyboard controller
+    44 0000000E 66BA6400                  mov dx, 0x64
+    45 00000012 B401                      mov ah, 1       ; write port (byte)
+    46 00000014 CD34                      int 0x34        ; TRDOS 386 IOCTL interrupt
+    47 00000016 E801000000                call CHKPRT     ; check if command is progressed (demand!)
+    48 0000001B C3                      ret
+    49                                  
+    50                                  ;***********************************************************************
+    51                                  ;Check if command is accepted. (not got stuck in inputbuffer)
+    52                                  ;***********************************************************************
+    53                                  CHKPRT:
+    54                                    ;mov ecx, 65536
+    55 0000001C 31C9                      xor ecx, ecx 
+    56                                  again:
+    57                                    ;in al, 0x64    ; read from keyboard controller
+    58 0000001E 66BA6400                  mov dx, 0x64
+    59 00000022 B400                      mov ah, 0       ; read port (byte)
+    60 00000024 CD34                      int 0x34	  ; TRDOS 386 IOCTL interrupt
+    61 00000026 A802                      test al, 2      ; Check if input buffer is empty
+    62 00000028 7402                      jz gogo
+    63                                    ;jmp again      ; (demand!) This may couse hanging, use only when sure.
+    64 0000002A E2F2                      loop again
+    65                                  gogo:
+    66 0000002C C3                        ret
+    67                                  
+    68                                  ;***********************************************************************
+    69                                  ;Write to mouse
+    70                                  ;***********************************************************************
+    71                                  WMOUS:
+    72 0000002D B0D4                      mov al, 0xd4    ; write to mouse device instead of to keyboard
+    73                                    ;out 0x64, al   ; write to keyboard controller
+    74 0000002F 66BA6400                  mov dx, 0x64
+    75 00000033 B401                      mov ah, 1       ; write port (byte)
+    76 00000035 CD34                      int 0x34	  ; TRDOS 386 IOCTL interrupt
+    77 00000037 E8E0FFFFFF                call CHKPRT     ; check if command is progressed (demand!)
+    78 0000003C C3                      ret
+    79                                  
+    80                                  ;***********************************************************************
+    81                                  ;mouse output buffer full
+    82                                  ;***********************************************************************
+    83                                  MBUFFUL:
+    84                                    ;mov ecx, 65536
+    85 0000003D 31C9                      xor ecx, ecx 
+    86                                  mn:
+    87                                    ;in al, 0x64    ; read from keyboard controller
+    88 0000003F 66BA6400                  mov dx, 0x64
+    89 00000043 B400                      mov ah, 0       ; read port (byte)
+    90 00000045 CD34                      int 0x34
+    91 00000047 A820                      test al, 0x20   ; check if mouse output buffer is full
+    92 00000049 7402                      jz mnn
+    93 0000004B E2F2                      loop mn
+    94                                  mnn:
+    95 0000004D C3                        ret
+    96                                  
+    97                                  ;***********************************************************************
+    98                                  ;Write activate Mouse HardWare
+    99                                  ;***********************************************************************
+   100                                  ACTMOUS:
+   101 0000004E E8DAFFFFFF                call WMOUS
+   102 00000053 B0F4                      mov al, 0xf4    ; Command to activate mouse itself (Stream mode)
+   103                                    ;out 0x60, al   ; write ps/2 controller output port (activate mouse)
+   104 00000055 66BA6000                  mov dx, 0x60
+   105 00000059 B401                      mov ah, 1       ; write port (byte)
+   106 0000005B CD34                      int 0x34
+   107 0000005D E8BAFFFFFF                call CHKPRT     ; check if command is progressed (demand!)
+   108 00000062 E801000000                call CHKMOUS    ; check if a byte is available
+   109 00000067 C3                      ret
+   110                                  
+   111                                  ;***********************************************************************
+   112                                  ;Check if mouse has info for us
+   113                                  ;***********************************************************************
+   114                                  CHKMOUS:
+   115 00000068 B300                      mov bl, 0
+   116                                    ;mov ecx, 65536
+   117 0000006A 31C9                      xor  ecx, ecx
+   118                                  vrd:
+   119                                    ;in al, 0x64    ; read from keyboard controller
+   120 0000006C 66BA6400                  mov dx, 0x64
+   121 00000070 B400                      mov ah, 0       ; read port (byte)
+   122 00000072 CD34                      int 0x34
+   123 00000074 A801                      test al, 1      ; check if controller buffer (60h) has data
+   124 00000076 7504                      jnz yy
+   125 00000078 E2F2                      loop vrd
+   126 0000007A B301                      mov bl, 1
+   127                                  yy:
+   128 0000007C C3                        ret
+   129                                  
+   130                                  ;***********************************************************************
+   131                                  ;Disable Keyboard
+   132                                  ;***********************************************************************
+   133                                  DKEYB:
+   134 0000007D B0AD                      mov al, 0xad    ; Disable Keyboard
+   135                                    ;out 0x64, al   ; write to keyboard controller
+   136 0000007F 66BA6400                  mov dx, 0x64
+   137 00000083 B401                      mov ah, 1       ; write port (byte)
+   138 00000085 CD34                      int 0x34
+   139 00000087 E890FFFFFF                call CHKPRT     ; check if command is progressed (demand!)
+   140 0000008C C3                      ret
+   141                                  
+   142                                  ;***********************************************************************
+   143                                  ;Enable Keyboard
+   144                                  ;***********************************************************************
+   145                                  EKEYB:
+   146 0000008D B0AE                      mov al, 0xae    ; Enable Keyboard
+   147                                    ;out 0x64, al   ; write to keyboard controller
+   148 0000008F 66BA6400                  mov dx, 0x64
+   149 00000093 B401                      mov ah, 1       ; write port (byte)
+   150 00000095 CD34                      int 0x34
+   151 00000097 E880FFFFFF                call CHKPRT     ; check if command is progressed (demand!)
+   152 0000009C C3                      ret
+   153                                  
+   154                                  ;***********************************************************************
+   155                                  ;Get Mouse Byte
+   156                                  ;***********************************************************************
+   157                                  GETB:
+   158                                  cagain:
+   159 0000009D E8C6FFFFFF                call CHKMOUS    ; check if a byte is available
+   160 000000A2 08DB                      or bl, bl
+   161 000000A4 75F7                      jnz cagain
+   162 000000A6 E8D2FFFFFF                call DKEYB      ; disable keyboard to read mouse byte
+   163                                    ;xor eax, eax
+   164                                    ;in al, 0x60    ; read ps/2 controller output port (mouse byte)
+   165 000000AB 66BA6000                  mov dx, 0x60
+   166 000000AF B400                      mov ah, 0       ; read port (byte)
+   167 000000B1 CD34                      int 0x34
+   168 000000B3 50                        push eax
+   169 000000B4 E8D4FFFFFF                call EKEYB      ; enable keyboard
+   170 000000B9 58                        pop eax
+   171 000000BA C3                      ret
+   172                                  
+   173                                  ;***********************************************************************
+   174                                  ;Get 3 Mouse Bytes (PS/2 packet)
+   175                                  ;***********************************************************************
+   176                                  
+   177                                  GETB3:
+   178                                  c_again:
+   179 000000BB E8A8FFFFFF                call CHKMOUS    ; check if a byte is available
+   180 000000C0 08DB                      or bl, bl
+   181 000000C2 75F7                      jnz c_again
+   182 000000C4 E8B4FFFFFF                call DKEYB      ; disable keyboard to read mouse byte
+   183                                  getfirstbyte:
+   184                                    ;xor eax, eax
+   185                                    ;in al, 0x60    ; read ps/2 controller output port (mouse byte)
+   186 000000C9 66BA6000                  mov dx, 0x60
+   187 000000CD B400                      mov ah, 0       ; read port (byte)
+   188 000000CF CD34                      int 0x34
+   189 000000D1 88C3                      mov bl, al
+   190 000000D3 80E301                    and bl, 1
+   191 000000D6 881D[2C030000]            mov [LBUTTON], bl
+   192 000000DC 88C3                      mov bl, al
+   193 000000DE 80E302                    and bl, 2
+   194 000000E1 881D[2D030000]            mov [RBUTTON], bl
+   195 000000E7 88C3                      mov bl, al
+   196 000000E9 80E304                    and bl, 4
+   197 000000EC 881D[2E030000]            mov [MBUTTON], bl
+   198 000000F2 88C3                      mov bl, al
+   199 000000F4 80E308                    and bl, 8
+   200 000000F7 881D[31030000]            mov [XCOORDN], bl
+   201 000000FD 88C3                      mov bl, al
+   202 000000FF 80E310                    and bl, 16
+   203 00000102 881D[32030000]            mov [YCOORDN], bl
+   204 00000108 88C3                      mov bl, al
+   205 0000010A 80E320                    and bl, 32
+   206 0000010D 881D[33030000]            mov [XFLOW], bl
+   207 00000113 88C3                      mov bl, al
+   208 00000115 80E340                    and bl, 64
+   209 00000118 881D[34030000]            mov [YFLOW], bl
+   210                                  getsecondbyte:
+   211                                    ;xor eax, eax
+   212                                    ;in al, 0x60    ; read ps/2 controller output port (mouse byte)
+   213 0000011E 66BA6000                  mov dx, 0x60
+   214 00000122 B400                      mov ah, 0       ; read port (byte)
+   215 00000124 CD34                      int 0x34
+   216 00000126 A2[2F030000]              mov [XCOORD], al
+   217                                  getthirdbyte:
+   218                                    ;xor eax, eax
+   219                                    ;in al, 0x60    ; read ps/2 controller output port (mouse byte)
+   220 0000012B 66BA6000                  mov dx, 0x60
+   221 0000012F B400                      mov ah, 0       ; read port (byte)
+   222 00000131 CD34                      int 0x34
+   223 00000133 A2[30030000]              mov [YCOORD], al
+   224 00000138 E850FFFFFF                call EKEYB      ; enable keyboard
+   225 0000013D C3                        ret
+   226                                  
+   227                                  
+   228                                  ;***********************************************************************
+   229                                  ;Get 1ST Mouse Byte
+   230                                  ;***********************************************************************
+   231                                  ; GETFIRST:
+   232                                  ;  call GETB       ; Get byte1 of packet
+   233                                  ;  ;xor ah, ah
+   234                                  ;  mov bl, al
+   235                                  ;  and bl, 1
+   236                                  ;  mov [LBUTTON], bl
+   237                                  ;  mov bl, al
+   238                                  ;  and bl, 2
+   239                                  ;  mov [RBUTTON], bl
+   240                                  ;  mov bl, al
+   241                                  ;  and bl, 4
+   242                                  ;  mov [MBUTTON], bl
+   243                                  ;  mov bl, al
+   244                                  ;  and bl, 8
+   245                                  ;  mov [XCOORDN], bl
+   246                                  ;  mov bl, al
+   247                                  ;  and bl, 16
+   248                                  ;  mov [YCOORDN], bl
+   249                                  ;  mov bl, al
+   250                                  ;  and bl, 32
+   251                                  ;  mov [XFLOW], bl
+   252                                  ;  mov bl, al
+   253                                  ;  and bl, 64
+   254                                  ;  mov [YFLOW], bl
+   255                                  ; ret
+   256                                  
+   257                                  ;***********************************************************************
+   258                                  ;Get 2ND Mouse Byte
+   259                                  ;***********************************************************************
+   260                                  ; GETSECOND:
+   261                                  ;  call GETB       ; Get byte2 of packet
+   262                                  ;  ;xor ah, ah
+   263                                  ;  mov [XCOORD], al
+   264                                  ; ret
+   265                                  
+   266                                  ;***********************************************************************
+   267                                  ;Get 3RD Mouse Byte
+   268                                  ;***********************************************************************
+   269                                  ; GETTHIRD:
+   270                                  ;  call GETB       ; Get byte3 of packet
+   271                                  ;  ;xor ah, ah
+   272                                  ;  mov [YCOORD], al
+   273                                  ; ret
+   274                                  
+   275                                  ;-----------------------------------------------------------------------
+   276                                  ;***********************************************************************
+   277                                  ;* MAIN PROGRAM
+   278                                  ;***********************************************************************
+   279                                  ;-----------------------------------------------------------------------
+   280                                  
+   281                                  MAINP:
+   282                                  
+   283 0000013E 31C0                      xor eax, eax
+   284                                  checkit:
+   285                                    ; check keyboard buffer 
+   286 00000140 B411                      mov ah, 11h
+   287 00000142 CD32                      int 32h
+   288 00000144 7406                      jz doit
+   289                                    ; read key
+   290 00000146 B410                      mov ah, 10h
+   291 00000148 CD32                      int 32h
+   292 0000014A EBF4                      jmp checkit
+   293                                  doit:
+   294                                  
+   295 0000014C E8BBFEFFFF                call PS2SET
+   296 00000151 E8F8FEFFFF                call ACTMOUS
+   297 00000156 E842FFFFFF                call GETB    ; Get the responce byte of the mouse (like: Hey i am active)
+   298                                                 ; If the bytes are mixed up, remove this line or add another of this line.
+   299                                  main:
+   300                                    ;call GETFIRST
+   301                                    ;call GETSECOND
+   302                                    ;call GETTHIRD
+   303 0000015B E85BFFFFFF                call GETB3
+   304                                     
+   305                                  ;*NOW WE HAVE XCOORD & YCOORD* + the button status of L-butten and R-button 
+   306                                  ; and M-button allsow overflow + sign bits
+   307                                  
+   308                                  ;!!!
+   309                                  ;! The Sign bit of X tells if the XCOORD is Negative or positive. (if 1 this means -256)
+   310                                  ;! The XCOORD is allways positive
+   311                                  ;!!!
+   312                                  
+   313                                  ;???
+   314                                  ;? Like if:    X-Signbit = 1     Signbit
+   315                                  ;?                |
+   316                                  ;?             XCOORD = 11111110 ---> -256 + 254 = -2  (the mouse cursor goes left)
+   317                                  ;?                      \      /
+   318                                  ;?                       \    /
+   319                                  ;?                        \Positive
+   320                                  ;???
+   321                                  
+   322                                  ;?? FOR MORE INFORMATION ON THE PS/2 PROTOCOL SEE BELOW!!!!
+   323                                  
+   324                                  ;!!!!!!!!!!!!!
+   325                                  ;the rest of the source... (like move cursor) (i leave this up to you m8!)
+   326                                  ;!!!!!!!!!!!!!
+   327                                  
+   328                                  ;*************************************************************
+   329                                  ;Allright, Allright i'll give an example!  |EXAMPLE CODE|
+   330                                  ;*************************************************************
+   331                                  ;=============================
+   332                                  ;**Mark a position on scr**
+   333                                  ;=============================
+   334                                   
+   335 00000160 31C9                       xor ecx, ecx
+   336 00000162 31D2                       xor edx, edx
+   337                                     
+   338 00000164 8A0D[2F030000]             mov cl, [XCOORD]
+   339 0000016A 8A15[30030000]             mov dl, [YCOORD]
+   340                                     
+   341 00000170 80F900                     cmp cl, 0
+   342 00000173 7415                       je NoxChange
+   343 00000175 80F900                     cmp cl, 0
+   344 00000178 7F09                       jg Subx
+   345                                     ;sub word [xpos], 1
+   346 0000017A 66FF0D[AA030000]           dec word [xpos]
+   347 00000181 EB07                       jmp NoxChange
+   348                                  
+   349                                  Subx:
+   350                                     ;add word [xpos], 1
+   351 00000183 66FF05[AA030000]           inc word [xpos]
+   352                                  
+   353                                  NoxChange:
+   354 0000018A 80FA00                     cmp dl, 0
+   355 0000018D 7415                       je NoyChange
+   356 0000018F 80FA00                     cmp dl, 0
+   357 00000192 7F09                       jg Addy
+   358                                     ;add word [ypos], 1
+   359 00000194 66FF05[AC030000]           inc word [ypos]
+   360 0000019B EB07                       jmp NoyChange
+   361                                  Addy:
+   362                                     ;sub word [ypos], 1
+   363 0000019D 66FF0D[AC030000]           dec word [ypos]
+   364                                  
+   365                                  NoyChange:
+   366 000001A4 668B0D[AA030000]           mov cx, [xpos]
+   367 000001AB 668B15[AC030000]           mov dx, [ypos]
+   368                                  
+   369                                     ;mov ah, 0Ch
+   370                                     ;mov al, 0Fh
+   371 000001B2 B80F0C0000                 mov eax, 0C0Fh
+   372                                     ;int 10h 
+   373 000001B7 CD31                       int 31h
+   374                                   
+   375 000001B9 C605[A7030000]0F         mov byte [row], 15
+   376 000001C0 C605[A8030000]00         mov byte [col], 0
+   377                                  
+   378                                  ;=============================
+   379                                  ;**go to start position**
+   380                                  ;=============================
+   381 000001C7 E84D010000               call GOTOXY
+   382                                  
+   383                                  ;=============================
+   384                                  ;**Lets display the X coord**
+   385                                  ;=============================
+   386 000001CC BE[71030000]             mov esi, strcdx ; display the text for Xcoord
+   387 000001D1 E833010000               call disp
+   388 000001D6 30E4                     xor ah, ah
+   389 000001D8 A0[2F030000]             mov al, [XCOORD]
+   390 000001DD E8C3000000               call DISPDEC
+   391 000001E2 BE[A0030000]             mov esi, stretr ; goto nextline on scr
+   392 000001E7 E81D010000               call disp
+   393                                  
+   394                                  ;=============================
+   395                                  ;**Lets display the Y coord**
+   396                                  ;=============================
+   397 000001EC BE[83030000]             mov esi, strcdy ; display the text for Ycoord
+   398 000001F1 E813010000               call disp
+   399 000001F6 30E4                     xor ah, ah
+   400 000001F8 A0[30030000]             mov al, [YCOORD]
+   401 000001FD E8A3000000               call DISPDEC
+   402 00000202 BE[A0030000]             mov esi, stretr ; goto nextline on scr
+   403 00000207 E8FD000000               call disp
+   404                                  
+   405                                  ;=============================
+   406                                  ;**Lets display the L button**
+   407                                  ;=============================
+   408 0000020C BE[41030000]             mov  esi, strlbt ; display the text for Lbutton
+   409 00000211 E8F3000000               call disp
+   410 00000216 A0[2C030000]             mov al, [LBUTTON]
+   411 0000021B 30E4                     xor ah, ah
+   412 0000021D E883000000               call DISPDEC
+   413 00000222 BE[A0030000]             mov esi, stretr ; goto nextline on scr
+   414 00000227 E8DD000000               call disp
+   415                                  
+   416                                  ;=============================
+   417                                  ;**Lets display the R button**
+   418                                  ;=============================
+   419 0000022C BE[51030000]             mov esi, strrbt ; display the text for Rbutton
+   420 00000231 E8D3000000               call disp
+   421 00000236 A0[2D030000]             mov al, [RBUTTON]
+   422 0000023B 30E4                     xor ah, ah
+   423 0000023D E863000000               call DISPDEC
+   424 00000242 BE[A0030000]             mov esi, stretr ; goto nextline on scr
+   425 00000247 E8BD000000               call disp
+   426                                   
+   427                                  ;=============================
+   428                                  ;**Lets display the M button**
+   429                                  ;=============================
+   430 0000024C BE[61030000]             mov esi, strmbt ; display the text for Mbutton
+   431 00000251 E8B3000000               call disp
+   432 00000256 A0[2E030000]             mov al, [MBUTTON]
+   433 0000025B 30E4                     xor ah, ah
+   434 0000025D E843000000               call DISPDEC
+   435 00000262 BE[A0030000]             mov esi, stretr ; goto nextline on scr
+   436 00000267 E89D000000               call disp
+   437                                   
+   438                                  ;=============================
+   439                                  ;**Lets display sign of y
+   440                                  ;=============================
+   441 0000026C BE[95030000]             mov esi, signy  ; display the text for Mbutton
+   442 00000271 E893000000               call disp
+   443 00000276 A0[32030000]             mov al, [YCOORDN]
+   444 0000027B 30E4                     xor ah, ah
+   445 0000027D E823000000               call DISPDEC
+   446 00000282 BE[A0030000]             mov esi, stretr ; goto nextline on scr
+   447 00000287 E87D000000               call disp
+   448                                  
+   449                                  ;=============================
+   450                                  ;**stop program on keypress** 
+   451                                  ;=============================
+   452                                  
+   453                                  ; Note: sometimes it takes a while for the program stops, or keyboard stalls
+   454                                  ;       due to more time is spend looking at the PS/2 mouse port (keyb disabled)
+   455                                  
+   456                                      ;xor eax, eax
+   457 0000028C B411                        mov ah, 11h
+   458 0000028E CD32                        int 32h
+   459 00000290 7505                        jnz quitprog
+   460                                  
+   461                                  ;*************************************************************
+   462 00000292 E9C4FEFFFF               jmp main
+   463                                   
+   464                                  quitprog:
+   465                                   ;mov ah, 0     ; set video mode to 03h
+   466                                   ;mov al, 03h
+   467 00000297 B803000000               mov eax, 03h 
+   468 0000029C CD31                     int 31h
+   469                                  
+   470 0000029E B801000000               mov eax, 1    ; Return to OS
+   471 000002A3 CD40                     int 40h       ; (sys _exit)	
+   472                                       
+   473                                  ;-----------------------------------------------------------------------
+   474                                  ;***********************************************************************
+   475                                  ;* END OF MAIN PROGRAM
+   476                                  ;***********************************************************************
+   477                                  ;-----------------------------------------------------------------------
+   478                                  
+   479                                  ;XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+   480                                  ;X Dont Worry about this displaypart, its yust ripped of my os.
+   481                                  ;X (I know it could be done nicer but this works Razz)
+   482                                  ;XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+   483                                  ;XXX
+   484                                  ;************************************************
+   485                                  ;* Displays AX in a decimal way 
+   486                                  ;************************************************
+   487                                  DISPDEC:
+   488 000002A5 C605[40030000]00            mov byte [zerow], 0
+   489 000002AC A3[3C030000]                mov [varbuff], eax
+   490                                      ;xor eax, eax
+   491                                      ;xor ecx, ecx
+   492                                      ;xor edx, edx
+   493                                      ;mov ebx, 10000
+   494                                      ;mov [deel], ebx
+   495 000002B1 C705[38030000]1027-         mov	dword [deel], 10000
+   495 000002B9 0000               
+   496                                  mainl:
+   497 000002BB 8B1D[38030000]              mov ebx, [deel]
+   498 000002C1 A1[3C030000]                mov eax, [varbuff]
+   499 000002C6 31D2                        xor edx, edx
+   500                                      ;xor ecx, ecx
+   501 000002C8 F7F3                        div ebx
+   502 000002CA 8915[3C030000]              mov [varbuff], edx
+   503 000002D0 EB09                        jmp ydisp
+   504                                  
+   505                                  vdisp:
+   506 000002D2 803D[40030000]00            cmp byte [zerow], 0
+   507 000002D9 7413                        je nodisp
+   508                                  
+   509                                  ydisp:
+   510 000002DB B40E                        mov ah, 0Eh     ; BIOS teletype
+   511 000002DD 0430                        add al, 48      ; lets make it a 0123456789 Very Happy
+   512 000002DF 66BB0100                    mov bx, 1       
+   513                                      ;int 10h        ; invoke BIOS
+   514 000002E3 CD31                        int 31h	    ; TRDOS 386 video bios interrupt	
+   515                                  
+   516 000002E5 C605[40030000]01            mov byte [zerow], 1
+   517 000002EC EB00                        jmp yydis
+   518                                  
+   519                                  nodisp:
+   520                                  
+   521                                  yydis:
+   522 000002EE 31D2                        xor edx, edx
+   523                                      ;xor ecx, ecx
+   524                                      ;xor ebx, ebx
+   525 000002F0 A1[38030000]                mov eax, [deel]
+   526                                      ;cmp eax, 1
+   527                                      ;je bver
+   528                                      ;cmp eax, 0
+   529                                      ;je bver
+   530 000002F5 83F801                      cmp	eax, 1
+   531 000002F8 760E                        jna	short bver	
+   532 000002FA BB0A000000                  mov ebx, 10
+   533 000002FF F7F3                        div ebx
+   534 00000301 A3[38030000]                mov [deel], eax
+   535 00000306 EBB3                        jmp mainl
+   536                                  
+   537                                  bver:
+   538 00000308 C3                         ret
+   539                                  
+   540                                  ;***************END of PROCEDURE*********************************
+   541                                  ;****************************************************************
+   542                                  ;* PROCEDURE disp      
+   543                                  ;* display a string at ds:si via BIOS
+   544                                  ;****************************************************************
+   545                                  disp:
+   546                                  HEAD:
+   547 00000309 AC                          lodsb           ; load next character
+   548 0000030A 3C00                        cmp al, 0       ; test for NUL character
+   549 0000030C 740A                        je DONE         ; if NUL char found then goto done
+   550 0000030E B40E                        mov ah, 0Eh     ; BIOS teletype
+   551 00000310 66BB0100                    mov bx, 1       ; make it a nice fluffy blue (mostly it will be grey but ok..)
+   552                                      ;int 10h        ; invoke BIOS
+   553 00000314 CD31                        int 31h	    ; TRDOS 386 video bios interrupt	
+   554                                  
+   555 00000316 EBF1                        jmp HEAD
+   556                                   
+   557                                  DONE: 
+   558 00000318 C3                         ret
+   559                                  
+   560                                  ;*******************End Procedure ***********************
+   561                                  
+   562                                  ;*****************************
+   563                                  ;*GOTOXY  go back to startpos
+   564                                  ;*****************************
+   565                                  GOTOXY:
+   566 00000319 B402                        mov ah, 2
+   567 0000031B B700                        mov bh, 0       ; 0:graphic mode 0-3: in modes 2&3 0-7: in modes 0&1
+   568 0000031D 8A15[A8030000]              mov dl, [col]
+   569 00000323 8A35[A7030000]              mov dh, [row]
+   570                                      ;int 10h
+   571 00000329 CD31                        int 31h	    ; TRDOS 386 video bios interrupt	
+   572 0000032B C3                      ret
+   573                                  
+   574                                  ;*******END********
+   575                                  ;
+   576                                  ;XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+   577                                  ;XXX
+   578                                  ;XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+   579                                  
+   580                                  ;***********************************************************************
+   581                                  ;variables
+   582                                  ;***********************************************************************
+   583 0000032C 00                      LBUTTON: db 0x00   ;  Left   button status 1=PRESSED 0=RELEASED
+   584 0000032D 00                      RBUTTON: db 0x00   ;  Right  button status 1=PRESSED 0=RELEASED
+   585 0000032E 00                      MBUTTON: db 0x00   ;  Middle button status 1=PRESSED 0=RELEASED
+   586 0000032F 00                      XCOORD:  db 0x00   ;  the moved distance (horizontal)
+   587 00000330 00                      YCOORD:  db 0x00   ;  the moved distance (vertical)
+   588 00000331 00                      XCOORDN: db 0x00   ;  Sign bit (positive/negative) of X Coord
+   589 00000332 00                      YCOORDN: db 0x00   ;  Sign bit (positive/negative) of Y Coord
+   590 00000333 00                      XFLOW:   db 0x00   ;  Overflow bit (Movement too fast) of X Coord
+   591 00000334 00                      YFLOW:   db 0x00   ;  Overflow bit (Movement too fast) of Y Coord
+   592                                  
+   593                                  ;************************************
+   594                                  ;* Some var's of my display function
+   595                                  ;************************************
+   596                                  
+   597 00000335 90<rep 3h>              align 4
+   598                                  
+   599 00000338 00000000                deel:    dd 0x0000
+   600 0000033C 00000000                varbuff: dd 0x0000
+   601                                  
+   602 00000340 00                      zerow:   db 0x00
+   603                                  
+   604 00000341 4C6566742062757474-     strlbt:  db "Left button:   ", 0x00
+   604 0000034A 6F6E3A20202000     
+   605 00000351 526967687420627574-     strrbt:  db "Right button:  ", 0x00
+   605 0000035A 746F6E3A202000     
+   606 00000361 4D6964646C65206275-     strmbt:  db "Middle button: ", 0x00
+   606 0000036A 74746F6E3A2000     
+   607 00000371 4D6F757365206D6F76-     strcdx:  db "Mouse moved (X): ", 0x00
+   607 0000037A 6564202858293A2000 
+   608 00000383 4D6F757365206D6F76-     strcdy:  db "Mouse moved (Y): ", 0x00
+   608 0000038C 6564202859293A2000 
+   609 00000395 5369676E202879293A-     signy:   db "Sign (y): " ,0x00
+   609 0000039E 2000               
+   610 000003A0 0D0A00                  stretr:  db 0x0D, 0x0A, 0x00
+   611 000003A3 2D00                    strneg:  db "-", 0x00
+   612 000003A5 2000                    strsp:   db " ", 0x00
+   613 000003A7 00                      row:     db 0x00
+   614 000003A8 00                      col:     db 0x00
+   615                                  
+   616 000003A9 90                      align 2
+   617                                  
+   618 000003AA 9F00                    xpos:    dw 0x9F
+   619 000003AC 6300                    ypos:    dw 0x63
+   620                                  
+   621                                  ;***********************************************************************
+   622                                  ; PS/2 mouse protocol (Standard PS/2 protocol)
+   623                                  ;***********************************************************************
+   624                                  ; ----------------------------------------------------------------------
+   625                                  ;
+   626                                  ; Data packet format: 
+   627                                  ; Data packet is 3 byte packet. 
+   628                                  ; It is send to the computer every time mouse state changes 
+   629                                  ; (mouse moves or keys are pressed/released). 
+   630                                  ; 
+   631                                  ;   Bit7 Bit6 Bit5 Bit4 Bit3 Bit2 Bit1 Bit0 
+   632                                  ; 
+   633                                  ; 1. YO   XO   YS   XS   1    MB   RB   LB 
+   634                                  ; 2. X7   X6   X5   X4   X3   X2   X1   X0
+   635                                  ; 3. Y7   Y6   Y5   Y4   Y3   Y2   Y1   Y0
+   636                                  ;
+   637                                  ; This means:
+   638                                  ; YO   :  Overflow bit for Y-coord (movement to fast)
+   639                                  ; XO   :  Overflow bit for X-coord (movement to fast) 
+   640                                  ; X0-X7:  byte of the x-coord 
+   641                                  ; Y0-Y7:  byte of the y-coord
+   642                                  ; LB   :  Left button pressed
+   643                                  ; RB   :  Right button pressed
+   644                                  ; MB   :  Middle button pressed
+   645                                  ;
+   646                                  ;*********************************************************************** 
+   647                                  ;If you want to use the scroll function u might look up the protocol at 
+   648                                  ;the company that made the mouse. 
+   649                                  ;(the packet format will then mostly be greater then 3)
+   650                                  ;***********************************************************************
+   651                                  
